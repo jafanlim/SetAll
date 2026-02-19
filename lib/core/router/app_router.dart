@@ -1,0 +1,185 @@
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../services/biometric_service.dart';
+import '../../features/auth/presentation/screens/biometric_gate_screen.dart';
+import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
+import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
+import '../../features/expenses/presentation/screens/add_expense_screen.dart';
+import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
+import '../../features/expenses/presentation/screens/group_picker_screen.dart';
+
+final class AppRouter {
+  AppRouter._();
+
+  static const String login = '/login';
+  static const String biometricGate = '/biometric-gate';
+  static const String dashboard = '/';
+  static const String addExpense = '/add-expense';
+  static const String editExpense = '/group/:id/expense/:expenseId';
+  static const String groupPicker = '/add-expense/choose-group';
+  static const String groupDetail = '/group/:id';
+
+  static GoRouter create() {
+    final bio = BiometricService.instance;
+    return GoRouter(
+      initialLocation: dashboard,
+      debugLogDiagnostics: true,
+      redirect: (context, state) async {
+        try {
+          final user = Supabase.instance.client.auth.currentUser;
+          final isLogin = state.matchedLocation == login;
+          final isBiometricGate = state.matchedLocation == biometricGate;
+          if (user == null && !isLogin) return login;
+          if (user != null && isLogin) {
+            final useBio = await bio.getUseBiometric();
+            if (useBio) return biometricGate;
+            return dashboard;
+          }
+          if (user != null && isBiometricGate) return null;
+          if (user != null) {
+            final useBio = await bio.getUseBiometric();
+            if (useBio) return biometricGate;
+          }
+        } catch (_) {}
+        return null;
+      },
+      refreshListenable: _AuthRefresh(),
+      errorBuilder: (context, state) => Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Page not found',
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  state.uri.toString(),
+                  style: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      routes: [
+        GoRoute(
+          path: login,
+          name: 'login',
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const LoginScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: biometricGate,
+          name: 'biometricGate',
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const BiometricGateScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: dashboard,
+          name: 'dashboard',
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const DashboardScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: groupPicker,
+          name: 'groupPicker',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const GroupPickerScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: addExpense,
+          name: 'addExpense',
+          pageBuilder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: AddExpenseScreen(
+                  groupId: extra?['groupId'] as String? ?? '',
+                  groupName: extra?['groupName'] as String? ?? 'Group',
+                ),
+              ),
+            );
+          },
+        ),
+        GoRoute(
+          path: '/group/:id',
+          name: 'groupDetail',
+          pageBuilder: (context, state) {
+            final id = state.pathParameters['id']!;
+            final extra = state.extra as Map<String, dynamic>?;
+            final name = extra?['groupName'] as String? ?? 'Group';
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: GroupDetailScreen(groupId: id, groupName: name),
+              ),
+            );
+          },
+          routes: [
+            GoRoute(
+              path: 'expense/:expenseId',
+              name: 'editExpense',
+              pageBuilder: (context, state) {
+                final groupId = state.pathParameters['id']!;
+                final expenseId = state.pathParameters['expenseId']!;
+                final extra = state.extra as Map<String, dynamic>?;
+                final groupName = extra?['groupName'] as String? ?? 'Group';
+                return MaterialPage(
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: EditExpenseScreen(
+                      expenseId: expenseId,
+                      groupId: groupId,
+                      groupName: groupName,
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+/// Notifies when Supabase auth state changes so the router can redirect.
+class _AuthRefresh extends ChangeNotifier {
+  _AuthRefresh() {
+    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+      notifyListeners();
+    });
+  }
+}
