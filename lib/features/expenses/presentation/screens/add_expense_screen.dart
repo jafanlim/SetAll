@@ -710,6 +710,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
                         style: TextStyle(fontSize: 13.sp),
+                        onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: _splitMode == _SplitMode.percentage
                               ? '%'
@@ -731,6 +732,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
               );
             }),
+            // Percentage sum indicator
+            if (_splitMode == _SplitMode.percentage) ...[
+              SizedBox(height: 8.h),
+              _PercentageSumIndicator(controllers: _customCtrl),
+            ],
+            // Manual amount sum indicator
+            if (_splitMode == _SplitMode.manual) ...[
+              SizedBox(height: 8.h),
+              _ManualSumIndicator(
+                controllers: _customCtrl,
+                total: Decimal.tryParse(
+                      _amountCtrl.text.trim().replaceAll(',', '.'),
+                    ) ??
+                    Decimal.zero,
+                currency: _currency,
+              ),
+            ],
           ] else ...[
             SizedBox(height: 14.h),
             Container(
@@ -1079,6 +1097,115 @@ class _RateDisplayRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Split sum indicators
+// ---------------------------------------------------------------------------
+
+class _PercentageSumIndicator extends StatelessWidget {
+  const _PercentageSumIndicator({required this.controllers});
+  final List<TextEditingController> controllers;
+
+  @override
+  Widget build(BuildContext context) {
+    final sum = controllers.fold<Decimal>(
+      Decimal.zero,
+      (acc, c) => acc + (Decimal.tryParse(c.text.trim()) ?? Decimal.zero),
+    );
+    final isExact = sum == Decimal.fromInt(100);
+    final diff = (Decimal.fromInt(100) - sum).abs();
+    final color = isExact ? _teal : _orange;
+    final label = isExact
+        ? 'Sum: 100% — ready to split'
+        : sum < Decimal.fromInt(100)
+            ? 'Sum: $sum% — needs $diff% more'
+            : 'Sum: $sum% — $diff% over budget';
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExact ? Icons.check_circle_outline : Icons.warning_amber_outlined,
+            color: color,
+            size: 13.sp,
+          ),
+          SizedBox(width: 6.w),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualSumIndicator extends StatelessWidget {
+  const _ManualSumIndicator({
+    required this.controllers,
+    required this.total,
+    required this.currency,
+  });
+
+  final List<TextEditingController> controllers;
+  final Decimal total;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final sum = controllers.fold<Decimal>(
+      Decimal.zero,
+      (acc, c) => acc +
+          (Decimal.tryParse(c.text.trim().replaceAll(',', '.')) ?? Decimal.zero),
+    );
+    final isExact = total > Decimal.zero && sum == total;
+    final color = isExact ? _teal : _orange;
+    final label = total == Decimal.zero
+        ? 'Enter total amount first'
+        : isExact
+            ? 'Sum: $currency $sum — matches total'
+            : sum < total
+                ? 'Sum: $currency $sum — ${total - sum} remaining'
+                : 'Sum: $currency $sum — ${sum - total} over total';
+
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            isExact ? Icons.check_circle_outline : Icons.info_outline,
+            color: color,
+            size: 13.sp,
+          ),
+          SizedBox(width: 6.w),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 11.sp,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

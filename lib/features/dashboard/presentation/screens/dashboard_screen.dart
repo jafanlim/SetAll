@@ -5,7 +5,6 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../core/layout/adaptive_shell.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/router/app_router.dart';
@@ -99,8 +98,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final width = MediaQuery.sizeOf(context).width;
-    final useRail = width >= kAdaptiveBreakpoint;
 
     final summaryAsync = ref.watch(balanceSummaryProvider);
     final groupsAsync = ref.watch(myGroupsProvider);
@@ -275,33 +272,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ],
       ),
-      body: useRail
-          ? Row(
-              children: [
-                NavigationRail(
-                  selectedIndex: 0,
-                  onDestinationSelected: (_) {},
-                  labelType: NavigationRailLabelType.all,
-                  indicatorColor: _tealDim,
-                  selectedIconTheme: const IconThemeData(color: _teal),
-                  destinations: const [
-                    NavigationRailDestination(
-                      icon: Icon(Icons.dashboard_outlined),
-                      selectedIcon: Icon(Icons.dashboard),
-                      label: Text('Dashboard'),
-                    ),
-                    NavigationRailDestination(
-                      icon: Icon(Icons.group_outlined),
-                      selectedIcon: Icon(Icons.group),
-                      label: Text('Groups'),
-                    ),
-                  ],
-                ),
-                const VerticalDivider(width: 1),
-                Expanded(child: body),
-              ],
-            )
-          : body,
+      body: body,
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticUtils.primaryTap();
