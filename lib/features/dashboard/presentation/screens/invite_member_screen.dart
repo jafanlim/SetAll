@@ -6,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../widgets/add_person_modal.dart';
 
 const _teal = Color(0xFF00D9B0);
+const _tealDim = Color(0x2600D9B0);
+const _orange = Color(0xFFFF8C42);
 
 class InviteMemberScreen extends ConsumerStatefulWidget {
   const InviteMemberScreen({
@@ -24,60 +27,29 @@ class InviteMemberScreen extends ConsumerStatefulWidget {
 }
 
 class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
-  final _emailCtrl = TextEditingController();
-  bool _loading = false;
-  String? _error;
-  bool _success = false;
+  // Holds the last result to show a summary before popping
+  AddPersonResult? _lastResult;
 
-  @override
-  void dispose() {
-    _emailCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _sendInvite() async {
-    final email = _emailCtrl.text.trim().toLowerCase();
-    if (email.isEmpty) {
-      setState(() => _error = 'Enter an email address');
-      return;
-    }
-    if (!email.contains('@')) {
-      setState(() => _error = 'Enter a valid email address');
-      return;
-    }
-
-    setState(() { _loading = true; _error = null; _success = false; });
+  Future<void> _openAddPersonModal() async {
     HapticUtils.primaryTap();
+    final result = await showAddPersonModal(
+      context,
+      groupId: widget.groupId,
+      groupName: widget.groupName,
+    );
+    if (result == null || !mounted) return;
 
-    try {
-      final repo = ref.read(setAllRepositoryProvider);
-      await repo.addMemberByEmail(widget.groupId, email, groupName: widget.groupName);
-      if (!mounted) return;
-      HapticUtils.success();
-      setState(() { _success = true; _emailCtrl.clear(); });
-      // Invalidate members so GroupDetailScreen refreshes on pop.
-      ref.invalidate(groupMembersProvider(widget.groupId));
-    } catch (e) {
-      if (!mounted) return;
-      HapticUtils.lightTap();
-      final msg = e.toString().toLowerCase();
-      if (msg.contains('user_not_found') || msg.contains('not found')) {
-        setState(() => _error =
-            'No SetAll account found for that email.\n'
-            'They can sign up at setall.app and you can add them afterwards.');
-      } else if (msg.contains('already') || msg.contains('duplicate')) {
-        setState(() => _error = 'That person is already a member of this group.');
-      } else {
-        setState(() => _error = 'Could not send invite. Check your connection and try again.');
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
+    setState(() => _lastResult = result);
+
+    // Refresh the group members list in the parent screen.
+    ref.invalidate(groupMembersProvider(widget.groupId));
+    ref.invalidate(balanceSummaryProvider);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -99,16 +71,16 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
       body: ListView(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         children: [
-          // ── Context card ────────────────────────────────────────────────
+          // ── Group context card ─────────────────────────────────────────
           GlassCard(
             padding: EdgeInsets.all(16.w),
             child: Row(
               children: [
                 Container(
-                  width: 40.w,
-                  height: 40.w,
+                  width: 44.w,
+                  height: 44.w,
                   decoration: BoxDecoration(
-                    color: const Color(0x2600D9B0),
+                    color: _tealDim,
                     borderRadius: BorderRadius.circular(12.r),
                   ),
                   child: Center(
@@ -137,7 +109,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                         ),
                       ),
                       Text(
-                        'Invite by email',
+                        'Add members to this group',
                         style: TextStyle(
                           fontSize: 11.sp,
                           color: theme.colorScheme.onSurfaceVariant,
@@ -149,129 +121,171 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
               ],
             ),
           ),
-          SizedBox(height: 20.h),
-
-          // ── Email field ─────────────────────────────────────────────────
-          Text(
-            'Email address',
-            style: TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13.sp,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          SizedBox(height: 8.h),
-          TextField(
-            controller: _emailCtrl,
-            autofocus: true,
-            keyboardType: TextInputType.emailAddress,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _sendInvite(),
-            decoration: InputDecoration(
-              hintText: 'member@example.com',
-              prefixIcon: const Icon(Icons.email_outlined),
-            ),
-          ),
-          SizedBox(height: 8.h),
-
-          // ── Error / Success feedback ─────────────────────────────────────
-          if (_error != null)
-            Padding(
-              padding: EdgeInsets.only(top: 4.h, bottom: 4.h),
-              child: GlassCard(
-                padding: EdgeInsets.all(12.w),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Icon(Icons.info_outline,
-                        color: theme.colorScheme.error, size: 16.sp),
-                    SizedBox(width: 8.w),
-                    Expanded(
-                      child: Text(
-                        _error!,
-                        style: TextStyle(
-                          color: theme.colorScheme.error,
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-          if (_success)
-            Padding(
-              padding: EdgeInsets.only(top: 4.h, bottom: 4.h),
-              child: GlassCard(
-                padding: EdgeInsets.all(12.w),
-                child: Row(
-                  children: [
-                    Icon(Icons.check_circle_outline,
-                        color: _teal, size: 16.sp),
-                    SizedBox(width: 8.w),
-                    Text(
-                      'Member added successfully!',
-                      style: TextStyle(
-                        color: _teal,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12.sp,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
 
           SizedBox(height: 20.h),
 
-          // ── CTA ─────────────────────────────────────────────────────────
+          // ── Add Person CTA ────────────────────────────────────────────
           SizedBox(
             width: double.infinity,
             child: ElevatedButton.icon(
-              onPressed: _loading ? null : _sendInvite,
-              icon: _loading
-                  ? SizedBox(
-                      height: 16.h,
-                      width: 16.w,
-                      child: const CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.send_outlined),
+              onPressed: _openAddPersonModal,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.black,
+                padding: EdgeInsets.symmetric(vertical: 14.h),
+              ),
+              icon: const Icon(Icons.person_search_outlined),
               label: Text(
-                'Send invite',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.sp,
-                ),
+                'Search & Add Person',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
               ),
             ),
           ),
-          SizedBox(height: 16.h),
 
-          // ── Info note ───────────────────────────────────────────────────
-          Row(
+          SizedBox(height: 24.h),
+
+          // ── Last result feedback ───────────────────────────────────────
+          if (_lastResult != null) _LastResultCard(result: _lastResult!),
+
+          SizedBox(height: 24.h),
+
+          // ── Info section ──────────────────────────────────────────────
+          GlassCard(
+            padding: EdgeInsets.all(16.w),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _InfoRow(
+                  icon: Icons.search,
+                  color: _teal,
+                  title: 'Find by name, @nickname, or email',
+                  body: 'Search instantly searches all SetAll users.',
+                ),
+                SizedBox(height: 12.h),
+                _InfoRow(
+                  icon: Icons.send_outlined,
+                  color: _orange,
+                  title: 'Ghost Invite',
+                  body:
+                      'If someone isn\'t on SetAll yet, enter their email to add '
+                      'them as a placeholder. Their debts are tracked immediately '
+                      'and automatically claimed when they sign up.',
+                ),
+                SizedBox(height: 12.h),
+                _InfoRow(
+                  icon: Icons.lock_outline,
+                  color: theme.colorScheme.onSurfaceVariant,
+                  title: 'Privacy',
+                  body: 'Members can see all expenses in this group.',
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Last result feedback card
+// ---------------------------------------------------------------------------
+class _LastResultCard extends StatelessWidget {
+  const _LastResultCard({required this.result});
+  final AddPersonResult result;
+
+  @override
+  Widget build(BuildContext context) {
+    final isGhost = result is AddPersonResultGhost;
+    final color = isGhost ? _orange : _teal;
+    final icon =
+        isGhost ? Icons.send_outlined : Icons.check_circle_outline;
+    final title = isGhost
+        ? 'Ghost invite sent to ${(result as AddPersonResultGhost).email}'
+        : '${(result as AddPersonResultReal).profile.name} added!';
+
+    return GlassCard(
+      padding: EdgeInsets.all(12.w),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18.sp),
+          SizedBox(width: 10.w),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 13.sp,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => (context as Element).markNeedsBuild(),
+            child: Text(
+              'Add another',
+              style: TextStyle(color: color, fontSize: 12.sp),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Info row helper
+// ---------------------------------------------------------------------------
+class _InfoRow extends StatelessWidget {
+  const _InfoRow({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.body,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String body;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: EdgeInsets.all(6.w),
+          decoration: BoxDecoration(
+            color: color.withAlpha(40),
+            borderRadius: BorderRadius.circular(6.r),
+          ),
+          child: Icon(icon, color: color, size: 14.sp),
+        ),
+        SizedBox(width: 10.w),
+        Expanded(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                Icons.lock_outline,
-                size: 13.sp,
-                color: theme.colorScheme.onSurfaceVariant,
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.sp,
+                ),
               ),
-              SizedBox(width: 6.w),
-              Expanded(
-                child: Text(
-                  'The person must have a SetAll account. Once added, they can '
-                  'see all expenses in this group.',
-                  style: TextStyle(
-                    fontSize: 11.sp,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
+              Text(
+                body,
+                style: TextStyle(
+                  fontSize: 11.sp,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.4,
                 ),
               ),
             ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

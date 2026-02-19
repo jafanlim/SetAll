@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -209,10 +210,10 @@ class _GroupBalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final owed = double.tryParse(summary.youAreOwed) ?? 0;
-    final owe = double.tryParse(summary.youOwe) ?? 0;
+    final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
+    final owe = Decimal.tryParse(summary.youOwe) ?? Decimal.zero;
 
-    if (owed == 0 && owe == 0) {
+    if (owed == Decimal.zero && owe == Decimal.zero) {
       return GlassCard(
         padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
         child: Row(
@@ -236,7 +237,7 @@ class _GroupBalanceCard extends StatelessWidget {
       padding: EdgeInsets.all(16.w),
       child: Row(
         children: [
-          if (owed > 0)
+          if (owed > Decimal.zero)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,7 +260,7 @@ class _GroupBalanceCard extends StatelessWidget {
                 ],
               ),
             ),
-          if (owe > 0)
+          if (owe > Decimal.zero)
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

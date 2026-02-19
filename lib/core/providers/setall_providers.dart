@@ -10,6 +10,39 @@ import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
 
+// Supported currencies with display names and emoji flags.
+// "Most used" group shown first in pickers.
+const List<Map<String, String>> kMostUsedCurrencies = [
+  {'code': 'USD', 'name': 'US Dollar',        'flag': '🇺🇸'},
+  {'code': 'EUR', 'name': 'Euro',              'flag': '🇪🇺'},
+  {'code': 'GBP', 'name': 'British Pound',     'flag': '🇬🇧'},
+  {'code': 'GEL', 'name': 'Georgian Lari',     'flag': '🇬🇪'},
+  {'code': 'AED', 'name': 'UAE Dirham',        'flag': '🇦🇪'},
+];
+
+const List<Map<String, String>> kAllSupportedCurrencies = [
+  {'code': 'USD', 'name': 'US Dollar',        'flag': '🇺🇸'},
+  {'code': 'EUR', 'name': 'Euro',              'flag': '🇪🇺'},
+  {'code': 'GBP', 'name': 'British Pound',     'flag': '🇬🇧'},
+  {'code': 'GEL', 'name': 'Georgian Lari',     'flag': '🇬🇪'},
+  {'code': 'AED', 'name': 'UAE Dirham',        'flag': '🇦🇪'},
+  {'code': 'TRY', 'name': 'Turkish Lira',      'flag': '🇹🇷'},
+  {'code': 'PLN', 'name': 'Polish Złoty',      'flag': '🇵🇱'},
+  {'code': 'CAD', 'name': 'Canadian Dollar',   'flag': '🇨🇦'},
+  {'code': 'AUD', 'name': 'Australian Dollar', 'flag': '🇦🇺'},
+  {'code': 'CHF', 'name': 'Swiss Franc',       'flag': '🇨🇭'},
+  {'code': 'JPY', 'name': 'Japanese Yen',      'flag': '🇯🇵'},
+  {'code': 'CNY', 'name': 'Chinese Yuan',      'flag': '🇨🇳'},
+  {'code': 'INR', 'name': 'Indian Rupee',      'flag': '🇮🇳'},
+  {'code': 'BRL', 'name': 'Brazilian Real',    'flag': '🇧🇷'},
+  {'code': 'MXN', 'name': 'Mexican Peso',      'flag': '🇲🇽'},
+  {'code': 'SEK', 'name': 'Swedish Krona',     'flag': '🇸🇪'},
+  {'code': 'NOK', 'name': 'Norwegian Krone',   'flag': '🇳🇴'},
+  {'code': 'DKK', 'name': 'Danish Krone',      'flag': '🇩🇰'},
+  {'code': 'SGD', 'name': 'Singapore Dollar',  'flag': '🇸🇬'},
+  {'code': 'HKD', 'name': 'Hong Kong Dollar',  'flag': '🇭🇰'},
+];
+
 // ---------------------------------------------------------------------------
 // Infrastructure providers
 // ---------------------------------------------------------------------------
@@ -100,9 +133,13 @@ final groupMembersProvider =
 // Debt simplification
 // ---------------------------------------------------------------------------
 
+/// Simplified debts for a group, amounts expressed in the user's base currency.
 final simplifiedDebtsProvider =
     FutureProvider.family<List<SimplifiedDebt>, String>((ref, groupId) async {
-  return ref.watch(setAllRepositoryProvider).getSimplifiedDebts(groupId);
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  return ref
+      .watch(setAllRepositoryProvider)
+      .getSimplifiedDebts(groupId, baseCurrency: baseCurrency);
 });
 
 // ---------------------------------------------------------------------------
@@ -131,4 +168,25 @@ final rateToBaseProvider =
   final svc = ref.watch(currencyServiceProvider);
   final rate = await svc.getRate(params.from, params.base);
   return rate.toStringAsFixed(6);
+});
+
+// ---------------------------------------------------------------------------
+// Profile
+// ---------------------------------------------------------------------------
+
+/// Current user's full profile (includes nickname, avatarUrl, isGhost).
+final currentProfileProvider = FutureProvider<ProfileModel?>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getCurrentUserProfile();
+});
+
+// ---------------------------------------------------------------------------
+// User search
+// ---------------------------------------------------------------------------
+
+/// Real-time user search by email or nickname. Pass the search query string.
+/// Returns empty list for queries shorter than 2 characters.
+final searchUsersProvider =
+    FutureProvider.family<List<ProfileModel>, String>((ref, query) async {
+  if (query.trim().length < 2) return [];
+  return ref.watch(setAllRepositoryProvider).searchUsers(query);
 });

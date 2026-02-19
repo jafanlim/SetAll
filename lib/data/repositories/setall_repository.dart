@@ -139,6 +139,8 @@ class SetAllRepository {
   Future<ProfileModel?> getCurrentUserProfile() async {
     final uid = await ensureUser();
     if (uid == null) return null;
+
+    // Web: always use Supabase.
     if (_isWeb && _client != null) {
       final res = await _client
           .from('profiles')
@@ -146,25 +148,123 @@ class SetAllRepository {
           .eq('id', uid)
           .maybeSingle();
       if (res == null) return null;
-      final r = res;
-      return ProfileModel(
-        id: r['id'] as String,
-        name: r['name'] as String,
-        defaultCurrency: (r['default_currency'] as String?) ?? 'USD',
-      );
+      return ProfileModel.fromJson(res);
     }
+
+    // Mobile: prefer Supabase when online so we always get the freshest data
+    // (name, nickname, avatar_url, default_currency) and cache it locally.
+    if (_client != null && await _isOnline) {
+      try {
+        final res = await _client
+            .from('profiles')
+            .select()
+            .eq('id', uid)
+            .maybeSingle();
+        if (res != null) {
+          await _upsertProfileToSQLite(res);
+          return ProfileModel.fromJson(res);
+        }
+      } catch (_) {}
+    }
+
+    // Offline fallback: SQLite cache.
     final rows = await LocalDatabase.db.query(
       'profiles',
       where: 'id = ?',
       whereArgs: [uid],
     );
     if (rows.isEmpty) return null;
-    final r = rows.first;
-    return ProfileModel(
-      id: r['id'] as String,
-      name: r['name'] as String,
-      defaultCurrency: (r['default_currency'] as String?) ?? 'USD',
+    return ProfileModel.fromJson(rows.first);
+  }
+
+  /// Upsert a Supabase profiles row into local SQLite, normalising bool→int.
+  Future<void> _upsertProfileToSQLite(Map<String, dynamic> p) async {
+    await LocalDatabase.db.insert(
+      'profiles',
+      {
+        'id': p['id'],
+        'name': p['name'] ?? '',
+        'nickname': p['nickname'],
+        'avatar_url': p['avatar_url'],
+        'is_ghost': (p['is_ghost'] == true) ? 1 : 0,
+        'default_currency': p['default_currency'] ?? 'USD',
+        'synced_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
     );
+  }
+
+  /// Update the current user's profile fields (name, nickname, avatarUrl,
+  /// defaultCurrency). Only non-null values are written.
+  Future<void> updateProfile({
+    String? name,
+    String? nickname,
+    String? avatarUrl,
+    String? defaultCurrency,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return;
+
+    final updates = <String, dynamic>{};
+    if (name != null) updates['name'] = name.trim();
+    if (nickname != null) {
+      updates['nickname'] = nickname.trim().isEmpty ? null : nickname.trim();
+    }
+    if (avatarUrl != null) updates['avatar_url'] = avatarUrl;
+    if (defaultCurrency != null) updates['default_currency'] = defaultCurrency;
+    if (updates.isEmpty) return;
+
+    if (_isWeb && _client != null) {
+      await _client.from('profiles').update(updates).eq('id', uid);
+      return;
+    }
+
+    // Local DB (column additions require schema v6 — see local_database.dart)
+    await LocalDatabase.db.update(
+      'profiles',
+      updates,
+      where: 'id = ?',
+      whereArgs: [uid],
+    );
+    // Mirror to Supabase when online
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('profiles').update(updates).eq('id', uid);
+      } catch (_) {}
+    }
+  }
+
+  /// Search profiles by name, nickname, or email (via Supabase RPC).
+  /// Returns an empty list when offline or Supabase is not configured.
+  Future<List<ProfileModel>> searchUsers(String query) async {
+    if (query.trim().length < 2) return [];
+    if (_client == null) return [];
+    try {
+      final rows = await _client.rpc('search_profiles', params: {'p_query': query.trim()}) as List;
+      return rows
+          .map((r) => ProfileModel.fromJson(r as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Add a ghost member to a group when the email is not found in Supabase.
+  /// Creates a pending invite and a synthetic profile row so the ghost user
+  /// can participate in debt simplification immediately.
+  /// Returns the ghost user's UUID, or null if offline / not configured.
+  Future<String?> addGhostMember(String groupId, String email) async {
+    if (_client == null) return null;
+    try {
+      final result = await _client.rpc('add_ghost_member', params: {
+        'p_group_id': groupId,
+        'p_email': email.trim().toLowerCase(),
+        'p_invited_by': currentUserId,
+      });
+      return result as String?;
+    } catch (_) {
+      return null;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -637,6 +737,64 @@ class SetAllRepository {
     }
   }
 
+  /// Create (or return an existing) 1-on-1 "direct" group with [otherUserId].
+  /// Uses the [create_direct_group_by_id] SECURITY DEFINER RPC so no email
+  /// look-up is needed — only the profile UUID from the search results.
+  Future<GroupModel?> createDirectGroupById(String otherUserId) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
+    if (_client == null) return null;
+    try {
+      final groupId = await _client.rpc(
+        'create_direct_group_by_id',
+        params: {'p_other_id': otherUserId},
+      ) as String?;
+      if (groupId == null) return null;
+
+      final rows = await _client
+          .from('groups')
+          .select()
+          .eq('id', groupId)
+          .limit(1) as List;
+      if (rows.isEmpty) return null;
+      final group = _rowToGroup(rows.first as Map<String, dynamic>);
+      final now   = _now();
+
+      if (!_isWeb) {
+        await LocalDatabase.db.insert(
+          'groups',
+          {
+            'id': group.id,
+            'name': group.name,
+            'creator_id': group.creatorId,
+            'type': group.type.name,
+            'created_at': now,
+            'updated_at': now,
+            'synced_at': DateTime.now().millisecondsSinceEpoch,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        await LocalDatabase.db.insert(
+          'group_members',
+          {'group_id': group.id, 'user_id': uid, 'joined_at': now, 'synced_at': null},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        await LocalDatabase.db.insert(
+          'group_members',
+          {'group_id': group.id, 'user_id': otherUserId, 'joined_at': now, 'synced_at': null},
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+      }
+      return group;
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('cannot_add_self')) {
+        throw Exception('You cannot add yourself as a friend.');
+      }
+      rethrow;
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Members
   // ---------------------------------------------------------------------------
@@ -674,23 +832,42 @@ class SetAllRepository {
     final userIds =
         rows.map((r) => r['user_id'] as String).toSet().toList();
     if (userIds.isEmpty) return [];
+
+    // Find which user IDs are missing from local profiles table.
     final profileRows = await LocalDatabase.db.query(
       'profiles',
       where: 'id IN (${userIds.map((_) => '?').join(',')})',
       whereArgs: userIds,
     );
+    final cachedIds = profileRows.map((r) => r['id'] as String).toSet();
+    final missingIds = userIds.where((id) => !cachedIds.contains(id)).toList();
+
+    // Pull missing profiles from Supabase and cache them.
+    if (missingIds.isNotEmpty && _client != null && await _isOnline) {
+      try {
+        final fetched = await _client
+            .from('profiles')
+            .select()
+            .inFilter('id', missingIds) as List;
+        for (final p in fetched) {
+          await _upsertProfileToSQLite(p as Map<String, dynamic>);
+        }
+        // Re-query so we include the newly cached rows.
+        final refreshed = await LocalDatabase.db.query(
+          'profiles',
+          where: 'id IN (${userIds.map((_) => '?').join(',')})',
+          whereArgs: userIds,
+        );
+        return refreshed.map((r) => ProfileModel.fromJson(r)).toList();
+      } catch (_) {}
+    }
+
     if (profileRows.isEmpty) {
       return userIds
           .map((id) => ProfileModel(id: id, name: 'Member', defaultCurrency: 'USD'))
           .toList();
     }
-    return profileRows
-        .map((r) => ProfileModel(
-              id: r['id'] as String,
-              name: r['name'] as String,
-              defaultCurrency: (r['default_currency'] as String?) ?? 'USD',
-            ))
-        .toList();
+    return profileRows.map((r) => ProfileModel.fromJson(r)).toList();
   }
 
   Future<void> addMemberByEmail(
@@ -713,6 +890,59 @@ class SetAllRepository {
           });
         } catch (_) {}
       }
+    }
+  }
+
+  /// Add an existing (registered) user to a group by their profile UUID.
+  /// Calls the [add_member_by_id] SECURITY DEFINER RPC, then mirrors the row
+  /// into local SQLite so [getGroupMembers] reflects the change immediately
+  /// without requiring a full sync round-trip.
+  Future<void> addMemberById(String groupId, String userId) async {
+    if (_client == null || !await _isOnline) {
+      throw Exception('Internet connection required to add member.');
+    }
+    await _client.rpc('add_member_by_id', params: {
+      'p_group_id': groupId,
+      'p_user_id': userId,
+    });
+
+    // Mirror to local SQLite so the member appears immediately on mobile.
+    if (!_isWeb) {
+      final now = _now();
+      await LocalDatabase.db.insert(
+        'group_members',
+        {
+          'group_id': groupId,
+          'user_id': userId,
+          'joined_at': now,
+          'synced_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      // Also pull the new member's profile into local profiles table.
+      try {
+        final profileRows = await _client
+            .from('profiles')
+            .select()
+            .eq('id', userId)
+            .limit(1) as List;
+        if (profileRows.isNotEmpty) {
+          final p = profileRows.first as Map<String, dynamic>;
+          await LocalDatabase.db.insert(
+            'profiles',
+            {
+              'id': p['id'],
+              'name': p['name'] ?? '',
+              'nickname': p['nickname'],
+              'avatar_url': p['avatar_url'],
+              'default_currency': p['default_currency'] ?? 'USD',
+              'is_ghost': (p['is_ghost'] == true) ? 1 : 0,
+              'synced_at': DateTime.now().millisecondsSinceEpoch,
+            },
+            conflictAlgorithm: ConflictAlgorithm.replace,
+          );
+        }
+      } catch (_) {}
     }
   }
 
@@ -1180,7 +1410,16 @@ class SetAllRepository {
   // Simplified debts
   // ---------------------------------------------------------------------------
 
-  Future<List<SimplifiedDebt>> getSimplifiedDebts(String groupId) async {
+  /// Returns simplified debts for a group.
+  ///
+  /// [baseCurrency] should be the user's base currency (e.g. from
+  /// [BalanceService.getBaseCurrency]). Amounts are normalised to base currency
+  /// via [base_amount_at_entry] (schema v4+). The returned [SimplifiedDebt.currency]
+  /// is [baseCurrency] so the UI can show a consistent denomination.
+  Future<List<SimplifiedDebt>> getSimplifiedDebts(
+    String groupId, {
+    String baseCurrency = 'USD',
+  }) async {
     if (_isWeb && _client != null) {
       final expenseRows = await _client
           .from('expenses')
@@ -1193,12 +1432,9 @@ class SetAllRepository {
           .from('splits')
           .select()
           .inFilter('expense_id', expenseIds) as List;
-      final currency =
-          ((expenseRows.first as Map<String, dynamic>)['currency'] as String?) ??
-              'USD';
       return DebtSimplificationEngine.simplify(
         groupId: groupId,
-        currency: currency,
+        currency: baseCurrency,
         expenses: expenseRows.cast<Map<String, dynamic>>(),
         splits: splitRows.cast<Map<String, dynamic>>(),
       );
@@ -1216,10 +1452,9 @@ class SetAllRepository {
       where: 'expense_id IN ($placeholders)',
       whereArgs: expenseIds,
     );
-    final currency = (expenseRows.first['currency'] as String?) ?? 'USD';
     return DebtSimplificationEngine.simplify(
       groupId: groupId,
-      currency: currency,
+      currency: baseCurrency,
       expenses: expenseRows,
       splits: splitRows,
     );
@@ -1269,8 +1504,10 @@ class SetAllRepository {
           .from('group_members')
           .select()
           .inFilter('group_id', memberIds.toList());
+      final allMemberUserIds = <String>{uid};
       for (final m in gMembers as List) {
         final map = m as Map<String, dynamic>;
+        allMemberUserIds.add(map['user_id'] as String);
         await LocalDatabase.db.insert(
           'group_members',
           {
@@ -1282,6 +1519,18 @@ class SetAllRepository {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
+
+      // Sync all member profiles (including current user) so local SQLite
+      // always has fresh name / nickname / avatar_url / default_currency.
+      try {
+        final profileRows = await _client
+            .from('profiles')
+            .select()
+            .inFilter('id', allMemberUserIds.toList()) as List;
+        for (final p in profileRows) {
+          await _upsertProfileToSQLite(p as Map<String, dynamic>);
+        }
+      } catch (_) {}
 
       final expenses =
           await _client.from('expenses').select().inFilter('group_id', memberIds.toList());

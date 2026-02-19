@@ -9,7 +9,8 @@ import '../router/app_router.dart';
 const double kAdaptiveBreakpoint = 600;
 
 /// Adaptive shell: Bottom Nav on mobile (<600dp), Side Rail on tablet (>=600dp).
-/// Tabs: Dashboard (0), Friends (1), Groups (2 — navigates to dashboard).
+/// Tabs: Dashboard (0), Friends (1), Groups (2).
+/// Settings is accessed via the toolbar icon on the Dashboard.
 class AdaptiveShell extends ConsumerStatefulWidget {
   const AdaptiveShell({
     super.key,
@@ -35,22 +36,22 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
 
   int _indexForPath(String path) {
     if (path.startsWith('/friends')) return 1;
-    if (path.startsWith('/group/') && !path.contains('/expense/') && !path.contains('/invite')) {
-      return 2;
-    }
+    if (path.startsWith('/groups')) return 2;
     return 0;
   }
 
   void _onTap(int index) {
     HapticUtils.selection();
-    setState(() => _selectedIndex = index);
     switch (index) {
       case 0:
+        setState(() => _selectedIndex = 0);
         context.go(AppRouter.dashboard);
       case 1:
+        setState(() => _selectedIndex = 1);
         context.go(AppRouter.friends);
       case 2:
-        context.go(AppRouter.dashboard);
+        setState(() => _selectedIndex = 2);
+        context.go(AppRouter.groups);
     }
   }
 
@@ -63,9 +64,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       body: Row(
         children: [
           if (useRail) _buildRail(context),
-          Expanded(
-            child: widget.child,
-          ),
+          Expanded(child: widget.child),
         ],
       ),
       bottomNavigationBar: useRail ? null : _buildBottomNav(context),

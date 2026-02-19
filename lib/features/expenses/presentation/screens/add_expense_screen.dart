@@ -1,5 +1,6 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -12,43 +13,58 @@ import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
 // ---------------------------------------------------------------------------
-// Currency catalogue (ISO 4217 top-30 by trading volume/prevalence)
+// Currency catalogue — "Most Used" first, then alphabetical remainder
 // ---------------------------------------------------------------------------
 const List<Map<String, String>> kCurrencyList = [
+  // ── Most used (shown first in picker) ──
   {'code': 'USD', 'name': 'US Dollar',           'flag': '🇺🇸'},
-  {'code': 'EUR', 'name': 'Euro',                 'flag': '🇪🇺'},
-  {'code': 'GBP', 'name': 'British Pound',        'flag': '🇬🇧'},
-  {'code': 'JPY', 'name': 'Japanese Yen',         'flag': '🇯🇵'},
-  {'code': 'AUD', 'name': 'Australian Dollar',    'flag': '🇦🇺'},
-  {'code': 'CAD', 'name': 'Canadian Dollar',      'flag': '🇨🇦'},
-  {'code': 'CHF', 'name': 'Swiss Franc',          'flag': '🇨🇭'},
-  {'code': 'CNY', 'name': 'Chinese Yuan',         'flag': '🇨🇳'},
-  {'code': 'HKD', 'name': 'Hong Kong Dollar',     'flag': '🇭🇰'},
-  {'code': 'NZD', 'name': 'New Zealand Dollar',   'flag': '🇳🇿'},
-  {'code': 'SEK', 'name': 'Swedish Krona',        'flag': '🇸🇪'},
-  {'code': 'KRW', 'name': 'South Korean Won',     'flag': '🇰🇷'},
-  {'code': 'SGD', 'name': 'Singapore Dollar',     'flag': '🇸🇬'},
-  {'code': 'NOK', 'name': 'Norwegian Krone',      'flag': '🇳🇴'},
-  {'code': 'MXN', 'name': 'Mexican Peso',         'flag': '🇲🇽'},
-  {'code': 'INR', 'name': 'Indian Rupee',         'flag': '🇮🇳'},
-  {'code': 'RUB', 'name': 'Russian Ruble',        'flag': '🇷🇺'},
-  {'code': 'ZAR', 'name': 'South African Rand',   'flag': '🇿🇦'},
-  {'code': 'TRY', 'name': 'Turkish Lira',         'flag': '🇹🇷'},
-  {'code': 'BRL', 'name': 'Brazilian Real',       'flag': '🇧🇷'},
-  {'code': 'THB', 'name': 'Thai Baht',            'flag': '🇹🇭'},
-  {'code': 'DKK', 'name': 'Danish Krone',         'flag': '🇩🇰'},
-  {'code': 'PLN', 'name': 'Polish Zloty',         'flag': '🇵🇱'},
-  {'code': 'TWD', 'name': 'Taiwan Dollar',        'flag': '🇹🇼'},
-  {'code': 'CZK', 'name': 'Czech Koruna',         'flag': '🇨🇿'},
-  {'code': 'HUF', 'name': 'Hungarian Forint',     'flag': '🇭🇺'},
-  {'code': 'ILS', 'name': 'Israeli Shekel',       'flag': '🇮🇱'},
-  {'code': 'MYR', 'name': 'Malaysian Ringgit',    'flag': '🇲🇾'},
-  {'code': 'PHP', 'name': 'Philippine Peso',      'flag': '🇵🇭'},
-  {'code': 'AED', 'name': 'UAE Dirham',           'flag': '🇦🇪'},
+  {'code': 'EUR', 'name': 'Euro',                'flag': '🇪🇺'},
+  {'code': 'GBP', 'name': 'British Pound',       'flag': '🇬🇧'},
+  {'code': 'GEL', 'name': 'Georgian Lari',       'flag': '🇬🇪'},
+  {'code': 'AED', 'name': 'UAE Dirham',          'flag': '🇦🇪'},
+  {'code': 'TRY', 'name': 'Turkish Lira',        'flag': '🇹🇷'},
+  {'code': 'PLN', 'name': 'Polish Złoty',        'flag': '🇵🇱'},
+  // ── Extended list ──
+  {'code': 'AUD', 'name': 'Australian Dollar',   'flag': '🇦🇺'},
+  {'code': 'BRL', 'name': 'Brazilian Real',      'flag': '🇧🇷'},
+  {'code': 'CAD', 'name': 'Canadian Dollar',     'flag': '🇨🇦'},
+  {'code': 'CHF', 'name': 'Swiss Franc',         'flag': '🇨🇭'},
+  {'code': 'CNY', 'name': 'Chinese Yuan',        'flag': '🇨🇳'},
+  {'code': 'CZK', 'name': 'Czech Koruna',        'flag': '🇨🇿'},
+  {'code': 'DKK', 'name': 'Danish Krone',        'flag': '🇩🇰'},
+  {'code': 'HKD', 'name': 'Hong Kong Dollar',    'flag': '🇭🇰'},
+  {'code': 'HUF', 'name': 'Hungarian Forint',    'flag': '🇭🇺'},
+  {'code': 'ILS', 'name': 'Israeli Shekel',      'flag': '🇮🇱'},
+  {'code': 'INR', 'name': 'Indian Rupee',        'flag': '🇮🇳'},
+  {'code': 'JPY', 'name': 'Japanese Yen',        'flag': '🇯🇵'},
+  {'code': 'KRW', 'name': 'South Korean Won',    'flag': '🇰🇷'},
+  {'code': 'MXN', 'name': 'Mexican Peso',        'flag': '🇲🇽'},
+  {'code': 'MYR', 'name': 'Malaysian Ringgit',   'flag': '🇲🇾'},
+  {'code': 'NOK', 'name': 'Norwegian Krone',     'flag': '🇳🇴'},
+  {'code': 'NZD', 'name': 'New Zealand Dollar',  'flag': '🇳🇿'},
+  {'code': 'PHP', 'name': 'Philippine Peso',     'flag': '🇵🇭'},
+  {'code': 'SEK', 'name': 'Swedish Krona',       'flag': '🇸🇪'},
+  {'code': 'SGD', 'name': 'Singapore Dollar',    'flag': '🇸🇬'},
+  {'code': 'THB', 'name': 'Thai Baht',           'flag': '🇹🇭'},
+  {'code': 'TWD', 'name': 'Taiwan Dollar',       'flag': '🇹🇼'},
+  {'code': 'ZAR', 'name': 'South African Rand',  'flag': '🇿🇦'},
 ];
 
 List<String> get kCurrencyCodes =>
     kCurrencyList.map((c) => c['code']!).toList();
+
+/// Returns the ISO currency symbol for [code] using intl's NumberFormat.
+/// Falls back to the code itself if the symbol is unavailable.
+String currencySymbol(String code) {
+  try {
+    final format = NumberFormat.simpleCurrency(name: code, decimalDigits: 0);
+    final sym = format.currencySymbol;
+    // NumberFormat sometimes returns the code itself — still fine.
+    return sym.isEmpty ? code : sym;
+  } catch (_) {
+    return code;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Fintech accent colours (must match dashboard)
@@ -533,7 +549,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             decoration: InputDecoration(
               labelText: 'Amount',
               labelStyle: TextStyle(fontSize: 13.sp),
-              prefixIcon: const Icon(Icons.attach_money, color: _teal),
+              prefixIcon: _CurrencySymbolIcon(currency: _currency),
               filled: true,
               fillColor:
                   theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -1259,6 +1275,36 @@ class _ManualRateRow extends StatelessWidget {
           child: Text('Apply', style: TextStyle(fontSize: 12.sp)),
         ),
       ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Dynamic currency symbol prefix icon
+// ---------------------------------------------------------------------------
+class _CurrencySymbolIcon extends StatelessWidget {
+  const _CurrencySymbolIcon({required this.currency});
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final sym = currencySymbol(currency);
+    // If symbol is longer than 2 chars (e.g. "GEL" → "₾" or the code itself),
+    // shrink the font so it fits in the prefix icon area.
+    final fontSize = sym.length > 2 ? 11.0 : 16.0;
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      child: Center(
+        widthFactor: 1,
+        child: Text(
+          sym,
+          style: TextStyle(
+            color: _teal,
+            fontWeight: FontWeight.w800,
+            fontSize: fontSize.sp,
+          ),
+        ),
+      ),
     );
   }
 }

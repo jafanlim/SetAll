@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
-import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -29,72 +27,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  void _showThemeSelector() {
-    HapticUtils.selection();
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Colors.transparent,
-        builder: (ctx) {
-        final themeMode = ref.read(themeModeProvider);
-        return Padding(
-          padding: EdgeInsets.all(16.w),
-          child: GlassCard(
-          padding: EdgeInsets.symmetric(vertical: 8.h),
-          child: SafeArea(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _ThemeTile(
-                  icon: Icons.dark_mode,
-                  label: 'Dark',
-                  active: themeMode == ThemeMode.dark,
-                  onTap: () {
-                    ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
-                    Navigator.pop(ctx);
-                    HapticUtils.success();
-                  },
-                ),
-                _ThemeTile(
-                  icon: Icons.light_mode,
-                  label: 'Light',
-                  active: themeMode == ThemeMode.light,
-                  onTap: () {
-                    ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
-                    Navigator.pop(ctx);
-                    HapticUtils.success();
-                  },
-                ),
-                _ThemeTile(
-                  icon: Icons.brightness_auto,
-                  label: 'System',
-                  active: themeMode == ThemeMode.system,
-                  onTap: () {
-                    ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
-                    Navigator.pop(ctx);
-                    HapticUtils.success();
-                  },
-                ),
-                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
-                ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.logout, color: Colors.redAccent),
-                  title: const Text('Sign out', style: TextStyle(color: Colors.redAccent)),
-                  onTap: () async {
-                    HapticUtils.primaryTap();
-                    Navigator.pop(ctx);
-                    await Supabase.instance.client.auth.signOut();
-                    if (ctx.mounted) context.go(AppRouter.login);
-                  },
-                ),
-              ],
-            ),
-          ),
-          ),
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -266,8 +198,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         scrolledUnderElevation: 0.5,
         actions: [
           IconButton(
-            icon: const Icon(Icons.tune_outlined),
-            onPressed: _showThemeSelector,
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () {
+              HapticUtils.primaryTap();
+              context.push(AppRouter.settings);
+            },
             tooltip: 'Settings',
           ),
         ],
@@ -677,36 +612,3 @@ class _ActivityTile extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Theme tile helper
-// ---------------------------------------------------------------------------
-class _ThemeTile extends StatelessWidget {
-  const _ThemeTile({
-    required this.icon,
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      dense: true,
-      leading: Icon(icon, color: active ? _teal : null),
-      title: Text(
-        label,
-        style: TextStyle(
-          color: active ? _teal : null,
-          fontWeight: active ? FontWeight.w600 : FontWeight.normal,
-        ),
-      ),
-      trailing: active ? const Icon(Icons.check, color: _teal, size: 18) : null,
-      onTap: onTap,
-    );
-  }
-}
