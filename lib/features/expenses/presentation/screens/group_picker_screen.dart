@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../data/models/group_model.dart';
-import '../../../../data/repositories/setall_repository.dart';
 
 /// Choose an existing group or create a new one, then go to add expense.
 class GroupPickerScreen extends ConsumerStatefulWidget {

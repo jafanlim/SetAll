@@ -2,6 +2,7 @@
 /// 
 /// IMPORTANT: Never commit actual API keys to a public GitHub repository.
 /// For a production app, these should eventually be moved to environment variables (.env).
+library;
 
 /// Base URL for auth redirects (email confirmation, OAuth). Set to your app's URL for mobile, e.g. https://your-app.vercel.app
 const String? kAuthRedirectBaseUrl = null;

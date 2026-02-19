@@ -1,30 +1,42 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../core/services/balance_service.dart';
-import '../../core/services/currency_service.dart';
-import '../../core/utils/debt_simplification_engine.dart';
+import '../services/balance_service.dart';
+import '../services/currency_service.dart';
+import '../services/currency_sync_service.dart';
+import '../utils/debt_simplification_engine.dart';
 import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
-import '../../domain/entities/expense.dart';
+
+// ---------------------------------------------------------------------------
+// Infrastructure providers
+// ---------------------------------------------------------------------------
 
 final setAllRepositoryProvider = Provider<SetAllRepository>((ref) {
   try {
-    final client = Supabase.instance.client;
-    return SetAllRepository(client: client);
+    return SetAllRepository(client: Supabase.instance.client);
   } catch (_) {
     return SetAllRepository();
   }
 });
 
-/// Current user id (null if not configured or not signed in).
-final currentUserIdProvider = Provider<String?>((ref) {
-  return ref.watch(setAllRepositoryProvider).currentUserId;
+/// Supabase-backed rate sync service (single source of truth for rates).
+final currencySyncServiceProvider = Provider<CurrencySyncService>((ref) {
+  try {
+    return CurrencySyncService(client: Supabase.instance.client);
+  } catch (_) {
+    return CurrencySyncService();
+  }
 });
 
-/// Balance service: multi-currency conversion to base currency.
+/// Currency service: manual override > Supabase DB rates > Frankfurter API.
+final currencyServiceProvider = Provider<CurrencyService>((ref) {
+  return CurrencyService(syncService: ref.watch(currencySyncServiceProvider));
+});
+
+/// Balance service: correct multi-currency conversion using [baseAmountAtEntry].
 final balanceServiceProvider = Provider<BalanceService>((ref) {
   return BalanceService(
     repository: ref.watch(setAllRepositoryProvider),
@@ -32,66 +44,83 @@ final balanceServiceProvider = Provider<BalanceService>((ref) {
   );
 });
 
-/// Balance summary (global net in base currency). Uses BalanceService for correct conversion.
+// ---------------------------------------------------------------------------
+// Current user
+// ---------------------------------------------------------------------------
+
+final currentUserIdProvider = Provider<String?>((ref) {
+  return ref.watch(setAllRepositoryProvider).currentUserId;
+});
+
+// ---------------------------------------------------------------------------
+// Balance
+// ---------------------------------------------------------------------------
+
+/// Global net balance in user's base currency. Uses BalanceService for
+/// correct multi-currency conversion with [baseAmountAtEntry] fast path.
 final balanceSummaryProvider = FutureProvider<BalanceSummary>((ref) async {
   return ref.watch(balanceServiceProvider).getBalanceSummary();
 });
 
-/// User's groups from Supabase.
-final myGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
-  final repo = ref.watch(setAllRepositoryProvider);
-  return repo.getMyGroups();
-});
-
-/// Recent expenses across all groups.
-final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
-  final repo = ref.watch(setAllRepositoryProvider);
-  return repo.getRecentExpenses();
-});
-
-/// Expenses for a specific group.
-final groupExpensesProvider = FutureProvider.family<List<ExpenseModel>, String>((ref, groupId) async {
-  final repo = ref.watch(setAllRepositoryProvider);
-  return repo.getExpensesForGroup(groupId);
-});
-
-/// Members of a group.
-final groupMembersProvider = FutureProvider.family<List<ProfileModel>, String>((ref, groupId) async {
-  final repo = ref.watch(setAllRepositoryProvider);
-  return repo.getGroupMembers(groupId);
-});
-
 /// Group-scoped balance in base currency.
-final groupBalanceSummaryProvider = FutureProvider.family<BalanceSummary, String>((ref, groupId) async {
+final groupBalanceSummaryProvider =
+    FutureProvider.family<BalanceSummary, String>((ref, groupId) async {
   return ref.watch(balanceServiceProvider).getGroupBalanceSummary(groupId);
 });
 
-/// Simplified debts for a group (minimal transactions, group-scoped).
-final simplifiedDebtsProvider = FutureProvider.family<List<SimplifiedDebt>, String>((ref, groupId) async {
-  final repo = ref.watch(setAllRepositoryProvider);
-  return repo.getSimplifiedDebts(groupId);
+// ---------------------------------------------------------------------------
+// Groups & expenses
+// ---------------------------------------------------------------------------
+
+final myGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getMyGroups();
 });
 
-/// Currency service for live rates and manual override (e.g. bank fees).
-final currencyServiceProvider = Provider<CurrencyService>((ref) {
-  return CurrencyService();
+final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
-/// Live rate 1 USD -> [toCurrency]. Refreshes when [toCurrency] changes.
-final exchangeRateProvider = FutureProvider.family<String, String>((ref, toCurrency) async {
+final groupExpensesProvider =
+    FutureProvider.family<List<ExpenseModel>, String>((ref, groupId) async {
+  return ref.watch(setAllRepositoryProvider).getExpensesForGroup(groupId);
+});
+
+final groupMembersProvider =
+    FutureProvider.family<List<ProfileModel>, String>((ref, groupId) async {
+  return ref.watch(setAllRepositoryProvider).getGroupMembers(groupId);
+});
+
+// ---------------------------------------------------------------------------
+// Debt simplification
+// ---------------------------------------------------------------------------
+
+final simplifiedDebtsProvider =
+    FutureProvider.family<List<SimplifiedDebt>, String>((ref, groupId) async {
+  return ref.watch(setAllRepositoryProvider).getSimplifiedDebts(groupId);
+});
+
+// ---------------------------------------------------------------------------
+// Currency helpers
+// ---------------------------------------------------------------------------
+
+/// User's base currency (from profile). Defaults to USD.
+final baseCurrencyProvider = FutureProvider<String>((ref) async {
+  return ref.watch(balanceServiceProvider).getBaseCurrency();
+});
+
+/// Live display rate: 1 USD → [toCurrency]. Used for UI preview only.
+final exchangeRateProvider =
+    FutureProvider.family<String, String>((ref, toCurrency) async {
   if (toCurrency == 'USD') return '1';
   final svc = ref.watch(currencyServiceProvider);
   final rate = await svc.getRate('USD', toCurrency);
   return rate.toStringAsFixed(4);
 });
 
-/// User's base currency for balance (from profile). Default USD.
-final baseCurrencyProvider = FutureProvider<String>((ref) async {
-  return ref.watch(balanceServiceProvider).getBaseCurrency();
-});
-
-/// Rate from [fromCurrency] to base (for converted amount preview).
-final rateToBaseProvider = FutureProvider.family<String, ({String from, String base})>((ref, params) async {
+/// Rate from [from] currency to user's [base] currency (for conversion preview).
+final rateToBaseProvider =
+    FutureProvider.family<String, ({String from, String base})>(
+        (ref, params) async {
   if (params.from == params.base) return '1';
   final svc = ref.watch(currencyServiceProvider);
   final rate = await svc.getRate(params.from, params.base);

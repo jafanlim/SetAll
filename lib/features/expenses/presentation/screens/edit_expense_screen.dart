@@ -237,7 +237,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _currency,
+              initialValue: _currency,
               decoration: const InputDecoration(labelText: 'Currency'),
               items: ['USD', 'EUR', 'GBP']
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
@@ -246,7 +246,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: const InputDecoration(labelText: 'Category'),
               items: kExpenseCategories
                   .map((c) => DropdownMenuItem(value: c, child: Text(c)))
