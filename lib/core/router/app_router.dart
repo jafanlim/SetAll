@@ -13,6 +13,7 @@ import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 
@@ -24,6 +25,7 @@ final class AppRouter {
   static const String dashboard = '/';
   static const String friends = '/friends';
   static const String groups = '/groups';
+  static const String createGroup = '/create-group';
   static const String settings = '/settings';
   static const String addExpense = '/add-expense';
   static const String editExpense = '/group/:id/expense/:expenseId';
@@ -145,6 +147,21 @@ final class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // ── Create group (modal push, no shell nav bar) ───────────────────
+        GoRoute(
+          path: createGroup,
+          name: 'createGroup',
+          pageBuilder: (context, state) {
+            final cb = state.extra as void Function(String, String)?;
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: CreateGroupScreen(onGroupCreated: cb),
+              ),
+            );
+          },
         ),
 
         // ── Settings (modal push, no shell nav bar) ───────────────────────

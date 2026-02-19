@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
@@ -38,7 +39,7 @@ class GroupsScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticUtils.primaryTap();
-          context.push('/add-expense/choose-group');
+          context.push(AppRouter.createGroup);
         },
         backgroundColor: _teal,
         foregroundColor: Colors.black,

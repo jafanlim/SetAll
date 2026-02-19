@@ -601,9 +601,8 @@ class SetAllRepository {
     final id = const Uuid().v4();
 
     if (_isWeb && _client != null) {
-      await _client
-          .from('groups')
-          .insert({'id': id, 'name': name, 'creator_id': uid});
+      await _client.from('groups').insert(
+          {'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'});
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
@@ -615,6 +614,7 @@ class SetAllRepository {
       'id': id,
       'name': name,
       'creator_id': uid,
+      'type': 'normal',
       'created_at': now,
       'updated_at': now,
       'synced_at': null,
@@ -630,7 +630,7 @@ class SetAllRepository {
       try {
         await _client
             .from('groups')
-            .insert({'id': id, 'name': name, 'creator_id': uid})
+            .insert({'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'})
             .select()
             .single();
         await _client
