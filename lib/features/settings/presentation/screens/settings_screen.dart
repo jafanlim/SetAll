@@ -150,8 +150,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (uid == null) throw Exception('Not authenticated');
 
       final bytes = await File(picked.path).readAsBytes();
-      final ext = picked.path.split('.').last.toLowerCase();
-      final storagePath = 'avatars/$uid.$ext';
+      // Normalise extension: iOS sometimes gives HEIC; convert to jpeg mime.
+      final rawExt  = picked.path.split('.').last.toLowerCase();
+      final ext     = (rawExt == 'heic' || rawExt == 'heif') ? 'jpg' : rawExt;
+      // Path inside the 'avatars' bucket: one file per user, always replaced.
+      final storagePath = '$uid.$ext';
 
       await client.storage.from('avatars').uploadBinary(
         storagePath,

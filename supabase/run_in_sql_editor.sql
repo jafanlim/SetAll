@@ -1,233 +1,437 @@
 -- =============================================================================
--- SetAll: Full schema for Supabase — run this once in SQL Editor
+-- SetAll: Complete Supabase schema — run this in SQL Editor
 -- Dashboard → SQL Editor → New query → paste → Run
+-- Safe to re-run: every statement is idempotent.
 -- =============================================================================
 
--- 1. PROFILES (extends auth.users)
-create table if not exists public.profiles (
-  id uuid primary key references auth.users(id) on delete cascade,
-  name text not null,
-  default_currency text not null default 'USD',
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 1. PROFILES
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.profiles (
+  id               UUID        PRIMARY KEY,
+  name             TEXT        NOT NULL DEFAULT '',
+  nickname         TEXT,
+  avatar_url       TEXT,
+  is_ghost         BOOLEAN     NOT NULL DEFAULT FALSE,
+  default_currency TEXT        NOT NULL DEFAULT 'USD',
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-alter table public.profiles enable row level security;
+-- Add new columns if the table already existed from an older schema.
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS nickname         TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url       TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS is_ghost         BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS default_currency TEXT    NOT NULL DEFAULT 'USD';
 
-create policy "Users can read all profiles"
-  on public.profiles for select using (true);
+-- Unique index on nickname for @handle look-ups (null values are excluded).
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_nickname_unique
+  ON public.profiles (nickname)
+  WHERE nickname IS NOT NULL;
 
-create policy "Users can update own profile"
-  on public.profiles for update using (auth.uid() = id);
+-- Drop the FK to auth.users so ghost profiles (no auth account) can be inserted.
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_schema = 'public'
+      AND table_name        = 'profiles'
+      AND constraint_type   = 'FOREIGN KEY'
+      AND constraint_name   = 'profiles_id_fkey'
+  ) THEN
+    ALTER TABLE public.profiles DROP CONSTRAINT profiles_id_fkey;
+  END IF;
+END $$;
 
-create policy "Users can insert own profile"
-  on public.profiles for insert with check (auth.uid() = id);
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, name)
-  values (new.id, coalesce(new.raw_user_meta_data->>'name', 'User'));
-  return new;
-end;
-$$ language plpgsql security definer;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='Users can read all profiles') THEN
+    CREATE POLICY "Users can read all profiles" ON public.profiles FOR SELECT USING (true);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='Users can update own profile') THEN
+    CREATE POLICY "Users can update own profile" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='Users can insert own profile') THEN
+    CREATE POLICY "Users can insert own profile" ON public.profiles FOR INSERT WITH CHECK (auth.uid() = id);
+  END IF;
+END $$;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='profiles' AND policyname='Service role can insert ghost profiles') THEN
+    CREATE POLICY "Service role can insert ghost profiles" ON public.profiles FOR INSERT TO service_role WITH CHECK (true);
+  END IF;
+END $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- Trigger: create a profile row for every new auth user; also claims ghost.
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_ghost_id UUID;
+BEGIN
+  -- Check for a ghost profile with the same email and promote it.
+  SELECT id INTO v_ghost_id
+  FROM   public.profiles
+  WHERE  nickname = NEW.email AND is_ghost = TRUE
+  LIMIT  1;
 
-comment on table public.profiles is 'User profiles with display name and default currency';
+  IF v_ghost_id IS NOT NULL THEN
+    UPDATE public.profiles
+    SET    id         = NEW.id,
+           name       = COALESCE(NEW.raw_user_meta_data->>'name', 'User'),
+           nickname   = COALESCE(NEW.raw_user_meta_data->>'nickname', NULL),
+           is_ghost   = FALSE,
+           updated_at = now()
+    WHERE  id = v_ghost_id;
+  ELSE
+    INSERT INTO public.profiles (id, name, nickname)
+    VALUES (
+      NEW.id,
+      COALESCE(NEW.raw_user_meta_data->>'name', 'User'),
+      COALESCE(NEW.raw_user_meta_data->>'nickname', NULL)
+    )
+    ON CONFLICT (id) DO UPDATE
+      SET name     = EXCLUDED.name,
+          nickname = EXCLUDED.nickname;
+  END IF;
+  RETURN NEW;
+END;
+$$;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
 -- 2. GROUPS & GROUP_MEMBERS
-create table if not exists public.groups (
-  id uuid primary key default gen_random_uuid(),
-  name text not null,
-  creator_id uuid not null references public.profiles(id) on delete cascade,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.groups (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       TEXT        NOT NULL,
+  creator_id UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type       TEXT        NOT NULL DEFAULT 'normal',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE public.groups ADD COLUMN IF NOT EXISTS type TEXT NOT NULL DEFAULT 'normal';
 
-create index if not exists idx_groups_creator_id on public.groups(creator_id);
-alter table public.groups enable row level security;
+CREATE INDEX IF NOT EXISTS idx_groups_creator_id ON public.groups(creator_id);
+ALTER TABLE public.groups ENABLE ROW LEVEL SECURITY;
 
-create table if not exists public.group_members (
-  group_id uuid not null references public.groups(id) on delete cascade,
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  joined_at timestamptz not null default now(),
-  primary key (group_id, user_id)
+CREATE TABLE IF NOT EXISTS public.group_members (
+  group_id  UUID        NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  user_id   UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (group_id, user_id)
 );
+CREATE INDEX IF NOT EXISTS idx_group_members_user_id ON public.group_members(user_id);
+ALTER TABLE public.group_members ENABLE ROW LEVEL SECURITY;
 
-create index if not exists idx_group_members_user_id on public.group_members(user_id);
-alter table public.group_members enable row level security;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='groups' AND policyname='Users can read groups they belong to') THEN
+  CREATE POLICY "Users can read groups they belong to" ON public.groups FOR SELECT
+    USING (id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid()) OR creator_id = auth.uid());
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='groups' AND policyname='Authenticated users can create groups') THEN
+  CREATE POLICY "Authenticated users can create groups" ON public.groups FOR INSERT WITH CHECK (auth.uid() = creator_id);
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='groups' AND policyname='Creator can update group') THEN
+  CREATE POLICY "Creator can update group" ON public.groups FOR UPDATE USING (creator_id = auth.uid());
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='groups' AND policyname='Creator can delete group') THEN
+  CREATE POLICY "Creator can delete group" ON public.groups FOR DELETE USING (creator_id = auth.uid());
+END IF; END $$;
 
-create policy "Users can read groups they belong to"
-  on public.groups for select
-  using (
-    id in (select group_id from public.group_members where user_id = auth.uid())
-    or creator_id = auth.uid()
-  );
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='group_members' AND policyname='Members can read group_members') THEN
+  CREATE POLICY "Members can read group_members" ON public.group_members FOR SELECT
+    USING (group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+        OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='group_members' AND policyname='Group creator can manage members') THEN
+  CREATE POLICY "Group creator can manage members" ON public.group_members FOR ALL
+    USING (group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
 
-create policy "Authenticated users can create groups"
-  on public.groups for insert with check (auth.uid() = creator_id);
 
-create policy "Creator can update group"
-  on public.groups for update using (creator_id = auth.uid());
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 3. EXPENSES & SPLITS
+-- ─────────────────────────────────────────────────────────────────────────────
+DO $$ BEGIN
+  CREATE TYPE public.split_type AS ENUM ('even', 'manual', 'parts');
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-create policy "Creator can delete group"
-  on public.groups for delete using (creator_id = auth.uid());
-
-create policy "Members can read group_members"
-  on public.group_members for select
-  using (
-    group_id in (select group_id from public.group_members where user_id = auth.uid())
-    or group_id in (select id from public.groups where creator_id = auth.uid())
-  );
-
-create policy "Group creator can manage members"
-  on public.group_members for all
-  using (group_id in (select id from public.groups where creator_id = auth.uid()));
-
-comment on table public.groups is 'Cost-sharing groups';
-comment on table public.group_members is 'Group membership';
-
--- 3. EXPENSES (with category and currency normalization)
-do $$ begin
-  create type public.split_type as enum ('even', 'manual', 'parts');
-exception
-  when duplicate_object then null;
-end $$;
-
-create table if not exists public.expenses (
-  id uuid primary key default gen_random_uuid(),
-  group_id uuid not null references public.groups(id) on delete cascade,
-  payer_id uuid not null references public.profiles(id) on delete cascade,
-  amount numeric(14, 4) not null check (amount >= 0),
-  description text not null default '',
-  currency text not null default 'USD',
-  split_type public.split_type not null default 'even',
-  category text default 'General',
-  original_amount numeric(14, 4),
-  original_currency text,
-  exchange_rate_applied numeric(14, 6),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+CREATE TABLE IF NOT EXISTS public.expenses (
+  id                    UUID                NOT NULL DEFAULT gen_random_uuid(),
+  group_id              UUID                NOT NULL REFERENCES public.groups(id)   ON DELETE CASCADE,
+  payer_id              UUID                NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  amount                NUMERIC(14,4)       NOT NULL CHECK (amount >= 0),
+  description           TEXT                NOT NULL DEFAULT '',
+  currency              TEXT                NOT NULL DEFAULT 'USD',
+  split_type            public.split_type   NOT NULL DEFAULT 'even',
+  category              TEXT                DEFAULT 'General',
+  original_amount       NUMERIC(14,4),
+  original_currency     TEXT,
+  exchange_rate_applied NUMERIC(14,6),
+  base_amount_at_entry  NUMERIC(14,4),
+  created_at            TIMESTAMPTZ         NOT NULL DEFAULT now(),
+  updated_at            TIMESTAMPTZ         NOT NULL DEFAULT now(),
+  PRIMARY KEY (id)
 );
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS category              TEXT          DEFAULT 'General';
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS original_amount       NUMERIC(14,4);
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS original_currency     TEXT;
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS exchange_rate_applied NUMERIC(14,6);
+ALTER TABLE public.expenses ADD COLUMN IF NOT EXISTS base_amount_at_entry  NUMERIC(14,4);
 
--- Add columns if table already existed without them
-alter table public.expenses add column if not exists category text default 'General';
-alter table public.expenses add column if not exists original_amount numeric(14, 4);
-alter table public.expenses add column if not exists original_currency text;
-alter table public.expenses add column if not exists exchange_rate_applied numeric(14, 6);
+CREATE INDEX IF NOT EXISTS idx_expenses_group_id   ON public.expenses(group_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_payer_id   ON public.expenses(payer_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_created_at ON public.expenses(created_at DESC);
+ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 
-create index if not exists idx_expenses_group_id on public.expenses(group_id);
-create index if not exists idx_expenses_payer_id on public.expenses(payer_id);
-create index if not exists idx_expenses_created_at on public.expenses(created_at desc);
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='expenses' AND policyname='Group members can read expenses') THEN
+  CREATE POLICY "Group members can read expenses" ON public.expenses FOR SELECT
+    USING (group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+        OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='expenses' AND policyname='Group members can insert expenses') THEN
+  CREATE POLICY "Group members can insert expenses" ON public.expenses FOR INSERT
+    WITH CHECK (auth.uid() = payer_id AND (
+      group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+      OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid())));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='expenses' AND policyname='Payer or group creator can update expense') THEN
+  CREATE POLICY "Payer or group creator can update expense" ON public.expenses FOR UPDATE
+    USING (payer_id = auth.uid() OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='expenses' AND policyname='Payer or group creator can delete expense') THEN
+  CREATE POLICY "Payer or group creator can delete expense" ON public.expenses FOR DELETE
+    USING (payer_id = auth.uid() OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
 
-alter table public.expenses enable row level security;
+CREATE TABLE IF NOT EXISTS public.splits (
+  id           UUID          NOT NULL DEFAULT gen_random_uuid(),
+  expense_id   UUID          NOT NULL REFERENCES public.expenses(id) ON DELETE CASCADE,
+  user_id      UUID          NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  amount_owed  NUMERIC(14,4) NOT NULL CHECK (amount_owed >= 0),
+  created_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (expense_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_splits_expense_id ON public.splits(expense_id);
+CREATE INDEX IF NOT EXISTS idx_splits_user_id    ON public.splits(user_id);
+ALTER TABLE public.splits ENABLE ROW LEVEL SECURITY;
 
-create policy "Group members can read expenses"
-  on public.expenses for select
-  using (
-    group_id in (select group_id from public.group_members where user_id = auth.uid())
-    or group_id in (select id from public.groups where creator_id = auth.uid())
-  );
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='splits' AND policyname='Group members can read splits for their group expenses') THEN
+  CREATE POLICY "Group members can read splits for their group expenses" ON public.splits FOR SELECT
+    USING (expense_id IN (SELECT e.id FROM public.expenses e
+      WHERE e.group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+         OR e.group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid())));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='splits' AND policyname='Expense payer can manage splits') THEN
+  CREATE POLICY "Expense payer can manage splits" ON public.splits FOR ALL
+    USING (expense_id IN (SELECT id FROM public.expenses WHERE payer_id = auth.uid()));
+END IF; END $$;
 
-create policy "Group members can insert expenses"
-  on public.expenses for insert
-  with check (
-    auth.uid() = payer_id
-    and (
-      group_id in (select group_id from public.group_members where user_id = auth.uid())
-      or group_id in (select id from public.groups where creator_id = auth.uid())
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 4. EXCHANGE RATES
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.exchange_rates (
+  base_currency   TEXT        NOT NULL,
+  target_currency TEXT        NOT NULL,
+  rate            NUMERIC(18,8) NOT NULL,
+  last_updated    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (base_currency, target_currency)
+);
+ALTER TABLE public.exchange_rates ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='exchange_rates' AND policyname='Anyone can read exchange rates') THEN
+  CREATE POLICY "Anyone can read exchange rates" ON public.exchange_rates FOR SELECT USING (true);
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='exchange_rates' AND policyname='Service role can manage exchange rates') THEN
+  CREATE POLICY "Service role can manage exchange rates" ON public.exchange_rates FOR ALL TO service_role USING (true);
+END IF; END $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 5. PENDING INVITES (ghost accounts)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS public.pending_invites (
+  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email       TEXT        NOT NULL,
+  group_id    UUID        NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  invited_by  UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  ghost_id    UUID        REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.pending_invites ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Group members can read pending invites') THEN
+  CREATE POLICY "Group members can read pending invites" ON public.pending_invites FOR SELECT
+    USING (group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+        OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Group members can create invites') THEN
+  CREATE POLICY "Group members can create invites" ON public.pending_invites FOR INSERT WITH CHECK (
+    group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
+    OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+END IF; END $$;
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 6. STORAGE: avatars bucket
+-- ─────────────────────────────────────────────────────────────────────────────
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES ('avatars', 'avatars', true, 5242880, '{image/jpeg,image/jpg,image/png,image/webp,image/gif}')
+ON CONFLICT (id) DO UPDATE SET
+  public             = true,
+  file_size_limit    = 5242880,
+  allowed_mime_types = '{image/jpeg,image/jpg,image/png,image/webp,image/gif}';
+
+-- Drop and recreate storage policies cleanly.
+DROP POLICY IF EXISTS "Avatar public read"                        ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users upload own avatar"     ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own avatar"               ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own avatar"               ON storage.objects;
+DROP POLICY IF EXISTS "Public avatar access"                      ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated avatar upload"               ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated avatar update"               ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated avatar delete"               ON storage.objects;
+
+CREATE POLICY "Avatar public read"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "Authenticated avatar upload"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'avatars');
+
+CREATE POLICY "Authenticated avatar update"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'avatars');
+
+CREATE POLICY "Authenticated avatar delete"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'avatars');
+
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- 7. RPCs
+-- ─────────────────────────────────────────────────────────────────────────────
+
+-- search_profiles: used by the add-member / add-friend search UI
+CREATE OR REPLACE FUNCTION public.search_profiles(p_query TEXT)
+RETURNS TABLE (id UUID, name TEXT, nickname TEXT, avatar_url TEXT, is_ghost BOOLEAN)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  RETURN QUERY
+  SELECT p.id, p.name, p.nickname, p.avatar_url, p.is_ghost
+  FROM   public.profiles p
+  WHERE  p.is_ghost = FALSE
+    AND  p.id <> auth.uid()
+    AND (
+      p.name     ILIKE '%' || p_query || '%'
+      OR p.nickname ILIKE '%' || p_query || '%'
+      OR p.nickname ILIKE '%' || REPLACE(p_query, '@', '') || '%'
     )
-  );
-
-create policy "Payer or group creator can update expense"
-  on public.expenses for update
-  using (payer_id = auth.uid() or group_id in (select id from public.groups where creator_id = auth.uid()));
-
-create policy "Payer or group creator can delete expense"
-  on public.expenses for delete
-  using (payer_id = auth.uid() or group_id in (select id from public.groups where creator_id = auth.uid()));
-
-comment on table public.expenses is 'Expenses per group with amount, currency, split type, and optional currency normalization';
-
--- 4. SPLITS
-create table if not exists public.splits (
-  id uuid primary key default gen_random_uuid(),
-  expense_id uuid not null references public.expenses(id) on delete cascade,
-  user_id uuid not null references public.profiles(id) on delete cascade,
-  amount_owed numeric(14, 4) not null check (amount_owed >= 0),
-  created_at timestamptz not null default now(),
-  unique (expense_id, user_id)
-);
-
-create index if not exists idx_splits_expense_id on public.splits(expense_id);
-create index if not exists idx_splits_user_id on public.splits(user_id);
-
-alter table public.splits enable row level security;
-
-create policy "Group members can read splits for their group expenses"
-  on public.splits for select
-  using (
-    expense_id in (
-      select e.id from public.expenses e
-      where e.group_id in (select group_id from public.group_members where user_id = auth.uid())
-         or e.group_id in (select id from public.groups where creator_id = auth.uid())
-    )
-  );
-
-create policy "Expense payer can manage splits"
-  on public.splits for all
-  using (expense_id in (select id from public.expenses where payer_id = auth.uid()));
-
-comment on table public.splits is 'Per-user share of an expense (amount owed)';
-
--- 5. RPC: add member by email
-create or replace function public.add_member_by_email(p_group_id uuid, p_email text)
-returns void
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  v_user_id uuid;
-begin
-  if p_email is null or trim(p_email) = '' then
-    raise exception 'Email is required';
-  end if;
-  if not exists (select 1 from public.groups where id = p_group_id and creator_id = auth.uid()) then
-    raise exception 'Only the group creator can add members';
-  end if;
-  select id into v_user_id from auth.users where email = trim(lower(p_email)) limit 1;
-  if v_user_id is null then
-    raise exception 'No user found with this email';
-  end if;
-  insert into public.group_members (group_id, user_id)
-  values (p_group_id, v_user_id)
-  on conflict (group_id, user_id) do nothing;
-end;
+  ORDER BY
+    CASE WHEN p.nickname ILIKE p_query OR p.nickname ILIKE REPLACE(p_query,'@','') THEN 0 ELSE 1 END,
+    p.name
+  LIMIT 20;
+END;
 $$;
+GRANT EXECUTE ON FUNCTION public.search_profiles(TEXT) TO authenticated;
 
-comment on function public.add_member_by_email is 'Add a member to a group by email; caller must be group creator';
-grant execute on function public.add_member_by_email(uuid, text) to authenticated;
-grant execute on function public.add_member_by_email(uuid, text) to anon;
-
--- 6. Helper: is current user a member of the group?
-create or replace function public.is_group_member(p_group_id uuid)
-returns boolean
-language sql
-security definer
-stable
-set search_path = public
-as $$
-  select exists (select 1 from public.group_members where group_id = p_group_id and user_id = auth.uid())
-  or exists (select 1 from public.groups where id = p_group_id and creator_id = auth.uid());
+-- add_member_by_id: SECURITY DEFINER so any group member can add people
+CREATE OR REPLACE FUNCTION public.add_member_by_id(p_group_id UUID, p_user_id UUID)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group_id AND creator_id = auth.uid())
+     AND NOT EXISTS (SELECT 1 FROM public.group_members WHERE group_id = p_group_id AND user_id = auth.uid())
+  THEN
+    RAISE EXCEPTION 'You must be a member of this group to add people';
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM public.profiles WHERE id = p_user_id AND is_ghost = FALSE) THEN
+    RAISE EXCEPTION 'User not found';
+  END IF;
+  INSERT INTO public.group_members (group_id, user_id)
+  VALUES (p_group_id, p_user_id)
+  ON CONFLICT (group_id, user_id) DO NOTHING;
+END;
 $$;
+GRANT EXECUTE ON FUNCTION public.add_member_by_id(UUID, UUID) TO authenticated;
 
-comment on function public.is_group_member(uuid) is 'True if auth.uid() is a member or creator of the group';
-grant execute on function public.is_group_member(uuid) to authenticated;
-grant execute on function public.is_group_member(uuid) to anon;
+-- add_ghost_member: adds a placeholder for a non-registered user
+CREATE OR REPLACE FUNCTION public.add_ghost_member(p_group_id UUID, p_email TEXT, p_invited_by UUID)
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_ghost_id UUID;
+BEGIN
+  SELECT id INTO v_ghost_id FROM public.profiles WHERE nickname = p_email AND is_ghost = TRUE LIMIT 1;
+  IF v_ghost_id IS NULL THEN
+    v_ghost_id := gen_random_uuid();
+    INSERT INTO public.profiles (id, name, nickname, is_ghost)
+    VALUES (v_ghost_id, SPLIT_PART(p_email,'@',1), p_email, TRUE);
+  END IF;
+  INSERT INTO public.group_members (group_id, user_id) VALUES (p_group_id, v_ghost_id) ON CONFLICT DO NOTHING;
+  INSERT INTO public.pending_invites (email, group_id, invited_by, ghost_id) VALUES (p_email, p_group_id, p_invited_by, v_ghost_id) ON CONFLICT DO NOTHING;
+  RETURN v_ghost_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.add_ghost_member(UUID, TEXT, UUID) TO authenticated;
 
--- Done. SetAll schema is ready.
+-- create_direct_group_by_id: 1-on-1 friend group by user UUID
+CREATE OR REPLACE FUNCTION public.create_direct_group_by_id(p_other_id UUID)
+RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_my_id    UUID := auth.uid();
+  v_group_id UUID;
+  v_name     TEXT;
+BEGIN
+  IF v_my_id IS NULL THEN RAISE EXCEPTION 'not_authenticated'; END IF;
+  IF v_my_id = p_other_id THEN RAISE EXCEPTION 'cannot_add_self'; END IF;
+  SELECT gm1.group_id INTO v_group_id
+  FROM   public.group_members gm1
+  JOIN   public.group_members gm2 ON gm1.group_id = gm2.group_id
+  JOIN   public.groups g          ON g.id = gm1.group_id
+  WHERE  gm1.user_id = v_my_id AND gm2.user_id = p_other_id AND g.type = 'direct'
+  LIMIT  1;
+  IF v_group_id IS NOT NULL THEN RETURN v_group_id; END IF;
+  SELECT COALESCE(name, 'Friend') INTO v_name FROM public.profiles WHERE id = p_other_id;
+  INSERT INTO public.groups (id, name, creator_id, type)
+  VALUES (gen_random_uuid(), v_name, v_my_id, 'direct') RETURNING id INTO v_group_id;
+  INSERT INTO public.group_members (group_id, user_id) VALUES (v_group_id, v_my_id), (v_group_id, p_other_id) ON CONFLICT DO NOTHING;
+  RETURN v_group_id;
+END;
+$$;
+GRANT EXECUTE ON FUNCTION public.create_direct_group_by_id(UUID) TO authenticated;
+
+-- add_member_by_email: legacy helper
+CREATE OR REPLACE FUNCTION public.add_member_by_email(p_group_id UUID, p_email TEXT)
+RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE v_user_id UUID; BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.groups WHERE id = p_group_id AND creator_id = auth.uid()) THEN
+    RAISE EXCEPTION 'Only the group creator can add members'; END IF;
+  SELECT id INTO v_user_id FROM auth.users WHERE email = trim(lower(p_email)) LIMIT 1;
+  IF v_user_id IS NULL THEN RAISE EXCEPTION 'user_not_found'; END IF;
+  INSERT INTO public.group_members (group_id, user_id) VALUES (p_group_id, v_user_id) ON CONFLICT DO NOTHING;
+END; $$;
+GRANT EXECUTE ON FUNCTION public.add_member_by_email(UUID, TEXT) TO authenticated;
+
+-- is_group_member: convenience helper
+CREATE OR REPLACE FUNCTION public.is_group_member(p_group_id UUID)
+RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
+  SELECT EXISTS (SELECT 1 FROM public.group_members WHERE group_id = p_group_id AND user_id = auth.uid())
+      OR EXISTS (SELECT 1 FROM public.groups WHERE id = p_group_id AND creator_id = auth.uid());
+$$;
+GRANT EXECUTE ON FUNCTION public.is_group_member(UUID) TO authenticated;
+
+-- =============================================================================
+-- Done. All SetAll schema objects are now created / updated.
+-- =============================================================================
