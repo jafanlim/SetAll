@@ -67,6 +67,7 @@ DO $$ BEGIN
 END $$;
 
 -- Trigger: create a profile row for every new auth user; also claims ghost.
+DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -350,6 +351,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.search_profiles(TEXT) TO authenticated;
 
 -- add_member_by_id: SECURITY DEFINER so any group member can add people
+DROP FUNCTION IF EXISTS public.add_member_by_id(UUID, UUID);
 CREATE OR REPLACE FUNCTION public.add_member_by_id(p_group_id UUID, p_user_id UUID)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
@@ -369,6 +371,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.add_member_by_id(UUID, UUID) TO authenticated;
 
 -- add_ghost_member: adds a placeholder for a non-registered user
+DROP FUNCTION IF EXISTS public.add_ghost_member(UUID, TEXT, UUID);
 CREATE OR REPLACE FUNCTION public.add_ghost_member(p_group_id UUID, p_email TEXT, p_invited_by UUID)
 RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -388,6 +391,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.add_ghost_member(UUID, TEXT, UUID) TO authenticated;
 
 -- create_direct_group_by_id: 1-on-1 friend group by user UUID
+DROP FUNCTION IF EXISTS public.create_direct_group_by_id(UUID);
 CREATE OR REPLACE FUNCTION public.create_direct_group_by_id(p_other_id UUID)
 RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
@@ -414,6 +418,7 @@ $$;
 GRANT EXECUTE ON FUNCTION public.create_direct_group_by_id(UUID) TO authenticated;
 
 -- add_member_by_email: legacy helper
+DROP FUNCTION IF EXISTS public.add_member_by_email(UUID, TEXT);
 CREATE OR REPLACE FUNCTION public.add_member_by_email(p_group_id UUID, p_email TEXT)
 RETURNS VOID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE v_user_id UUID; BEGIN
@@ -426,6 +431,7 @@ END; $$;
 GRANT EXECUTE ON FUNCTION public.add_member_by_email(UUID, TEXT) TO authenticated;
 
 -- is_group_member: convenience helper
+DROP FUNCTION IF EXISTS public.is_group_member(UUID);
 CREATE OR REPLACE FUNCTION public.is_group_member(p_group_id UUID)
 RETURNS BOOLEAN LANGUAGE sql SECURITY DEFINER STABLE SET search_path = public AS $$
   SELECT EXISTS (SELECT 1 FROM public.group_members WHERE group_id = p_group_id AND user_id = auth.uid())
