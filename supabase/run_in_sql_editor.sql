@@ -326,6 +326,7 @@ CREATE POLICY "Authenticated avatar delete"
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- search_profiles: used by the add-member / add-friend search UI
+DROP FUNCTION IF EXISTS public.search_profiles(TEXT);
 CREATE OR REPLACE FUNCTION public.search_profiles(p_query TEXT)
 RETURNS TABLE (id UUID, name TEXT, nickname TEXT, avatar_url TEXT, is_ghost BOOLEAN)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
