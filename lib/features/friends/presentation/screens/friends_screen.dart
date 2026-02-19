@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,7 +34,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       context: context,
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
-      builder: (_) => _AddFriendSheet(
+      builder: (_) => _AddFriendSearchSheet(
         onAdded: () {
           ref.invalidate(friendGroupsProvider);
           HapticUtils.success();
@@ -349,133 +351,355 @@ class _BalanceSubtitle extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Add friend bottom sheet
+// Add friend — search-based bottom sheet
 // ---------------------------------------------------------------------------
-class _AddFriendSheet extends ConsumerStatefulWidget {
-  const _AddFriendSheet({required this.onAdded});
+class _AddFriendSearchSheet extends ConsumerStatefulWidget {
+  const _AddFriendSearchSheet({required this.onAdded});
   final VoidCallback onAdded;
 
   @override
-  ConsumerState<_AddFriendSheet> createState() => _AddFriendSheetState();
+  ConsumerState<_AddFriendSearchSheet> createState() =>
+      _AddFriendSearchSheetState();
 }
 
-class _AddFriendSheetState extends ConsumerState<_AddFriendSheet> {
-  final _emailCtrl = TextEditingController();
-  bool _loading = false;
+class _AddFriendSearchSheetState
+    extends ConsumerState<_AddFriendSearchSheet> {
+  final _ctrl     = TextEditingController();
+  Timer?  _debounce;
+  String  _query  = '';
+  bool    _adding = false;
   String? _error;
+  String? _success;
 
   @override
   void dispose() {
-    _emailCtrl.dispose();
+    _ctrl.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
-  Future<void> _submit() async {
-    final email = _emailCtrl.text.trim();
-    if (email.isEmpty) {
-      setState(() => _error = 'Enter an email address');
-      return;
-    }
-    setState(() { _loading = true; _error = null; });
+  void _onQueryChanged(String v) {
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 350), () {
+      if (mounted) setState(() => _query = v.trim());
+    });
+  }
+
+  Future<void> _addFriend(ProfileModel profile) async {
+    setState(() { _adding = true; _error = null; _success = null; });
+    HapticUtils.primaryTap();
     try {
-      final repo = ref.read(setAllRepositoryProvider);
-      final group = await repo.createDirectGroup(email);
+      final group = await ref
+          .read(setAllRepositoryProvider)
+          .createDirectGroupById(profile.id);
       if (!mounted) return;
       if (group != null) {
-        widget.onAdded();
-        Navigator.pop(context);
+        HapticUtils.success();
+        setState(() {
+          _success = '${profile.name} added as a friend!';
+          _adding  = false;
+        });
+        await Future.delayed(const Duration(milliseconds: 800));
+        if (mounted) {
+          widget.onAdded();
+          Navigator.pop(context);
+        }
       } else {
-        setState(() => _error = 'Could not create friendship. Try again.');
+        setState(() {
+          _error  = 'Could not create friendship. Try again.';
+          _adding = false;
+        });
       }
-    } on DirectGroupUserNotFoundException {
-      if (mounted) {
-        setState(() => _error = 'No SetAll account found for that email.');
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(() => _error = 'Something went wrong. Check your connection.');
-      }
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error  = e.toString().contains('cannot_add_self')
+            ? 'You cannot add yourself as a friend.'
+            : 'Something went wrong. Check your connection.';
+        _adding = false;
+      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme       = Theme.of(context);
+    final searchAsync = ref.watch(searchUsersProvider(_query));
+
     return Padding(
-      padding: EdgeInsets.only(
-        left: 16.w,
-        right: 16.w,
-        bottom: MediaQuery.viewInsetsOf(context).bottom + 24.h,
-        top: 8.h,
-      ),
-      child: GlassCard(
-        padding: EdgeInsets.all(20.w),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+      child: Container(
+        constraints:
+            BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Handle
             Center(
               child: Container(
+                margin: EdgeInsets.symmetric(vertical: 10.h),
                 width: 36.w,
                 height: 4.h,
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
                   borderRadius: BorderRadius.circular(2.r),
                 ),
               ),
             ),
-            SizedBox(height: 16.h),
-            Text(
-              'Add a friend',
-              style: TextStyle(
-                fontSize: 18.sp,
-                fontWeight: FontWeight.w700,
+
+            // Header
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Add a Friend',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17.sp,
+                          ),
+                        ),
+                        Text(
+                          'Search by name, @nickname or email',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: _teal,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ],
               ),
             ),
-            SizedBox(height: 4.h),
-            Text(
-              'Enter their email to start splitting 1-on-1 expenses.',
-              style: TextStyle(
-                fontSize: 12.sp,
-                color: theme.colorScheme.onSurfaceVariant,
+
+            SizedBox(height: 8.h),
+
+            // Search field
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                onChanged: _onQueryChanged,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(
+                  hintText: 'Search by name, @nickname or email…',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _ctrl.text.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () {
+                            _ctrl.clear();
+                            setState(() => _query = '');
+                          },
+                        )
+                      : null,
+                ),
               ),
             ),
-            SizedBox(height: 16.h),
-            TextField(
-              controller: _emailCtrl,
-              autofocus: true,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.done,
-              onSubmitted: (_) => _submit(),
-              decoration: InputDecoration(
-                hintText: 'friend@example.com',
-                prefixIcon: const Icon(Icons.email_outlined),
-                errorText: _error,
-              ),
-            ),
-            SizedBox(height: 16.h),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _loading ? null : _submit,
-                child: _loading
-                    ? SizedBox(
-                        height: 18.h,
-                        width: 18.w,
-                        child: const CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(
-                        'Add friend',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14.sp,
+            SizedBox(height: 8.h),
+
+            // Feedback
+            if (_error != null)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                child: GlassCard(
+                  padding: EdgeInsets.all(10.w),
+                  child: Row(
+                    children: [
+                      Icon(Icons.error_outline,
+                          color: theme.colorScheme.error, size: 15.sp),
+                      SizedBox(width: 8.w),
+                      Expanded(
+                        child: Text(
+                          _error!,
+                          style: TextStyle(
+                              color: theme.colorScheme.error, fontSize: 12.sp),
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+
+            if (_success != null)
+              Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                child: GlassCard(
+                  padding: EdgeInsets.all(10.w),
+                  child: Row(
+                    children: [
+                      Icon(Icons.check_circle_outline,
+                          color: _teal, size: 15.sp),
+                      SizedBox(width: 8.w),
+                      Text(
+                        _success!,
+                        style: TextStyle(color: _teal, fontSize: 12.sp),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // Results
+            Flexible(
+              child: _query.length < 2
+                  ? Padding(
+                      padding: EdgeInsets.symmetric(
+                          horizontal: 24.w, vertical: 24.h),
+                      child: Center(
+                        child: Text(
+                          'Type at least 2 characters to search for friends.',
+                          style: TextStyle(
+                            fontSize: 13.sp,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    )
+                  : searchAsync.when(
+                      loading: () => const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24),
+                          child: CircularProgressIndicator(),
+                        ),
+                      ),
+                      error: (_, _) => Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(24.w),
+                          child: Text(
+                            'Search unavailable. Check your connection.',
+                            style: TextStyle(
+                                fontSize: 13.sp,
+                                color: theme.colorScheme.onSurfaceVariant),
+                          ),
+                        ),
+                      ),
+                      data: (results) => results.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24.w),
+                                child: Text(
+                                  'No users found for "$_query".',
+                                  style: TextStyle(
+                                      fontSize: 13.sp,
+                                      color: theme.colorScheme.onSurfaceVariant),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            )
+                          : ListView(
+                              padding: EdgeInsets.symmetric(
+                                  horizontal: 16.w, vertical: 4.h),
+                              children: results
+                                  .map((p) => _FriendResultTile(
+                                        profile: p,
+                                        adding:  _adding,
+                                        onAdd:   () => _addFriend(p),
+                                      ))
+                                  .toList(),
+                            ),
+                    ),
+            ),
+
+            SizedBox(height: 16.h),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Friend result tile (mirrors _UserResultTile from add_person_modal)
+// ---------------------------------------------------------------------------
+class _FriendResultTile extends StatelessWidget {
+  const _FriendResultTile({
+    required this.profile,
+    required this.adding,
+    required this.onAdd,
+  });
+
+  final ProfileModel profile;
+  final bool         adding;
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    final initial = profile.name.isNotEmpty
+        ? profile.name[0].toUpperCase()
+        : '?';
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: 6.h),
+      child: GlassCard(
+        padding: EdgeInsets.zero,
+        child: ListTile(
+          leading: Container(
+            width: 40.w,
+            height: 40.w,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [_teal, Color(0xFF00A896)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(12.r),
+            ),
+            child: Center(
+              child: Text(
+                initial,
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14.sp,
+                ),
               ),
             ),
-          ],
+          ),
+          title: Text(
+            profile.name,
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp),
+          ),
+          subtitle: profile.nickname != null
+              ? Text(
+                  '@${profile.nickname}',
+                  style: TextStyle(fontSize: 11.sp, color: _teal),
+                )
+              : null,
+          trailing: adding
+              ? SizedBox(
+                  height: 20.h,
+                  width:  20.w,
+                  child:  const CircularProgressIndicator(strokeWidth: 2),
+                )
+              : FilledButton(
+                  onPressed: onAdd,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: _teal,
+                    foregroundColor: Colors.black,
+                    padding: EdgeInsets.symmetric(
+                        horizontal: 14.w, vertical: 6.h),
+                    textStyle: TextStyle(
+                        fontSize: 12.sp, fontWeight: FontWeight.w700),
+                    minimumSize: const Size(0, 0),
+                  ),
+                  child: const Text('Add'),
+                ),
         ),
       ),
     );

@@ -13,6 +13,8 @@ import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/groups/presentation/screens/groups_screen.dart';
+import '../../features/settings/presentation/screens/settings_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -21,6 +23,8 @@ final class AppRouter {
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
   static const String friends = '/friends';
+  static const String groups = '/groups';
+  static const String settings = '/settings';
   static const String addExpense = '/add-expense';
   static const String editExpense = '/group/:id/expense/:expenseId';
   static const String groupPicker = '/add-expense/choose-group';
@@ -130,7 +134,29 @@ final class AppRouter {
                 ),
               ),
             ),
+            GoRoute(
+              path: groups,
+              name: 'groups',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const GroupsScreen(),
+                ),
+              ),
+            ),
           ],
+        ),
+
+        // ── Settings (modal push, no shell nav bar) ───────────────────────
+        GoRoute(
+          path: settings,
+          name: 'settings',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const SettingsScreen(),
+            ),
+          ),
         ),
 
         // ── Modal flows (push on top, no shell nav bar) ────────────────────

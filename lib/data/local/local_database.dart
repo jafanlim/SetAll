@@ -17,7 +17,11 @@ class LocalDatabase {
   ///   • exchange_rates table – local mirror of Supabase exchange_rates
   /// Schema v5 adds:
   ///   • groups.type – 'normal' | 'direct' to distinguish friend vs group expenses
-  static const int _version = 5;
+  /// Schema v6 adds:
+  ///   • profiles.nickname – optional @handle
+  ///   • profiles.avatar_url – optional avatar URL
+  ///   • profiles.is_ghost – true for synthetic ghost users
+  static const int _version = 6;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -98,6 +102,13 @@ class LocalDatabase {
         "ALTER TABLE groups ADD COLUMN type TEXT NOT NULL DEFAULT 'normal'",
       );
     }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE profiles ADD COLUMN nickname TEXT');
+      await db.execute('ALTER TABLE profiles ADD COLUMN avatar_url TEXT');
+      await db.execute(
+        'ALTER TABLE profiles ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -154,6 +165,9 @@ class LocalDatabase {
       CREATE TABLE profiles (
         id               TEXT PRIMARY KEY,
         name             TEXT NOT NULL,
+        nickname         TEXT,
+        avatar_url       TEXT,
+        is_ghost         INTEGER NOT NULL DEFAULT 0,
         default_currency TEXT,
         synced_at        INTEGER
       )
