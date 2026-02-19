@@ -72,8 +72,14 @@ final groupBalanceSummaryProvider =
 // Groups & expenses
 // ---------------------------------------------------------------------------
 
+/// Normal (non-direct) groups for the Groups/Dashboard tab.
 final myGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getMyGroups();
+});
+
+/// Direct (1-on-1 friend) groups for the Friends tab.
+final friendGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getDirectGroups();
 });
 
 final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {

@@ -17,6 +17,15 @@ import '../models/split_model.dart';
 const String _deviceUserIdKey = 'device_user_id';
 const String _personalGroupName = 'Personal';
 
+/// Thrown when [SetAllRepository.createDirectGroup] cannot find a user with
+/// the given email address in the Supabase auth system.
+class DirectGroupUserNotFoundException implements Exception {
+  const DirectGroupUserNotFoundException();
+
+  @override
+  String toString() => 'DirectGroupUserNotFoundException: email not found';
+}
+
 // ---------------------------------------------------------------------------
 // Data transfer objects
 // ---------------------------------------------------------------------------
@@ -122,7 +131,6 @@ class SetAllRepository {
     }
   }
 
-  Future<LocalDatabase> get _local async => LocalDatabase.instance;
 
   // ---------------------------------------------------------------------------
   // Profile
@@ -411,10 +419,24 @@ class SetAllRepository {
     return GroupModel(id: id, name: _personalGroupName, creatorId: uid);
   }
 
+  /// Returns all normal (non-direct) groups the user belongs to.
+  /// Direct groups are shown separately in the Friends tab via [getDirectGroups].
   Future<List<GroupModel>> getMyGroups() async {
+    return _getGroupsByType(type: 'normal', includePersonal: true);
+  }
+
+  /// Returns all 1-on-1 direct groups the user belongs to.
+  Future<List<GroupModel>> getDirectGroups() async {
+    return _getGroupsByType(type: 'direct', includePersonal: false);
+  }
+
+  Future<List<GroupModel>> _getGroupsByType({
+    required String type,
+    required bool includePersonal,
+  }) async {
     final uid = await ensureUser();
     if (uid == null) return [];
-    await _getOrCreatePersonalGroup(uid);
+    if (includePersonal) await _getOrCreatePersonalGroup(uid);
 
     if (_isWeb && _client != null) {
       final memberRows = await _client
@@ -435,13 +457,16 @@ class SetAllRepository {
           .from('groups')
           .select()
           .inFilter('id', memberIds)
+          .eq('type', type)
           .order('updated_at', ascending: false) as List;
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
     }
 
     if (await _isOnline && _client != null) {
-      await syncPendingToSupabase();
-      await _syncFromSupabase(uid);
+      try {
+        await syncPendingToSupabase();
+        await _syncFromSupabase(uid);
+      } catch (_) {}
     }
 
     final memberRows = await LocalDatabase.db.query(
@@ -462,8 +487,9 @@ class SetAllRepository {
 
     final rows = await LocalDatabase.db.query(
       'groups',
-      where: 'id IN (${allIds.map((_) => '?').join(',')})',
-      whereArgs: allIds,
+      where:
+          "id IN (${allIds.map((_) => '?').join(',')}) AND (type = ? OR type IS NULL AND ? = 'normal')",
+      whereArgs: [...allIds, type, type],
       orderBy: 'updated_at DESC',
     );
     return rows.map(_rowToGroup).toList();
@@ -525,6 +551,90 @@ class SetAllRepository {
       } catch (_) {}
     }
     return GroupModel(id: id, name: name, creatorId: uid);
+  }
+
+  /// Creates a 1-on-1 direct group with [otherEmail].
+  ///
+  /// On web/Supabase: calls the `create_direct_group` RPC which is idempotent
+  /// (returns the existing direct group ID if one already exists).
+  /// On mobile (local-first): creates the group locally and syncs when online.
+  ///
+  /// Returns null if [otherEmail] is not found or an error occurs.
+  Future<GroupModel?> createDirectGroup(String otherEmail) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
+    final trimmedEmail = otherEmail.trim().toLowerCase();
+
+    if (_isWeb && _client != null) {
+      try {
+        final groupId = await _client.rpc(
+          'create_direct_group',
+          params: {'p_other_email': trimmedEmail},
+        ) as String?;
+        if (groupId == null) return null;
+        final rows = await _client
+            .from('groups')
+            .select()
+            .eq('id', groupId)
+            .limit(1) as List;
+        if (rows.isEmpty) return null;
+        return _rowToGroup(rows.first as Map<String, dynamic>);
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('user_not_found')) {
+          throw const DirectGroupUserNotFoundException();
+        }
+        rethrow;
+      }
+    }
+
+    // Mobile: resolve other user via Supabase, create locally, sync.
+    final client = _client;
+    if (client == null) return null;
+    try {
+      final groupId = await client.rpc(
+        'create_direct_group',
+        params: {'p_other_email': trimmedEmail},
+      ) as String?;
+      if (groupId == null) return null;
+
+      // Fetch full group data from Supabase to sync locally.
+      final rows = await client
+          .from('groups')
+          .select()
+          .eq('id', groupId)
+          .limit(1) as List;
+      if (rows.isEmpty) return null;
+      final group = _rowToGroup(rows.first as Map<String, dynamic>);
+      final now = _now();
+
+      // Upsert into local DB so offline access works.
+      await LocalDatabase.db.insert(
+        'groups',
+        {
+          'id': group.id,
+          'name': group.name,
+          'creator_id': group.creatorId,
+          'type': group.type.name,
+          'created_at': now,
+          'updated_at': now,
+          'synced_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      await LocalDatabase.db.insert(
+        'group_members',
+        {'group_id': group.id, 'user_id': uid, 'joined_at': now, 'synced_at': null},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+      return group;
+    } catch (e) {
+      final msg = e.toString();
+      if (msg.contains('user_not_found')) {
+        throw const DirectGroupUserNotFoundException();
+      }
+      rethrow;
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -1322,11 +1432,7 @@ class SetAllRepository {
 
   String _now() => DateTime.now().toUtc().toIso8601String();
 
-  GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel(
-        id: row['id'] as String,
-        name: row['name'] as String,
-        creatorId: row['creator_id'] as String,
-      );
+  GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
 
   ExpenseModel _rowToExpense(Map<String, dynamic> row) => ExpenseModel(
         id: row['id'] as String,

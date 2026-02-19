@@ -37,7 +37,11 @@ class BalanceService {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
-    await _repo.syncIfOnline();
+    try {
+      await _repo.syncIfOnline();
+    } catch (_) {
+      // Sync failure is non-fatal — continue with cached/local data.
+    }
     final baseCurrency = await getBaseCurrency();
     final raw = await _repo.getBalanceRawData(uid);
 
@@ -63,7 +67,11 @@ class BalanceService {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
-    await _repo.syncIfOnline();
+    try {
+      await _repo.syncIfOnline();
+    } catch (_) {
+      // Sync failure is non-fatal — continue with cached/local data.
+    }
     final baseCurrency = await getBaseCurrency();
     final raw = await _repo.getGroupBalanceRawData(uid, groupId);
     if (raw == null) return BalanceSummary(currency: baseCurrency);
@@ -101,7 +109,14 @@ class BalanceService {
     }
 
     // Priority 4: live rate lookup (v1-v2 legacy data, last resort)
-    final rate = await _currency.getRate(e.currency, baseCurrency);
-    return (e.amount * rate).round(scale: 2);
+    try {
+      final rate = await _currency.getRate(e.currency, baseCurrency);
+      return (e.amount * rate).round(scale: 2);
+    } catch (_) {
+      // Priority 5: graceful degradation — return raw amount and surface it
+      // as-is so balance still renders rather than crashing. Mis-currency data
+      // will be off until rates are available, but the dashboard stays usable.
+      return e.amount.round(scale: 2);
+    }
   }
 }

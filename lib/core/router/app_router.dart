@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import '../layout/adaptive_shell.dart';
 import '../services/biometric_service.dart';
 import '../../features/auth/presentation/screens/biometric_gate_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
+import '../../features/dashboard/presentation/screens/invite_member_screen.dart';
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
+import '../../features/friends/presentation/screens/friends_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -17,10 +20,12 @@ final class AppRouter {
   static const String login = '/login';
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
+  static const String friends = '/friends';
   static const String addExpense = '/add-expense';
   static const String editExpense = '/group/:id/expense/:expenseId';
   static const String groupPicker = '/add-expense/choose-group';
   static const String groupDetail = '/group/:id';
+  static const String inviteMember = '/group/:id/invite';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -97,16 +102,38 @@ final class AppRouter {
             ),
           ),
         ),
-        GoRoute(
-          path: dashboard,
-          name: 'dashboard',
-          pageBuilder: (context, state) => NoTransitionPage(
-            child: Material(
-              color: Theme.of(context).colorScheme.surface,
-              child: const DashboardScreen(),
-            ),
+
+        // ── Shell: persistent nav bar wrapping Dashboard + Friends ─────────
+        ShellRoute(
+          builder: (context, state, child) => AdaptiveShell(
+            currentPath: state.matchedLocation,
+            child: child,
           ),
+          routes: [
+            GoRoute(
+              path: dashboard,
+              name: 'dashboard',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const DashboardScreen(),
+                ),
+              ),
+            ),
+            GoRoute(
+              path: friends,
+              name: 'friends',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const FriendsScreen(),
+                ),
+              ),
+            ),
+          ],
         ),
+
+        // ── Modal flows (push on top, no shell nav bar) ────────────────────
         GoRoute(
           path: groupPicker,
           name: 'groupPicker',
@@ -161,6 +188,24 @@ final class AppRouter {
                     color: Theme.of(context).colorScheme.surface,
                     child: EditExpenseScreen(
                       expenseId: expenseId,
+                      groupId: groupId,
+                      groupName: groupName,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'invite',
+              name: 'inviteMember',
+              pageBuilder: (context, state) {
+                final groupId = state.pathParameters['id']!;
+                final extra = state.extra as Map<String, dynamic>?;
+                final groupName = extra?['groupName'] as String? ?? 'Group';
+                return MaterialPage(
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: InviteMemberScreen(
                       groupId: groupId,
                       groupName: groupName,
                     ),

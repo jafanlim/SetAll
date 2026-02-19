@@ -15,7 +15,9 @@ class LocalDatabase {
   /// Schema v4 adds:
   ///   • expenses.base_amount_at_entry – frozen base-currency total at entry time
   ///   • exchange_rates table – local mirror of Supabase exchange_rates
-  static const int _version = 4;
+  /// Schema v5 adds:
+  ///   • groups.type – 'normal' | 'direct' to distinguish friend vs group expenses
+  static const int _version = 5;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -90,6 +92,12 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 5) {
+      // Group type: 'normal' for shared groups, 'direct' for 1-on-1 friend expenses.
+      await db.execute(
+        "ALTER TABLE groups ADD COLUMN type TEXT NOT NULL DEFAULT 'normal'",
+      );
+    }
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -98,6 +106,7 @@ class LocalDatabase {
         id         TEXT PRIMARY KEY,
         name       TEXT NOT NULL,
         creator_id TEXT NOT NULL,
+        type       TEXT NOT NULL DEFAULT 'normal',
         created_at TEXT,
         updated_at TEXT,
         synced_at  INTEGER
