@@ -3,8 +3,18 @@ import 'package:decimal/decimal.dart';
 import '../../data/repositories/setall_repository.dart';
 import 'currency_service.dart';
 
-/// Multi-currency balance: all amounts converted to user's base currency before summing.
-/// Manual overrides are used per-expense via stored exchange_rate_applied.
+/// Multi-currency balance: all split amounts converted to the user's base
+/// currency before summing.
+///
+/// Conversion priority per [BalanceEntry]:
+///  1. [BalanceEntry.baseAmountAtEntry] – frozen value written at entry time
+///     (schema v4+). Fastest path: no API call, immune to rate drift, works
+///     fully offline. Eliminates the "$104 bug".
+///  2. Currency match – if the expense currency equals the user's base currency
+///     the split amount is already correct.
+///  3. [BalanceEntry.exchangeRateApplied] – rate persisted at entry (v3+ data).
+///     Avoids live-rate drift for historical expenses.
+///  4. Live rate from [CurrencyService] – last resort for v1-v2 legacy data.
 class BalanceService {
   BalanceService({
     required SetAllRepository repository,
@@ -17,14 +27,12 @@ class BalanceService {
 
   static const String _defaultBaseCurrency = 'USD';
 
-  /// Base currency for the current user (from profile). Default USD.
   Future<String> getBaseCurrency() async {
     final profile = await _repo.getCurrentUserProfile();
     return profile?.defaultCurrency ?? _defaultBaseCurrency;
   }
 
-  /// Global net balance: you are owed and you owe, both in [baseCurrency].
-  /// Converts every split to base using expense's exchange_rate_applied or live rate.
+  /// Global net balance (you are owed / you owe), in user's base currency.
   Future<BalanceSummary> getBalanceSummary() async {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
@@ -76,12 +84,23 @@ class BalanceService {
     );
   }
 
-  /// Convert entry to base: if exchange_rate_applied is set, amount is already in base; else convert.
+  /// Convert a split entry to [baseCurrency] using Decimal arithmetic.
   Future<Decimal> _toBase(BalanceEntry e, String baseCurrency) async {
-    if (e.exchangeRateApplied != null) {
-      return e.amount;
-    }
+    // Priority 1: pre-computed base amount (schema v4+, zero API calls needed)
+    if (e.baseAmountAtEntry != null) return e.baseAmountAtEntry!;
+
+    // Priority 2: split already in base currency (new data, v1-v3)
     if (e.currency == baseCurrency) return e.amount;
+
+    // Priority 3: use the rate persisted at entry time (v3 legacy data)
+    if (e.exchangeRateApplied != null) {
+      final stored = Decimal.tryParse(e.exchangeRateApplied!);
+      if (stored != null && stored > Decimal.zero) {
+        return (e.amount * stored).round(scale: 2);
+      }
+    }
+
+    // Priority 4: live rate lookup (v1-v2 legacy data, last resort)
     final rate = await _currency.getRate(e.currency, baseCurrency);
     return (e.amount * rate).round(scale: 2);
   }

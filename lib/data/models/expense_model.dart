@@ -11,6 +11,10 @@ class ExpenseModel extends Expense {
     super.splitType = SplitType.even,
     super.category = 'General',
     super.createdAt,
+    super.originalAmount,
+    super.originalCurrency,
+    super.exchangeRateApplied,
+    super.baseAmountAtEntry,
   });
 
   static SplitType _splitTypeFromString(String? v) {
@@ -29,12 +33,16 @@ class ExpenseModel extends Expense {
       id: json['id'] as String,
       groupId: json['group_id'] as String,
       payerId: json['payer_id'] as String,
-      amount: (json['amount'] as num).toString(),
+      amount: (json['amount'] ?? '0').toString(),
       description: (json['description'] as String?) ?? '',
       currency: (json['currency'] as String?) ?? 'USD',
       splitType: _splitTypeFromString(json['split_type'] as String?),
       category: (json['category'] as String?) ?? 'General',
       createdAt: json['created_at'] as String?,
+      originalAmount: json['original_amount']?.toString(),
+      originalCurrency: json['original_currency'] as String?,
+      exchangeRateApplied: json['exchange_rate_applied']?.toString(),
+      baseAmountAtEntry: json['base_amount_at_entry']?.toString(),
     );
   }
 
@@ -48,5 +56,9 @@ class ExpenseModel extends Expense {
         'split_type': splitType.name,
         'category': category,
         'created_at': createdAt,
+        if (originalAmount != null) 'original_amount': originalAmount,
+        if (originalCurrency != null) 'original_currency': originalCurrency,
+        if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
+        if (baseAmountAtEntry != null) 'base_amount_at_entry': baseAmountAtEntry,
       };
 }

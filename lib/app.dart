@@ -26,7 +26,7 @@ class SetAllApp extends ConsumerWidget {
           designSize: const Size(ScalingUtility.designWidth, ScalingUtility.designHeight),
           minTextAdapt: true,
           splitScreenMode: true,
-          builder: (_, __) {
+          builder: (_, _) {
             ScalingUtility.init(context);
             final theme = Theme.of(context);
             return Container(

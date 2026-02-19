@@ -1,6 +1,7 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -10,7 +11,50 @@ import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
-const List<String> kCurrencies = ['USD', 'EUR', 'GBP'];
+// ---------------------------------------------------------------------------
+// Currency catalogue (ISO 4217 top-30 by trading volume/prevalence)
+// ---------------------------------------------------------------------------
+const List<Map<String, String>> kCurrencyList = [
+  {'code': 'USD', 'name': 'US Dollar',           'flag': '🇺🇸'},
+  {'code': 'EUR', 'name': 'Euro',                 'flag': '🇪🇺'},
+  {'code': 'GBP', 'name': 'British Pound',        'flag': '🇬🇧'},
+  {'code': 'JPY', 'name': 'Japanese Yen',         'flag': '🇯🇵'},
+  {'code': 'AUD', 'name': 'Australian Dollar',    'flag': '🇦🇺'},
+  {'code': 'CAD', 'name': 'Canadian Dollar',      'flag': '🇨🇦'},
+  {'code': 'CHF', 'name': 'Swiss Franc',          'flag': '🇨🇭'},
+  {'code': 'CNY', 'name': 'Chinese Yuan',         'flag': '🇨🇳'},
+  {'code': 'HKD', 'name': 'Hong Kong Dollar',     'flag': '🇭🇰'},
+  {'code': 'NZD', 'name': 'New Zealand Dollar',   'flag': '🇳🇿'},
+  {'code': 'SEK', 'name': 'Swedish Krona',        'flag': '🇸🇪'},
+  {'code': 'KRW', 'name': 'South Korean Won',     'flag': '🇰🇷'},
+  {'code': 'SGD', 'name': 'Singapore Dollar',     'flag': '🇸🇬'},
+  {'code': 'NOK', 'name': 'Norwegian Krone',      'flag': '🇳🇴'},
+  {'code': 'MXN', 'name': 'Mexican Peso',         'flag': '🇲🇽'},
+  {'code': 'INR', 'name': 'Indian Rupee',         'flag': '🇮🇳'},
+  {'code': 'RUB', 'name': 'Russian Ruble',        'flag': '🇷🇺'},
+  {'code': 'ZAR', 'name': 'South African Rand',   'flag': '🇿🇦'},
+  {'code': 'TRY', 'name': 'Turkish Lira',         'flag': '🇹🇷'},
+  {'code': 'BRL', 'name': 'Brazilian Real',       'flag': '🇧🇷'},
+  {'code': 'THB', 'name': 'Thai Baht',            'flag': '🇹🇭'},
+  {'code': 'DKK', 'name': 'Danish Krone',         'flag': '🇩🇰'},
+  {'code': 'PLN', 'name': 'Polish Zloty',         'flag': '🇵🇱'},
+  {'code': 'TWD', 'name': 'Taiwan Dollar',        'flag': '🇹🇼'},
+  {'code': 'CZK', 'name': 'Czech Koruna',         'flag': '🇨🇿'},
+  {'code': 'HUF', 'name': 'Hungarian Forint',     'flag': '🇭🇺'},
+  {'code': 'ILS', 'name': 'Israeli Shekel',       'flag': '🇮🇱'},
+  {'code': 'MYR', 'name': 'Malaysian Ringgit',    'flag': '🇲🇾'},
+  {'code': 'PHP', 'name': 'Philippine Peso',      'flag': '🇵🇭'},
+  {'code': 'AED', 'name': 'UAE Dirham',           'flag': '🇦🇪'},
+];
+
+List<String> get kCurrencyCodes =>
+    kCurrencyList.map((c) => c['code']!).toList();
+
+// ---------------------------------------------------------------------------
+// Fintech accent colours (must match dashboard)
+// ---------------------------------------------------------------------------
+const _teal = Color(0xFF00D9B0);
+const _orange = Color(0xFFFF8C42);
 
 enum _SplitMode { even, percentage, shares, manual }
 
@@ -30,8 +74,9 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _descriptionController = TextEditingController();
+  final _amountCtrl = TextEditingController();
+  final _descriptionCtrl = TextEditingController();
+  final _rateOverrideCtrl = TextEditingController();
 
   int _step = 0;
   static const int _totalSteps = 3;
@@ -40,10 +85,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String _category = 'General';
   _SplitMode _splitMode = _SplitMode.even;
   bool _isSubmitting = false;
-  final _rateOverrideController = TextEditingController();
 
-  /// For percentage: index -> percentage (0-100). For shares: index -> shares. For manual: index -> amount.
-  final List<TextEditingController> _customControllers = [];
+  final List<TextEditingController> _customCtrl = [];
   List<String> _memberIds = [];
   List<String> _memberNames = [];
 
@@ -60,41 +103,52 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() {
       _memberIds = members.map((m) => m.id).toList();
       _memberNames = members.map((m) => m.name).toList();
-      _customControllers.clear();
-      for (var i = 0; i < _memberIds.length; i++) {
-        _customControllers.add(TextEditingController(text: _splitMode == _SplitMode.percentage ? '${100 ~/ _memberIds.length}' : '1'));
-      }
+      _rebuildControllers();
     });
+  }
+
+  void _rebuildControllers() {
+    for (final c in _customCtrl) {
+      c.dispose();
+    }
+    _customCtrl.clear();
+    final n = _memberIds.length;
+    for (var i = 0; i < n; i++) {
+      final text = _splitMode == _SplitMode.percentage
+          ? '${i < n - 1 ? 100 ~/ n : 100 - (100 ~/ n) * (n - 1)}'
+          : '1';
+      _customCtrl.add(TextEditingController(text: text));
+    }
   }
 
   @override
   void dispose() {
-    _amountController.dispose();
-    _descriptionController.dispose();
-    _rateOverrideController.dispose();
-    for (final c in _customControllers) {
+    _amountCtrl.dispose();
+    _descriptionCtrl.dispose();
+    _rateOverrideCtrl.dispose();
+    for (final c in _customCtrl) {
       c.dispose();
     }
     super.dispose();
   }
 
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
+
   void _nextStep() {
     if (_step == 0 && !_validateAmount()) return;
     HapticUtils.primaryTap();
-    setState(() {
-      if (_step < _totalSteps - 1) _step++;
-    });
+    setState(() { if (_step < _totalSteps - 1) _step++; });
   }
 
   void _prevStep() {
     HapticUtils.lightTap();
-    setState(() {
-      if (_step > 0) _step--;
-    });
+    setState(() { if (_step > 0) _step--; });
   }
 
   bool _validateAmount() {
-    final v = _amountController.text.trim().replaceAll(',', '.');
+    final v = _amountCtrl.text.trim().replaceAll(',', '.');
     final d = Decimal.tryParse(v);
     if (d == null || d <= Decimal.zero) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -105,9 +159,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     return true;
   }
 
+  // ---------------------------------------------------------------------------
+  // Submit
+  // ---------------------------------------------------------------------------
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    final amountStr = _amountController.text.trim().replaceAll(',', '.');
+    final amountStr = _amountCtrl.text.trim().replaceAll(',', '.');
     final amount = Decimal.tryParse(amountStr);
     if (amount == null || amount <= Decimal.zero) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -128,18 +186,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
 
     if (widget.groupId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Choose a group first')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Choose a group first')));
       return;
     }
-
     if (_memberIds.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No members in this group. Add members first.')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No members in this group. Add members first.')),
+      );
       return;
     }
 
@@ -148,22 +202,22 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     setState(() => _isSubmitting = true);
 
+    // -- Build split results --------------------------------------------------
     List<SplitResult> results;
-    SplitType splitType = SplitType.even;
+    SplitType splitType;
 
     switch (_splitMode) {
       case _SplitMode.even:
-        results = SplitEngine.splitEven(total: amount, participantIds: _memberIds);
+        results = SplitEngine.splitEven(
+          total: amount,
+          participantIds: _memberIds,
+        );
         splitType = SplitType.even;
-        break;
       case _SplitMode.percentage:
-        final percents = <Decimal>[];
-        var sum = Decimal.zero;
-        for (final c in _customControllers) {
-          final p = Decimal.tryParse(c.text.trim()) ?? Decimal.zero;
-          percents.add(p);
-          sum += p;
-        }
+        final percents = _customCtrl
+            .map((c) => Decimal.tryParse(c.text.trim()) ?? Decimal.zero)
+            .toList();
+        final sum = percents.fold(Decimal.zero, (a, b) => a + b);
         if (sum <= Decimal.zero) {
           if (mounted) {
             setState(() => _isSubmitting = false);
@@ -179,13 +233,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           weights: percents,
         );
         splitType = SplitType.parts;
-        break;
       case _SplitMode.shares:
-        final shares = <Decimal>[];
-        for (final c in _customControllers) {
-          final s = Decimal.tryParse(c.text.trim()) ?? Decimal.zero;
-          shares.add(s);
-        }
+        final shares = _customCtrl
+            .map((c) => Decimal.tryParse(c.text.trim()) ?? Decimal.zero)
+            .toList();
         if (shares.every((s) => s <= Decimal.zero)) {
           if (mounted) {
             setState(() => _isSubmitting = false);
@@ -201,20 +252,22 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           weights: shares,
         );
         splitType = SplitType.parts;
-        break;
       case _SplitMode.manual:
-        final amounts = <Decimal>[];
-        Decimal totalManual = Decimal.zero;
-        for (final c in _customControllers) {
-          final a = Decimal.tryParse(c.text.trim().replaceAll(',', '.')) ?? Decimal.zero;
-          amounts.add(a);
-          totalManual += a;
-        }
+        final amounts = _customCtrl
+            .map((c) =>
+                Decimal.tryParse(c.text.trim().replaceAll(',', '.')) ??
+                Decimal.zero)
+            .toList();
+        final totalManual = amounts.fold(Decimal.zero, (a, b) => a + b);
         if (totalManual != amount) {
           if (mounted) {
             setState(() => _isSubmitting = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Amounts must sum to $amount (got $totalManual)')),
+              SnackBar(
+                content: Text(
+                  'Amounts must sum to $amount (got $totalManual)',
+                ),
+              ),
             );
           }
           return;
@@ -225,26 +278,36 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           amountsOwed: amounts,
         );
         splitType = SplitType.manual;
-        break;
     }
 
+    // -- Currency conversion --------------------------------------------------
+    // Always compute base_amount_at_entry regardless of currency match to
+    // guarantee the field is set on every new expense (eliminates $104 bug).
     Decimal amountToStore = amount;
     String currencyToStore = _currency;
     Decimal? originalAmount;
     String? originalCurrency;
     String? exchangeRateApplied;
-    List<SplitInsert> splitsToStore;
+    late Decimal baseAmountAtEntry;
+    late List<SplitInsert> splitsToStore;
 
     if (_currency == baseCurrency) {
-      splitsToStore = results.map((r) => SplitInsert(userId: r.userId, amountOwed: r.amountOwed)).toList();
+      baseAmountAtEntry = amount;
+      splitsToStore = results
+          .map((r) => SplitInsert(userId: r.userId, amountOwed: r.amountOwed))
+          .toList();
     } else {
       final rate = await currencyService.getRate(_currency, baseCurrency);
       amountToStore = (amount * rate).round(scale: 2);
+      baseAmountAtEntry = amountToStore;
       originalAmount = amount;
       originalCurrency = _currency;
       exchangeRateApplied = rate.toString();
       splitsToStore = results
-          .map((r) => SplitInsert(userId: r.userId, amountOwed: (r.amountOwed * rate).round(scale: 2)))
+          .map((r) => SplitInsert(
+                userId: r.userId,
+                amountOwed: (r.amountOwed * rate).round(scale: 2),
+              ))
           .toList();
       currencyToStore = baseCurrency;
     }
@@ -253,7 +316,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       groupId: widget.groupId,
       payerId: payerId,
       amount: amountToStore,
-      description: _descriptionController.text.trim(),
+      description: _descriptionCtrl.text.trim(),
       currency: currencyToStore,
       splitType: splitType,
       splits: splitsToStore,
@@ -261,6 +324,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       originalAmount: originalAmount,
       originalCurrency: originalCurrency,
       exchangeRateApplied: exchangeRateApplied,
+      baseAmountAtEntry: baseAmountAtEntry,
     );
 
     if (mounted) {
@@ -272,16 +336,24 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ref.invalidate(groupExpensesProvider(widget.groupId));
         ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Expense saved')),
+          SnackBar(
+            content: const Text('Expense saved'),
+            backgroundColor: _teal.withValues(alpha: 0.9),
+          ),
         );
         context.pop();
       } else {
+        HapticUtils.lightTap();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Could not save expense')),
         );
       }
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Build
+  // ---------------------------------------------------------------------------
 
   @override
   Widget build(BuildContext context) {
@@ -290,9 +362,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text('Add expense · ${_step + 1}/$_totalSteps'),
+        title: Text(
+          'Add expense · ${_step + 1}/$_totalSteps',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+        ),
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
+        scrolledUnderElevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () {
@@ -304,22 +380,33 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
           children: [
             if (widget.groupName.isNotEmpty)
               Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(
-                  widget.groupName,
-                  style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                padding: EdgeInsets.only(bottom: 10.h),
+                child: Row(
+                  children: [
+                    Icon(Icons.group_outlined,
+                        size: 14.sp,
+                        color: theme.colorScheme.onSurfaceVariant),
+                    SizedBox(width: 6.w),
+                    Text(
+                      widget.groupName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontSize: 12.sp,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             _stepIndicator(theme),
-            const SizedBox(height: 24),
+            SizedBox(height: 20.h),
             if (_step == 0) _buildStepAmount(theme),
             if (_step == 1) _buildStepSplit(theme),
             if (_step == 2) _buildStepDetails(theme),
-            const SizedBox(height: 24),
+            SizedBox(height: 24.h),
             Row(
               children: [
                 if (_step > 0)
@@ -332,28 +419,44 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 if (_step < _totalSteps - 1)
                   FilledButton.icon(
                     onPressed: _nextStep,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _teal,
+                      foregroundColor: Colors.black,
+                    ),
                     icon: const Icon(Icons.arrow_forward),
                     label: const Text('Next'),
                   )
                 else
                   FilledButton.icon(
                     onPressed: _isSubmitting ? null : _submit,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: _teal,
+                      foregroundColor: Colors.black,
+                    ),
                     icon: _isSubmitting
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                        ? SizedBox(
+                            width: 18.w,
+                            height: 18.w,
+                            child: const CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.black54,
+                            ),
                           )
                         : const Icon(Icons.check),
                     label: Text(_isSubmitting ? 'Saving…' : 'Save expense'),
                   ),
               ],
             ),
+            SizedBox(height: 32.h),
           ],
         ),
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Step indicator
+  // ---------------------------------------------------------------------------
 
   Widget _stepIndicator(ThemeData theme) {
     return Row(
@@ -362,14 +465,17 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         final done = i < _step;
         return Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: Container(
-              height: 4,
+            padding: EdgeInsets.symmetric(horizontal: 2.w),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              height: 4.h,
               decoration: BoxDecoration(
                 color: active
-                    ? theme.colorScheme.primary
-                    : (done ? theme.colorScheme.primary.withValues(alpha: 0.5) : theme.colorScheme.surfaceContainerHighest),
-                borderRadius: BorderRadius.circular(2),
+                    ? _teal
+                    : done
+                        ? _teal.withValues(alpha: 0.4)
+                        : theme.colorScheme.surfaceContainerHighest,
+                borderRadius: BorderRadius.circular(2.r),
               ),
             ),
           ),
@@ -377,6 +483,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Step 1 – Amount & Currency
+  // ---------------------------------------------------------------------------
 
   Widget _buildStepAmount(ThemeData theme) {
     final baseAsync = ref.watch(baseCurrencyProvider);
@@ -386,33 +496,53 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         : null;
     final rateStr = rateAsync?.valueOrNull;
     final rate = rateStr != null ? Decimal.tryParse(rateStr) : null;
-    final amountStr = _amountController.text.trim().replaceAll(',', '.');
+    final amountStr = _amountCtrl.text.trim().replaceAll(',', '.');
     final amountForPreview = Decimal.tryParse(amountStr);
-    final convertedPreview = (base != null && base != _currency && rate != null && amountForPreview != null && amountForPreview > Decimal.zero)
+    final convertedPreview = (base != null &&
+            base != _currency &&
+            rate != null &&
+            amountForPreview != null &&
+            amountForPreview > Decimal.zero)
         ? (amountForPreview * rate).round(scale: 2)
         : null;
 
-    final rateDisplayAsync = _currency == 'USD' ? null : ref.watch(exchangeRateProvider(_currency));
     return GlassCard(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Amount & currency',
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 15.sp,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16.h),
+
+          // Amount field
           TextFormField(
-            controller: _amountController,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(
-              labelText: 'Amount',
-              prefixText: '  ',
+            controller: _amountCtrl,
+            keyboardType:
+                const TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(
+              fontSize: 22.sp,
+              fontWeight: FontWeight.w700,
+              color: _teal,
             ),
+            decoration: InputDecoration(
+              labelText: 'Amount',
+              labelStyle: TextStyle(fontSize: 13.sp),
+              prefixIcon: const Icon(Icons.attach_money, color: _teal),
+              filled: true,
+              fillColor:
+                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (_) => setState(() {}),
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Enter amount';
               final d = Decimal.tryParse(v.trim().replaceAll(',', '.'));
@@ -420,70 +550,58 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               return null;
             },
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _currency,
-            decoration: const InputDecoration(labelText: 'Currency'),
-            items: kCurrencies.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-            onChanged: (v) => setState(() => _currency = v ?? 'USD'),
+          SizedBox(height: 12.h),
+
+          // Currency picker
+          _CurrencyPicker(
+            selected: _currency,
+            onChanged: (code) {
+              HapticUtils.selection();
+              setState(() {
+                _currency = code;
+                _rateOverrideCtrl.clear();
+              });
+            },
           ),
-          if (convertedPreview != null && base != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Converted Amount Preview: ≈ $convertedPreview $base',
-              style: theme.textTheme.titleSmall?.copyWith(
-                color: theme.colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
+          SizedBox(height: 12.h),
+
+          // Conversion preview
+          if (convertedPreview != null && base != null)
+            _ConversionPreviewChip(
+              fromAmount: amountForPreview!,
+              fromCurrency: _currency,
+              toAmount: convertedPreview,
+              toCurrency: base,
             ),
-          ],
-          if (_currency != 'USD' && rateDisplayAsync != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Live rate: 1 USD = ${rateDisplayAsync.when(
-                data: (r) => '$r $_currency',
-                loading: () => '…',
-                error: (e, st) => '—',
-              )}',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+
+          // DB rate display + manual override
+          if (base != null && base != _currency) ...[
+            SizedBox(height: 12.h),
+            _RateDisplayRow(
+              fromCurrency: _currency,
+              toCurrency: base,
+              rateAsync: rateAsync,
             ),
-            const SizedBox(height: 8),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _rateOverrideController,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                    decoration: InputDecoration(
-                      labelText: 'Manual override (e.g. bank fee)',
-                      hintText: '1 USD = ? $_currency',
-                      isDense: true,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                TextButton(
-                  onPressed: () async {
-                    final v = _rateOverrideController.text.trim();
-                    if (v.isEmpty) {
-                      final svc = ref.read(currencyServiceProvider);
-                      await svc.clearManualOverride('USD', _currency);
-                      ref.invalidate(exchangeRateProvider(_currency));
-                      if (mounted) setState(() {});
-                      return;
-                    }
-                    final d = Decimal.tryParse(v.replaceAll(',', '.'));
-                    if (d == null || d <= Decimal.zero) return;
-                    final svc = ref.read(currencyServiceProvider);
-                    await svc.setManualOverride('USD', _currency, d);
-                    ref.invalidate(exchangeRateProvider(_currency));
-                    if (mounted) setState(() {});
-                    HapticUtils.success();
-                  },
-                  child: const Text('Apply'),
-                ),
-              ],
+            SizedBox(height: 8.h),
+            _ManualRateRow(
+              rateCtrl: _rateOverrideCtrl,
+              fromCurrency: _currency,
+              toCurrency: base,
+              onApply: () async {
+                final v = _rateOverrideCtrl.text.trim();
+                final svc = ref.read(currencyServiceProvider);
+                if (v.isEmpty) {
+                  await svc.clearManualOverride(_currency, base);
+                } else {
+                  final d = Decimal.tryParse(v.replaceAll(',', '.'));
+                  if (d != null && d > Decimal.zero) {
+                    await svc.setManualOverride(_currency, base, d);
+                  }
+                }
+                ref.invalidate(rateToBaseProvider((from: _currency, base: base)));
+                if (mounted) setState(() {});
+                HapticUtils.success();
+              },
             ),
           ],
         ],
@@ -491,88 +609,121 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Step 2 – Split
+  // ---------------------------------------------------------------------------
+
   Widget _buildStepSplit(ThemeData theme) {
     return GlassCard(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'How to split',
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 15.sp,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 14.h),
           SegmentedButton<_SplitMode>(
-            segments: const [
-              ButtonSegment(value: _SplitMode.even, label: Text('Even'), icon: Icon(Icons.equalizer)),
-              ButtonSegment(value: _SplitMode.percentage, label: Text('%'), icon: Icon(Icons.percent)),
-              ButtonSegment(value: _SplitMode.shares, label: Text('Shares'), icon: Icon(Icons.pie_chart_outline)),
-              ButtonSegment(value: _SplitMode.manual, label: Text('Manual'), icon: Icon(Icons.edit)),
+            segments: [
+              ButtonSegment(
+                value: _SplitMode.even,
+                label: Text('Even', style: TextStyle(fontSize: 11.sp)),
+                icon: Icon(Icons.equalizer, size: 14.sp),
+              ),
+              ButtonSegment(
+                value: _SplitMode.percentage,
+                label: Text('%', style: TextStyle(fontSize: 11.sp)),
+                icon: Icon(Icons.percent, size: 14.sp),
+              ),
+              ButtonSegment(
+                value: _SplitMode.shares,
+                label: Text('Shares', style: TextStyle(fontSize: 11.sp)),
+                icon: Icon(Icons.pie_chart_outline, size: 14.sp),
+              ),
+              ButtonSegment(
+                value: _SplitMode.manual,
+                label: Text('Manual', style: TextStyle(fontSize: 11.sp)),
+                icon: Icon(Icons.edit, size: 14.sp),
+              ),
             ],
             selected: {_splitMode},
-            onSelectionChanged: (Set<_SplitMode> s) {
+            onSelectionChanged: (s) {
               HapticUtils.selection();
               setState(() {
                 _splitMode = s.isNotEmpty ? s.first : _splitMode;
-                for (final c in _customControllers) {
-                  c.dispose();
-                }
-                _customControllers.clear();
-                final n = _memberIds.length;
-                for (var i = 0; i < n; i++) {
-                  if (_splitMode == _SplitMode.percentage) {
-                    final p = n > 0 ? (i < n - 1 ? 100 ~/ n : 100 - (100 ~/ n) * (n - 1)) : 0;
-                    _customControllers.add(TextEditingController(text: '$p'));
-                  } else {
-                    _customControllers.add(TextEditingController(text: '1'));
-                  }
-                }
+                _rebuildControllers();
               });
             },
             style: ButtonStyle(
               backgroundColor: WidgetStateProperty.resolveWith((states) {
-                if (states.contains(WidgetState.selected)) return theme.colorScheme.primaryContainer;
+                if (states.contains(WidgetState.selected)) {
+                  return _teal.withValues(alpha: 0.15);
+                }
                 return theme.colorScheme.surfaceContainerHighest;
+              }),
+              foregroundColor: WidgetStateProperty.resolveWith((states) {
+                if (states.contains(WidgetState.selected)) return _teal;
+                return theme.colorScheme.onSurfaceVariant;
               }),
             ),
           ),
           if (_splitMode != _SplitMode.even) ...[
-            const SizedBox(height: 16),
+            SizedBox(height: 16.h),
             Text(
               _splitMode == _SplitMode.percentage
-                  ? 'Percentage per person (should sum to 100)'
+                  ? 'Percentage per person (total = 100)'
                   : _splitMode == _SplitMode.shares
-                      ? 'Shares per person'
+                      ? 'Relative shares per person'
                       : 'Exact amount per person',
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontSize: 11.sp,
+              ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8.h),
             ...List.generate(_memberIds.length, (i) {
-              if (_customControllers.length <= i) return const SizedBox.shrink();
+              if (_customCtrl.length <= i) return const SizedBox.shrink();
               return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: EdgeInsets.only(bottom: 8.h),
                 child: Row(
                   children: [
                     Expanded(
                       flex: 2,
                       child: Text(
-                        _memberNames.length > i ? _memberNames[i] : 'Member ${i + 1}',
-                        style: theme.textTheme.bodyMedium,
+                        _memberNames.length > i
+                            ? _memberNames[i]
+                            : 'Member ${i + 1}',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(fontSize: 13.sp),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12.w),
                     SizedBox(
-                      width: 100,
+                      width: 90.w,
                       child: TextFormField(
-                        controller: _customControllers[i],
-                        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                        controller: _customCtrl[i],
+                        keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true),
+                        style: TextStyle(fontSize: 13.sp),
                         decoration: InputDecoration(
-                          hintText: _splitMode == _SplitMode.percentage ? '%' : _splitMode == _SplitMode.shares ? 'Shares' : 'Amount',
+                          hintText: _splitMode == _SplitMode.percentage
+                              ? '%'
+                              : _splitMode == _SplitMode.shares
+                                  ? 'x'
+                                  : _currency,
                           isDense: true,
+                          filled: true,
+                          fillColor: theme.colorScheme.surfaceContainerHighest
+                              .withValues(alpha: 0.4),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                            borderSide: BorderSide.none,
+                          ),
                         ),
                       ),
                     ),
@@ -580,40 +731,407 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
               );
             }),
+          ] else ...[
+            SizedBox(height: 14.h),
+            Container(
+              padding: EdgeInsets.all(12.w),
+              decoration: BoxDecoration(
+                color: _teal.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10.r),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.equalizer, color: _teal, size: 16.sp),
+                  SizedBox(width: 8.w),
+                  Text(
+                    'Split evenly among ${_memberIds.length} members',
+                    style: TextStyle(color: _teal, fontSize: 12.sp),
+                  ),
+                ],
+              ),
+            ),
           ],
         ],
       ),
     );
   }
 
+  // ---------------------------------------------------------------------------
+  // Step 3 – Details
+  // ---------------------------------------------------------------------------
+
   Widget _buildStepDetails(ThemeData theme) {
     return GlassCard(
-      padding: const EdgeInsets.all(20),
+      padding: EdgeInsets.all(20.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             'Details',
             style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: theme.colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+              fontSize: 15.sp,
             ),
           ),
-          const SizedBox(height: 16),
-          DropdownButtonFormField<String>(
-            value: _category,
-            decoration: const InputDecoration(labelText: 'Category'),
-            items: kExpenseCategories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
-            onChanged: (v) => setState(() => _category = v ?? 'General'),
+          SizedBox(height: 16.h),
+          // Category chips
+          Text(
+            'Category',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+              fontSize: 11.sp,
+            ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 8.h),
+          Wrap(
+            spacing: 8.w,
+            runSpacing: 6.h,
+            children: kExpenseCategories.map((cat) {
+              final selected = _category == cat;
+              return FilterChip(
+                label: Text(cat, style: TextStyle(fontSize: 11.sp)),
+                selected: selected,
+                selectedColor: _teal.withValues(alpha: 0.15),
+                checkmarkColor: _teal,
+                labelStyle: TextStyle(
+                  color: selected ? _teal : null,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                ),
+                onSelected: (_) {
+                  HapticUtils.selection();
+                  setState(() => _category = cat);
+                },
+              );
+            }).toList(),
+          ),
+          SizedBox(height: 16.h),
           TextFormField(
-            controller: _descriptionController,
-            decoration: const InputDecoration(labelText: 'Description (optional)'),
+            controller: _descriptionCtrl,
+            decoration: InputDecoration(
+              labelText: 'Description (optional)',
+              labelStyle: TextStyle(fontSize: 13.sp),
+              prefixIcon: const Icon(Icons.notes_outlined),
+              filled: true,
+              fillColor:
+                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide.none,
+              ),
+            ),
             maxLines: 2,
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Reusable sub-widgets
+// ---------------------------------------------------------------------------
+
+class _CurrencyPicker extends StatelessWidget {
+  const _CurrencyPicker({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final String selected;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final entry = kCurrencyList.firstWhere(
+      (c) => c['code'] == selected,
+      orElse: () => {'code': selected, 'name': selected, 'flag': ''},
+    );
+
+    return InkWell(
+      onTap: () async {
+        HapticUtils.lightTap();
+        final result = await showModalBottomSheet<String>(
+          context: context,
+          backgroundColor: Colors.transparent,
+          isScrollControlled: true,
+          builder: (_) => _CurrencySearchSheet(selected: selected),
+        );
+        if (result != null) onChanged(result);
+      },
+      borderRadius: BorderRadius.circular(12.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+        decoration: BoxDecoration(
+          color:
+              theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12.r),
+        ),
+        child: Row(
+          children: [
+            Text(entry['flag'] ?? '', style: TextStyle(fontSize: 20.sp)),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    entry['code']!,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.sp,
+                      color: _teal,
+                    ),
+                  ),
+                  Text(
+                    entry['name']!,
+                    style: TextStyle(
+                      fontSize: 11.sp,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.expand_more,
+                color: theme.colorScheme.onSurfaceVariant, size: 18.sp),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CurrencySearchSheet extends StatefulWidget {
+  const _CurrencySearchSheet({required this.selected});
+  final String selected;
+
+  @override
+  State<_CurrencySearchSheet> createState() => _CurrencySearchSheetState();
+}
+
+class _CurrencySearchSheetState extends State<_CurrencySearchSheet> {
+  String _query = '';
+
+  List<Map<String, String>> get _filtered {
+    if (_query.isEmpty) return kCurrencyList;
+    final q = _query.toUpperCase();
+    return kCurrencyList
+        .where((c) =>
+            c['code']!.contains(q) ||
+            c['name']!.toUpperCase().contains(_query.toUpperCase()))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      maxChildSize: 0.95,
+      minChildSize: 0.4,
+      builder: (_, ctrl) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+        ),
+        child: Column(
+          children: [
+            SizedBox(height: 8.h),
+            Container(
+              width: 36.w,
+              height: 4.h,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                borderRadius: BorderRadius.circular(2.r),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+              child: TextField(
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Search currency…',
+                  prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                    borderSide: BorderSide.none,
+                  ),
+                  isDense: true,
+                ),
+                onChanged: (v) => setState(() => _query = v),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: ctrl,
+                itemCount: _filtered.length,
+                itemBuilder: (_, i) {
+                  final c = _filtered[i];
+                  final isSelected = c['code'] == widget.selected;
+                  return ListTile(
+                    dense: true,
+                    leading: Text(c['flag'] ?? '',
+                        style: TextStyle(fontSize: 22.sp)),
+                    title: Text(
+                      c['code']!,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13.sp,
+                        color: isSelected ? _teal : null,
+                      ),
+                    ),
+                    subtitle: Text(
+                      c['name']!,
+                      style: TextStyle(fontSize: 11.sp),
+                    ),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: _teal)
+                        : null,
+                    onTap: () {
+                      HapticUtils.selection();
+                      Navigator.pop(context, c['code']);
+                    },
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConversionPreviewChip extends StatelessWidget {
+  const _ConversionPreviewChip({
+    required this.fromAmount,
+    required this.fromCurrency,
+    required this.toAmount,
+    required this.toCurrency,
+  });
+
+  final Decimal fromAmount;
+  final String fromCurrency;
+  final Decimal toAmount;
+  final String toCurrency;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      decoration: BoxDecoration(
+        color: _teal.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(8.r),
+        border: Border.all(color: _teal.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.swap_horiz, color: _teal, size: 14.sp),
+          SizedBox(width: 6.w),
+          Text(
+            '$fromAmount $fromCurrency  →  ≈ $toAmount $toCurrency',
+            style: TextStyle(
+              color: _teal,
+              fontWeight: FontWeight.w600,
+              fontSize: 12.sp,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RateDisplayRow extends StatelessWidget {
+  const _RateDisplayRow({
+    required this.fromCurrency,
+    required this.toCurrency,
+    required this.rateAsync,
+  });
+
+  final String fromCurrency;
+  final String toCurrency;
+  final AsyncValue<String>? rateAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final rateStr = rateAsync?.when(
+          data: (r) => '1 $fromCurrency = $r $toCurrency',
+          loading: () => 'Fetching rate…',
+          error: (_, _) => 'Rate unavailable',
+        ) ??
+        '—';
+
+    return Row(
+      children: [
+        Icon(Icons.bolt, color: _orange, size: 14.sp),
+        SizedBox(width: 4.w),
+        Text(
+          rateStr,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            fontSize: 11.sp,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ManualRateRow extends StatelessWidget {
+  const _ManualRateRow({
+    required this.rateCtrl,
+    required this.fromCurrency,
+    required this.toCurrency,
+    required this.onApply,
+  });
+
+  final TextEditingController rateCtrl;
+  final String fromCurrency;
+  final String toCurrency;
+  final VoidCallback onApply;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(
+          child: TextFormField(
+            controller: rateCtrl,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: TextStyle(fontSize: 12.sp),
+            decoration: InputDecoration(
+              labelText: 'Manual rate (bank / cash)',
+              hintText: '1 $fromCurrency = ? $toCurrency',
+              labelStyle: TextStyle(fontSize: 11.sp),
+              isDense: true,
+              filled: true,
+              fillColor:
+                  theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(8.r),
+                borderSide: BorderSide.none,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 8.w),
+        OutlinedButton(
+          onPressed: onApply,
+          style: OutlinedButton.styleFrom(
+            side: const BorderSide(color: _teal),
+            foregroundColor: _teal,
+            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+          ),
+          child: Text('Apply', style: TextStyle(fontSize: 12.sp)),
+        ),
+      ],
     );
   }
 }

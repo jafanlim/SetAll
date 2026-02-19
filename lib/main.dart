@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'app.dart';
+import 'core/services/currency_sync_service.dart';
 import 'data/local/local_database.dart';
 
 /// SetAll Supabase project (organisation: Shoko12).
@@ -107,6 +108,11 @@ class _AppLoaderState extends State<_AppLoader> {
         ]);
       }
       if (mounted) setState(() => _ready = true);
+
+      // Sync exchange rates in background after UI is ready (non-blocking).
+      // This keeps the Supabase exchange_rates table as a local cache for
+      // offline-first rate lookups without delaying startup.
+      _backgroundSyncRates();
     } catch (e, st) {
       if (kDebugMode) {
         debugPrint('Init error: $e');
@@ -123,7 +129,17 @@ class _AppLoaderState extends State<_AppLoader> {
 
   Future<void> _initSupabase() async {
     await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
-    // No automatic anonymous sign-in; user can sign in with Email or Google from login screen.
+  }
+
+  /// Kick off a background rate sync. Errors are swallowed – the app has a
+  /// SharedPreferences cache from the previous session as fallback.
+  void _backgroundSyncRates() {
+    Future.microtask(() async {
+      try {
+        final client = Supabase.instance.client;
+        await CurrencySyncService(client: client).syncRates();
+      } catch (_) {}
+    });
   }
 
   /// On web, recover auth session when user lands from email confirmation or OAuth redirect (e.g. opening link on iPhone).
