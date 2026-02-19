@@ -56,6 +56,7 @@
 		74858FAE1ED2DC5600515810 /* AppDelegate.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		7884E8672EC3CC0400C636F2 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		7AFA3C8E1D35360C0083082E /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Release.xcconfig; path = Flutter/Release.xcconfig; sourceTree = "<group>"; };
+		7AFA3C8F1D35360C0083082F /* Profile.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = Profile.xcconfig; path = Flutter/Profile.xcconfig; sourceTree = "<group>"; };
 		7D3C37B9CA5BE72D385E1010 /* Pods_RunnerTests.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_RunnerTests.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		9740EEB21CF90195004384FC /* Debug.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Debug.xcconfig; path = Flutter/Debug.xcconfig; sourceTree = "<group>"; };
 		9740EEB31CF90195004384FC /* Generated.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = Generated.xcconfig; path = Flutter/Generated.xcconfig; sourceTree = "<group>"; };
@@ -125,6 +126,7 @@
 				3B3967151E833CAA004F5970 /* AppFrameworkInfo.plist */,
 				9740EEB21CF90195004384FC /* Debug.xcconfig */,
 				7AFA3C8E1D35360C0083082E /* Release.xcconfig */,
+				7AFA3C8F1D35360C0083082F /* Profile.xcconfig */,
 				9740EEB31CF90195004384FC /* Generated.xcconfig */,
 			);
 			name = Flutter;
@@ -309,7 +311,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n# Source Flutter env so paths with spaces work (e.g. \"coding tries\")\n. \"${SRCROOT}/Flutter/flutter_export_environment.sh\"\n# Strip extended attributes so codesign succeeds (resource fork / detritus not allowed)\nif [ -n \"$FLUTTER_ROOT\" ]; then\n  [ -d \"$FLUTTER_ROOT/bin/cache/artifacts/engine\" ] && xattr -cr \"$FLUTTER_ROOT/bin/cache/artifacts/engine\" 2>/dev/null || true\n  [ -d \"$FLUTTER_ROOT/bin/cache/artifacts\" ] && xattr -cr \"$FLUTTER_ROOT/bin/cache/artifacts\" 2>/dev/null || true\nfi\nif [ -d \"${SRCROOT}/../build\" ]; then xattr -cr \"${SRCROOT}/../build\" 2>/dev/null || true; fi\nif [ -n \"$BUILT_PRODUCTS_DIR\" ] && [ -d \"$BUILT_PRODUCTS_DIR\" ]; then xattr -cr \"$BUILT_PRODUCTS_DIR\" 2>/dev/null || true; fi\n# Run embed_and_thin; if codesign fails due to xattr, strip the framework and retry once\nset +e\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\nif [ $? -ne 0 ]; then\n  FRAMEWORK=\"${SRCROOT}/../build/ios/Release-iphoneos/Flutter.framework\"\n  [ -d \"$FRAMEWORK\" ] && xattr -cr \"$FRAMEWORK\" 2>/dev/null || true\n  [ -d \"${SRCROOT}/../build\" ] && xattr -cr \"${SRCROOT}/../build\" 2>/dev/null || true\n  [ -n \"$BUILT_PRODUCTS_DIR\" ] && [ -d \"$BUILT_PRODUCTS_DIR\" ] && xattr -cr \"$BUILT_PRODUCTS_DIR\" 2>/dev/null || true\n  set -e\n  /bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\nfi\n";
+			shellScript = "set -e\n. \"${SRCROOT}/Flutter/flutter_export_environment.sh\"\n_WRAP=$(mktemp -d)\ncp \"${SRCROOT}/scripts/codesign_wrapper.sh\" \"$_WRAP/codesign\"\nchmod +x \"$_WRAP/codesign\"\nexport PATH=\"$_WRAP:$PATH\"\ntrap \"rm -rf '$_WRAP'\" EXIT\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" embed_and_thin\n";
 		};
 		6F781609C65E146271172FB0 /* [CP] Embed Pods Frameworks */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -363,7 +365,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "set -e\n# Source Flutter env so paths with spaces work (e.g. \"coding tries\")\n. \"${SRCROOT}/Flutter/flutter_export_environment.sh\"\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n";
+			shellScript = "set -e\n. \"${SRCROOT}/Flutter/flutter_export_environment.sh\"\n# Wrap codesign to strip com.apple.FinderInfo from framework dirs before signing.\n# iCloud Drive (Documents folder) adds FinderInfo to new dirs, causing codesign to fail.\n_WRAP=$(mktemp -d)\ncp \"${SRCROOT}/scripts/codesign_wrapper.sh\" \"$_WRAP/codesign\"\nchmod +x \"$_WRAP/codesign\"\nexport PATH=\"$_WRAP:$PATH\"\ntrap \"rm -rf '$_WRAP'\" EXIT\n/bin/sh \"$FLUTTER_ROOT/packages/flutter_tools/bin/xcode_backend.sh\" build\n";
 		};
 		AA11EEB71CF901F6004384FD /* Strip xattr (codesign fix) */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -378,7 +380,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "# Strip extended attributes so codesign succeeds (resource fork / detritus not allowed)\n. \"${SRCROOT}/Flutter/flutter_export_environment.sh\" 2>/dev/null || true\nif [ -n \"$FLUTTER_ROOT\" ] && [ -d \"$FLUTTER_ROOT/bin/cache/artifacts/engine\" ]; then xattr -cr \"$FLUTTER_ROOT/bin/cache/artifacts/engine\" 2>/dev/null || true; fi\nif [ -d \"${SRCROOT}/../build\" ]; then xattr -cr \"${SRCROOT}/../build\" 2>/dev/null || true; fi\nif [ -n \"$BUILT_PRODUCTS_DIR\" ] && [ -d \"$BUILT_PRODUCTS_DIR\" ]; then xattr -cr \"$BUILT_PRODUCTS_DIR\" 2>/dev/null || true; fi\n";
+			shellScript = ". \"${SRCROOT}/Flutter/flutter_export_environment.sh\" 2>/dev/null || true\n# Pre-clean FinderInfo from any existing framework dirs (belt-and-suspenders)\nfor fw in \"${SRCROOT}/../build/native_assets/ios/\"*.framework \"${SRCROOT}/../build/ios/\"*.framework; do\n  [ -d \"$fw\" ] && xattr -d com.apple.FinderInfo \"$fw\" 2>/dev/null || true\ndone\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -487,7 +489,7 @@
 		};
 		249021D4217E4FDB00AE95B9 /* Profile */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 7AFA3C8E1D35360C0083082E /* Release.xcconfig */;
+			baseConfigurationReference = 7AFA3C8F1D35360C0083082F /* Profile.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CLANG_ENABLE_MODULES = YES;
