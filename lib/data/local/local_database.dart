@@ -132,7 +132,7 @@ class LocalDatabase {
         PRIMARY KEY (group_id, user_id)
       )
     ''');
-    await db.execute('''
+   await db.execute('''
       CREATE TABLE expenses (
         id                   TEXT PRIMARY KEY,
         group_id             TEXT NOT NULL,
@@ -145,7 +145,7 @@ class LocalDatabase {
         original_amount      TEXT,
         original_currency    TEXT,
         exchange_rate_applied TEXT,
-        base_amount_at_entry TEXT,
+        universal_usd_amount TEXT, -- CHANGED
         created_at           TEXT,
         updated_at           TEXT,
         synced_at            INTEGER
@@ -153,12 +153,12 @@ class LocalDatabase {
     ''');
     await db.execute('''
       CREATE TABLE splits (
-        id         TEXT PRIMARY KEY,
-        expense_id TEXT NOT NULL,
-        user_id    TEXT NOT NULL,
-        amount_owed TEXT NOT NULL,
-        created_at TEXT,
-        synced_at  INTEGER
+        id                 TEXT PRIMARY KEY,
+        expense_id         TEXT NOT NULL,
+        user_id            TEXT NOT NULL,
+        universal_usd_owed TEXT NOT NULL, -- CHANGED
+        created_at         TEXT,
+        synced_at          INTEGER
       )
     ''');
     await db.execute('''

@@ -1,0 +1,29 @@
+---
+description: When iOS build fails, read Xcode DerivedData logs to diagnose
+alwaysApply: true
+---
+
+# Xcode build failure debugging
+
+When an iOS build fails, **always** read the Xcode logs to diagnose the issue.
+
+## Log location
+
+```
+~/Library/Developer/Xcode/DerivedData/Runner-*/Logs/
+```
+
+- **Build logs**: `Logs/Build/*.xcactivitylog` (gzip-compressed)
+- **Launch logs**: `Logs/Launch/*.xcresult`
+
+## How to read build logs
+
+1. Find the most recent: `ls -t ~/Library/Developer/Xcode/DerivedData/Runner-*/Logs/Build/*.xcactivitylog 2>/dev/null | head -1`
+2. Search for errors: `gunzip -c <path> | strings | grep -iE "Error:|failed|BUILD FAILED|codesign|resource fork"`
+3. Get context: `gunzip -c <path> | tail -c 100000 | strings | tail -150`
+
+## Common fixes from logs
+
+- **Dart errors** (`lib/...dart:line: Error:`): Fix the referenced file
+- **resource fork / detritus**: Run `xattr -cr .` then `flutter clean`
+- **PhaseScriptExecution failed**: Check preceding error output
