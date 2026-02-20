@@ -8,12 +8,13 @@ class SplitModel extends Split {
     required super.amountOwed,
   });
 
-  factory SplitModel.fromJson(Map<String, dynamic> json) {
+   factory SplitModel.fromJson(Map<String, dynamic> json) {
     return SplitModel(
       id: json['id'] as String,
       expenseId: json['expense_id'] as String,
       userId: json['user_id'] as String,
-      amountOwed: (json['amount_owed'] as num).toString(),
+      // CHANGED
+      amountOwed: (json['universal_usd_owed'] as num).toString(),
     );
   }
 
@@ -21,6 +22,7 @@ class SplitModel extends Split {
         'id': id,
         'expense_id': expenseId,
         'user_id': userId,
-        'amount_owed': amountOwed,
+        // CHANGED
+        'universal_usd_owed': amountOwed,
       };
 }

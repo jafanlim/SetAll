@@ -42,7 +42,7 @@ class ExpenseModel extends Expense {
       originalAmount: json['original_amount']?.toString(),
       originalCurrency: json['original_currency'] as String?,
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
-      baseAmountAtEntry: json['base_amount_at_entry']?.toString(),
+      baseAmountAtEntry: json['universal_usd_amount']?.toString(),
     );
   }
 
@@ -59,6 +59,7 @@ class ExpenseModel extends Expense {
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,
         if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
-        if (baseAmountAtEntry != null) 'base_amount_at_entry': baseAmountAtEntry,
+        // CHANGED: Mapped to universal_usd_amount
+        if (baseAmountAtEntry != null) 'universal_usd_amount': baseAmountAtEntry,
       };
 }

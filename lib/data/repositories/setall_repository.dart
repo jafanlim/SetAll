@@ -432,46 +432,23 @@ class SetAllRepository {
 
   /// Construct a [BalanceEntry] from a split row and its parent expense row.
   ///
-  /// When the expense has [base_amount_at_entry] (schema v4+), we compute the
+  /// When the expense has [universal_usd_amount] (schema v4+), we compute the
   /// split's proportional base amount to populate [BalanceEntry.baseAmountAtEntry].
   /// This allows [BalanceService._toBase] to skip any live rate lookup.
-  BalanceEntry _makeEntry(
+    BalanceEntry _makeEntry(
     Map<String, dynamic> splitRow,
     Map<String, dynamic> expenseRow,
   ) {
+    // Splits are now natively USD! No more complex math.
     final splitAmount =
-        Decimal.parse((splitRow['amount_owed']?.toString()) ?? '0');
-    final currency = (expenseRow['currency'] as String?) ?? 'USD';
-    final rate = expenseRow['exchange_rate_applied']?.toString();
-    final baseStr = expenseRow['base_amount_at_entry']?.toString();
-
-    Decimal? baseAmountAtEntry;
-    if (baseStr != null) {
-      final baseTotal = Decimal.tryParse(baseStr);
-      final expenseTotal =
-          Decimal.tryParse((expenseRow['amount']?.toString()) ?? '0');
-      if (baseTotal != null &&
-          expenseTotal != null &&
-          expenseTotal > Decimal.zero) {
-        // Proportional: split_base = (split_amount * base_total) / expense_amount
-        // Multiply first (Decimal × Decimal = Decimal) to avoid Rational × Decimal
-        // type mismatch that occurs when dividing first (Decimal / Decimal = Rational).
-        baseAmountAtEntry =
-            ((splitAmount * baseTotal) / expenseTotal)
-                .toDecimal(scaleOnInfinitePrecision: 10)
-                .round(scale: 2);
-      } else if (baseTotal != null) {
-        baseAmountAtEntry = baseTotal;
-      }
-    }
+        Decimal.parse((splitRow['universal_usd_owed']?.toString()) ?? '0');
 
     return BalanceEntry(
       amount: splitAmount,
-      currency: currency,
-      exchangeRateApplied: rate,
-      baseAmountAtEntry: baseAmountAtEntry,
+      currency: 'USD',
     );
   }
+
 
   // ---------------------------------------------------------------------------
   // Groups
@@ -1100,7 +1077,7 @@ class SetAllRepository {
           await _client.from('splits').insert({
             'expense_id': expenseId,
             'user_id': s.userId,
-            'amount_owed': s.amountOwed.toString(),
+            'universal_usd_owed': s.amountOwed.toString(),
           });
         }
         return _expenseFromMap(
@@ -1131,7 +1108,7 @@ class SetAllRepository {
         'id': const Uuid().v4(),
         'expense_id': expenseId,
         'user_id': s.userId,
-        'amount_owed': s.amountOwed.toString(),
+        'universal_usd_owed': s.amountOwed.toString(),
         'created_at': now,
         'synced_at': null,
       });
@@ -1144,7 +1121,7 @@ class SetAllRepository {
           await _client.from('splits').insert({
             'expense_id': expenseId,
             'user_id': s.userId,
-            'amount_owed': s.amountOwed.toString(),
+            'universal_usd_owed': s.amountOwed.toString(),
           });
         }
         await LocalDatabase.db.update(
@@ -1193,7 +1170,7 @@ class SetAllRepository {
       'split_type': splitType.name,
       'category': category,
       if (baseAmountAtEntry != null)
-        'base_amount_at_entry': baseAmountAtEntry.toString(),
+        'universal_usd_amount': baseAmountAtEntry.toString(),
     };
 
     if (_isWeb && _client != null) {
@@ -1207,7 +1184,7 @@ class SetAllRepository {
           await _client.from('splits').insert({
             'expense_id': expenseId,
             'user_id': s.userId,
-            'amount_owed': s.amountOwed.toString(),
+            'universal_usd_owed': s.amountOwed.toString(),
           });
         }
         final res = await _client
@@ -1256,7 +1233,7 @@ class SetAllRepository {
         'id': const Uuid().v4(),
         'expense_id': expenseId,
         'user_id': s.userId,
-        'amount_owed': s.amountOwed.toString(),
+        'universal_usd_owed': s.amountOwed.toString(),
         'created_at': now,
         'synced_at': null,
       });
@@ -1273,7 +1250,7 @@ class SetAllRepository {
           await _client.from('splits').insert({
             'expense_id': expenseId,
             'user_id': s.userId,
-            'amount_owed': s.amountOwed.toString(),
+            'universal_usd_owed': s.amountOwed.toString(),
           });
         }
         await LocalDatabase.db.update(
@@ -1414,7 +1391,7 @@ class SetAllRepository {
   ///
   /// [baseCurrency] should be the user's base currency (e.g. from
   /// [BalanceService.getBaseCurrency]). Amounts are normalised to base currency
-  /// via [base_amount_at_entry] (schema v4+). The returned [SimplifiedDebt.currency]
+  /// via [universal_usd_amount] (schema v4+). The returned [SimplifiedDebt.currency]
   /// is [baseCurrency] so the UI can show a consistent denomination.
   Future<List<SimplifiedDebt>> getSimplifiedDebts(
     String groupId, {
@@ -1550,7 +1527,7 @@ class SetAllRepository {
             'original_amount': map['original_amount']?.toString(),
             'original_currency': map['original_currency'],
             'exchange_rate_applied': map['exchange_rate_applied']?.toString(),
-            'base_amount_at_entry': map['base_amount_at_entry']?.toString(),
+            'universal_usd_amount': map['universal_usd_amount']?.toString(),
             'created_at': map['created_at']?.toString(),
             'updated_at': map['updated_at']?.toString(),
             'synced_at': DateTime.now().millisecondsSinceEpoch,
@@ -1575,7 +1552,7 @@ class SetAllRepository {
               'id': map['id'],
               'expense_id': map['expense_id'],
               'user_id': map['user_id'],
-              'amount_owed': map['amount_owed']?.toString(),
+              'universal_usd_owed': map['universal_usd_owed']?.toString(),
               'created_at': map['created_at']?.toString(),
               'synced_at': DateTime.now().millisecondsSinceEpoch,
             },
@@ -1642,8 +1619,8 @@ class SetAllRepository {
         if (row['exchange_rate_applied'] != null) {
           payload['exchange_rate_applied'] = row['exchange_rate_applied'];
         }
-        if (row['base_amount_at_entry'] != null) {
-          payload['base_amount_at_entry'] = row['base_amount_at_entry'];
+        if (row['universal_usd_amount'] != null) {
+          payload['universal_usd_amount'] = row['universal_usd_amount'];
         }
         await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
@@ -1663,7 +1640,7 @@ class SetAllRepository {
           'id': row['id'],
           'expense_id': row['expense_id'],
           'user_id': row['user_id'],
-          'amount_owed': row['amount_owed'],
+          'universal_usd_owed': row['universal_usd_owed'],
         });
         await LocalDatabase.db.update(
           'splits',
@@ -1696,14 +1673,14 @@ class SetAllRepository {
         originalAmount: row['original_amount']?.toString(),
         originalCurrency: row['original_currency'] as String?,
         exchangeRateApplied: row['exchange_rate_applied']?.toString(),
-        baseAmountAtEntry: row['base_amount_at_entry']?.toString(),
+        baseAmountAtEntry: row['universal_usd_amount']?.toString(),
       );
 
   SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel(
         id: row['id'] as String,
         expenseId: row['expense_id'] as String,
         userId: row['user_id'] as String,
-        amountOwed: row['amount_owed'] as String,
+        amountOwed: row['universal_usd_owed'] as String,
       );
 
   SplitType _splitTypeFromString(String? v) {
@@ -1740,7 +1717,7 @@ class SetAllRepository {
       'currency': currency,
       'split_type': splitType.name,
       'category': category,
-      'base_amount_at_entry': baseAmountAtEntry.toString(),
+      'universal_usd_amount': baseAmountAtEntry.toString(),
       if (originalAmount != null) 'original_amount': originalAmount.toString(),
       'original_currency': ?originalCurrency,
       'exchange_rate_applied': ?exchangeRateApplied,
