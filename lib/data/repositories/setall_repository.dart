@@ -1660,39 +1660,9 @@ class SetAllRepository {
 
   GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
 
-  ExpenseModel _rowToExpense(Map<String, dynamic> row) => ExpenseModel(
-        id: row['id'] as String,
-        groupId: row['group_id'] as String,
-        payerId: row['payer_id'] as String,
-        amount: (row['amount'] ?? '0').toString(),
-        description: (row['description'] as String?) ?? '',
-        currency: (row['currency'] as String?) ?? 'USD',
-        splitType: _splitTypeFromString(row['split_type'] as String?),
-        category: (row['category'] as String?) ?? 'General',
-        createdAt: row['created_at'] as String?,
-        originalAmount: row['original_amount']?.toString(),
-        originalCurrency: row['original_currency'] as String?,
-        exchangeRateApplied: row['exchange_rate_applied']?.toString(),
-        baseAmountAtEntry: row['universal_usd_amount']?.toString(),
-      );
+  ExpenseModel _rowToExpense(Map<String, dynamic> row) => ExpenseModel.fromJson(row);
 
-  SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel(
-        id: row['id'] as String,
-        expenseId: row['expense_id'] as String,
-        userId: row['user_id'] as String,
-        amountOwed: row['universal_usd_owed'] as String,
-      );
-
-  SplitType _splitTypeFromString(String? v) {
-    switch (v) {
-      case 'manual':
-        return SplitType.manual;
-      case 'parts':
-        return SplitType.parts;
-      default:
-        return SplitType.even;
-    }
-  }
+  SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
 
   Map<String, dynamic> _buildExpenseMap({
     required String id,
@@ -1719,8 +1689,8 @@ class SetAllRepository {
       'category': category,
       'universal_usd_amount': baseAmountAtEntry.toString(),
       if (originalAmount != null) 'original_amount': originalAmount.toString(),
-      'original_currency': ?originalCurrency,
-      'exchange_rate_applied': ?exchangeRateApplied,
+      if (originalCurrency != null) 'original_currency': originalCurrency,
+      if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
     };
   }
 
@@ -1736,21 +1706,18 @@ class SetAllRepository {
     required String? createdAt,
     required Decimal baseAmountAtEntry,
   }) {
-    return ExpenseModel(
-      id: map['id'] as String,
-      groupId: groupId,
-      payerId: payerId,
-      amount: amount.toString(),
-      description: description,
-      currency: currency,
-      splitType: splitType,
-      category: category,
-      createdAt: createdAt,
-      originalAmount: map['original_amount']?.toString(),
-      originalCurrency: map['original_currency'] as String?,
-      exchangeRateApplied: map['exchange_rate_applied']?.toString(),
-      baseAmountAtEntry: baseAmountAtEntry.toString(),
-    );
+    return ExpenseModel.fromJson({
+      ...map,
+      'group_id': groupId,
+      'payer_id': payerId,
+      'amount': amount.toString(),
+      'description': description,
+      'currency': currency,
+      'split_type': splitType.name,
+      'category': category,
+      'created_at': createdAt,
+      'universal_usd_amount': baseAmountAtEntry.toString(),
+    });
   }
 }
 
