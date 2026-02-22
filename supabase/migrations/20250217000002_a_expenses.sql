@@ -8,6 +8,7 @@ create table if not exists public.expenses (
   payer_id uuid not null references public.profiles(id) on delete cascade,
   amount numeric(14, 4) not null check (amount >= 0),
   description text not null default '',
+  category text not null default 'General',
   currency text not null default 'USD',
   split_type public.split_type not null default 'even',
   created_at timestamptz not null default now(),
@@ -23,26 +24,28 @@ alter table public.expenses enable row level security;
 create policy "Group members can read expenses"
   on public.expenses for select
   using (
-    group_id in (select group_id from public.group_members where user_id = auth.uid())
-    or group_id in (select id from public.groups where creator_id = auth.uid())
+    group_id in (select public.get_my_groups())
   );
 
 create policy "Group members can insert expenses"
   on public.expenses for insert
   with check (
     auth.uid() = payer_id
-    and (
-      group_id in (select group_id from public.group_members where user_id = auth.uid())
-      or group_id in (select id from public.groups where creator_id = auth.uid())
-    )
+    and group_id in (select public.get_my_groups())
   );
 
 create policy "Payer or group creator can update expense"
   on public.expenses for update
-  using (payer_id = auth.uid() or group_id in (select id from public.groups where creator_id = auth.uid()));
+  using (
+    payer_id = auth.uid() 
+    or group_id in (select id from public.groups where creator_id = auth.uid())
+  );
 
 create policy "Payer or group creator can delete expense"
   on public.expenses for delete
-  using (payer_id = auth.uid() or group_id in (select id from public.groups where creator_id = auth.uid()));
+  using (
+    payer_id = auth.uid() 
+    or group_id in (select id from public.groups where creator_id = auth.uid())
+  );
 
 comment on table public.expenses is 'Expenses per group with amount, currency and split type';

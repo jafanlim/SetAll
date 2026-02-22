@@ -47,14 +47,6 @@ const List<Map<String, String>> kAllSupportedCurrencies = [
 // Infrastructure providers
 // ---------------------------------------------------------------------------
 
-final setAllRepositoryProvider = Provider<SetAllRepository>((ref) {
-  try {
-    return SetAllRepository(client: Supabase.instance.client);
-  } catch (_) {
-    return SetAllRepository();
-  }
-});
-
 /// Supabase-backed rate sync service (single source of truth for rates).
 final currencySyncServiceProvider = Provider<CurrencySyncService>((ref) {
   try {
@@ -67,6 +59,19 @@ final currencySyncServiceProvider = Provider<CurrencySyncService>((ref) {
 /// Currency service: manual override > Supabase DB rates > Frankfurter API.
 final currencyServiceProvider = Provider<CurrencyService>((ref) {
   return CurrencyService(syncService: ref.watch(currencySyncServiceProvider));
+});
+
+final setAllRepositoryProvider = Provider<SetAllRepository>((ref) {
+  try {
+    return SetAllRepository(
+      client: Supabase.instance.client,
+      currencyService: ref.watch(currencyServiceProvider),
+    );
+  } catch (_) {
+    return SetAllRepository(
+      currencyService: ref.watch(currencyServiceProvider),
+    );
+  }
 });
 
 /// Balance service: correct multi-currency conversion using [baseAmountAtEntry].

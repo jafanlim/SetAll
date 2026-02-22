@@ -18,18 +18,17 @@ create policy "Group members can read splits for their group expenses"
   on public.splits for select
   using (
     expense_id in (
-      select e.id from public.expenses e
-      where e.group_id in (
-        select group_id from public.group_members where user_id = auth.uid()
-      )
-      or e.group_id in (select id from public.groups where creator_id = auth.uid())
+      select id from public.expenses
+      where group_id in (select public.get_my_groups())
     )
   );
 
 create policy "Expense payer can manage splits"
   on public.splits for all
   using (
-    expense_id in (select id from public.expenses where payer_id = auth.uid())
+    expense_id in (
+      select id from public.expenses where payer_id = auth.uid()
+    )
   );
 
 comment on table public.splits is 'Per-user share of an expense (amount owed)';

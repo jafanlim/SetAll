@@ -1,5 +1,5 @@
 import 'package:decimal/decimal.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -13,6 +13,7 @@ import '../models/expense_model.dart';
 import '../models/group_model.dart';
 import '../models/profile_model.dart';
 import '../models/split_model.dart';
+import '../../core/services/currency_service.dart';
 
 const String _deviceUserIdKey = 'device_user_id';
 const String _personalGroupName = 'Personal';
@@ -76,9 +77,14 @@ class BalanceEntry {
 /// Central repository: offline-first. Writes go to local SQLite first, then
 /// sync to Supabase when online.
 class SetAllRepository {
-  SetAllRepository({SupabaseClient? client}) : _client = client;
+  SetAllRepository({
+    SupabaseClient? client,
+    CurrencyService? currencyService,
+  })  : _client = client,
+        _currencyService = currencyService;
 
   final SupabaseClient? _client;
+  final CurrencyService? _currencyService;
   String? _deviceUserId;
 
   bool get isConfigured => _client != null;
@@ -630,6 +636,40 @@ class SetAllRepository {
     return GroupModel(id: id, name: name, creatorId: uid);
   }
 
+  /// Delete a group. Only the creator can perform this action.
+  Future<bool> deleteGroup(String groupId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    // Local check
+    final rows = await LocalDatabase.db.query(
+      'groups',
+      where: 'id = ? AND creator_id = ?',
+      whereArgs: [groupId, uid],
+    );
+    if (rows.isEmpty) return false;
+
+    await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
+    await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
+
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
+      } catch (_) {}
+    }
+    return true;
+  }
+
+ 
   /// Creates a 1-on-1 direct group with [otherEmail].
   ///
   /// On web/Supabase: calls the `create_direct_group` RPC which is idempotent
@@ -847,28 +887,37 @@ class SetAllRepository {
     return profileRows.map((r) => ProfileModel.fromJson(r)).toList();
   }
 
-  Future<void> addMemberByEmail(
-    String groupId,
-    String email, {
-    bool sendEmail = true,
-    String? groupName,
-  }) async {
-    if (_client != null && await _isOnline) {
-      await _client.rpc('add_member_by_email', params: {
-        'p_group_id': groupId,
-        'p_email': email.trim().toLowerCase(),
-      });
-      if (sendEmail) {
-        try {
-          await _client.functions.invoke('notify-group-invite', body: {
-            'email': email.trim(),
-            'groupId': groupId,
-            'groupName': groupName ?? 'a group',
-          });
-        } catch (_) {}
-      }
-    }
+  
+  
+  Future<void> addMemberByEmail(String groupId, String identifier) async {
+  final uid = await ensureUser();
+  if (uid == null || _client == null || !await _isOnline) {
+    debugPrint('❌ Cannot invite: Offline or Not Authenticated');
+    throw Exception('You must be online to invite members.');
   }
+
+  try {
+    debugPrint('🚀 Calling RPC add_member_by_email with: $identifier');
+    
+    // The RPC now automatically detects if the identifier is an email or nickname
+    await _client!.rpc('add_member_by_email', params: {
+      'p_group_id': groupId,
+      'p_identifier': identifier.trim().toLowerCase(),
+    });
+    
+    debugPrint('✅ Successfully added $identifier to group $groupId');
+    
+  } on PostgrestException catch (e) {
+    debugPrint('❌ DATABASE ERROR [${e.code}]: ${e.message}');
+    // Throw a user-friendly version of the database exception
+    throw Exception(e.message); 
+  } catch (e) {
+    debugPrint('❌ SYSTEM ERROR: $e');
+    throw Exception('An unexpected error occurred. Please try again.');
+  }
+}
+
+
 
   /// Add an existing (registered) user to a group by their profile UUID.
   /// Calls the [add_member_by_id] SECURITY DEFINER RPC, then mirrors the row
@@ -1035,9 +1084,8 @@ class SetAllRepository {
 
   /// Add an expense. Offline-first on mobile; Supabase-only on web.
   ///
-  /// [baseAmountAtEntry] must be supplied by the caller (computed in the UI
-  /// layer using [CurrencyService]).  It is the total expense value frozen in
-  /// the user's base currency at the moment of entry.
+  /// The [universal_usd_amount] (USD anchor) is calculated internally via
+  /// [CurrencyService] to ensure financial consistency.
   Future<ExpenseModel?> addExpense({
     required String groupId,
     required String payerId,
@@ -1050,65 +1098,75 @@ class SetAllRepository {
     Decimal? originalAmount,
     String? originalCurrency,
     String? exchangeRateApplied,
-    required Decimal baseAmountAtEntry,
   }) async {
     final expenseId = const Uuid().v4();
     final now = _now();
 
-    final baseMap = _buildExpenseMap(
+    // -- Anchor logic: Always compute USD value --
+    Decimal rateToUsd = Decimal.one;
+    if (_currencyService != null) {
+      rateToUsd = await _currencyService.getRateToUsd(currency);
+    }
+    final universalUsdAmount = (amount * rateToUsd).round(scale: 2);
+
+    final expense = ExpenseModel(
       id: expenseId,
       groupId: groupId,
       payerId: payerId,
-      amount: amount,
+      amount: amount.toString(),
       description: description,
       currency: currency,
       splitType: splitType,
       category: category,
-      originalAmount: originalAmount,
+      createdAt: now,
+      originalAmount: originalAmount?.toString(),
       originalCurrency: originalCurrency,
-      exchangeRateApplied: exchangeRateApplied,
-      baseAmountAtEntry: baseAmountAtEntry,
+      exchangeRateApplied: exchangeRateApplied ?? rateToUsd.toString(),
+      baseAmountAtEntry: universalUsdAmount.toString(),
     );
+
+    final expenseData = expense.toJson();
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('expenses').insert(baseMap);
+        await _client.from('expenses').insert(expenseData);
         for (final s in splits) {
-          await _client.from('splits').insert({
-            'expense_id': expenseId,
-            'user_id': s.userId,
-            'universal_usd_owed': s.amountOwed.toString(),
-          });
+          // Calculate proportional universal_usd_owed
+          final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+          final split = SplitModel(
+            id: const Uuid().v4(),
+            expenseId: expenseId,
+            userId: s.userId,
+            amountOwed: usdOwed.toString(),
+          );
+          await _client.from('splits').insert(split.toJson());
         }
-        return _expenseFromMap(
-          baseMap,
-          groupId: groupId,
-          payerId: payerId,
-          amount: amount,
-          description: description,
-          currency: currency,
-          splitType: splitType,
-          category: category,
-          createdAt: now,
-          baseAmountAtEntry: baseAmountAtEntry,
-        );
-      } catch (_) {
+        return expense;
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in addExpense: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in addExpense (Supabase): $e');
+        }
         return null;
       }
     }
 
+    // Local SQLite
     await LocalDatabase.db.insert('expenses', {
-      ...baseMap,
-      'created_at': now,
-      'updated_at': now,
+      ...expenseData,
       'synced_at': null,
     });
     for (final s in splits) {
+      final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+      final split = SplitModel(
+        id: const Uuid().v4(),
+        expenseId: expenseId,
+        userId: s.userId,
+        amountOwed: usdOwed.toString(),
+      );
       await LocalDatabase.db.insert('splits', {
-        'id': const Uuid().v4(),
-        'expense_id': expenseId,
-        'user_id': s.userId,
-        'universal_usd_owed': s.amountOwed.toString(),
+        ...split.toJson(),
         'created_at': now,
         'synced_at': null,
       });
@@ -1116,13 +1174,16 @@ class SetAllRepository {
 
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('expenses').insert(baseMap).select().single();
+        await _client.from('expenses').insert(expenseData);
         for (final s in splits) {
-          await _client.from('splits').insert({
-            'expense_id': expenseId,
-            'user_id': s.userId,
-            'universal_usd_owed': s.amountOwed.toString(),
-          });
+          final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+          final split = SplitModel(
+            id: const Uuid().v4(),
+            expenseId: expenseId,
+            userId: s.userId,
+            amountOwed: usdOwed.toString(),
+          );
+          await _client.from('splits').insert(split.toJson());
         }
         await LocalDatabase.db.update(
           'expenses',
@@ -1130,22 +1191,19 @@ class SetAllRepository {
           where: 'id = ?',
           whereArgs: [expenseId],
         );
-      } catch (_) {}
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in addExpense (mobile sync): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in addExpense (mobile sync): $e');
+        }
+      }
     }
 
-    return _expenseFromMap(
-      baseMap,
-      groupId: groupId,
-      payerId: payerId,
-      amount: amount,
-      description: description,
-      currency: currency,
-      splitType: splitType,
-      category: category,
-      createdAt: now,
-      baseAmountAtEntry: baseAmountAtEntry,
-    );
+    return expense;
   }
+
+
 
   /// Update expense: replaces splits. Offline-first, then sync. Web: Supabase only.
   Future<ExpenseModel?> updateExpense({
@@ -1158,60 +1216,69 @@ class SetAllRepository {
     required SplitType splitType,
     required List<SplitInsert> splits,
     String category = 'General',
-    Decimal? baseAmountAtEntry,
   }) async {
     final now = _now();
 
-    final updatePayload = {
-      'payer_id': payerId,
-      'amount': amount.toString(),
-      'description': description,
-      'currency': currency,
-      'split_type': splitType.name,
-      'category': category,
-      if (baseAmountAtEntry != null)
-        'universal_usd_amount': baseAmountAtEntry.toString(),
-    };
+    // -- Anchor logic: Always re-compute USD value on update --
+    Decimal rateToUsd = Decimal.one;
+    if (_currencyService != null) {
+      rateToUsd = await _currencyService.getRateToUsd(currency);
+    }
+    final universalUsdAmount = (amount * rateToUsd).round(scale: 2);
+
+    final expense = ExpenseModel(
+      id: expenseId,
+      groupId: groupId,
+      payerId: payerId,
+      amount: amount.toString(),
+      description: description,
+      currency: currency,
+      splitType: splitType,
+      category: category,
+      // Note: We might want to fetch the original createdAt and currency normalization fields here
+      // but following the requested logic of using toJson() as the source.
+      baseAmountAtEntry: universalUsdAmount.toString(),
+      exchangeRateApplied: rateToUsd.toString(),
+    );
+
+    final expenseData = expense.toJson();
 
     if (_isWeb && _client != null) {
       try {
         await _client
             .from('expenses')
-            .update(updatePayload)
+            .update(expenseData)
             .eq('id', expenseId);
         await _client.from('splits').delete().eq('expense_id', expenseId);
         for (final s in splits) {
-          await _client.from('splits').insert({
-            'expense_id': expenseId,
-            'user_id': s.userId,
-            'universal_usd_owed': s.amountOwed.toString(),
-          });
+          final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+          final split = SplitModel(
+            id: const Uuid().v4(),
+            expenseId: expenseId,
+            userId: s.userId,
+            amountOwed: usdOwed.toString(),
+          );
+          await _client.from('splits').insert(split.toJson());
         }
         final res = await _client
             .from('expenses')
             .select()
             .eq('id', expenseId)
             .single();
-        return ExpenseModel(
-          id: expenseId,
-          groupId: groupId,
-          payerId: payerId,
-          amount: amount.toString(),
-          description: description,
-          currency: currency,
-          splitType: splitType,
-          category: category,
-          createdAt: res['created_at']?.toString(),
-          baseAmountAtEntry: baseAmountAtEntry?.toString(),
-        );
-      } catch (_) {
+        return ExpenseModel.fromJson(res);
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in updateExpense: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in updateExpense (Supabase): $e');
+        }
         return null;
       }
     }
 
     await LocalDatabase.db.update(
       'expenses',
-      {...updatePayload, 'updated_at': now, 'synced_at': null},
+      {...expenseData, 'synced_at': null},
       where: 'id = ?',
       whereArgs: [expenseId],
     );
@@ -1229,11 +1296,15 @@ class SetAllRepository {
       );
     }
     for (final s in splits) {
+      final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+      final split = SplitModel(
+        id: const Uuid().v4(),
+        expenseId: expenseId,
+        userId: s.userId,
+        amountOwed: usdOwed.toString(),
+      );
       await LocalDatabase.db.insert('splits', {
-        'id': const Uuid().v4(),
-        'expense_id': expenseId,
-        'user_id': s.userId,
-        'universal_usd_owed': s.amountOwed.toString(),
+        ...split.toJson(),
         'created_at': now,
         'synced_at': null,
       });
@@ -1243,15 +1314,18 @@ class SetAllRepository {
       try {
         await _client
             .from('expenses')
-            .update(updatePayload)
+            .update(expenseData)
             .eq('id', expenseId);
         await _client.from('splits').delete().eq('expense_id', expenseId);
         for (final s in splits) {
-          await _client.from('splits').insert({
-            'expense_id': expenseId,
-            'user_id': s.userId,
-            'universal_usd_owed': s.amountOwed.toString(),
-          });
+          final usdOwed = (s.amountOwed * rateToUsd).round(scale: 2);
+          final split = SplitModel(
+            id: const Uuid().v4(),
+            expenseId: expenseId,
+            userId: s.userId,
+            amountOwed: usdOwed.toString(),
+          );
+          await _client.from('splits').insert(split.toJson());
         }
         await LocalDatabase.db.update(
           'expenses',
@@ -1259,7 +1333,13 @@ class SetAllRepository {
           where: 'id = ?',
           whereArgs: [expenseId],
         );
-      } catch (_) {}
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in updateExpense (mobile sync): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in updateExpense (mobile sync): $e');
+        }
+      }
     }
 
     final updatedRow = await LocalDatabase.db.query(
@@ -1267,20 +1347,8 @@ class SetAllRepository {
       where: 'id = ?',
       whereArgs: [expenseId],
     );
-    final createdAt =
-        updatedRow.isNotEmpty ? updatedRow.first['created_at'] as String? : null;
-    return ExpenseModel(
-      id: expenseId,
-      groupId: groupId,
-      payerId: payerId,
-      amount: amount.toString(),
-      description: description,
-      currency: currency,
-      splitType: splitType,
-      category: category,
-      createdAt: createdAt,
-      baseAmountAtEntry: baseAmountAtEntry?.toString(),
-    );
+    if (updatedRow.isEmpty) return null;
+    return ExpenseModel.fromJson(updatedRow.first);
   }
 
   Future<bool> deleteExpense(String expenseId) async {
@@ -1330,10 +1398,10 @@ class SetAllRepository {
       var youOwe = Decimal.zero;
       var youAreOwed = Decimal.zero;
       for (final e in raw.youOwe) {
-        youOwe += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+        youOwe += e.baseAmountAtEntry ?? e.amount;
       }
       for (final e in raw.youAreOwed) {
-        youAreOwed += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+        youAreOwed += e.baseAmountAtEntry ?? e.amount;
       }
       return BalanceSummary(
         youOwe: youOwe.toStringAsFixed(2),
@@ -1347,10 +1415,10 @@ class SetAllRepository {
     var youOwe = Decimal.zero;
     var youAreOwed = Decimal.zero;
     for (final e in raw.youOwe) {
-      youOwe += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+      youOwe += e.baseAmountAtEntry ?? e.amount;
     }
     for (final e in raw.youAreOwed) {
-      youAreOwed += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+      youAreOwed += e.baseAmountAtEntry ?? e.amount;
     }
     return BalanceSummary(
       youOwe: youOwe.toStringAsFixed(2),
@@ -1371,10 +1439,10 @@ class SetAllRepository {
     var youOwe = Decimal.zero;
     var youAreOwed = Decimal.zero;
     for (final e in raw.youOwe) {
-      youOwe += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+      youOwe += e.baseAmountAtEntry ?? e.amount;
     }
     for (final e in raw.youAreOwed) {
-      youAreOwed += e.baseAmountAtEntry ?? (e.currency == baseCurrency ? e.amount : Decimal.zero);
+      youAreOwed += e.baseAmountAtEntry ?? e.amount;
     }
     return BalanceSummary(
       youOwe: youOwe.toStringAsFixed(2),
@@ -1513,22 +1581,11 @@ class SetAllRepository {
           await _client.from('expenses').select().inFilter('group_id', memberIds.toList());
       for (final e in expenses as List) {
         final map = e as Map<String, dynamic>;
+        final expense = ExpenseModel.fromJson(map);
         await LocalDatabase.db.insert(
           'expenses',
           {
-            'id': map['id'],
-            'group_id': map['group_id'],
-            'payer_id': map['payer_id'],
-            'amount': map['amount']?.toString(),
-            'description': map['description'],
-            'currency': map['currency'],
-            'split_type': map['split_type'],
-            'category': map['category'],
-            'original_amount': map['original_amount']?.toString(),
-            'original_currency': map['original_currency'],
-            'exchange_rate_applied': map['exchange_rate_applied']?.toString(),
-            'universal_usd_amount': map['universal_usd_amount']?.toString(),
-            'created_at': map['created_at']?.toString(),
+            ...expense.toJson(),
             'updated_at': map['updated_at']?.toString(),
             'synced_at': DateTime.now().millisecondsSinceEpoch,
           },
@@ -1546,13 +1603,11 @@ class SetAllRepository {
             .inFilter('expense_id', expenseIds);
         for (final s in splits as List) {
           final map = s as Map<String, dynamic>;
+          final split = SplitModel.fromJson(map);
           await LocalDatabase.db.insert(
             'splits',
             {
-              'id': map['id'],
-              'expense_id': map['expense_id'],
-              'user_id': map['user_id'],
-              'universal_usd_owed': map['universal_usd_owed']?.toString(),
+              ...split.toJson(),
               'created_at': map['created_at']?.toString(),
               'synced_at': DateTime.now().millisecondsSinceEpoch,
             },
@@ -1600,55 +1655,42 @@ class SetAllRepository {
         await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
     for (final row in pendingExpenses) {
       try {
-        final payload = <String, dynamic>{
-          'id': row['id'],
-          'group_id': row['group_id'],
-          'payer_id': row['payer_id'],
-          'amount': row['amount'],
-          'description': row['description'] ?? '',
-          'currency': row['currency'] ?? 'USD',
-          'split_type': row['split_type'] ?? 'even',
-        };
-        if (row['category'] != null) payload['category'] = row['category'];
-        if (row['original_amount'] != null) {
-          payload['original_amount'] = row['original_amount'];
-        }
-        if (row['original_currency'] != null) {
-          payload['original_currency'] = row['original_currency'];
-        }
-        if (row['exchange_rate_applied'] != null) {
-          payload['exchange_rate_applied'] = row['exchange_rate_applied'];
-        }
-        if (row['universal_usd_amount'] != null) {
-          payload['universal_usd_amount'] = row['universal_usd_amount'];
-        }
-        await _client.from('expenses').insert(payload);
+        final expense = ExpenseModel.fromJson(row);
+        await _client.from('expenses').insert(expense.toJson());
         await LocalDatabase.db.update(
           'expenses',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
           where: 'id = ?',
           whereArgs: [row['id']],
         );
-      } catch (_) {}
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in syncPendingToSupabase (expenses): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in syncPendingToSupabase (expenses): $e');
+        }
+      }
     }
 
     final pendingSplits =
         await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
     for (final row in pendingSplits) {
       try {
-        await _client.from('splits').insert({
-          'id': row['id'],
-          'expense_id': row['expense_id'],
-          'user_id': row['user_id'],
-          'universal_usd_owed': row['universal_usd_owed'],
-        });
+        final split = SplitModel.fromJson(row);
+        await _client.from('splits').insert(split.toJson());
         await LocalDatabase.db.update(
           'splits',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
           where: 'id = ?',
           whereArgs: [row['id']],
         );
-      } catch (_) {}
+      } catch (e) {
+        if (e is PostgrestException) {
+          debugPrint('PostgrestException in syncPendingToSupabase (splits): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+        } else {
+          debugPrint('Error in syncPendingToSupabase (splits): $e');
+        }
+      }
     }
   }
 
@@ -1663,62 +1705,6 @@ class SetAllRepository {
   ExpenseModel _rowToExpense(Map<String, dynamic> row) => ExpenseModel.fromJson(row);
 
   SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
-
-  Map<String, dynamic> _buildExpenseMap({
-    required String id,
-    required String groupId,
-    required String payerId,
-    required Decimal amount,
-    required String description,
-    required String currency,
-    required SplitType splitType,
-    required String category,
-    required Decimal baseAmountAtEntry,
-    Decimal? originalAmount,
-    String? originalCurrency,
-    String? exchangeRateApplied,
-  }) {
-    return {
-      'id': id,
-      'group_id': groupId,
-      'payer_id': payerId,
-      'amount': amount.toString(),
-      'description': description,
-      'currency': currency,
-      'split_type': splitType.name,
-      'category': category,
-      'universal_usd_amount': baseAmountAtEntry.toString(),
-      if (originalAmount != null) 'original_amount': originalAmount.toString(),
-      if (originalCurrency != null) 'original_currency': originalCurrency,
-      if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
-    };
-  }
-
-  ExpenseModel _expenseFromMap(
-    Map<String, dynamic> map, {
-    required String groupId,
-    required String payerId,
-    required Decimal amount,
-    required String description,
-    required String currency,
-    required SplitType splitType,
-    required String category,
-    required String? createdAt,
-    required Decimal baseAmountAtEntry,
-  }) {
-    return ExpenseModel.fromJson({
-      ...map,
-      'group_id': groupId,
-      'payer_id': payerId,
-      'amount': amount.toString(),
-      'description': description,
-      'currency': currency,
-      'split_type': splitType.name,
-      'category': category,
-      'created_at': createdAt,
-      'universal_usd_amount': baseAmountAtEntry.toString(),
-    });
-  }
 }
 
 class SplitInsert {

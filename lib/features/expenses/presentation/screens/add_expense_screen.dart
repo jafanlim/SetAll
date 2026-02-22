@@ -213,9 +213,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
-    final baseCurrency = await ref.read(balanceServiceProvider).getBaseCurrency();
-    final currencyService = ref.read(currencyServiceProvider);
-
     setState(() => _isSubmitting = true);
 
     // -- Build split results --------------------------------------------------
@@ -296,52 +293,22 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         splitType = SplitType.manual;
     }
 
-    // -- Currency conversion --------------------------------------------------
-    // Always compute base_amount_at_entry regardless of currency match to
-    // guarantee the field is set on every new expense (eliminates $104 bug).
-    Decimal amountToStore = amount;
-    String currencyToStore = _currency;
-    Decimal? originalAmount;
-    String? originalCurrency;
-    String? exchangeRateApplied;
-    late Decimal baseAmountAtEntry;
-    late List<SplitInsert> splitsToStore;
-
-    if (_currency == baseCurrency) {
-      baseAmountAtEntry = amount;
-      splitsToStore = results
-          .map((r) => SplitInsert(userId: r.userId, amountOwed: r.amountOwed))
-          .toList();
-    } else {
-      final rate = await currencyService.getRate(_currency, baseCurrency);
-      amountToStore = (amount * rate).round(scale: 2);
-      baseAmountAtEntry = amountToStore;
-      originalAmount = amount;
-      originalCurrency = _currency;
-      exchangeRateApplied = rate.toString();
-      splitsToStore = results
-          .map((r) => SplitInsert(
-                userId: r.userId,
-                amountOwed: (r.amountOwed * rate).round(scale: 2),
-              ))
-          .toList();
-      currencyToStore = baseCurrency;
-    }
+    // Map splits to SplitInsert objects
+    final splitsToStore = results.map((r) {
+      return SplitInsert(userId: r.userId, amountOwed: r.amountOwed);
+    }).toList();
 
     final expense = await repo.addExpense(
       groupId: widget.groupId,
       payerId: payerId,
-      amount: amountToStore,
+      amount: amount, // Original input amount
       description: _descriptionCtrl.text.trim(),
-      currency: currencyToStore,
+      currency: _currency, // Original input currency
       splitType: splitType,
       splits: splitsToStore,
       category: _category,
-      originalAmount: originalAmount,
-      originalCurrency: originalCurrency,
-      exchangeRateApplied: exchangeRateApplied,
-      baseAmountAtEntry: baseAmountAtEntry,
     );
+
 
     if (mounted) {
       setState(() => _isSubmitting = false);

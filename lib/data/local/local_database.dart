@@ -17,11 +17,10 @@ class LocalDatabase {
   ///   • exchange_rates table – local mirror of Supabase exchange_rates
   /// Schema v5 adds:
   ///   • groups.type – 'normal' | 'direct' to distinguish friend vs group expenses
-  /// Schema v6 adds:
-  ///   • profiles.nickname – optional @handle
-  ///   • profiles.avatar_url – optional avatar URL
-  ///   • profiles.is_ghost – true for synthetic ghost users
-  static const int _version = 6;
+  /// Schema v8 adds:
+  ///   • expenses.universal_usd_amount – final check for column existence
+  ///   • splits.universal_usd_owed – final check for column existence
+  static const int _version = 8;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -109,6 +108,33 @@ class LocalDatabase {
         'ALTER TABLE profiles ADD COLUMN is_ghost INTEGER NOT NULL DEFAULT 0',
       );
     }
+    if (oldVersion < 7) {
+      // Supabase sync alignment
+      await _addColumnIfNotExists(db, 'expenses', 'created_by', 'TEXT');
+      await _addColumnIfNotExists(db, 'expenses', 'total_amount', 'TEXT');
+      await _addColumnIfNotExists(db, 'groups', 'created_by', 'TEXT');
+    }
+    if (oldVersion < 8) {
+      // The "numerical illiteracy" pivot columns
+      await _addColumnIfNotExists(db, 'expenses', 'universal_usd_amount', 'TEXT');
+      await _addColumnIfNotExists(db, 'splits', 'universal_usd_owed', 'TEXT');
+    }
+  }
+
+  /// Helper to safely add columns during migration.
+  static Future<void> _addColumnIfNotExists(
+    Database db,
+    String tableName,
+    String columnName,
+    String columnType,
+  ) async {
+    try {
+      final columns = await db.rawQuery('PRAGMA table_info($tableName)');
+      final exists = columns.any((c) => c['name'] == columnName);
+      if (!exists) {
+        await db.execute('ALTER TABLE $tableName ADD COLUMN $columnName $columnType');
+      }
+    } catch (_) {}
   }
 
   Future<void> _onCreate(Database db, int version) async {
@@ -117,6 +143,7 @@ class LocalDatabase {
         id         TEXT PRIMARY KEY,
         name       TEXT NOT NULL,
         creator_id TEXT NOT NULL,
+        created_by TEXT, -- Schema v7
         type       TEXT NOT NULL DEFAULT 'normal',
         created_at TEXT,
         updated_at TEXT,
@@ -137,7 +164,9 @@ class LocalDatabase {
         id                   TEXT PRIMARY KEY,
         group_id             TEXT NOT NULL,
         payer_id             TEXT NOT NULL,
+        created_by           TEXT, -- Schema v7
         amount               TEXT NOT NULL,
+        total_amount         TEXT, -- Schema v7
         description          TEXT,
         currency             TEXT,
         split_type           TEXT,
@@ -145,7 +174,7 @@ class LocalDatabase {
         original_amount      TEXT,
         original_currency    TEXT,
         exchange_rate_applied TEXT,
-        universal_usd_amount TEXT, -- CHANGED
+        universal_usd_amount TEXT, -- Schema v8
         created_at           TEXT,
         updated_at           TEXT,
         synced_at            INTEGER
@@ -156,7 +185,7 @@ class LocalDatabase {
         id                 TEXT PRIMARY KEY,
         expense_id         TEXT NOT NULL,
         user_id            TEXT NOT NULL,
-        universal_usd_owed TEXT NOT NULL, -- CHANGED
+        universal_usd_owed TEXT NOT NULL, -- Schema v8
         created_at         TEXT,
         synced_at          INTEGER
       )
@@ -183,3 +212,4 @@ class LocalDatabase {
     ''');
   }
 }
+
