@@ -13,7 +13,7 @@ class SplitModel extends Split {
       id: json['id'] as String,
       expenseId: json['expense_id'] as String,
       userId: json['user_id'] as String,
-      // CHANGED: Support both num (Supabase) and String (SQLite)
+      // Fixed to strictly use universal_usd_owed
       amountOwed: (json['universal_usd_owed'] ?? '0').toString(),
     );
   }
@@ -22,7 +22,6 @@ class SplitModel extends Split {
         'id': id,
         'expense_id': expenseId,
         'user_id': userId,
-        // CHANGED
         'universal_usd_owed': amountOwed,
       };
 }

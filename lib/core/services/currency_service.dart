@@ -90,6 +90,11 @@ class CurrencyService {
     }
   }
 
+  /// Get rate from [fromCurrency] to USD.
+  Future<Decimal> getRateToUsd(String fromCurrency) async {
+    return getRate(fromCurrency, 'USD');
+  }
+
   /// Convenience: convert [amount] from [fromCurrency] to [toCurrency].
   Future<Decimal> convert(
     Decimal amount,

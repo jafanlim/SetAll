@@ -24,12 +24,24 @@ create index if not exists idx_group_members_user_id on public.group_members(use
 
 alter table public.group_members enable row level security;
 
+-- Security Definer to break RLS recursion in membership checks
+create or replace function public.get_my_groups()
+returns setof uuid
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select group_id from public.group_members where user_id = auth.uid()
+  union
+  select id from public.groups where creator_id = auth.uid();
+$$;
+
 -- Policies: members can read their groups
 create policy "Users can read groups they belong to"
   on public.groups for select
   using (
-    id in (select group_id from public.group_members where user_id = auth.uid())
-    or creator_id = auth.uid()
+    id in (select public.get_my_groups())
   );
 
 create policy "Authenticated users can create groups"
@@ -47,8 +59,8 @@ create policy "Creator can delete group"
 create policy "Members can read group_members"
   on public.group_members for select
   using (
-    group_id in (select group_id from public.group_members where user_id = auth.uid())
-    or group_id in (select id from public.groups where creator_id = auth.uid())
+    user_id = auth.uid()
+    or group_id in (select public.get_my_groups())
   );
 
 create policy "Group creator can manage members"
@@ -59,3 +71,4 @@ create policy "Group creator can manage members"
 
 comment on table public.groups is 'Cost-sharing groups';
 comment on table public.group_members is 'Group membership';
+comment on function public.get_my_groups() is 'Breaks RLS recursion by using security definer to fetch member group IDs.';

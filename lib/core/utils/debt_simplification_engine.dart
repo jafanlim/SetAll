@@ -68,23 +68,36 @@ class DebtSimplificationEngine {
 
     for (final s in groupSplits) {
       final userId = s['user_id'] as String;
-      final rawOwed = _parseDecimal(s['amount_owed']);
+      
+      // FIX: Prefer universal_usd_owed (Schema v4+) as it is already the base value.
+      final usdOwedStr = s['universal_usd_owed']?.toString();
+      final legacyOwedStr = s['amount_owed']?.toString();
+      
+      Decimal baseOwed = Decimal.zero;
 
-      // Compute the proportional base-currency share for this split.
-      final ex = expenseById[s['expense_id'] as String];
-      Decimal baseOwed = rawOwed;
-      if (ex != null) {
-        final baseStr = ex['base_amount_at_entry']?.toString();
-        final baseTotal = baseStr != null ? Decimal.tryParse(baseStr) : null;
-        if (baseTotal != null && baseTotal > Decimal.zero) {
-          final expenseRaw = _parseDecimal(ex['amount']);
-          if (expenseRaw > Decimal.zero) {
-            // split_base = (split_amount_owed / expense_amount) * base_total
-            baseOwed = ((rawOwed * baseTotal) / expenseRaw)
-                .toDecimal(scaleOnInfinitePrecision: 10)
-                .round(scale: 4);
-          } else {
-            baseOwed = baseTotal;
+      if (usdOwedStr != null) {
+        // Modern path: Value is already USD/Base. Use directly.
+        baseOwed = Decimal.tryParse(usdOwedStr) ?? Decimal.zero;
+      } else {
+        // Legacy path (v1-v3): Proportional calculation required.
+        final rawOwed = _parseDecimal(legacyOwedStr);
+        final ex = expenseById[s['expense_id'] as String];
+        
+        baseOwed = rawOwed; // Default fallback
+        
+        if (ex != null) {
+          final baseStr = ex['base_amount_at_entry']?.toString();
+          final baseTotal = baseStr != null ? Decimal.tryParse(baseStr) : null;
+          if (baseTotal != null && baseTotal > Decimal.zero) {
+            final expenseRaw = _parseDecimal(ex['amount']);
+            if (expenseRaw > Decimal.zero) {
+              // split_base = (split_amount_owed / expense_amount) * base_total
+              baseOwed = ((rawOwed * baseTotal) / expenseRaw)
+                  .toDecimal(scaleOnInfinitePrecision: 10)
+                  .round(scale: 4);
+            } else {
+              baseOwed = baseTotal;
+            }
           }
         }
       }

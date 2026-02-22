@@ -11,9 +11,9 @@ class ProfileModel extends Profile {
   });
 
   factory ProfileModel.fromJson(Map<String, dynamic> json) {
-    // SQLite stores booleans as integers (0/1); Supabase returns true Dart bools.
     final rawGhost = json['is_ghost'];
-    final isGhost = (rawGhost == true || rawGhost == 1 || rawGhost == '1');
+    // Strictly handle Supabase bool vs SQLite int
+    final bool isGhost = rawGhost is bool ? rawGhost : (rawGhost == 1 || rawGhost == '1');
 
     return ProfileModel(
       id: json['id'] as String,

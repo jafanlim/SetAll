@@ -32,10 +32,9 @@ class ExpenseModel extends Expense {
     return ExpenseModel(
       id: json['id'] as String,
       groupId: json['group_id'] as String,
-      // Support both payer_id (legacy/local) and created_by (Supabase)
-      payerId: (json['payer_id'] ?? json['created_by'] ?? '').toString(),
-      // Support both amount (legacy/local) and total_amount (Supabase)
-      amount: (json['amount'] ?? json['total_amount'] ?? '0').toString(),
+      payerId: (json['payer_id'] ?? '').toString(),
+      // 'amount' is the raw total
+      amount: (json['amount'] ?? '0').toString(),
       description: (json['description'] as String?) ?? '',
       currency: (json['currency'] as String?) ?? 'USD',
       splitType: _splitTypeFromString(json['split_type'] as String?),
@@ -44,8 +43,8 @@ class ExpenseModel extends Expense {
       originalAmount: json['original_amount']?.toString(),
       originalCurrency: json['original_currency'] as String?,
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
-      // CHANGED: Match 'universal_usd_amount' as instructed
-      baseAmountAtEntry: (json['universal_usd_amount'] ?? json['base_amount_at_entry'])?.toString(),
+      // 'universal_usd_amount' is the USD anchor
+      baseAmountAtEntry: (json['universal_usd_amount'])?.toString(),
     );
   }
 
@@ -59,10 +58,9 @@ class ExpenseModel extends Expense {
         'split_type': splitType.name,
         'category': category,
         'created_at': createdAt,
+        'universal_usd_amount': baseAmountAtEntry, // Key MUST be universal_usd_amount
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,
         if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
-        // CHANGED: Mapped to universal_usd_amount
-        if (baseAmountAtEntry != null) 'universal_usd_amount': baseAmountAtEntry,
       };
 }
