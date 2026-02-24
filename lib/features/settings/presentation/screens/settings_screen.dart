@@ -11,11 +11,11 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
-import '../../../../core/router/app_router.dart';
 import '../../../../core/services/biometric_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/profile_model.dart';
+import '../../../../data/local/local_database.dart';
 
 const _teal = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
@@ -213,14 +213,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await prefs.setInt(_kGracePeriodKey, seconds);
     if (mounted) setState(() => _gracePeriodSeconds = seconds);
     HapticUtils.selection();
-  }
-
-  Future<void> _signOut() async {
-    HapticUtils.primaryTap();
-    try {
-      await Supabase.instance.client.auth.signOut();
-    } catch (_) {}
-    if (mounted) context.go(AppRouter.login);
   }
 
   @override
@@ -421,16 +413,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              onTap: _signOut,
-            ),
-          ),
+              onTap: () async { // <-- Must be onTap, not onPressed
+                try {
+                  await Supabase.instance.client.auth.signOut();
+                  
+                  // Wipe local cache correctly
+                  await LocalDatabase.db.delete('splits');
+                  await LocalDatabase.db.delete('expenses');
+                  await LocalDatabase.db.delete('group_members');
+                  await LocalDatabase.db.delete('groups');
+                  await LocalDatabase.db.delete('profiles');
+                  
+                  debugPrint('🧹 Local cache wiped. Clean state for next user.');
+                  if (context.mounted) {
+                    context.go('/login');
+                  }
+                } catch (e) {
+                  debugPrint('❌ Logout Error: $e');
+                }
+              }
+                          ),
+                        ),
 
-          SizedBox(height: 32.h),
-        ],
-      ),
-    );
-  }
-}
+                        SizedBox(height: 32.h),
+                      ],
+                    ),
+                  );
+                }
+              }
 
 // ---------------------------------------------------------------------------
 // Profile section

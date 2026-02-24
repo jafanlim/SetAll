@@ -21,7 +21,6 @@ class ThemeModeNotifier extends StateNotifier<ThemeMode> {
       case ThemeMode.system:
         return 2;
       case ThemeMode.dark:
-      default:
         return 0;
     }
   }

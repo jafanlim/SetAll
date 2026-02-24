@@ -37,11 +37,11 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   String _category = 'General';
   bool _splitEvenly = true;
   bool _isLoading = true;
-  bool _isSubmitting = false;
-  ExpenseModel? _expense;
-  List<SplitModel> _splits = [];
-  List<ProfileModel> _members = [];
-  /// For custom split: member id -> amount string (pre-filled from splits).
+      bool _isSubmitting = false;
+      ExpenseModel? _expense;
+      List<ProfileModel> _members = [];
+      /// For custom split: member id -> amount string (pre-filled from splits).
+  
   final Map<String, TextEditingController> _customAmountControllers = {};
 
   @override
@@ -63,51 +63,52 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   Future<void> _load() async {
     final repo = ref.read(setAllRepositoryProvider);
     final expense = await repo.getExpense(widget.expenseId);
-    final splits = await repo.getSplitsForExpense(widget.expenseId);
-    final members = await repo.getGroupMembers(widget.groupId);
-
-    if (!mounted) return;
-    setState(() {
-      _expense = expense;
-      _splits = splits;
-      _members = members;
-      _isLoading = false;
-      if (expense != null) {
-        _amountController.text = expense.amount;
-        _descriptionController.text = expense.description;
-        _currency = expense.currency;
-        _category = expense.category;
-        _splitEvenly = expense.splitType == SplitType.even;
-        
-        // REVERSE CALC: Convert stored USD splits back to Original Currency for display
-        Decimal rate = Decimal.one;
-        if (expense.exchangeRateApplied != null) {
-           rate = Decimal.tryParse(expense.exchangeRateApplied!) ?? Decimal.one;
-        }
-
-        for (final m in members) {
-          SplitModel? split;
-          try {
-            split = splits.firstWhere((s) => s.userId == m.id);
-          } catch (_) {}
-          
-          String initialValue = '';
-          if (split != null) {
-             final usdAmount = Decimal.tryParse(split.amountOwed) ?? Decimal.zero;
-             if (rate > Decimal.zero) {
-                 // Original = USD / Rate
-                 // Using Rational.toDecimal to handle the division result
-                 final originalSplit = (usdAmount / rate).toDecimal(scaleOnInfinitePrecision: 2);
-                 initialValue = originalSplit.toString();
-             } else {
-                 initialValue = split.amountOwed;
-             }
-          }
-          final c = TextEditingController(text: initialValue);
-          _customAmountControllers[m.id] = c;
-        }
-      }
-    });
+          final splits = await repo.getSplitsForExpense(widget.expenseId);
+          final members = await repo.getGroupMembers(widget.groupId);
+    
+          if (!mounted) return;
+          setState(() {
+            _expense = expense;
+            _members = members;
+            _isLoading = false;
+            if (expense != null) {
+              _amountController.text = expense.amount;
+              _descriptionController.text = expense.description;
+              _currency = expense.currency;
+              _category = expense.category;
+              _splitEvenly = expense.splitType == SplitType.even;
+              
+              // REVERSE CALC: Convert stored USD splits back to Original Currency for display
+              Decimal rate = Decimal.one;
+              if (expense.exchangeRateApplied != null) {
+                 rate = Decimal.tryParse(expense.exchangeRateApplied!) ?? Decimal.one;
+              }
+    
+              for (final m in members) {
+                SplitModel? split;
+                try {
+                  split = splits.firstWhere((s) => s.userId == m.id);
+                } catch (_) {}
+                
+                            String initialValue = '';
+                            if (split != null) {
+                               final usdAmount = Decimal.tryParse(split.amountOwed) ?? Decimal.zero;
+                               if (rate > Decimal.zero) {
+                                   // Original = USD / Rate
+                                   // Using Rational.toDecimal to handle the division result
+                                   final originalSplit = (usdAmount / rate).toDecimal(scaleOnInfinitePrecision: 2);
+                                   initialValue = originalSplit.toString();
+                               } else {
+                                   initialValue = split.amountOwed;
+                               }
+                            }
+                
+                final c = TextEditingController(text: initialValue);
+                _customAmountControllers[m.id] = c;
+              }
+            }
+          });
+    
   }
 
   Future<void> _submit() async {

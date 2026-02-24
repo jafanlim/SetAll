@@ -56,10 +56,12 @@ class _LoginScreenState extends State<LoginScreen> {
         await Supabase.instance.client.auth.signInWithPassword(email: email, password: password);
         if (mounted) {
           final bio = BiometricService.instance;
-          final canUse = await bio.canUseBiometrics();
-          if (canUse) {
-            final useBio = await showDialog<bool>(
-              context: context,
+                      final canUse = await bio.canUseBiometrics();
+                      if (!mounted) return;
+                      if (canUse) {
+                        final useBio = await showDialog<bool>(
+                          context: context,
+          
               barrierDismissible: false,
               builder: (ctx) => AlertDialog(
                 title: const Text('Use Face ID to unlock?'),

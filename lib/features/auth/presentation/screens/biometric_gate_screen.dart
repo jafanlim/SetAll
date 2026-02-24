@@ -89,6 +89,7 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
     if (!mounted) return;
     if (ok) {
       await _recordForegroundTime(); // reset grace period clock on successful auth
+      if (!mounted) return;
       context.go(AppRouter.dashboard);
     } else {
       setState(() => _failed = true);
@@ -145,12 +146,14 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
                     label: Text('Try $_biometricLabel again'),
                   ),
                 const SizedBox(height: 24),
-                TextButton(
-                  onPressed: () async {
-                    await _bio.setUseBiometric(false);
-                    if (mounted) context.go(AppRouter.dashboard);
-                  },
-                  child: const Text('Skip and use app without biometric'),
+                                                    TextButton(
+                                                      onPressed: () async {
+                                                        final navigator = Navigator.of(context);
+                                                        await _bio.setUseBiometric(false);
+                                                        if (!mounted) return;
+                                                        navigator.pushNamedAndRemoveUntil(AppRouter.dashboard, (route) => false);
+                                                      },
+                                                    child: const Text('Skip and use app without biometric'),
                 ),
               ],
             ),
