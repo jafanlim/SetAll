@@ -44,6 +44,11 @@ class BalanceSummary {
   final String currency;
 }
 
+class SplitInsert {
+  final String userId;
+  final Decimal amountOwed;
+  const SplitInsert({required this.userId, required this.amountOwed});
+}
 /// One entry used by [BalanceService] to compute totals in the user's base
 /// currency.
 ///
@@ -575,7 +580,7 @@ class SetAllRepository {
       whereArgs: [...allIds, type, type],
       orderBy: 'updated_at DESC',
     );
-    return rows.map(_rowToGroup).toList();
+    return rows.map<GroupModel>((row) => _rowToGroup(row)).toList();
   }
 
   Future<GroupModel?> createGroup(String name) async {
@@ -899,9 +904,10 @@ class SetAllRepository {
   try {
     debugPrint('🚀 Calling RPC add_member_by_email with: $identifier');
     
-    // The RPC now automatically detects if the identifier is an email or nickname
-    await _client!.rpc('add_member_by_email', params: {
-      'p_group_id': groupId,
+          // The RPC now automatically detects if the identifier is an email or nickname
+          await _client.rpc('add_member_by_email', params: {
+            'p_group_id': groupId,
+    
       'p_identifier': identifier.trim().toLowerCase(),
     });
     
@@ -1028,7 +1034,7 @@ class SetAllRepository {
       orderBy: 'created_at DESC',
       limit: limit,
     );
-    return rows.map(_rowToExpense).toList();
+    return rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
   }
 
   Future<List<ExpenseModel>> getExpensesForGroup(String groupId) async {
@@ -1046,7 +1052,7 @@ class SetAllRepository {
       whereArgs: [groupId],
       orderBy: 'created_at DESC',
     );
-    return rows.map(_rowToExpense).toList();
+    return rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
   }
 
   Future<ExpenseModel?> getExpense(String expenseId) async {
@@ -1079,7 +1085,7 @@ class SetAllRepository {
       where: 'expense_id = ?',
       whereArgs: [expenseId],
     );
-    return rows.map(_rowToSplit).toList();
+    return rows.map<SplitModel>((row) => _rowToSplit(row)).toList();
   }
 
   /// Add an expense. Offline-first on mobile; Supabase-only on web.
@@ -1651,64 +1657,76 @@ class SetAllRepository {
       } catch (_) {}
     }
 
-    final pendingExpenses =
-        await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
-    for (final row in pendingExpenses) {
-      try {
-        final expense = ExpenseModel.fromJson(row);
-        await _client.from('expenses').insert(expense.toJson());
-        await LocalDatabase.db.update(
-          'expenses',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-      } catch (e) {
-        if (e is PostgrestException) {
-          debugPrint('PostgrestException in syncPendingToSupabase (expenses): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        } else {
-          debugPrint('Error in syncPendingToSupabase (expenses): $e');
+        final pendingExpenses =
+            await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
+        for (final row in pendingExpenses) {
+          try {
+            final expense = ExpenseModel.fromJson(row);
+            await _client.from('expenses').insert(expense.toJson());
+            await LocalDatabase.db.update(
+              'expenses',
+              {'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'id = ?',
+              whereArgs: [row['id']],
+            );
+          } catch (e) {
+            if (e is PostgrestException) {
+              if (e.code == '23505') {
+                // DUPLICATE KEY: It's already in Supabase! Just mark it as synced locally.
+                debugPrint(
+                    '⚠️ Expense already exists in cloud. Marking as synced locally.');
+                await LocalDatabase.db.update(
+                  'expenses',
+                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                  where: 'id = ?',
+                  whereArgs: [row['id']],
+                );
+              } else {
+                debugPrint('❌ Expense Sync Error: ${e.message}');
+              }
+            }
+          }
+        }
+    
+        final pendingSplits =
+            await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
+        for (final row in pendingSplits) {
+          try {
+            final split = SplitModel.fromJson(row);
+            await _client.from('splits').insert(split.toJson());
+            await LocalDatabase.db.update(
+              'splits',
+              {'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'id = ?',
+              whereArgs: [row['id']],
+            );
+          } catch (e) {
+            if (e is PostgrestException) {
+              if (e.code == '23505') {
+                // DUPLICATE KEY
+                await LocalDatabase.db.update(
+                  'splits',
+                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                  where: 'id = ?',
+                  whereArgs: [row['id']],
+                );
+              }
+            }
+          }
         }
       }
+    
+      // ---------------------------------------------------------------------------
+      // Private helpers
+      // ---------------------------------------------------------------------------
+    
+      String _now() => DateTime.now().toUtc().toIso8601String();
+    
+      GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
+    
+      ExpenseModel _rowToExpense(Map<String, dynamic> row) =>
+          ExpenseModel.fromJson(row);
+    
+      SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
     }
-
-    final pendingSplits =
-        await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
-    for (final row in pendingSplits) {
-      try {
-        final split = SplitModel.fromJson(row);
-        await _client.from('splits').insert(split.toJson());
-        await LocalDatabase.db.update(
-          'splits',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-      } catch (e) {
-        if (e is PostgrestException) {
-          debugPrint('PostgrestException in syncPendingToSupabase (splits): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-        } else {
-          debugPrint('Error in syncPendingToSupabase (splits): $e');
-        }
-      }
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // Private helpers
-  // ---------------------------------------------------------------------------
-
-  String _now() => DateTime.now().toUtc().toIso8601String();
-
-  GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
-
-  ExpenseModel _rowToExpense(Map<String, dynamic> row) => ExpenseModel.fromJson(row);
-
-  SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
-}
-
-class SplitInsert {
-  const SplitInsert({required this.userId, required this.amountOwed});
-  final String userId;
-  final Decimal amountOwed;
-}
+    

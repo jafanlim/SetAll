@@ -192,6 +192,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     final repo = ref.read(setAllRepositoryProvider);
     final payerId = await repo.ensureUser();
+    if (!mounted) return;
     if (payerId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
