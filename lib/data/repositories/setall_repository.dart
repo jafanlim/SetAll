@@ -123,10 +123,8 @@ class SetAllRepository {
     if (kIsWeb) return _client != null;
     try {
       final result = await Connectivity().checkConnectivity();
-      return result.contains(ConnectivityResult.wifi) ||
-          result.contains(ConnectivityResult.mobile) ||
-          result.contains(ConnectivityResult.ethernet) ||
-          result.contains(ConnectivityResult.vpn);
+      // ConnectivityResult.other covers macOS wired/wifi — must be included.
+      return result.any((r) => r != ConnectivityResult.none);
     } catch (_) {
       return false;
     }
@@ -650,6 +648,8 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
+      final authUid = _client.auth.currentUser?.id;
+      debugPrint('[CreateGroup] auth.currentUser.id=$authUid uid=$uid');
       // Step 1: push group row — must succeed before group_members FK insert.
       bool groupSynced = false;
       try {
