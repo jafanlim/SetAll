@@ -96,9 +96,8 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       body: Row(
         children: [
           _buildSidebar(context),
-          // Master list — flex takes remaining space, capped at kContentMaxWidth
+          // Master list — always flex:1, capped at kContentMaxWidth
           Expanded(
-            flex: hasDetail ? 0 : 1,
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
               child: widget.child,
@@ -110,7 +109,6 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
             color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
           ),
           Expanded(
-            flex: 1,
             child: hasDetail
                 ? GroupDetailScreen(
                     key: ValueKey(selectedGroup.groupId),
