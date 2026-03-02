@@ -358,29 +358,31 @@ class _BalancePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
-              fontSize: 10.sp,
+              fontSize: 10,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: 2.h),
+          const SizedBox(height: 2),
           Text(
             '$currency $amount',
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,
-              fontSize: 14.sp,
+              fontSize: 13,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -808,22 +810,25 @@ class _ActivityTile extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$displayCurrency $displayAmount',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: _teal),
-                    ),
-                    if (expense.createdAt != null)
+                IntrinsicWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
-                        _shortDate(expense.createdAt!),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 10.sp,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        '$displayCurrency $displayAmount',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _teal),
                       ),
-                  ],
+                      if (expense.createdAt != null)
+                        Text(
+                          _shortDate(expense.createdAt!),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
               ),
