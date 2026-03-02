@@ -85,15 +85,12 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
       // Add all selected members via the SECURITY DEFINER RPC.
       final failedNames = <String>[];
-      debugPrint('[CreateGroup] groupId=${group.id}, adding ${_selected.length} members');
       for (final member in _selected) {
         try {
-          debugPrint('[CreateGroup] calling addMemberById groupId=${group.id} userId=${member.id} name=${member.name}');
           await repo.addMemberById(group.id, member.id);
-          debugPrint('[CreateGroup] addMemberById SUCCESS for ${member.name}');
         } catch (e) {
           failedNames.add(member.name);
-          debugPrint('[CreateGroup] addMemberById FAILED for ${member.name}: $e');
+          debugPrint('addMemberById failed for ${member.name}: $e');
         }
       }
 
