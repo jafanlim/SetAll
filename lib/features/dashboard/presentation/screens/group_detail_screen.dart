@@ -65,7 +65,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ],
       ),
     );
-    ctrl.dispose();
+    // Dispose after the dialog's exit animation completes to avoid
+    // "controller used after dispose" during the pop transition.
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
     if (newName == null || newName.isEmpty || !mounted) return;
     final ok = await ref.read(setAllRepositoryProvider).renameGroup(widget.groupId, newName);
     if (!mounted) return;

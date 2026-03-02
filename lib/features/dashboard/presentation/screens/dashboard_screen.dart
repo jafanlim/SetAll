@@ -428,7 +428,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       ),
     );
     final newName = ctrl.text.trim();
-    ctrl.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
     if (confirmed != true || newName.isEmpty || newName == widget.group.name) return;
     final ok = await ref.read(setAllRepositoryProvider).renameGroup(widget.group.id, newName);
     if (!mounted) return;
