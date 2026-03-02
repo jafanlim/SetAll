@@ -14,7 +14,7 @@ class ExpenseModel extends Expense {
     super.originalAmount,
     super.originalCurrency,
     super.exchangeRateApplied,
-    super.baseAmountAtEntry,
+    super.universalUsdAmount,
   });
 
   static SplitType _splitTypeFromString(String? v) {
@@ -44,7 +44,7 @@ class ExpenseModel extends Expense {
       originalCurrency: json['original_currency'] as String?,
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
       // 'universal_usd_amount' is the USD anchor
-      baseAmountAtEntry: (json['universal_usd_amount'])?.toString(),
+      universalUsdAmount: (json['universal_usd_amount'])?.toString(),
     );
   }
 
@@ -58,7 +58,7 @@ class ExpenseModel extends Expense {
         'split_type': splitType.name,
         'category': category,
         'created_at': createdAt,
-        'universal_usd_amount': baseAmountAtEntry, // Key MUST be universal_usd_amount
+        'universal_usd_amount': universalUsdAmount, // Key MUST be universal_usd_amount
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,
         if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,

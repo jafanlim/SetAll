@@ -4,8 +4,9 @@
 /// For a production app, these should eventually be moved to environment variables (.env).
 library;
 
-/// Base URL for auth redirects (email confirmation, OAuth). Set to your app's URL for mobile, e.g. https://your-app.vercel.app
-const String? kAuthRedirectBaseUrl = null;
+/// Deep link callback URL for mobile OAuth (Google Sign-In) and email confirmation redirects.
+/// Must match exactly what is registered in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
+const String kAuthRedirectBaseUrl = 'com.jafa.setall://login-callback';
 
 class AuthConfig {
   // 1. SUPABASE CREDENTIALS

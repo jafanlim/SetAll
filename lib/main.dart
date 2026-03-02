@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/services/currency_sync_service.dart';
@@ -14,8 +15,23 @@ const String _supabaseUrl = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
 const String _supabaseAnonKey = 'REDACTED_JWT';
 
 /// Base URL for email confirmation and OAuth redirects. Set this to your deployed web app URL (e.g. https://your-app.vercel.app) so links work on mobile. When null, web uses current origin.
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set minimum window size on desktop so the UI never breaks.
+  if (defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux) {
+    await windowManager.ensureInitialized();
+    const options = WindowOptions(
+      minimumSize: Size(800, 600),
+      size: Size(1100, 720),
+      center: true,
+      titleBarStyle: TitleBarStyle.normal,
+    );
+    await windowManager.waitUntilReadyToShow(options);
+    await windowManager.show();
+  }
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Material(
@@ -96,7 +112,7 @@ class _AppLoaderState extends State<_AppLoader> {
         // Web: Supabase only. No anonymous sign-in; user signs in with Email or Google.
         LocalDatabase.setWebMode();
         if (hasSupabase) {
-          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
+          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce));
           // Recover session when user lands from email confirmation or OAuth (e.g. on iPhone opening link).
           await _recoverSessionFromUrlIfNeeded();
         }
@@ -128,7 +144,13 @@ class _AppLoaderState extends State<_AppLoader> {
   }
 
   Future<void> _initSupabase() async {
-    await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey);
+    await Supabase.initialize(
+      url: _supabaseUrl,
+      anonKey: _supabaseAnonKey,
+      authOptions: const FlutterAuthClientOptions(
+        authFlowType: AuthFlowType.pkce,
+      ),
+    );
   }
 
   /// Kick off a background rate sync. Errors are swallowed – the app has a
