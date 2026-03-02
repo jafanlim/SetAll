@@ -20,6 +20,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  final _emailFocus    = FocusNode();
+  final _passwordFocus = FocusNode();
+
   bool _isSignUp = false;
   bool _loading = false;
   String? _message;
@@ -28,6 +31,8 @@ class _LoginScreenState extends State<LoginScreen> {
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -104,14 +109,45 @@ class _LoginScreenState extends State<LoginScreen> {
 
   /// Base URL for email/OAuth redirects so confirmation and Google redirect work on mobile (e.g. open link on iPhone).
   String? _authRedirectUrl() {
-    if (kAuthRedirectBaseUrl != null && kAuthRedirectBaseUrl!.isNotEmpty) {
-      return kAuthRedirectBaseUrl!.endsWith('/') ? kAuthRedirectBaseUrl : '$kAuthRedirectBaseUrl/';
+    if (kAuthRedirectBaseUrl.isNotEmpty) {
+      // Custom scheme deep links (e.g. com.jafa.setall://login-callback) must
+      // not have a trailing slash added — return them verbatim.
+      if (!kAuthRedirectBaseUrl.startsWith('http')) {
+        return kAuthRedirectBaseUrl;
+      }
+      return kAuthRedirectBaseUrl.endsWith('/') ? kAuthRedirectBaseUrl : '$kAuthRedirectBaseUrl/';
     }
     if (kIsWeb) {
       final origin = Uri.base.origin;
       return origin.endsWith('/') ? origin : '$origin/';
     }
     return null;
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
+      setState(() => _message = 'Enter your email above, then tap “Forgot password”.');
+      return;
+    }
+    setState(() { _loading = true; _message = null; });
+    try {
+      final redirectUrl = _authRedirectUrl();
+      await Supabase.instance.client.auth.resetPasswordForEmail(
+        email,
+        redirectTo: redirectUrl,
+      );
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _message = 'Password reset email sent to $email. Check your inbox.';
+        });
+      }
+    } on AuthException catch (e) {
+      if (mounted) setState(() { _loading = false; _message = e.message; });
+    } catch (e) {
+      if (mounted) setState(() { _loading = false; _message = e.toString(); });
+    }
   }
 
   Future<void> _signInWithGoogle() async {
@@ -122,6 +158,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
+        authScreenLaunchMode: LaunchMode.platformDefault,
+        queryParams: const {'prompt': 'select_account'},
       );
       if (mounted) setState(() => _loading = false);
       // Web: redirect happens in browser; app will reload with session.
@@ -187,9 +225,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 32),
                     TextFormField(
                       controller: _emailController,
+                      focusNode: _emailFocus,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
                       autofillHints: const [AutofillHints.email],
+                      textInputAction: TextInputAction.next,
+                      onFieldSubmitted: (_) => _passwordFocus.requestFocus(),
                       decoration: const InputDecoration(
                         labelText: 'Email',
                         hintText: 'you@example.com',
@@ -204,10 +245,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 16),
                     TextFormField(
                       controller: _passwordController,
+                      focusNode: _passwordFocus,
                       obscureText: true,
                       autofillHints: _isSignUp
                           ? const [AutofillHints.newPassword]
                           : const [AutofillHints.password],
+                      textInputAction: TextInputAction.done,
+                      onFieldSubmitted: (_) => _submitEmail(),
                       decoration: InputDecoration(
                         labelText: _isSignUp ? 'Password (min 6 characters)' : 'Password',
                         prefixIcon: const Icon(Icons.lock_outline),
@@ -258,6 +302,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             },
                       child: Text(_isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'),
                     ),
+                    if (!_isSignUp)
+                      TextButton(
+                        onPressed: _loading ? null : _forgotPassword,
+                        child: Text(
+                          'Forgot password?',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 24),
                     Row(
                       children: [

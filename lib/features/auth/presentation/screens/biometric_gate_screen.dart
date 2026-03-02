@@ -71,6 +71,7 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
 
     // Check grace period first — skip biometric if within window
     if (await _isWithinGracePeriod()) {
+      _bio.markSessionUnlocked();
       if (mounted) context.go(AppRouter.dashboard);
       return;
     }
@@ -89,6 +90,7 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
     if (!mounted) return;
     if (ok) {
       await _recordForegroundTime(); // reset grace period clock on successful auth
+      _bio.markSessionUnlocked();
       if (!mounted) return;
       context.go(AppRouter.dashboard);
     } else {

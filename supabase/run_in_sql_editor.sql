@@ -148,9 +148,12 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' A
 END IF; END $$;
 
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='group_members' AND policyname='Members can read group_members') THEN
+  -- get_my_groups() is SECURITY DEFINER so it bypasses RLS when querying
+  -- group_members, breaking the recursion cycle. Do NOT use a plain subquery
+  -- against group_members here — that causes infinite recursion (42P17).
   CREATE POLICY "Members can read group_members" ON public.group_members FOR SELECT
-    USING (group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
-        OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+    USING (user_id = auth.uid()
+        OR group_id IN (SELECT public.get_my_groups()));
 END IF; END $$;
 DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='group_members' AND policyname='Group creator can manage members') THEN
   CREATE POLICY "Group creator can manage members" ON public.group_members FOR ALL
@@ -214,14 +217,26 @@ DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' A
 END IF; END $$;
 
 CREATE TABLE IF NOT EXISTS public.splits (
-  id           UUID          NOT NULL DEFAULT gen_random_uuid(),
-  expense_id   UUID          NOT NULL REFERENCES public.expenses(id) ON DELETE CASCADE,
-  user_id      UUID          NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  amount_owed  NUMERIC(14,4) NOT NULL CHECK (amount_owed >= 0),
-  created_at   TIMESTAMPTZ   NOT NULL DEFAULT now(),
+  id                   UUID          NOT NULL DEFAULT gen_random_uuid(),
+  expense_id           UUID          NOT NULL REFERENCES public.expenses(id) ON DELETE CASCADE,
+  user_id              UUID          NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  universal_usd_owed   NUMERIC(14,4) NOT NULL DEFAULT 0 CHECK (universal_usd_owed >= 0),
+  created_at           TIMESTAMPTZ   NOT NULL DEFAULT now(),
   PRIMARY KEY (id),
   UNIQUE (expense_id, user_id)
 );
+-- Rename legacy column if it still exists from a pre-migration schema setup
+DO $$ BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'splits' AND column_name = 'amount_owed'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public' AND table_name = 'splits' AND column_name = 'universal_usd_owed'
+  ) THEN
+    ALTER TABLE public.splits RENAME COLUMN amount_owed TO universal_usd_owed;
+  END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS idx_splits_expense_id ON public.splits(expense_id);
 CREATE INDEX IF NOT EXISTS idx_splits_user_id    ON public.splits(user_id);
 ALTER TABLE public.splits ENABLE ROW LEVEL SECURITY;
@@ -327,23 +342,31 @@ CREATE POLICY "Authenticated avatar delete"
 -- ─────────────────────────────────────────────────────────────────────────────
 
 -- search_profiles: used by the add-member / add-friend search UI
+-- Searches name, nickname, AND auth.users email (SECURITY DEFINER allows auth.users access)
 DROP FUNCTION IF EXISTS public.search_profiles(TEXT);
 CREATE OR REPLACE FUNCTION public.search_profiles(p_query TEXT)
-RETURNS TABLE (id UUID, name TEXT, nickname TEXT, avatar_url TEXT, is_ghost BOOLEAN)
+RETURNS TABLE (id UUID, name TEXT, nickname TEXT, avatar_url TEXT, default_currency TEXT, is_ghost BOOLEAN)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   RETURN QUERY
-  SELECT p.id, p.name, p.nickname, p.avatar_url, p.is_ghost
+  SELECT p.id, p.name, p.nickname, p.avatar_url, p.default_currency, p.is_ghost
   FROM   public.profiles p
+  JOIN   auth.users u ON u.id = p.id
   WHERE  p.is_ghost = FALSE
     AND  p.id <> auth.uid()
     AND (
-      p.name     ILIKE '%' || p_query || '%'
-      OR p.nickname ILIKE '%' || p_query || '%'
-      OR p.nickname ILIKE '%' || REPLACE(p_query, '@', '') || '%'
+      p.name       ILIKE '%' || p_query || '%'
+      OR p.nickname   ILIKE '%' || p_query || '%'
+      OR p.nickname   ILIKE '%' || REPLACE(p_query, '@', '') || '%'
+      OR u.email      ILIKE '%' || p_query || '%'
     )
   ORDER BY
-    CASE WHEN p.nickname ILIKE p_query OR p.nickname ILIKE REPLACE(p_query,'@','') THEN 0 ELSE 1 END,
+    CASE
+      WHEN lower(u.email)    = lower(p_query)                        THEN 0
+      WHEN lower(p.nickname) = lower(REPLACE(p_query, '@', ''))      THEN 1
+      WHEN p.nickname ILIKE p_query OR p.nickname ILIKE REPLACE(p_query,'@','') THEN 2
+      ELSE 3
+    END,
     p.name
   LIMIT 20;
 END;

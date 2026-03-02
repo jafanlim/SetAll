@@ -139,11 +139,14 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final viewInsets = MediaQuery.viewInsetsOf(context);
     final searchAsync = ref.watch(searchUsersProvider(_query));
 
-    return Padding(
-      padding: EdgeInsets.only(bottom: viewInsets.bottom),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 150),
+      curve: Curves.easeOut,
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
       child: Container(
         constraints: BoxConstraints(
           maxHeight: MediaQuery.sizeOf(context).height * 0.85,
@@ -209,7 +212,7 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
               padding: EdgeInsets.symmetric(horizontal: 16.w),
               child: TextField(
                 controller: _ctrl,
-                autofocus: true,
+                autofocus: false,
                 onChanged: _onQueryChanged,
                 keyboardType: TextInputType.emailAddress,
                 decoration: InputDecoration(
