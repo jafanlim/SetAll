@@ -648,48 +648,23 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
-      final authUid = _client.auth.currentUser?.id;
-      debugPrint('[CreateGroup] auth.currentUser.id=$authUid uid=$uid');
-      // Step 1: push group row — must succeed before group_members FK insert.
-      bool groupSynced = false;
+      // Use SECURITY DEFINER RPC to bypass RLS — same pattern as add_member_by_id.
+      // The RPC also inserts the creator's group_members row atomically.
       try {
-        await _client
-            .from('groups')
-            .insert({'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'})
-            .select()
-            .single();
-        groupSynced = true;
-        await LocalDatabase.db.update(
-          'groups',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [id],
-        );
-        debugPrint('[CreateGroup] Step1 group synced OK');
-      } catch (e) {
-        debugPrint('[CreateGroup] Step1 group sync FAILED: $e');
-      }
-
-      // Step 2: push creator's group_members row only if the group row is in
-      // Supabase (FK constraint). The add_member_by_id RPC checks creator_id
-      // OR group_members membership — this row is what makes it pass.
-      if (groupSynced) {
-        try {
-          await _client
-              .from('group_members')
-              .insert({'group_id': id, 'user_id': uid});
-          await LocalDatabase.db.update(
-            'group_members',
-            {'synced_at': DateTime.now().millisecondsSinceEpoch},
-            where: 'group_id = ? AND user_id = ?',
-            whereArgs: [id, uid],
-          );
-          debugPrint('[CreateGroup] Step2 group_members synced OK');
-        } catch (e) {
-          debugPrint('[CreateGroup] Step2 group_members sync FAILED: $e');
+        final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
+        // Mirror the remote UUID into local SQLite (replace the temp local id).
+        // If the remote id differs from the local id, update local rows.
+        if (remoteId != id) {
+          await LocalDatabase.db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+          await LocalDatabase.db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+          debugPrint('[CreateGroup] RPC OK — remote id=$remoteId (was $id locally, updated)');
+          return GroupModel(id: remoteId, name: name, creatorId: uid);
         }
-      } else {
-        debugPrint('[CreateGroup] Step2 skipped — group not in Supabase yet, addMemberById will fail');
+        await LocalDatabase.db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+        await LocalDatabase.db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+        debugPrint('[CreateGroup] RPC OK — id=$id');
+      } catch (e) {
+        debugPrint('[CreateGroup] RPC FAILED (group saved locally, will sync later): $e');
       }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
