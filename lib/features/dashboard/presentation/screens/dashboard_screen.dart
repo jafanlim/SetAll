@@ -479,92 +479,96 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(widget.group.id));
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-      child: SwipeActionCard(
-        actionsPanelWidth: 140,
-        actions: [
-          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
-          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
-        ],
-        child: GestureDetector(
-          onLongPress: () => _showContextMenu(context),
-          onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
-              ? (d) => _showRightClickMenu(context, d.globalPosition)
-              : null,
-          child: GlassCard(
-            child: InkWell(
-              onTap: () {
-                HapticUtils.lightTap();
-                navigateToGroup(context: context, ref: ref, groupId: widget.group.id, groupName: widget.group.name);
-              },
-              borderRadius: BorderRadius.circular(16.r),
-              child: Padding(
-                padding: EdgeInsets.all(16.w),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40.w,
-                      height: 40.w,
-                      decoration: BoxDecoration(
-                        color: _tealDim,
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
-                          style: TextStyle(color: _teal, fontWeight: FontWeight.w800, fontSize: 16.sp),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: SwipeActionCard(
+          actionsPanelWidth: 140,
+          actions: [
+            SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
+            SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
+          ],
+          child: GestureDetector(
+            onLongPress: () => _showContextMenu(context),
+            onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+                ? (d) => _showRightClickMenu(context, d.globalPosition)
+                : null,
+            child: GlassCard(
+              child: InkWell(
+                onTap: () {
+                  HapticUtils.lightTap();
+                  navigateToGroup(context: context, ref: ref, groupId: widget.group.id, groupName: widget.group.name);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _tealDim,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
+                            style: const TextStyle(color: _teal, fontWeight: FontWeight.w800, fontSize: 16),
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.group.name,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14.sp,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.group.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          SizedBox(height: 4.h),
-                          balanceAsync.when(
-                            data: (s) {
-                              final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
-                              final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
-                              if (owed == Decimal.zero && owe == Decimal.zero) {
-                                return Text('Settled up',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: _teal, fontSize: 11.sp));
-                              }
-                              return RichText(
-                                text: TextSpan(
-                                  style: TextStyle(fontSize: 11.sp),
-                                  children: [
-                                    if (owed > Decimal.zero)
-                                      TextSpan(
-                                        text: '+${s.currency} ${s.youAreOwed}',
-                                        style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
-                                      ),
-                                    if (owed > Decimal.zero && owe > Decimal.zero)
-                                      const TextSpan(text: '  '),
-                                    if (owe > Decimal.zero)
-                                      TextSpan(
-                                        text: '-${s.currency} ${s.youOwe}',
-                                        style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                            loading: () => SizedBox(height: 12.h),
-                            error: (_, _) => const SizedBox.shrink(),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            balanceAsync.when(
+                              data: (s) {
+                                final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
+                                final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
+                                if (owed == Decimal.zero && owe == Decimal.zero) {
+                                  return Text('Settled up',
+                                      style: theme.textTheme.bodySmall?.copyWith(color: _teal, fontSize: 11));
+                                }
+                                return RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(fontSize: 11),
+                                    children: [
+                                      if (owed > Decimal.zero)
+                                        TextSpan(
+                                          text: '+${s.currency} ${s.youAreOwed}',
+                                          style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
+                                        ),
+                                      if (owed > Decimal.zero && owe > Decimal.zero)
+                                        const TextSpan(text: '  '),
+                                      if (owe > Decimal.zero)
+                                        TextSpan(
+                                          text: '-${s.currency} ${s.youOwe}',
+                                          style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox(height: 12),
+                              error: (_, _) => const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20.sp),
-                  ],
+                      const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
