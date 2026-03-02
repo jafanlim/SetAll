@@ -610,6 +610,17 @@ class SetAllRepository {
   Future<GroupModel?> createGroup(String name) async {
     final uid = await ensureUser();
     if (uid == null) return null;
+
+    // Reject duplicate names (case-insensitive) within the user's groups.
+    final existing = await LocalDatabase.db.query(
+      'groups',
+      where: 'LOWER(name) = LOWER(?)',
+      whereArgs: [name],
+    );
+    if (existing.isNotEmpty) {
+      throw Exception('You already have a group named "$name".');
+    }
+
     final id = const Uuid().v4();
 
     if (_isWeb && _client != null) {
@@ -639,26 +650,30 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .insert({'id': id, 'name': name, 'creator_id': uid})
-          .select()
-          .single();
-      await _client
-          .from('group_members')
-          .insert({'group_id': id, 'user_id': uid});
-      await LocalDatabase.db.update(
-        'groups',
-        {'synced_at': DateTime.now().millisecondsSinceEpoch},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      await LocalDatabase.db.update(
-        'group_members',
-        {'synced_at': DateTime.now().millisecondsSinceEpoch},
-        where: 'group_id = ?',
-        whereArgs: [id],
-      );
+      try {
+        await _client
+            .from('groups')
+            .insert({'id': id, 'name': name, 'creator_id': uid})
+            .select()
+            .single();
+        await _client
+            .from('group_members')
+            .insert({'group_id': id, 'user_id': uid});
+        await LocalDatabase.db.update(
+          'groups',
+          {'synced_at': DateTime.now().millisecondsSinceEpoch},
+          where: 'id = ?',
+          whereArgs: [id],
+        );
+        await LocalDatabase.db.update(
+          'group_members',
+          {'synced_at': DateTime.now().millisecondsSinceEpoch},
+          where: 'group_id = ?',
+          whereArgs: [id],
+        );
+      } catch (e) {
+        debugPrint('⚠️ Group cloud sync failed (will retry on next sync): $e');
+      }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
   }
