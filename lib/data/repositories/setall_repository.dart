@@ -650,29 +650,37 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
+      // Step 1: push group row (silent failure — will retry on next sync).
       try {
         await _client
             .from('groups')
             .insert({'id': id, 'name': name, 'creator_id': uid})
             .select()
             .single();
-        await _client
-            .from('group_members')
-            .insert({'group_id': id, 'user_id': uid});
         await LocalDatabase.db.update(
           'groups',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
           where: 'id = ?',
           whereArgs: [id],
         );
+      } catch (e) {
+        debugPrint('⚠️ Group cloud sync failed (will retry on next sync): $e');
+      }
+
+      // Step 2: push creator's group_members row — MUST succeed so that the
+      // add_member_by_id RPC auth check (creator OR member) passes immediately.
+      try {
+        await _client
+            .from('group_members')
+            .insert({'group_id': id, 'user_id': uid});
         await LocalDatabase.db.update(
           'group_members',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'group_id = ?',
-          whereArgs: [id],
+          where: 'group_id = ? AND user_id = ?',
+          whereArgs: [id, uid],
         );
       } catch (e) {
-        debugPrint('⚠️ Group cloud sync failed (will retry on next sync): $e');
+        debugPrint('⚠️ group_members cloud sync failed: $e');
       }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
