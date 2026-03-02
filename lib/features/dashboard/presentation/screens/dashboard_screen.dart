@@ -270,7 +270,75 @@ class _NetBalanceHero extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final accent = isPositive ? _teal : _orange;
+    final isDesktop = MediaQuery.sizeOf(context).width >= 600;
 
+    if (isDesktop) {
+      return GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+        child: Row(
+          children: [
+            // Left: label + net amount
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 7,
+                        height: 7,
+                        decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isPositive ? 'Overall you are owed' : 'Overall you owe',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  if (_loading)
+                    const SizedBox(height: 28, child: LinearProgressIndicator())
+                  else
+                    Text(
+                      '$currency $netDisplay',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        letterSpacing: -0.5,
+                        color: _error ? theme.colorScheme.onSurfaceVariant : accent,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Right: the two pills side by side
+            _BalancePill(
+              label: 'Owed to you',
+              amount: youAreOwed,
+              currency: currency,
+              color: _teal,
+              bgColor: _tealDim,
+            ),
+            const SizedBox(width: 8),
+            _BalancePill(
+              label: 'You owe',
+              amount: youOwe,
+              currency: currency,
+              color: _orange,
+              bgColor: _orangeDim,
+            ),
+          ],
+        ),
+      );
+    }
+
+    // ── Mobile: original tall card layout ────────────────────────────────────
     return GlassCard(
       padding: EdgeInsets.all(20.w),
       child: Column(
@@ -281,10 +349,7 @@ class _NetBalanceHero extends StatelessWidget {
               Container(
                 width: 8.w,
                 height: 8.w,
-                decoration: BoxDecoration(
-                  color: accent,
-                  shape: BoxShape.circle,
-                ),
+                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
               ),
               SizedBox(width: 8.w),
               Expanded(
