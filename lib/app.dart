@@ -115,14 +115,8 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
 
         // On desktop clamp text scale to 1.0 so system accessibility settings
         // don't inflate every font. Mobile keeps the user's preferred scale.
-        final inner = isDesktop
-            ? MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: TextScaler.noScaling,
-                ),
-                child: child ?? const SizedBox.shrink(),
-              )
-            : (child ?? const SizedBox.shrink());
+        // Temporarily disabled to test keyboard input issue.
+        final inner = child ?? const SizedBox.shrink();
 
         return ScreenUtilInit(
           designSize: designSize,
