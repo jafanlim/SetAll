@@ -48,9 +48,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _localAvatarPath; // path of newly picked image (before upload)
   bool _avatarUploading = false;
 
+  // ── Email ────────────────────────────────────────────────────────────────
+  String? _currentEmail;
+  bool _emailChanging = false;
+
+  // ── Password ─────────────────────────────────────────────────────────────
+  bool _passwordChanging = false;
+
   // ── Currency ────────────────────────────────────────────────────────────
   String? _selectedCurrency;
   bool _currencySaving = false;
+  bool _currencyUserSelected = false; // true once user explicitly picks a value
 
   // ── Biometric ───────────────────────────────────────────────────────────
   bool _biometricAvailable = false;
@@ -62,6 +70,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadBiometricSettings();
+    _currentEmail = Supabase.instance.client.auth.currentUser?.email;
     // Seed controllers from a cached profile immediately (no wait for first frame).
     // ref.read is safe in initState for ConsumerStatefulWidget.
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -101,7 +110,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (_nicknameCtrl.text.isEmpty) {
       _nicknameCtrl.text = profile.nickname ?? '';
     }
-    _selectedCurrency ??= profile.defaultCurrency;
+    if (!_currencyUserSelected) _selectedCurrency = profile.defaultCurrency;
   }
 
   Future<void> _saveProfile() async {
@@ -124,8 +133,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       setState(() { _profileSaved = true; _profileSaving = false; });
     } catch (e) {
       if (!mounted) return;
+      // Show the actual DB error (e.g. nickname already taken) not a generic message.
+      final msg = e.toString().replaceFirst('Exception: ', '');
       setState(() {
-        _profileError  = 'Could not save. Check your connection.';
+        _profileError  = msg.contains('duplicate') || msg.contains('unique')
+            ? 'That nickname is already taken.'
+            : msg.contains('network') || msg.contains('socket')
+                ? 'Could not save. Check your connection.'
+                : msg;
         _profileSaving = false;
       });
     }
@@ -183,16 +198,246 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
+  /// Returns true when the current user has a password-based identity
+  /// (i.e. they signed up with email+password, not Google-only).
+  bool get _hasPasswordIdentity {
+    final identities =
+        Supabase.instance.client.auth.currentUser?.identities ?? [];
+    return identities.any((i) => i.provider == 'email');
+  }
+
+  Future<void> _showSetPasswordDialog() async {
+    final newPwCtrl    = TextEditingController();
+    final confirmCtrl  = TextEditingController();
+    final formKey      = GlobalKey<FormState>();
+    bool obscureNew    = true;
+    bool obscureConf   = true;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: Text(_hasPasswordIdentity ? 'Change Password' : 'Set Password'),
+          content: Form(
+            key: formKey,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                if (!_hasPasswordIdentity)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Text(
+                      'Add a password so you can also sign in with email + password.',
+                      style: TextStyle(
+                        fontSize: 12.sp,
+                        color: Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                TextFormField(
+                  controller: newPwCtrl,
+                  obscureText: obscureNew,
+                  decoration: InputDecoration(
+                    labelText: 'New password (min 8 characters)',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureNew
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () => setDlg(() => obscureNew = !obscureNew),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Enter a password';
+                    if (v.length < 8) return 'Use at least 8 characters';
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: confirmCtrl,
+                  obscureText: obscureConf,
+                  decoration: InputDecoration(
+                    labelText: 'Confirm password',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureConf
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined),
+                      onPressed: () => setDlg(() => obscureConf = !obscureConf),
+                    ),
+                  ),
+                  validator: (v) {
+                    if (v != newPwCtrl.text) return 'Passwords do not match';
+                    return null;
+                  },
+                ),
+              ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.black,
+              ),
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.of(ctx).pop(true);
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    final newPassword = newPwCtrl.text;
+    if (confirmed != true || !mounted) return;
+
+    // Capture messenger before any async gap so we never call it on a
+    // deactivated context.
+    final messenger = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    final isPasswordUser = _hasPasswordIdentity;
+
+    setState(() => _passwordChanging = true);
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(password: newPassword),
+      );
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            isPasswordUser
+                ? 'Password updated successfully.'
+                : 'Password set! You can now sign in with email + password.',
+          ),
+          backgroundColor: _teal.withValues(alpha: 0.9),
+        ),
+      );
+    } catch (e) {
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg.isNotEmpty ? msg : 'Could not update password.'),
+          backgroundColor: errorColor,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _passwordChanging = false);
+    }
+  }
+
+  Future<void> _showChangeEmailDialog() async {
+    final ctrl = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Change Email'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Current: ${_currentEmail ?? '—'}',
+                style: TextStyle(fontSize: 12.sp, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+              ),
+              SizedBox(height: 12.h),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  hintText: 'New email address',
+                  prefixIcon: Icon(Icons.email_outlined),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Send confirmation'),
+          ),
+        ],
+      ),
+    );
+    final newEmail = ctrl.text.trim().toLowerCase();
+    if (confirmed != true || !mounted) return;
+    if (newEmail.isEmpty || !newEmail.contains('@')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter a valid email address.')),
+      );
+      return;
+    }
+    final messenger  = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    setState(() => _emailChanging = true);
+    try {
+      await Supabase.instance.client.auth.updateUser(
+        UserAttributes(email: newEmail),
+      );
+      if (mounted) setState(() {
+        _currentEmail  = newEmail;
+        _emailChanging = false;
+      });
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Confirmation sent to $newEmail. Check your inbox.'),
+          backgroundColor: _teal.withValues(alpha: 0.9),
+        ),
+      );
+    } catch (e) {
+      if (mounted) setState(() => _emailChanging = false);
+      final msg = e.toString().replaceFirst('Exception: ', '');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(msg.isNotEmpty ? msg : 'Could not update email.'),
+          backgroundColor: errorColor,
+        ),
+      );
+    }
+  }
+
   Future<void> _saveCurrency(String code) async {
-    setState(() { _currencySaving = true; _selectedCurrency = code; });
+    setState(() { _currencySaving = true; _selectedCurrency = code; _currencyUserSelected = true; });
     HapticUtils.selection();
     try {
       await ref.read(setAllRepositoryProvider).updateProfile(defaultCurrency: code);
+      // Invalidate profile + balance providers so the new currency is picked
+      // up by baseCurrencyProvider immediately. The _currencyUserSelected flag
+      // prevents _seedFromProfile from overwriting the user's selection.
       ref.invalidate(currentProfileProvider);
       ref.invalidate(baseCurrencyProvider);
       ref.invalidate(balanceSummaryProvider);
       HapticUtils.success();
-    } catch (_) {} finally {
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not save currency: ${e.toString().replaceFirst('Exception: ', '')}'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
+        // Revert to the last known-good value from the DB, not null
+        // (null would cause the ?? 'USD' fallback to show incorrectly).
+        final profile = ref.read(currentProfileProvider).valueOrNull;
+        if (mounted) setState(() => _selectedCurrency = profile?.defaultCurrency ?? 'USD');
+      }
+    } finally {
       if (mounted) setState(() => _currencySaving = false);
     }
   }
@@ -404,36 +649,125 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           SizedBox(height: 8.h),
           GlassCard(
             padding: EdgeInsets.zero,
-            child: ListTile(
-              leading: const Icon(Icons.logout, color: Colors.redAccent),
-              title: const Text(
-                'Sign out',
-                style: TextStyle(
-                  color: Colors.redAccent,
-                  fontWeight: FontWeight.w600,
+            child: Column(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.email_outlined),
+                  title: Text(
+                    _currentEmail ?? '—',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    'Tap to change email',
+                    style: TextStyle(fontSize: 11.sp, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  trailing: _emailChanging
+                      ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.edit_outlined, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
+                  onTap: _emailChanging ? null : _showChangeEmailDialog,
                 ),
-              ),
-              onTap: () async { // <-- Must be onTap, not onPressed
-                try {
-                  await Supabase.instance.client.auth.signOut();
-                  
-                  // Wipe local cache correctly
-                  await LocalDatabase.db.delete('splits');
-                  await LocalDatabase.db.delete('expenses');
-                  await LocalDatabase.db.delete('group_members');
-                  await LocalDatabase.db.delete('groups');
-                  await LocalDatabase.db.delete('profiles');
-                  
-                  debugPrint('🧹 Local cache wiped. Clean state for next user.');
-                  if (context.mounted) {
-                    context.go('/login');
-                  }
-                } catch (e) {
-                  debugPrint('❌ Logout Error: $e');
-                }
-              }
-                          ),
+                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: Text(
+                    _hasPasswordIdentity ? 'Change Password' : 'Set Password',
+                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                  ),
+                  subtitle: Text(
+                    _hasPasswordIdentity
+                        ? 'Update your sign-in password'
+                        : 'Add a password to enable email + password login',
+                    style: TextStyle(fontSize: 11.sp, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  trailing: _passwordChanging
+                      ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.chevron_right, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
+                  onTap: _passwordChanging ? null : _showSetPasswordDialog,
+                ),
+                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                ListTile(
+                  leading: const Icon(Icons.delete_sweep_outlined, color: Colors.orangeAccent),
+                  title: const Text(
+                    'Clear all expenses',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text('Wipe all expenses & splits from device and cloud'),
+                  onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Clear all expenses?'),
+                        content: const Text(
+                          'This will permanently delete every expense and split from your account. '
+                          'Groups and members are kept. This cannot be undone.',
                         ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.orangeAccent,
+                              foregroundColor: Colors.black,
+                            ),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Clear expenses'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    await ref.read(setAllRepositoryProvider).clearAllExpenses();
+                    ref.invalidate(recentExpensesProvider);
+                    ref.invalidate(balanceSummaryProvider);
+                    ref.invalidate(myGroupsProvider);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('All expenses cleared')),
+                      );
+                    }
+                  },
+                ),
+                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                ListTile(
+                  leading: const Icon(Icons.logout, color: Colors.redAccent),
+                  title: const Text(
+                    'Sign out',
+                    style: TextStyle(
+                      color: Colors.redAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  onTap: () async {
+                    try {
+                      await Supabase.instance.client.auth.signOut();
+                      await LocalDatabase.db.delete('splits');
+                      await LocalDatabase.db.delete('expenses');
+                      await LocalDatabase.db.delete('group_members');
+                      await LocalDatabase.db.delete('groups');
+                      await LocalDatabase.db.delete('profiles');
+                      debugPrint('🧹 Local cache wiped. Clean state for next user.');
+                      // Invalidate all cached providers so the next user
+                      // never sees data that belonged to the previous session.
+                      ref.invalidate(currentProfileProvider);
+                      ref.invalidate(myGroupsProvider);
+                      ref.invalidate(friendGroupsProvider);
+                      ref.invalidate(recentExpensesProvider);
+                      ref.invalidate(balanceSummaryProvider);
+                      ref.invalidate(baseCurrencyProvider);
+                      if (context.mounted) context.go('/login');
+                    } catch (e) {
+                      debugPrint('❌ Logout Error: $e');
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
 
                         SizedBox(height: 32.h),
                       ],

@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
 
@@ -145,7 +146,7 @@ class _GroupCard extends ConsumerWidget {
         child: InkWell(
           onTap: () {
             HapticUtils.lightTap();
-            context.push('/group/${group.id}', extra: {'groupName': group.name});
+            navigateToGroup(context: context, ref: ref, groupId: group.id, groupName: group.name);
           },
           borderRadius: BorderRadius.circular(16.r),
           child: Padding(

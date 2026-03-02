@@ -84,22 +84,36 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       }
 
       // Add all selected members via the SECURITY DEFINER RPC.
+      final failedNames = <String>[];
       for (final member in _selected) {
         try {
           await repo.addMemberById(group.id, member.id);
-        } catch (_) {}
+        } catch (e) {
+          failedNames.add(member.name);
+          debugPrint('addMemberById failed for ${member.name}: $e');
+        }
       }
 
       ref.invalidate(myGroupsProvider);
       HapticUtils.success();
 
       if (!mounted) return;
+
+      if (failedNames.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Group created, but could not add: ${failedNames.join(', ')}. '
+              'Try adding them from the group page.',
+            ),
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
       final onCreated = widget.onGroupCreated;
       if (onCreated != null) {
-        // Caller handles navigation (e.g. expense flow).
         onCreated(group.id, group.name);
       } else {
-        // Default: go to the new group's detail page.
         context.pushReplacement(
           '/group/${group.id}',
           extra: {'groupName': group.name},
@@ -107,8 +121,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       }
     } catch (e) {
       if (!mounted) return;
+      // createGroup threw — likely offline or RLS blocked the group insert.
       setState(() {
-        _error    = 'Could not create group. Try again.';
+        _error    = 'Could not create group: ${e.toString().replaceFirst('Exception: ', '')}';
         _creating = false;
       });
     }

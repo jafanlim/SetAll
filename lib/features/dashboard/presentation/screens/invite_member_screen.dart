@@ -145,7 +145,11 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
           SizedBox(height: 24.h),
 
           // ── Last result feedback ───────────────────────────────────────
-          if (_lastResult != null) _LastResultCard(result: _lastResult!),
+          if (_lastResult != null)
+            _LastResultCard(
+              result: _lastResult!,
+              onAddAnother: () => setState(() => _lastResult = null),
+            ),
 
           SizedBox(height: 24.h),
 
@@ -191,8 +195,9 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
 // Last result feedback card
 // ---------------------------------------------------------------------------
 class _LastResultCard extends StatelessWidget {
-  const _LastResultCard({required this.result});
+  const _LastResultCard({required this.result, required this.onAddAnother});
   final AddPersonResult result;
+  final VoidCallback onAddAnother;
 
   @override
   Widget build(BuildContext context) {
@@ -221,7 +226,7 @@ class _LastResultCard extends StatelessWidget {
             ),
           ),
           TextButton(
-            onPressed: () => (context as Element).markNeedsBuild(),
+            onPressed: onAddAnother,
             child: Text(
               'Add another',
               style: TextStyle(color: color, fontSize: 12.sp),

@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -7,7 +8,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/group_model.dart';
 
@@ -154,7 +157,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   )
                 : SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) => _ActivityTile(expense: expenses[index]),
+                      (context, index) => _ActivityTile(expense: expenses[index], groupId: expenses[index].groupId),
                       childCount: expenses.length,
                     ),
                   ),
@@ -388,130 +391,249 @@ class _BalancePill extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Group card
+// Group card  (swipe left → Edit | Delete)
 // ---------------------------------------------------------------------------
-class _GroupCard extends ConsumerWidget {
+class _GroupCard extends ConsumerStatefulWidget {
   const _GroupCard({required this.group});
   final GroupModel group;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_GroupCard> createState() => _GroupCardState();
+}
+
+class _GroupCardState extends ConsumerState<_GroupCard> {
+  Future<void> _rename() async {
+    HapticUtils.primaryTap();
+    final ctrl = TextEditingController(text: widget.group.name);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Rename group'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          textCapitalization: TextCapitalization.words,
+          decoration: const InputDecoration(hintText: 'Group name'),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    final newName = ctrl.text.trim();
+    ctrl.dispose();
+    if (confirmed != true || newName.isEmpty || newName == widget.group.name) return;
+    final ok = await ref.read(setAllRepositoryProvider).renameGroup(widget.group.id, newName);
+    if (!mounted) return;
+    if (ok) {
+      ref.invalidate(myGroupsProvider);
+      HapticUtils.success();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not rename. Only the group creator can rename.')),
+      );
+    }
+  }
+
+  Future<void> _delete() async {
+    HapticUtils.primaryTap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete group?'),
+        content: Text('Delete "${widget.group.name}" and all its expenses? This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    final ok = await ref.read(setAllRepositoryProvider).deleteGroup(widget.group.id);
+    if (!mounted) return;
+    if (ok) {
+      ref.invalidate(myGroupsProvider);
+      ref.invalidate(balanceSummaryProvider);
+      HapticUtils.success();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete. Only the group creator can delete.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final balanceAsync = ref.watch(groupBalanceSummaryProvider(group.id));
+    final balanceAsync = ref.watch(groupBalanceSummaryProvider(widget.group.id));
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-      child: GlassCard(
-        child: InkWell(
-          onTap: () {
-            HapticUtils.lightTap();
-            context.push('/group/${group.id}', extra: {'groupName': group.name});
-          },
-          borderRadius: BorderRadius.circular(16.r),
-          child: Padding(
-            padding: EdgeInsets.all(16.w),
-            child: Row(
-              children: [
-                Container(
-                  width: 40.w,
-                  height: 40.w,
-                  decoration: BoxDecoration(
-                    color: _tealDim,
-                    borderRadius: BorderRadius.circular(12.r),
-                  ),
-                  child: Center(
-                    child: Text(
-                      group.name.isNotEmpty
-                          ? group.name[0].toUpperCase()
-                          : 'G',
-                      style: TextStyle(
-                        color: _teal,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16.sp,
+      child: SwipeActionCard(
+        actionsPanelWidth: 140,
+        actions: [
+          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
+          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
+        ],
+        child: GestureDetector(
+          onLongPress: () => _showContextMenu(context),
+          onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+              ? (d) => _showRightClickMenu(context, d.globalPosition)
+              : null,
+          child: GlassCard(
+            child: InkWell(
+              onTap: () {
+                HapticUtils.lightTap();
+                navigateToGroup(context: context, ref: ref, groupId: widget.group.id, groupName: widget.group.name);
+              },
+              borderRadius: BorderRadius.circular(16.r),
+              child: Padding(
+                padding: EdgeInsets.all(16.w),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40.w,
+                      height: 40.w,
+                      decoration: BoxDecoration(
+                        color: _tealDim,
+                        borderRadius: BorderRadius.circular(12.r),
                       ),
-                    ),
-                  ),
-                ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        group.name,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14.sp,
+                      child: Center(
+                        child: Text(
+                          widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
+                          style: TextStyle(color: _teal, fontWeight: FontWeight.w800, fontSize: 16.sp),
                         ),
                       ),
-                      SizedBox(height: 4.h),
-                      balanceAsync.when(
-                        data: (s) {
-                          final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
-                          final owe = Decimal.tryParse(s.youOwe) ?? Decimal.zero;
-                          if (owed == Decimal.zero && owe == Decimal.zero) {
-                            return Text(
-                              'Settled up',
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: _teal,
-                                fontSize: 11.sp,
-                              ),
-                            );
-                          }
-                          return RichText(
-                            text: TextSpan(
-                              style: TextStyle(fontSize: 11.sp),
-                              children: [
-                                if (owed > Decimal.zero) ...[
-                                  TextSpan(
-                                    text: '+${s.currency} ${s.youAreOwed}',
-                                    style: const TextStyle(
-                                      color: _teal,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                                if (owed > Decimal.zero && owe > Decimal.zero)
-                                  const TextSpan(text: '  '),
-                                if (owe > Decimal.zero) ...[
-                                  TextSpan(
-                                    text: '-${s.currency} ${s.youOwe}',
-                                    style: const TextStyle(
-                                      color: _orange,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                    ),
+                    SizedBox(width: 12.w),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.group.name,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14.sp,
                             ),
-                          );
-                        },
-                        loading: () => SizedBox(height: 12.h),
-                        error: (_, _) => const SizedBox.shrink(),
+                          ),
+                          SizedBox(height: 4.h),
+                          balanceAsync.when(
+                            data: (s) {
+                              final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
+                              final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
+                              if (owed == Decimal.zero && owe == Decimal.zero) {
+                                return Text('Settled up',
+                                    style: theme.textTheme.bodySmall?.copyWith(color: _teal, fontSize: 11.sp));
+                              }
+                              return RichText(
+                                text: TextSpan(
+                                  style: TextStyle(fontSize: 11.sp),
+                                  children: [
+                                    if (owed > Decimal.zero)
+                                      TextSpan(
+                                        text: '+${s.currency} ${s.youAreOwed}',
+                                        style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
+                                      ),
+                                    if (owed > Decimal.zero && owe > Decimal.zero)
+                                      const TextSpan(text: '  '),
+                                    if (owe > Decimal.zero)
+                                      TextSpan(
+                                        text: '-${s.currency} ${s.youOwe}',
+                                        style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
+                                      ),
+                                  ],
+                                ),
+                              );
+                            },
+                            loading: () => SizedBox(height: 12.h),
+                            error: (_, _) => const SizedBox.shrink(),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
+                    ),
+                    Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20.sp),
+                  ],
                 ),
-                Icon(
-                  Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20.sp,
-                ),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
   }
+
+  Future<void> _showContextMenu(BuildContext context) async {
+    HapticUtils.primaryTap();
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: _teal),
+              title: const Text('Rename group'),
+              onTap: () => Navigator.of(ctx).pop('rename'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == 'rename') _rename();
+    if (result == 'delete') _delete();
+  }
+
+  Future<void> _showRightClickMenu(BuildContext context, Offset position) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+          position.dx, position.dy, position.dx + 1, position.dy + 1),
+      items: [
+        PopupMenuItem(
+          value: 'rename',
+          child: Row(children: [
+            Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            const Text('Rename group'),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+          ]),
+        ),
+      ],
+    );
+    if (result == 'rename') _rename();
+    if (result == 'delete') _delete();
+  }
 }
 
 // ---------------------------------------------------------------------------
-// Activity tile
+// Activity tile  (tap → Edit, swipe left → Delete, right-click → menu)
 // ---------------------------------------------------------------------------
-class _ActivityTile extends StatelessWidget {
-  const _ActivityTile({required this.expense});
+class _ActivityTile extends ConsumerWidget {
+  const _ActivityTile({required this.expense, required this.groupId});
   final ExpenseModel expense;
+  final String groupId;
 
   static const Map<String, IconData> _categoryIcons = {
     'Food & drink': Icons.restaurant_outlined,
@@ -523,80 +645,190 @@ class _ActivityTile extends StatelessWidget {
     'Other': Icons.category_outlined,
   };
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final icon =
-        _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    HapticUtils.primaryTap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete expense?'),
+        content: Text(
+          'Remove "${expense.description.isEmpty ? expense.amount : expense.description}"? '
+          'This cannot be undone.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(balanceSummaryProvider);
+    if (context.mounted) {
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Expense deleted')),
+      );
+    }
+  }
 
-    // Display original amount if available, otherwise stored amount
+  Future<void> _showLongPressMenu(BuildContext context, WidgetRef ref) async {
+    HapticUtils.primaryTap();
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: _teal),
+              title: const Text('Edit expense'),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    if (result == 'edit') {
+      context.push('/group/$groupId/expense/${expense.id}',
+          extra: {'groupName': ''});
+    } else if (result == 'delete') {
+      _delete(context, ref);
+    }
+  }
+
+  Future<void> _showRightClickMenu(
+      BuildContext context, WidgetRef ref, Offset position) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+          position.dx, position.dy, position.dx + 1, position.dy + 1),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(children: [
+            Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            const Text('Edit expense'),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+          ]),
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    if (result == 'edit') {
+      context.push('/group/$groupId/expense/${expense.id}',
+          extra: {'groupName': ''});
+    } else if (result == 'delete') {
+      _delete(context, ref);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final icon = _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
     final displayAmount = expense.originalAmount ?? expense.amount;
     final displayCurrency = expense.originalCurrency ?? expense.currency;
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 3.h),
-      child: GlassCard(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
-        child: Row(
-          children: [
-            Container(
-              width: 38.w,
-              height: 38.w,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(10.r),
+      child: SwipeActionCard(
+        actionsPanelWidth: 140,
+        actions: [
+          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: () => context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''})),
+          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: () => _delete(context, ref)),
+        ],
+        child: GestureDetector(
+          onLongPress: () => _showLongPressMenu(context, ref),
+          onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+              ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
+              : null,
+          child: GlassCard(
+            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12.r),
+              onTap: () => context.push(
+                '/group/$groupId/expense/${expense.id}',
+                extra: {'groupName': ''},
               ),
-              child: Icon(icon, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Row(
                 children: [
-                  Text(
-                    expense.description.isEmpty ? expense.category : expense.description,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13.sp,
+                  Container(
+                    width: 38.w,
+                    height: 38.w,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10.r),
                     ),
-                    overflow: TextOverflow.ellipsis,
+                    child: Icon(icon, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
                   ),
-                  if (expense.originalCurrency != null &&
-                      expense.originalCurrency != expense.currency) ...[
-                    SizedBox(height: 2.h),
-                    Text(
-                      '${expense.currency} ${expense.amount} base',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 10.sp,
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        expense.description.isEmpty ? expense.category : expense.description,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13.sp,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '$displayCurrency $displayAmount',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13.sp,
-                    color: _teal,
+                      if (expense.originalCurrency != null &&
+                          expense.originalCurrency != expense.currency) ...[
+                        SizedBox(height: 2.h),
+                        Text(
+                          '${expense.currency} ${expense.amount} base',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10.sp,
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (expense.createdAt != null)
-                  Text(
-                    _shortDate(expense.createdAt!),
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 10.sp,
-                      color: theme.colorScheme.onSurfaceVariant,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '$displayCurrency $displayAmount',
+                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: _teal),
                     ),
-                  ),
+                    if (expense.createdAt != null)
+                      Text(
+                        _shortDate(expense.createdAt!),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontSize: 10.sp,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ],
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -611,4 +843,5 @@ class _ActivityTile extends StatelessWidget {
     }
   }
 }
+
 
