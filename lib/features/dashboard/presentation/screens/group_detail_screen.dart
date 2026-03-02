@@ -370,17 +370,19 @@ class _GroupBalanceCard extends StatelessWidget {
 
     if (owed == Decimal.zero && owe == Decimal.zero) {
       return GlassCard(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: [
-            Icon(Icons.check_circle_outline, color: _teal, size: 18.sp),
-            SizedBox(width: 8.w),
-            Text(
-              'All settled up in this group',
-              style: TextStyle(
-                color: _teal,
-                fontWeight: FontWeight.w600,
-                fontSize: 13.sp,
+            const Icon(Icons.check_circle_outline, color: _teal, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'All settled up in this group',
+                style: const TextStyle(
+                  color: _teal,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
               ),
             ),
           ],

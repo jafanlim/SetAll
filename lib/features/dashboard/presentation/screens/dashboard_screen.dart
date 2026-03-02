@@ -272,44 +272,44 @@ class _NetBalanceHero extends StatelessWidget {
     final accent = isPositive ? _teal : _orange;
 
     return GlassCard(
-      padding: EdgeInsets.all(20.w),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
               Container(
-                width: 8.w,
-                height: 8.w,
-                decoration: BoxDecoration(
-                  color: accent,
-                  shape: BoxShape.circle,
-                ),
+                width: 7,
+                height: 7,
+                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
               ),
-              SizedBox(width: 8.w),
+              const SizedBox(width: 6),
               Text(
                 isPositive ? 'Overall you are owed' : 'Overall you owe',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12.sp,
+                  fontSize: 12,
                 ),
               ),
             ],
           ),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 6),
           if (_loading)
-            SizedBox(height: 36.h, child: const LinearProgressIndicator())
+            const SizedBox(height: 28, child: LinearProgressIndicator())
           else
             Text(
               '$currency $netDisplay',
               style: TextStyle(
                 fontWeight: FontWeight.w800,
-                fontSize: 34.sp,
-                letterSpacing: -1.0,
+                fontSize: 26,
+                letterSpacing: -0.5,
                 color: _error ? theme.colorScheme.onSurfaceVariant : accent,
               ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-          SizedBox(height: 16.h),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -321,7 +321,7 @@ class _NetBalanceHero extends StatelessWidget {
                   bgColor: _tealDim,
                 ),
               ),
-              SizedBox(width: 10.w),
+              const SizedBox(width: 8),
               Expanded(
                 child: _BalancePill(
                   label: 'You owe',
@@ -358,29 +358,31 @@ class _BalancePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 10.h),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             label,
             style: theme.textTheme.bodySmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,
-              fontSize: 10.sp,
+              fontSize: 10,
             ),
+            overflow: TextOverflow.ellipsis,
           ),
-          SizedBox(height: 2.h),
+          const SizedBox(height: 2),
           Text(
             '$currency $amount',
             style: TextStyle(
               color: color,
               fontWeight: FontWeight.w700,
-              fontSize: 14.sp,
+              fontSize: 13,
             ),
             overflow: TextOverflow.ellipsis,
           ),
@@ -477,92 +479,96 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(widget.group.id));
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
-      child: SwipeActionCard(
-        actionsPanelWidth: 140,
-        actions: [
-          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
-          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
-        ],
-        child: GestureDetector(
-          onLongPress: () => _showContextMenu(context),
-          onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
-              ? (d) => _showRightClickMenu(context, d.globalPosition)
-              : null,
-          child: GlassCard(
-            child: InkWell(
-              onTap: () {
-                HapticUtils.lightTap();
-                navigateToGroup(context: context, ref: ref, groupId: widget.group.id, groupName: widget.group.name);
-              },
-              borderRadius: BorderRadius.circular(16.r),
-              child: Padding(
-                padding: EdgeInsets.all(16.w),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40.w,
-                      height: 40.w,
-                      decoration: BoxDecoration(
-                        color: _tealDim,
-                        borderRadius: BorderRadius.circular(12.r),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
-                          style: TextStyle(color: _teal, fontWeight: FontWeight.w800, fontSize: 16.sp),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: SizedBox(
+        width: double.infinity,
+        child: SwipeActionCard(
+          actionsPanelWidth: 140,
+          actions: [
+            SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
+            SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
+          ],
+          child: GestureDetector(
+            onLongPress: () => _showContextMenu(context),
+            onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+                ? (d) => _showRightClickMenu(context, d.globalPosition)
+                : null,
+            child: GlassCard(
+              child: InkWell(
+                onTap: () {
+                  HapticUtils.lightTap();
+                  navigateToGroup(context: context, ref: ref, groupId: widget.group.id, groupName: widget.group.name);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: _tealDim,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
+                            style: const TextStyle(color: _teal, fontWeight: FontWeight.w800, fontSize: 16),
+                          ),
                         ),
                       ),
-                    ),
-                    SizedBox(width: 12.w),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            widget.group.name,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              fontSize: 14.sp,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.group.name,
+                              style: theme.textTheme.titleSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                          SizedBox(height: 4.h),
-                          balanceAsync.when(
-                            data: (s) {
-                              final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
-                              final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
-                              if (owed == Decimal.zero && owe == Decimal.zero) {
-                                return Text('Settled up',
-                                    style: theme.textTheme.bodySmall?.copyWith(color: _teal, fontSize: 11.sp));
-                              }
-                              return RichText(
-                                text: TextSpan(
-                                  style: TextStyle(fontSize: 11.sp),
-                                  children: [
-                                    if (owed > Decimal.zero)
-                                      TextSpan(
-                                        text: '+${s.currency} ${s.youAreOwed}',
-                                        style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
-                                      ),
-                                    if (owed > Decimal.zero && owe > Decimal.zero)
-                                      const TextSpan(text: '  '),
-                                    if (owe > Decimal.zero)
-                                      TextSpan(
-                                        text: '-${s.currency} ${s.youOwe}',
-                                        style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
-                                      ),
-                                  ],
-                                ),
-                              );
-                            },
-                            loading: () => SizedBox(height: 12.h),
-                            error: (_, _) => const SizedBox.shrink(),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            balanceAsync.when(
+                              data: (s) {
+                                final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
+                                final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
+                                if (owed == Decimal.zero && owe == Decimal.zero) {
+                                  return Text('Settled up',
+                                      style: theme.textTheme.bodySmall?.copyWith(color: _teal, fontSize: 11));
+                                }
+                                return RichText(
+                                  text: TextSpan(
+                                    style: const TextStyle(fontSize: 11),
+                                    children: [
+                                      if (owed > Decimal.zero)
+                                        TextSpan(
+                                          text: '+${s.currency} ${s.youAreOwed}',
+                                          style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
+                                        ),
+                                      if (owed > Decimal.zero && owe > Decimal.zero)
+                                        const TextSpan(text: '  '),
+                                      if (owe > Decimal.zero)
+                                        TextSpan(
+                                          text: '-${s.currency} ${s.youOwe}',
+                                          style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
+                                        ),
+                                    ],
+                                  ),
+                                );
+                              },
+                              loading: () => const SizedBox(height: 12),
+                              error: (_, _) => const SizedBox.shrink(),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant, size: 20.sp),
-                  ],
+                      const Icon(Icons.chevron_right, color: Colors.white38, size: 20),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -808,22 +814,25 @@ class _ActivityTile extends ConsumerWidget {
                     ],
                   ),
                 ),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$displayCurrency $displayAmount',
-                      style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.sp, color: _teal),
-                    ),
-                    if (expense.createdAt != null)
+                IntrinsicWidth(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
                       Text(
-                        _shortDate(expense.createdAt!),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontSize: 10.sp,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        '$displayCurrency $displayAmount',
+                        style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _teal),
                       ),
-                  ],
+                      if (expense.createdAt != null)
+                        Text(
+                          _shortDate(expense.createdAt!),
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 10,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ],
               ),

@@ -123,10 +123,8 @@ class SetAllRepository {
     if (kIsWeb) return _client != null;
     try {
       final result = await Connectivity().checkConnectivity();
-      return result.contains(ConnectivityResult.wifi) ||
-          result.contains(ConnectivityResult.mobile) ||
-          result.contains(ConnectivityResult.ethernet) ||
-          result.contains(ConnectivityResult.vpn);
+      // ConnectivityResult.other covers macOS wired/wifi — must be included.
+      return result.any((r) => r != ConnectivityResult.none);
     } catch (_) {
       return false;
     }
@@ -295,9 +293,19 @@ class SetAllRepository {
 
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})>
       _getBalanceRawDataWeb(String uid) async {
+    // Only include expenses from 'normal' groups — exclude 'direct' (friend)
+    // groups so the global counter matches the sum of the dashboard group cards.
+    final normalGroupRows = await _client!
+        .from('groups')
+        .select('id')
+        .eq('type', 'normal') as List;
+    final normalGroupIds = normalGroupRows
+        .map((r) => (r as Map<String, dynamic>)['id'] as String)
+        .toSet();
+
     final youOwe = <BalanceEntry>[];
     final mySplits =
-        await _client!.from('splits').select().eq('user_id', uid) as List;
+        await _client.from('splits').select().eq('user_id', uid) as List;
     for (final row in mySplits) {
       final sMap = row as Map<String, dynamic>;
       final exList = await _client
@@ -305,7 +313,8 @@ class SetAllRepository {
           .select()
           .eq('id', sMap['expense_id'] as String);
       if ((exList as List).isEmpty) continue;
-      final ex = exList.first;
+      final ex = (exList as List).first as Map<String, dynamic>;
+      if (!normalGroupIds.contains(ex['group_id'] as String?)) continue;
       if (ex['payer_id'] == uid) continue; // payer doesn't owe themselves
       youOwe.add(_makeEntry(sMap, ex));
     }
@@ -315,6 +324,7 @@ class SetAllRepository {
         await _client.from('expenses').select().eq('payer_id', uid) as List;
     for (final ex in myExpenses) {
       final exMap = ex as Map<String, dynamic>;
+      if (!normalGroupIds.contains(exMap['group_id'] as String?)) continue;
       final splits = await _client
           .from('splits')
           .select()
@@ -330,6 +340,17 @@ class SetAllRepository {
 
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})>
       _getBalanceRawDataLocal(String uid) async {
+    // Only include expenses from 'normal' groups — exclude 'direct' (friend)
+    // groups so the global counter matches the sum of the dashboard group cards.
+    final normalGroupRows = await LocalDatabase.db.query(
+      'groups',
+      columns: ['id'],
+      where: 'type = ?',
+      whereArgs: ['normal'],
+    );
+    final normalGroupIds =
+        normalGroupRows.map((r) => r['id'] as String).toSet();
+
     final youOwe = <BalanceEntry>[];
     final mySplits = await LocalDatabase.db.query(
       'splits',
@@ -344,6 +365,7 @@ class SetAllRepository {
       );
       if (expRows.isEmpty) continue;
       final ex = expRows.first;
+      if (!normalGroupIds.contains(ex['group_id'] as String?)) continue;
       if (ex['payer_id'] == uid) continue;
       youOwe.add(_makeEntry(row, ex));
     }
@@ -355,6 +377,7 @@ class SetAllRepository {
       whereArgs: [uid],
     );
     for (final ex in myExpenses) {
+      if (!normalGroupIds.contains(ex['group_id'] as String?)) continue;
       final splits = await LocalDatabase.db.query(
         'splits',
         where: 'expense_id = ?',
@@ -610,6 +633,17 @@ class SetAllRepository {
   Future<GroupModel?> createGroup(String name) async {
     final uid = await ensureUser();
     if (uid == null) return null;
+
+    // Reject duplicate names (case-insensitive) within the user's groups.
+    final existing = await LocalDatabase.db.query(
+      'groups',
+      where: 'LOWER(name) = LOWER(?)',
+      whereArgs: [name],
+    );
+    if (existing.isNotEmpty) {
+      throw Exception('You already have a group named "$name".');
+    }
+
     final id = const Uuid().v4();
 
     if (_isWeb && _client != null) {
@@ -639,26 +673,20 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
-      await _client
-          .from('groups')
-          .insert({'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'})
-          .select()
-          .single();
-      await _client
-          .from('group_members')
-          .insert({'group_id': id, 'user_id': uid});
-      await LocalDatabase.db.update(
-        'groups',
-        {'synced_at': DateTime.now().millisecondsSinceEpoch},
-        where: 'id = ?',
-        whereArgs: [id],
-      );
-      await LocalDatabase.db.update(
-        'group_members',
-        {'synced_at': DateTime.now().millisecondsSinceEpoch},
-        where: 'group_id = ?',
-        whereArgs: [id],
-      );
+      // Use SECURITY DEFINER RPC to bypass RLS — same pattern as add_member_by_id.
+      // The RPC also inserts the creator's group_members row atomically.
+      try {
+        final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
+        if (remoteId != id) {
+          await LocalDatabase.db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+          await LocalDatabase.db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+          return GroupModel(id: remoteId, name: name, creatorId: uid);
+        }
+        await LocalDatabase.db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+        await LocalDatabase.db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+      } catch (e) {
+        debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
+      }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
   }
@@ -1822,6 +1850,7 @@ class SetAllRepository {
           'id': row['id'],
           'name': row['name'],
           'creator_id': row['creator_id'],
+          'type': row['type'] ?? 'normal',
         });
         await LocalDatabase.db.update(
           'groups',
@@ -1857,18 +1886,20 @@ class SetAllRepository {
           } catch (e) {
             if (e is PostgrestException) {
               if (e.code == '23505') {
-                // DUPLICATE KEY: It's already in Supabase! Just mark it as synced locally.
-                debugPrint(
-                    '⚠️ Expense already exists in cloud. Marking as synced locally.');
-                await LocalDatabase.db.update(
-                  'expenses',
-                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                  where: 'id = ?',
-                  whereArgs: [row['id']],
-                );
+                // DUPLICATE KEY: already in Supabase — mark synced locally.
+                debugPrint('⚠️ Expense already exists in cloud. Marking as synced locally.');
               } else {
-                debugPrint('❌ Expense Sync Error: ${e.message}');
+                // RLS violation (42501) or other permanent error — this row can
+                // never be pushed by this user (e.g. stale test data with a
+                // different payer_id). Mark synced to stop retrying.
+                debugPrint('⚠️ Expense skipped (${e.code}): ${e.message}');
               }
+              await LocalDatabase.db.update(
+                'expenses',
+                {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                where: 'id = ?',
+                whereArgs: [row['id']],
+              );
             }
           }
         }
@@ -1887,15 +1918,15 @@ class SetAllRepository {
             );
           } catch (e) {
             if (e is PostgrestException) {
-              if (e.code == '23505') {
-                // DUPLICATE KEY
-                await LocalDatabase.db.update(
-                  'splits',
-                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                  where: 'id = ?',
-                  whereArgs: [row['id']],
-                );
+              if (e.code != '23505') {
+                debugPrint('⚠️ Split skipped (${e.code}): ${e.message}');
               }
+              await LocalDatabase.db.update(
+                'splits',
+                {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                where: 'id = ?',
+                whereArgs: [row['id']],
+              );
             }
           }
         }
