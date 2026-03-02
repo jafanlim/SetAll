@@ -121,6 +121,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final membersAsync = ref.watch(groupMembersProvider(groupId));
     final expensesAsync = ref.watch(groupExpensesProvider(groupId));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(groupId));
+    final creatorAsync = ref.watch(groupCreatorProvider(groupId));
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -251,7 +252,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.w),
                 child: membersAsync.when(
-                  data: (members) => _MemberList(members: members),
+                  data: (members) => _MemberList(
+                    members: members,
+                    groupId: groupId,
+                    creatorId: creatorAsync.valueOrNull ?? '',
+                  ),
                   loading: () => const Center(
                     child: Padding(
                       padding: EdgeInsets.all(16),
@@ -449,32 +454,87 @@ class _GroupBalanceCard extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Members list
 // ---------------------------------------------------------------------------
-class _MemberList extends StatelessWidget {
-  const _MemberList({required this.members});
+class _MemberList extends ConsumerWidget {
+  const _MemberList({
+    required this.members,
+    required this.groupId,
+    required this.creatorId,
+  });
   final List<ProfileModel> members;
+  final String groupId;
+  final String creatorId;
+
+  Future<void> _removeMember(
+    BuildContext context,
+    WidgetRef ref,
+    ProfileModel member,
+  ) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove member?'),
+        content: Text('Remove "${member.name}" from this group?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+
+    final result = await ref
+        .read(setAllRepositoryProvider)
+        .removeGroupMember(groupId, member.id);
+
+    if (!context.mounted) return;
+    if (result.ok) {
+      ref.invalidate(groupMembersProvider(groupId));
+      ref.invalidate(balanceSummaryProvider);
+      HapticUtils.success();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result.error ?? 'Could not remove member.')),
+      );
+    }
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final currentProfileAsync = ref.watch(currentProfileProvider);
+    final currentUid = currentProfileAsync.valueOrNull?.id;
+    final isCreator = currentUid == creatorId;
+
     if (members.isEmpty) {
       return Text(
         'No members yet',
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
-          fontSize: 13.sp,
+          fontSize: 13,
         ),
       );
     }
     return GlassCard(
-      padding: EdgeInsets.symmetric(vertical: 4.h),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: members.map((m) {
           final initial = m.name.isNotEmpty ? m.name[0].toUpperCase() : '?';
+          final isCreatorMember = m.id == creatorId;
           return ListTile(
             dense: true,
             leading: Container(
-              width: 32.w,
-              height: 32.w,
+              width: 32,
+              height: 32,
               decoration: const BoxDecoration(
                 color: _tealDim,
                 shape: BoxShape.circle,
@@ -482,25 +542,33 @@ class _MemberList extends StatelessWidget {
               child: Center(
                 child: Text(
                   initial,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _teal,
                     fontWeight: FontWeight.w700,
-                    fontSize: 13.sp,
+                    fontSize: 13,
                   ),
                 ),
               ),
             ),
             title: Text(
-              m.name,
-              style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w600),
+              isCreatorMember ? '${m.name} (creator)' : m.name,
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
             subtitle: m.defaultCurrency != 'USD'
                 ? Text(
                     m.defaultCurrency,
                     style: TextStyle(
-                      fontSize: 10.sp,
+                      fontSize: 10,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
+                  )
+                : null,
+            trailing: isCreator && !isCreatorMember
+                ? IconButton(
+                    icon: const Icon(Icons.person_remove_outlined, size: 18),
+                    color: Colors.redAccent,
+                    tooltip: 'Remove member',
+                    onPressed: () => _removeMember(context, ref, m),
                   )
                 : null,
           );
