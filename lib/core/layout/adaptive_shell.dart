@@ -96,29 +96,29 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       body: Row(
         children: [
           _buildSidebar(context),
-          // Master list — capped at kContentMaxWidth, never stretches wider
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
-            child: SizedBox(
-              width: hasDetail ? kContentMaxWidth : double.infinity,
+          // Master list — flex takes remaining space, capped at kContentMaxWidth
+          Expanded(
+            flex: hasDetail ? 0 : 1,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
               child: widget.child,
             ),
           ),
-          // Detail pane — shown when a group is selected on desktop
-          if (hasDetail) ...[
-            VerticalDivider(
-              width: 1,
-              color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-            ),
-            Expanded(
-              child: GroupDetailScreen(
-                key: ValueKey(selectedGroup.groupId),
-                groupId: selectedGroup.groupId!,
-                groupName: selectedGroup.groupName ?? 'Group',
-              ),
-            ),
-          ] else
-            const Expanded(child: _DetailPlaceholder()),
+          // Detail pane — group detail or placeholder
+          VerticalDivider(
+            width: 1,
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+          Expanded(
+            flex: 1,
+            child: hasDetail
+                ? GroupDetailScreen(
+                    key: ValueKey(selectedGroup.groupId),
+                    groupId: selectedGroup.groupId!,
+                    groupName: selectedGroup.groupName ?? 'Group',
+                  )
+                : const _DetailPlaceholder(),
+          ),
         ],
       ),
     );
