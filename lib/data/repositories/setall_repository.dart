@@ -652,19 +652,15 @@ class SetAllRepository {
       // The RPC also inserts the creator's group_members row atomically.
       try {
         final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
-        // Mirror the remote UUID into local SQLite (replace the temp local id).
-        // If the remote id differs from the local id, update local rows.
         if (remoteId != id) {
           await LocalDatabase.db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
           await LocalDatabase.db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
-          debugPrint('[CreateGroup] RPC OK — remote id=$remoteId (was $id locally, updated)');
           return GroupModel(id: remoteId, name: name, creatorId: uid);
         }
         await LocalDatabase.db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
         await LocalDatabase.db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
-        debugPrint('[CreateGroup] RPC OK — id=$id');
       } catch (e) {
-        debugPrint('[CreateGroup] RPC FAILED (group saved locally, will sync later): $e');
+        debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
       }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
