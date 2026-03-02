@@ -87,41 +87,53 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     ref.invalidate(recentExpensesProvider);
   }
 
+  static bool get _isDesktop =>
+      defaultTargetPlatform == TargetPlatform.macOS ||
+      defaultTargetPlatform == TargetPlatform.windows ||
+      defaultTargetPlatform == TargetPlatform.linux;
+
   @override
   Widget build(BuildContext context) {
     final themeMode = ref.watch(themeModeProvider);
+    final isDesktop = _isDesktop;
 
     return MaterialApp.router(
       title: 'SetAll',
       debugShowCheckedModeBanner: false,
-      theme: SetAllTheme.light,
-      darkTheme: SetAllTheme.dark,
+      theme: isDesktop ? SetAllTheme.desktopLight : SetAllTheme.light,
+      darkTheme: isDesktop ? SetAllTheme.desktopDark : SetAllTheme.dark,
       themeMode: themeMode,
       routerConfig: AppRouter.create(),
       builder: (context, child) {
         // On desktop, pass the actual window size as the design size so every
         // .w / .h / .sp call is a 1:1 identity (no upscaling from mobile baseline).
         // Mobile keeps the 390×844 iPhone 16 Pro baseline.
-        final isDesktop = defaultTargetPlatform == TargetPlatform.macOS ||
-            defaultTargetPlatform == TargetPlatform.windows ||
-            defaultTargetPlatform == TargetPlatform.linux;
         final windowSize = MediaQuery.sizeOf(context);
         final designSize = isDesktop
             ? windowSize                                        // 1:1 on desktop
             : const Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
 
+        // On desktop clamp text scale to 1.0 so system accessibility settings
+        // don't inflate every font. Mobile keeps the user's preferred scale.
+        final inner = isDesktop
+            ? MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.noScaling,
+                ),
+                child: child ?? const SizedBox.shrink(),
+              )
+            : (child ?? const SizedBox.shrink());
+
         return ScreenUtilInit(
           designSize: designSize,
-          minTextAdapt: false,   // never re-scale text on desktop
+          minTextAdapt: false,
           splitScreenMode: false,
           builder: (_, _) {
             ScalingUtility.init(context);
             final theme = Theme.of(context);
             return Container(
               color: theme.colorScheme.surface,
-              child: child ?? Center(
-                child: CircularProgressIndicator(color: theme.colorScheme.primary),
-              ),
+              child: inner,
             );
           },
         );
