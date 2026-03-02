@@ -22,10 +22,10 @@ class GroupModel extends Group {
     );
   }
 
-  /// Supabase-safe JSON — excludes local-only fields like [type].
   Map<String, dynamic> toJson() => {
         'id': id,
         'name': name,
         'creator_id': creatorId,
+        'type': type.name,
       };
 }
