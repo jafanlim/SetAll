@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 /// A card wrapper that slides left to reveal action buttons.
 /// Unlike [Dismissible], the card stays open after release so the user
@@ -77,39 +76,42 @@ class _SwipeActionCardState extends State<SwipeActionCard>
         children: [
           // ── Action panel (behind the card) ──────────────────────────────
           Positioned.fill(
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: SizedBox(
-                width: panelW,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: widget.actions.map((a) {
-                    return GestureDetector(
-                      onTap: () {
-                        _close();
-                        a.onTap();
-                      },
-                      child: Container(
-                        width: panelW / widget.actions.length,
-                        alignment: Alignment.center,
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(a.icon, color: a.color, size: 22.sp),
-                            SizedBox(height: 4.h),
-                            Text(
-                              a.label,
-                              style: TextStyle(
-                                color: a.color,
-                                fontSize: 10.sp,
-                                fontWeight: FontWeight.w600,
+            child: ClipRect(
+              child: Align(
+                alignment: Alignment.centerRight,
+                child: SizedBox(
+                  width: panelW,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: widget.actions.map((a) {
+                      return GestureDetector(
+                        onTap: () {
+                          _close();
+                          a.onTap();
+                        },
+                        child: Container(
+                          width: panelW / widget.actions.length,
+                          alignment: Alignment.center,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(a.icon, color: a.color, size: 22),
+                              const SizedBox(height: 4),
+                              Text(
+                                a.label,
+                                style: TextStyle(
+                                  color: a.color,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    );
-                  }).toList(),
+                      );
+                    }).toList(),
+                  ),
                 ),
               ),
             ),
