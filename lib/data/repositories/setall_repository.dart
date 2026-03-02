@@ -623,7 +623,7 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       await _client.from('groups').insert(
-          {'id': id, 'name': name, 'creator_id': uid});
+          {'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'});
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
@@ -655,7 +655,7 @@ class SetAllRepository {
       try {
         await _client
             .from('groups')
-            .insert({'id': id, 'name': name, 'creator_id': uid})
+            .insert({'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'})
             .select()
             .single();
         groupSynced = true;
@@ -1854,6 +1854,7 @@ class SetAllRepository {
           'id': row['id'],
           'name': row['name'],
           'creator_id': row['creator_id'],
+          'type': row['type'] ?? 'normal',
         });
         await LocalDatabase.db.update(
           'groups',
