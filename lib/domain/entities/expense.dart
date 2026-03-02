@@ -27,7 +27,7 @@ class Expense {
     this.originalAmount,
     this.originalCurrency,
     this.exchangeRateApplied,
-    this.baseAmountAtEntry,
+    this.universalUsdAmount,
   });
 
   final String id;
@@ -36,8 +36,8 @@ class Expense {
 
   /// The stored amount (string for Decimal compatibility).
   /// For expenses entered in a foreign currency, this is the amount converted
-  /// to the user's base currency at entry time. [baseAmountAtEntry] is the
-  /// canonical frozen base-currency value since schema v4.
+  /// to the user's base currency at entry time. [universalUsdAmount] is the
+  /// canonical frozen USD value since schema v8.
   final String amount;
 
   final String description;
@@ -46,19 +46,19 @@ class Expense {
   final String category;
   final String? createdAt;
 
-  /// Original amount before base-currency conversion (null when entered in base).
+  /// Original amount before USD conversion (null when entered in USD).
   final String? originalAmount;
 
-  /// Original currency code before conversion (null when entered in base).
+  /// Original currency code before conversion (null when entered in USD).
   final String? originalCurrency;
 
   /// Exchange rate used at entry time: 1 [originalCurrency] = [exchangeRateApplied] [currency].
   final String? exchangeRateApplied;
 
-  /// Pre-computed total in the user's base currency at the time of entry.
+  /// Pre-computed total in pure USD at the time of entry.
   ///
-  /// This is the **definitive** field for balance calculations (schema v4+).
-  /// It is immune to future rate changes and base-currency profile changes.
-  /// NULL for expenses created before schema v4.
-  final String? baseAmountAtEntry;
+  /// This is the **definitive** field for balance calculations (schema v8+).
+  /// It is immune to future rate changes.
+  /// NULL for expenses created before schema v8.
+  final String? universalUsdAmount;
 }

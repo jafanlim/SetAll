@@ -4,10 +4,9 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/profile_model.dart';
@@ -189,10 +188,7 @@ class _FriendCard extends ConsumerWidget {
                   .toList();
               if (others.isNotEmpty) friendName = others.first.name;
             }
-            context.push(
-              '/group/${group.id}',
-              extra: {'groupName': friendName},
-            );
+            navigateToGroup(context: context, ref: ref, groupId: group.id, groupName: friendName);
           },
           borderRadius: BorderRadius.circular(16.r),
           child: Padding(

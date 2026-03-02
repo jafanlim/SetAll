@@ -66,6 +66,19 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.jafa.setall</string>
+			</array>
+		</dict>
+	</array>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock SetAll quickly and securely.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
