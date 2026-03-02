@@ -287,11 +287,14 @@ class _NetBalanceHero extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 8.w),
-              Text(
-                isPositive ? 'Overall you are owed' : 'Overall you owe',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12.sp,
+              Expanded(
+                child: Text(
+                  isPositive ? 'Overall you are owed' : 'Overall you owe',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                    fontSize: 12.sp,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],

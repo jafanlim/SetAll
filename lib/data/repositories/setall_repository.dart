@@ -614,7 +614,7 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       await _client.from('groups').insert(
-          {'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'});
+          {'id': id, 'name': name, 'creator_id': uid});
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
@@ -641,7 +641,7 @@ class SetAllRepository {
     if (await _isOnline && _client != null) {
       await _client
           .from('groups')
-          .insert({'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'})
+          .insert({'id': id, 'name': name, 'creator_id': uid})
           .select()
           .single();
       await _client
@@ -1857,18 +1857,20 @@ class SetAllRepository {
           } catch (e) {
             if (e is PostgrestException) {
               if (e.code == '23505') {
-                // DUPLICATE KEY: It's already in Supabase! Just mark it as synced locally.
-                debugPrint(
-                    '⚠️ Expense already exists in cloud. Marking as synced locally.');
-                await LocalDatabase.db.update(
-                  'expenses',
-                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                  where: 'id = ?',
-                  whereArgs: [row['id']],
-                );
+                // DUPLICATE KEY: already in Supabase — mark synced locally.
+                debugPrint('⚠️ Expense already exists in cloud. Marking as synced locally.');
               } else {
-                debugPrint('❌ Expense Sync Error: ${e.message}');
+                // RLS violation (42501) or other permanent error — this row can
+                // never be pushed by this user (e.g. stale test data with a
+                // different payer_id). Mark synced to stop retrying.
+                debugPrint('⚠️ Expense skipped (${e.code}): ${e.message}');
               }
+              await LocalDatabase.db.update(
+                'expenses',
+                {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                where: 'id = ?',
+                whereArgs: [row['id']],
+              );
             }
           }
         }
@@ -1887,15 +1889,15 @@ class SetAllRepository {
             );
           } catch (e) {
             if (e is PostgrestException) {
-              if (e.code == '23505') {
-                // DUPLICATE KEY
-                await LocalDatabase.db.update(
-                  'splits',
-                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                  where: 'id = ?',
-                  whereArgs: [row['id']],
-                );
+              if (e.code != '23505') {
+                debugPrint('⚠️ Split skipped (${e.code}): ${e.message}');
               }
+              await LocalDatabase.db.update(
+                'splits',
+                {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                where: 'id = ?',
+                whereArgs: [row['id']],
+              );
             }
           }
         }
