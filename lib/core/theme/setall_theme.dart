@@ -17,6 +17,28 @@ class SetAllTheme {
   static const Color _onSurfaceVariant = Color(0xFFB0B0B8);
   static const Color _onGold = Color(0xFF0F0F12);
 
+  // ── Compact TextTheme for desktop (M3 defaults scaled down ~15%) ──────────
+  static const TextTheme _compactTextTheme = TextTheme(
+    displayLarge:  TextStyle(fontSize: 45, fontWeight: FontWeight.w300, letterSpacing: -0.5),
+    displayMedium: TextStyle(fontSize: 36, fontWeight: FontWeight.w300),
+    displaySmall:  TextStyle(fontSize: 28, fontWeight: FontWeight.w400),
+    headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
+    headlineMedium:TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
+    headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w400),
+    titleLarge:    TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
+    titleMedium:   TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1),
+    titleSmall:    TextStyle(fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.1),
+    bodyLarge:     TextStyle(fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0.5),
+    bodyMedium:    TextStyle(fontSize: 13, fontWeight: FontWeight.w400, letterSpacing: 0.25),
+    bodySmall:     TextStyle(fontSize: 11, fontWeight: FontWeight.w400, letterSpacing: 0.4),
+    labelLarge:    TextStyle(fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.1),
+    labelMedium:   TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.5),
+    labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5),
+  );
+
+  static ThemeData get desktopDark  => dark.copyWith(textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onSurface, displayColor: _onSurface));
+  static ThemeData get desktopLight => light.copyWith(textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onGold, displayColor: _onGold));
+
   static ThemeData get dark {
     return ThemeData(
       useMaterial3: true,
