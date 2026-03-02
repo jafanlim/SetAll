@@ -691,6 +691,27 @@ class SetAllRepository {
     return GroupModel(id: id, name: name, creatorId: uid);
   }
 
+  /// Returns the creator_id for [groupId], or null if not found.
+  Future<String?> getGroupCreatorId(String groupId) async {
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('groups')
+          .select('creator_id')
+          .eq('id', groupId)
+          .limit(1) as List;
+      if (rows.isEmpty) return null;
+      return (rows.first as Map<String, dynamic>)['creator_id'] as String?;
+    }
+    final rows = await LocalDatabase.db.query(
+      'groups',
+      columns: ['creator_id'],
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+    if (rows.isEmpty) return null;
+    return rows.first['creator_id'] as String?;
+  }
+
   /// Delete a group. Only the creator can perform this action.
   Future<bool> deleteGroup(String groupId) async {
     final uid = await ensureUser();
@@ -725,6 +746,58 @@ class SetAllRepository {
   }
 
  
+  /// Remove a member from a group. Only the group creator can do this,
+  /// and cannot remove themselves.
+  Future<({bool ok, String? error})> removeGroupMember(
+      String groupId, String userId) async {
+    final uid = await ensureUser();
+    if (uid == null) return (ok: false, error: 'not_signed_in');
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.rpc('remove_group_member',
+            params: {'p_group_id': groupId, 'p_user_id': userId});
+        return (ok: true, error: null);
+      } catch (e) {
+        final msg = e.toString();
+        if (msg.contains('not_group_creator')) {
+          return (ok: false, error: 'Only the group creator can remove members.');
+        }
+        if (msg.contains('cannot_remove_creator')) {
+          return (ok: false, error: 'The group creator cannot be removed.');
+        }
+        return (ok: false, error: 'Could not remove member.');
+      }
+    }
+
+    // Local-first: verify caller is the creator.
+    final groupRows = await LocalDatabase.db.query(
+      'groups',
+      where: 'id = ? AND creator_id = ?',
+      whereArgs: [groupId, uid],
+    );
+    if (groupRows.isEmpty) {
+      return (ok: false, error: 'Only the group creator can remove members.');
+    }
+    if (userId == uid) {
+      return (ok: false, error: 'The group creator cannot be removed.');
+    }
+
+    await LocalDatabase.db.delete(
+      'group_members',
+      where: 'group_id = ? AND user_id = ?',
+      whereArgs: [groupId, userId],
+    );
+
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.rpc('remove_group_member',
+            params: {'p_group_id': groupId, 'p_user_id': userId});
+      } catch (_) {}
+    }
+    return (ok: true, error: null);
+  }
+
   /// Rename a group. Only the creator can perform this action.
   Future<bool> renameGroup(String groupId, String newName) async {
     final uid = await ensureUser();

@@ -134,6 +134,12 @@ final groupMembersProvider =
   return ref.watch(setAllRepositoryProvider).getGroupMembers(groupId);
 });
 
+/// Creator ID for a given group. Used to gate member-removal UI.
+final groupCreatorProvider =
+    FutureProvider.family<String?, String>((ref, groupId) async {
+  return ref.watch(setAllRepositoryProvider).getGroupCreatorId(groupId);
+});
+
 // ---------------------------------------------------------------------------
 // Debt simplification
 // ---------------------------------------------------------------------------
