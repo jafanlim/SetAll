@@ -650,37 +650,46 @@ class SetAllRepository {
     });
 
     if (await _isOnline && _client != null) {
-      // Step 1: push group row (silent failure — will retry on next sync).
+      // Step 1: push group row — must succeed before group_members FK insert.
+      bool groupSynced = false;
       try {
         await _client
             .from('groups')
             .insert({'id': id, 'name': name, 'creator_id': uid})
             .select()
             .single();
+        groupSynced = true;
         await LocalDatabase.db.update(
           'groups',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
           where: 'id = ?',
           whereArgs: [id],
         );
+        debugPrint('[CreateGroup] Step1 group synced OK');
       } catch (e) {
-        debugPrint('⚠️ Group cloud sync failed (will retry on next sync): $e');
+        debugPrint('[CreateGroup] Step1 group sync FAILED: $e');
       }
 
-      // Step 2: push creator's group_members row — MUST succeed so that the
-      // add_member_by_id RPC auth check (creator OR member) passes immediately.
-      try {
-        await _client
-            .from('group_members')
-            .insert({'group_id': id, 'user_id': uid});
-        await LocalDatabase.db.update(
-          'group_members',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'group_id = ? AND user_id = ?',
-          whereArgs: [id, uid],
-        );
-      } catch (e) {
-        debugPrint('⚠️ group_members cloud sync failed: $e');
+      // Step 2: push creator's group_members row only if the group row is in
+      // Supabase (FK constraint). The add_member_by_id RPC checks creator_id
+      // OR group_members membership — this row is what makes it pass.
+      if (groupSynced) {
+        try {
+          await _client
+              .from('group_members')
+              .insert({'group_id': id, 'user_id': uid});
+          await LocalDatabase.db.update(
+            'group_members',
+            {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'group_id = ? AND user_id = ?',
+            whereArgs: [id, uid],
+          );
+          debugPrint('[CreateGroup] Step2 group_members synced OK');
+        } catch (e) {
+          debugPrint('[CreateGroup] Step2 group_members sync FAILED: $e');
+        }
+      } else {
+        debugPrint('[CreateGroup] Step2 skipped — group not in Supabase yet, addMemberById will fail');
       }
     }
     return GroupModel(id: id, name: name, creatorId: uid);
