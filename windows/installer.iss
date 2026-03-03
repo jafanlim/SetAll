@@ -14,4 +14,10 @@ Root: HKCR; Subkey: "setall\shell\open\command"; ValueType: string; ValueName: "
 
 [Files]
 Source: "..\build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-# ... rest of file ...
+
+[Icons]
+Name: "{autoprograms}\SetAll"; Filename: "{app}\setall.exe"
+Name: "{commondesktop}\SetAll"; Filename: "{app}\setall.exe"; Tasks: desktopicon
+
+[Tasks]
+Name: "desktopicon"; Description: "Create a &desktop icon"; GroupDescription: "Additional icons:"
