@@ -94,16 +94,33 @@ final currentUserIdProvider = Provider<String?>((ref) {
 // Balance
 // ---------------------------------------------------------------------------
 
-/// Global net balance in user's base currency. Uses BalanceService for
-/// correct multi-currency conversion with [baseAmountAtEntry] fast path.
+/// Global net balance lazily localized to the user's [default_currency].
+///
+/// Watches [baseCurrencyProvider] and [currencyServiceProvider] so Riverpod
+/// automatically invalidates and re-fetches this provider whenever the user
+/// changes their preferred currency. Conversion math uses [Decimal] (no
+/// floating-point rounding errors) via [BalanceService.getBalanceSummary].
 final balanceSummaryProvider = FutureProvider<BalanceSummary>((ref) async {
-  return ref.watch(balanceServiceProvider).getBalanceSummary();
+  final targetCurrency = await ref.watch(baseCurrencyProvider.future);
+  ref.watch(currencyServiceProvider);
+  return ref
+      .watch(balanceServiceProvider)
+      .getBalanceSummary(targetCurrency: targetCurrency);
 });
 
-/// Group-scoped balance in base currency.
+/// Group-scoped balance lazily localized to the user's [default_currency].
+///
+/// Watches [baseCurrencyProvider] and [currencyServiceProvider] so Riverpod
+/// automatically invalidates and re-fetches this provider whenever the user
+/// changes their preferred currency. Conversion math uses [Decimal] (no
+/// floating-point rounding errors) via [BalanceService.getGroupBalanceSummary].
 final groupBalanceSummaryProvider =
     FutureProvider.family<BalanceSummary, String>((ref, groupId) async {
-  return ref.watch(balanceServiceProvider).getGroupBalanceSummary(groupId);
+  final targetCurrency = await ref.watch(baseCurrencyProvider.future);
+  ref.watch(currencyServiceProvider);
+  return ref
+      .watch(balanceServiceProvider)
+      .getGroupBalanceSummary(groupId, targetCurrency: targetCurrency);
 });
 
 // ---------------------------------------------------------------------------
