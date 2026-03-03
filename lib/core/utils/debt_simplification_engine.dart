@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import '../../data/models/split_model.dart';
 
 /// One suggested payment: from [fromUserId] to [toUserId] amount [amount].
 /// Privacy: only within same group_id.
@@ -16,140 +17,130 @@ class SimplifiedDebt {
   final String currency;
 }
 
-/// Group-scoped debt simplification. Settles debts strictly within a group_id.
-/// Uses greedy flow to minimize the number of transactions. All math in Decimal.
+/// Group-scoped debt simplification using the Greedy Flow algorithm.
+/// Settles debts strictly within a group_id by minimizing the number of transactions.
+/// All math performed in Decimal for precision.
 ///
-/// Multi-currency correctness: when [base_amount_at_entry] is available on an
-/// expense (schema v4+), all amounts are normalised to that frozen base value
-/// before computing net balances. This eliminates currency-mixing errors in
-/// groups with expenses in multiple currencies (e.g. GBP + GEL + EUR).
+/// The algorithm works by:
+/// 1. Computing net balances for all members (paid - owed)
+/// 2. Separating members into "Payers" (negative balance) and "Receivers" (positive balance)
+/// 3. Iteratively matching the largest payer with the largest receiver
+/// 4. Continuing until all debts are settled
 ///
-/// Legacy expenses (no base_amount_at_entry) fall back to raw [amount] and
-/// are treated as if they are in [currency] (same single-currency behaviour
-/// as before, correct for homogeneous groups).
+/// Uses universal_usd_owed fields from SplitModel (Schema v4+) for accurate
+/// multi-currency handling by working with normalized USD/base values.
 class DebtSimplificationEngine {
   DebtSimplificationEngine._();
 
-  /// [expenses]: list of expense rows with at minimum:
+  /// Simplifies debts within a group using the Greedy Flow algorithm.
+  ///
+  /// [groupId]: The group ID to process
+  /// [currency]: The display currency for returned SimplifiedDebt objects
+  /// [expenses]: List of expense maps with at minimum:
   ///   { id, group_id, payer_id, amount (string), currency (string),
   ///     base_amount_at_entry (string|null) }
-  /// [splits]: list of split rows with at minimum:
-  ///   { expense_id, user_id, amount_owed (string) }
-  /// [currency]: the display currency for the returned [SimplifiedDebt] objects
-  ///   (typically the user's base currency or the group's primary currency).
-  /// Returns list of simplified debts for that group only.
+  /// [splits]: List of SplitModel objects with universal_usd_owed fields
+  /// 
+  /// Returns list of optimized SimplifiedDebt objects for the group.
   static List<SimplifiedDebt> simplify({
     required String groupId,
     required String currency,
     required List<Map<String, dynamic>> expenses,
-    required List<Map<String, dynamic>> splits,
+    required List<SplitModel> splits,
   }) {
+    // Filter expenses and splits for the specific group
     final groupExpenses = expenses.where((e) => e['group_id'] == groupId).toList();
     final expenseIds = groupExpenses.map((e) => e['id'] as String).toSet();
-    final groupSplits = splits.where((s) => expenseIds.contains(s['expense_id'])).toList();
+    final groupSplits = splits.where((s) => expenseIds.contains(s.expenseId)).toList();
 
-    // Build lookup: expenseId → expense row
-    final expenseById = <String, Map<String, dynamic>>{
-      for (final e in groupExpenses) e['id'] as String: e,
-    };
-
-    // Net balance per user in base currency: total lent (paid) – total owed (from splits).
-    // We normalise to base currency via base_amount_at_entry when available.
+    // Step 1: Calculate net balances for all group members
+    // Net balance = total paid (as payer) - total owed (from splits)
     final netBalances = <String, Decimal>{};
 
-    for (final e in groupExpenses) {
-      final payerId = e['payer_id'] as String;
-      // Use frozen base amount when available (eliminates multi-currency mixing).
-      final baseStr = e['base_amount_at_entry']?.toString();
-      final baseTotal = baseStr != null ? Decimal.tryParse(baseStr) : null;
-      final amount = baseTotal ?? _parseDecimal(e['amount']);
+    // Add amounts paid by each payer (positive contribution to net balance)
+    for (final expense in groupExpenses) {
+      final payerId = expense['payer_id'] as String;
+      
+      // Use frozen base amount when available for multi-currency accuracy
+      final baseStr = expense['base_amount_at_entry']?.toString();
+      final baseAmount = baseStr != null ? Decimal.tryParse(baseStr) : null;
+      final amount = baseAmount ?? _parseDecimal(expense['amount']);
+      
       netBalances[payerId] = (netBalances[payerId] ?? Decimal.zero) + amount;
     }
 
-    for (final s in groupSplits) {
-      final userId = s['user_id'] as String;
+    // Subtract amounts owed by each user (negative contribution to net balance)
+    // Use universal_usd_owed from SplitModel for normalized USD/base values
+    for (final split in groupSplits) {
+      final userId = split.userId;
+      final owedAmount = Decimal.tryParse(split.universalUsdOwed) ?? Decimal.zero;
       
-      // FIX: Prefer universal_usd_owed (Schema v4+) as it is already the base value.
-      final usdOwedStr = s['universal_usd_owed']?.toString();
-      final legacyOwedStr = s['amount_owed']?.toString();
+      netBalances[userId] = (netBalances[userId] ?? Decimal.zero) - owedAmount;
+    }
+
+    // Step 2: Separate members into Payers (negative balance) and Receivers (positive balance)
+    final receivers = <MapEntry<String, Decimal>>[];  // Positive balance - should receive money
+    final payers = <MapEntry<String, Decimal>>[];     // Negative balance - should pay money
+    
+    for (final entry in netBalances.entries) {
+      if (entry.value > Decimal.zero) {
+        receivers.add(entry);  // This person is owed money
+      } else if (entry.value < Decimal.zero) {
+        payers.add(MapEntry(entry.key, -entry.value));  // Convert to positive amount owed
+      }
+      // Zero balance individuals are ignored (they're settled)
+    }
+
+    // Step 3: Sort by amount (largest first) to minimize number of transactions
+    receivers.sort((a, b) => b.value.compareTo(a.value));  // Largest receiver first
+    payers.sort((a, b) => b.value.compareTo(a.value));    // Largest payer first
+
+    // Step 4: Greedy Flow - iteratively match largest payer with largest receiver
+    final simplifiedDebts = <SimplifiedDebt>[];
+    var receiverIndex = 0;
+    var payerIndex = 0;
+
+    while (receiverIndex < receivers.length && payerIndex < payers.length) {
+      final receiver = receivers[receiverIndex];
+      final payer = payers[payerIndex];
       
-      Decimal baseOwed = Decimal.zero;
-
-      if (usdOwedStr != null) {
-        // Modern path: Value is already USD/Base. Use directly.
-        baseOwed = Decimal.tryParse(usdOwedStr) ?? Decimal.zero;
-      } else {
-        // Legacy path (v1-v3): Proportional calculation required.
-        final rawOwed = _parseDecimal(legacyOwedStr);
-        final ex = expenseById[s['expense_id'] as String];
-        
-        baseOwed = rawOwed; // Default fallback
-        
-        if (ex != null) {
-          final baseStr = ex['base_amount_at_entry']?.toString();
-          final baseTotal = baseStr != null ? Decimal.tryParse(baseStr) : null;
-          if (baseTotal != null && baseTotal > Decimal.zero) {
-            final expenseRaw = _parseDecimal(ex['amount']);
-            if (expenseRaw > Decimal.zero) {
-              // split_base = (split_amount_owed / expense_amount) * base_total
-              baseOwed = ((rawOwed * baseTotal) / expenseRaw)
-                  .toDecimal(scaleOnInfinitePrecision: 10)
-                  .round(scale: 4);
-            } else {
-              baseOwed = baseTotal;
-            }
-          }
-        }
+      // Calculate payment amount (minimum of what payer owes and receiver should receive)
+      final paymentAmount = receiver.value < payer.value 
+          ? receiver.value 
+          : payer.value;
+      
+      if (paymentAmount > Decimal.zero) {
+        simplifiedDebts.add(SimplifiedDebt(
+          fromUserId: payer.key,      // Person who owes money
+          toUserId: receiver.key,     // Person who should receive money
+          amount: paymentAmount.round(scale: 2),
+          currency: currency,
+        ));
       }
 
-      netBalances[userId] = (netBalances[userId] ?? Decimal.zero) - baseOwed;
-    }
-
-    // Greedy: creditors (positive balance) get paid by debtors (negative balance).
-    // Sort largest first to minimise number of transactions.
-    final creditors = <MapEntry<String, Decimal>>[];
-    final debtors = <MapEntry<String, Decimal>>[];
-    for (final e in netBalances.entries) {
-      if (e.value > Decimal.zero) {
-        creditors.add(e);
-      } else if (e.value < Decimal.zero) {
-        debtors.add(MapEntry(e.key, -e.value));
+      // Update balances and advance indices as needed
+      if (receiver.value == paymentAmount) {
+        receiverIndex++;  // This receiver is fully paid
+      } else {
+        // Update receiver's remaining amount
+        receivers[receiverIndex] = MapEntry(
+          receiver.key, 
+          receiver.value - paymentAmount
+        );
+      }
+      
+      if (payer.value == paymentAmount) {
+        payerIndex++;  // This payer has fully settled their debt
+      } else {
+        // Update payer's remaining amount
+        payers[payerIndex] = MapEntry(
+          payer.key, 
+          payer.value - paymentAmount
+        );
       }
     }
 
-    creditors.sort((a, b) => b.value.compareTo(a.value));
-    debtors.sort((a, b) => b.value.compareTo(a.value));
-
-    final result = <SimplifiedDebt>[];
-    var i = 0;
-    var j = 0;
-
-    while (i < creditors.length && j < debtors.length) {
-      final cred = creditors[i];
-      final deb = debtors[j];
-      final amount = cred.value < deb.value ? cred.value : deb.value;
-      if (amount <= Decimal.zero) break;
-
-      result.add(SimplifiedDebt(
-        fromUserId: deb.key,
-        toUserId: cred.key,
-        amount: amount.round(scale: 2),
-        currency: currency,
-      ));
-
-      if (cred.value == amount) {
-        i++;
-      } else {
-        creditors[i] = MapEntry(cred.key, cred.value - amount);
-      }
-      if (deb.value == amount) {
-        j++;
-      } else {
-        debtors[j] = MapEntry(deb.key, deb.value - amount);
-      }
-    }
-
-    return result;
+    return simplifiedDebts;
   }
 
   static Decimal _parseDecimal(dynamic v) {
