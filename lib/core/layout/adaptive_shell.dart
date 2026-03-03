@@ -5,12 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
 
-/// Breakpoint for master-detail / rail: 600dp.
-const double kAdaptiveBreakpoint = 600;
+/// Breakpoint for desktop navigation rail: 800dp.
+const double kAdaptiveBreakpoint = 800;
 
-/// Adaptive shell: Bottom Nav on mobile (<600dp), Side Rail on tablet (>=600dp).
-/// Tabs: Dashboard (0), Friends (1), Groups (2).
-/// Settings is accessed via the toolbar icon on the Dashboard.
+/// Adaptive shell: Bottom Nav on mobile (<=800dp), Side Rail on desktop (>800dp).
+/// Tabs: Dashboard (0), Friends (1), Groups (2), Settings (3 — desktop only).
+/// Settings is accessed via the toolbar icon on the Dashboard on mobile.
 class AdaptiveShell extends ConsumerStatefulWidget {
   const AdaptiveShell({
     super.key,
@@ -37,6 +37,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   int _indexForPath(String path) {
     if (path.startsWith('/friends')) return 1;
     if (path.startsWith('/groups')) return 2;
+    if (path.startsWith('/settings')) return 3;
     return 0;
   }
 
@@ -52,22 +53,42 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       case 2:
         setState(() => _selectedIndex = 2);
         context.go(AppRouter.groups);
+      case 3:
+        setState(() => _selectedIndex = 3);
+        context.go(AppRouter.settings);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.sizeOf(context).width;
-    final useRail = width >= kAdaptiveBreakpoint;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = constraints.maxWidth > kAdaptiveBreakpoint;
 
-    return Scaffold(
-      body: Row(
-        children: [
-          if (useRail) _buildRail(context),
-          Expanded(child: widget.child),
-        ],
-      ),
-      bottomNavigationBar: useRail ? null : _buildBottomNav(context),
+        if (isDesktop) {
+          return Scaffold(
+            body: Row(
+              children: [
+                _buildRail(context),
+                const VerticalDivider(thickness: 1, width: 1),
+                Expanded(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 850),
+                      child: widget.child,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          body: widget.child,
+          bottomNavigationBar: _buildBottomNav(context),
+        );
+      },
     );
   }
 
@@ -91,6 +112,11 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
           icon: Icon(Icons.group_outlined),
           selectedIcon: Icon(Icons.group),
           label: Text('Groups'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: Text('Settings'),
         ),
       ],
     );
