@@ -17,13 +17,13 @@ class BalanceService {
     return profile?.defaultCurrency ?? 'USD';
   }
 
-  Future<BalanceSummary> getBalanceSummary() async {
+  Future<BalanceSummary> getBalanceSummary({String? targetCurrency}) async {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
     try { await _repo.syncIfOnline(); } catch (_) {}
     
-    final baseCurrency = await getBaseCurrency();
+    final baseCurrency = targetCurrency ?? await getBaseCurrency();
     final raw = await _repo.getBalanceRawData(uid);
     var youOwe = Decimal.zero;
     var youAreOwed = Decimal.zero;
@@ -52,13 +52,13 @@ class BalanceService {
     );
   }
 
-  Future<BalanceSummary> getGroupBalanceSummary(String groupId) async {
+  Future<BalanceSummary> getGroupBalanceSummary(String groupId, {String? targetCurrency}) async {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
     try { await _repo.syncIfOnline(); } catch (_) {}
 
-    final baseCurrency = await getBaseCurrency();
+    final baseCurrency = targetCurrency ?? await getBaseCurrency();
     final raw = await _repo.getGroupBalanceRawData(uid, groupId);
     if (raw == null) return BalanceSummary(currency: baseCurrency);
 
