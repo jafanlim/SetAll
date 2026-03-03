@@ -1,5 +1,4 @@
 name: Release
-
 on:
   push:
     tags:
@@ -10,77 +9,77 @@ permissions:
 
 jobs:
   build:
-    name: Build (${{ matrix.os }})
+    name: Build & Package
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            artifact_name: SetAll-macOS.dmg
+            asset_path: SetAll-macOS.dmg
+          - os: windows-latest
+            artifact_name: SetAll-Windows.exe
+            asset_path: build/windows/installer/SetAll-Windows.exe
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: actions/checkout@v4
+      
+      - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: flutter pub get
 
-      - name: Enable desktop targets
-        run: flutter config --enable-macos-desktop --enable-windows-desktop
-
+      # macOS Build & Package
       - name: Build macOS
         if: matrix.os == 'macos-latest'
-        run: flutter build macos --release
+        run: |
+          flutter config --enable-macos-desktop
+          flutter build macos --release
+          brew install create-dmg
+          create-dmg \
+            --volname "SetAll Installer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --app-drop-link 425 120 \
+            "SetAll-macOS.dmg" \
+            "build/macos/Build/Products/Release/setall.app"
 
+      # Windows Build & Package
       - name: Build Windows
         if: matrix.os == 'windows-latest'
-        run: flutter build windows --release
+        run: |
+          flutter config --enable-windows-desktop
+          flutter build windows --release
+          iscc windows/installer.iss
 
-      - name: Zip macOS artifact
-        if: matrix.os == 'macos-latest'
-        run: zip -r SetAll-macOS.zip build/macos/Build/Products/Release/setall.app
-
-      - name: Zip Windows artifact
-        if: matrix.os == 'windows-latest'
-        run: Compress-Archive -Path build\windows\x64\runner\Release -DestinationPath SetAll-Windows.zip
-        shell: pwsh
-
-      - name: Upload macOS artifact
-        if: matrix.os == 'macos-latest'
+      # Upload the packaged artifact
+      - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: SetAll-macOS
-          path: SetAll-macOS.zip
-
-      - name: Upload Windows artifact
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: SetAll-Windows
-          path: SetAll-Windows.zip
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.asset_path }}
 
   release:
     name: Create GitHub Release
-    runs-on: ubuntu-latest
     needs: build
-
+    runs-on: ubuntu-latest
     steps:
-      - name: Download macOS artifact
+      - name: Download macOS Artifact
         uses: actions/download-artifact@v4
         with:
-          name: SetAll-macOS
+          name: SetAll-macOS.dmg
 
-      - name: Download Windows artifact
+      - name: Download Windows Artifact
         uses: actions/download-artifact@v4
         with:
-          name: SetAll-Windows
+          name: SetAll-Windows.exe
 
-      - name: Create GitHub Release
+      - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SetAll-macOS.zip
-            SetAll-Windows.zip
+            SetAll-macOS.dmg
+            SetAll-Windows.exe
