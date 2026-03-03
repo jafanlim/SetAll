@@ -97,6 +97,9 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     final themeMode = ref.watch(themeModeProvider);
     final isDesktop = _isDesktop;
 
+    const desktopDesignSize = Size(1440, 900);
+    const mobileDesignSize = Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
+
     return MaterialApp.router(
       title: 'SetAll',
       debugShowCheckedModeBanner: false,
