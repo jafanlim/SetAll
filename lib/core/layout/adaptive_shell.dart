@@ -47,6 +47,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   int _indexForPath(String path) {
     if (path.startsWith('/friends')) return 1;
     if (path.startsWith('/groups')) return 2;
+    if (path.startsWith('/settings')) return 3;
     return 0;
   }
 
@@ -64,6 +65,9 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       case 2:
         setState(() => _selectedIndex = 2);
         context.go(AppRouter.groups);
+      case 3:
+        setState(() => _selectedIndex = 3);
+        context.go(AppRouter.settings);
     }
   }
 
@@ -282,6 +286,11 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
           icon: Icon(Icons.group_outlined),
           selectedIcon: Icon(Icons.group),
           label: Text('Groups'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: Text('Settings'),
         ),
       ],
     );
