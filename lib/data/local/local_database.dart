@@ -20,7 +20,10 @@ class LocalDatabase {
   /// Schema v8 adds:
   ///   • expenses.universal_usd_amount – final check for column existence
   ///   • splits.universal_usd_owed – final check for column existence
-  static const int _version = 8;
+  /// Schema v9 adds:
+  ///   • splits UNIQUE(expense_id, user_id) – prevents duplicate split rows
+  ///     caused by local/Supabase UUID mismatch during sync
+  static const int _version = 9;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -119,6 +122,20 @@ class LocalDatabase {
       await _addColumnIfNotExists(db, 'expenses', 'universal_usd_amount', 'TEXT');
       await _addColumnIfNotExists(db, 'splits', 'universal_usd_owed', 'TEXT');
     }
+    if (oldVersion < 9) {
+      // Deduplicate splits rows: keep only the row with the largest rowid
+      // (most recently inserted) for each (expense_id, user_id) pair.
+      await db.execute('''
+        DELETE FROM splits
+        WHERE rowid NOT IN (
+          SELECT MAX(rowid) FROM splits GROUP BY expense_id, user_id
+        )
+      ''');
+      // Add unique index to prevent future duplicates.
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
+      );
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -187,7 +204,8 @@ class LocalDatabase {
         user_id            TEXT NOT NULL,
         universal_usd_owed TEXT NOT NULL, -- Schema v8
         created_at         TEXT,
-        synced_at          INTEGER
+        synced_at          INTEGER,
+        UNIQUE(expense_id, user_id) -- Schema v9
       )
     ''');
     await db.execute('''

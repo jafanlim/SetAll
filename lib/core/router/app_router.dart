@@ -51,8 +51,15 @@ final class AppRouter {
           }
           if (user != null && isBiometricGate) return null;
           if (user != null) {
-            final useBio = await bio.getUseBiometric();
-            if (useBio) return biometricGate;
+            // Only gate if biometric is enabled AND the session hasn't been
+            // unlocked yet in this process. Without this guard, every in-app
+            // navigation push (e.g. /group/:id/invite) triggers a redirect
+            // back to the biometric gate, silently discarding the intended
+            // destination.
+            if (!bio.sessionUnlocked) {
+              final useBio = await bio.getUseBiometric();
+              if (useBio) return biometricGate;
+            }
           }
         } catch (_) {}
         return null;

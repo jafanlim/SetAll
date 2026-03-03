@@ -1,5 +1,8 @@
 import 'package:decimal/decimal.dart';
 
+/// The four ways a user can split an expense.
+enum SplitMode { even, percentage, shares, manual }
+
 /// Result of a single user's share for an expense.
 class SplitResult {
   const SplitResult({
@@ -15,10 +18,12 @@ class SplitResult {
 class SplitEngine {
   SplitEngine._();
 
-  /// Even split: total / participantCount. Remainder applied to first participant.
+  /// Even split: total / participantCount. Remainder applied to [payerId] so
+  /// the person who paid absorbs any rounding penny rather than a random member.
   static List<SplitResult> splitEven({
     required Decimal total,
     required List<String> participantIds,
+    String? payerId,
   }) {
     if (participantIds.isEmpty) return [];
     if (total <= Decimal.zero) {
@@ -27,12 +32,15 @@ class SplitEngine {
 
     final n = Decimal.fromInt(participantIds.length);
     final base = (total / n).toDecimal(scaleOnInfinitePrecision: 2).round(scale: 2);
-    // First participant gets remainder so total adds up exactly
     final remainder = total - (base * (n - Decimal.one));
+
+    // Payer absorbs the remainder; fall back to index 0 if payer not found.
+    final payerIndex = payerId != null ? participantIds.indexOf(payerId) : -1;
+    final remainderIndex = payerIndex >= 0 ? payerIndex : 0;
 
     final results = <SplitResult>[];
     for (var i = 0; i < participantIds.length; i++) {
-      final amount = (i == 0) ? remainder : base;
+      final amount = (i == remainderIndex) ? remainder : base;
       results.add(SplitResult(userId: participantIds[i], amountOwed: amount));
     }
     return results;

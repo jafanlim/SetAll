@@ -10,6 +10,17 @@ class BiometricService {
   static final BiometricService _instance = BiometricService._();
   static BiometricService get instance => _instance;
 
+  /// True once the user has passed biometric auth (or grace period) in this
+  /// process lifetime. Prevents the router redirect from re-gating on every
+  /// in-app navigation push.
+  bool _sessionUnlocked = false;
+  bool get sessionUnlocked => _sessionUnlocked;
+  void markSessionUnlocked() => _sessionUnlocked = true;
+
+  /// Call this when the app comes to the foreground after the grace period
+  /// has expired, so the gate fires again on next cold open.
+  void resetSession() => _sessionUnlocked = false;
+
   static const _keyUseBiometric = 'setall_use_biometric';
   final LocalAuthentication _auth = LocalAuthentication();
   final FlutterSecureStorage _storage = const FlutterSecureStorage(

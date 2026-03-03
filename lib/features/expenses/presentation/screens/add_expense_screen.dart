@@ -72,7 +72,6 @@ String currencySymbol(String code) {
 const _teal = Color(0xFF00D9B0);
 const _orange = Color(0xFFFF8C42);
 
-enum _SplitMode { even, percentage, shares, manual }
 
 class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({
@@ -99,8 +98,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   String _currency = 'USD';
   String _category = 'General';
-  _SplitMode _splitMode = _SplitMode.even;
+  SplitMode _splitMode = SplitMode.even;
   bool _isSubmitting = false;
+  String? _payerId;
 
   final List<TextEditingController> _customCtrl = [];
   List<String> _memberIds = [];
@@ -114,11 +114,30 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Future<void> _loadMembers() async {
     final repo = ref.read(setAllRepositoryProvider);
+    final uid = await repo.ensureUser();
     final members = await repo.getGroupMembers(widget.groupId);
     if (!mounted) return;
+
+    var ids   = members.map((m) => m.id).toList();
+    var names = members.map((m) => m.name).toList();
+
+    debugPrint('[AddExpense] _loadMembers: uid=$uid, members=${ids.length}: $ids');
+
+    // Guarantee the current user is always a participant in the split.
+    // This guards against the offline-first race where the local SQLite
+    // group_members row is written but the creator's profile row isn't
+    // cached yet, causing getGroupMembers to return an empty list.
+    if (uid != null && !ids.contains(uid)) {
+      final profile = await repo.getCurrentUserProfile();
+      ids   = [uid,                       ...ids];
+      names = [profile?.name ?? 'You', ...names];
+      debugPrint('[AddExpense] _loadMembers: prepended current user, now ${ids.length} members');
+    }
+
     setState(() {
-      _memberIds = members.map((m) => m.id).toList();
-      _memberNames = members.map((m) => m.name).toList();
+      _memberIds   = ids;
+      _memberNames = names;
+      _payerId ??= uid; // default payer = current user
       _rebuildControllers();
     });
   }
@@ -129,11 +148,25 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
     _customCtrl.clear();
     final n = _memberIds.length;
-    for (var i = 0; i < n; i++) {
-      final text = _splitMode == _SplitMode.percentage
-          ? '${i < n - 1 ? 100 ~/ n : 100 - (100 ~/ n) * (n - 1)}'
-          : '1';
-      _customCtrl.add(TextEditingController(text: text));
+    if (_splitMode == SplitMode.percentage) {
+      // Use 1 decimal place. Assign remainder to payer so it always sums to 100.
+      final payerIndex = _memberIds.indexOf(_payerId ?? '');
+      // Compute each share to 1 dp, then give payer the residual.
+      final baseVal = (1000 ~/ n) / 10.0; // e.g. 33.3 for n=3
+      final baseFormatted = baseVal.toStringAsFixed(1);
+      final sumOthers = baseVal * (n - 1);
+      final payerVal = 100.0 - sumOthers;
+      final payerFormatted = payerVal.toStringAsFixed(1);
+      for (var i = 0; i < n; i++) {
+        final isPayer = i == payerIndex || (payerIndex == -1 && i == 0);
+        _customCtrl.add(TextEditingController(
+          text: isPayer ? payerFormatted : baseFormatted,
+        ));
+      }
+    } else {
+      for (var i = 0; i < n; i++) {
+        _customCtrl.add(TextEditingController(text: '1'));
+      }
     }
   }
 
@@ -191,7 +224,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
 
     final repo = ref.read(setAllRepositoryProvider);
-    final payerId = await repo.ensureUser();
+    final currentUid = await repo.ensureUser();
+    final payerId = _payerId ?? currentUid;
     if (!mounted) return;
     if (payerId == null) {
       if (mounted) {
@@ -216,18 +250,21 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     setState(() => _isSubmitting = true);
 
+    debugPrint('[AddExpense] _submit: payerId=$payerId currentUid=$currentUid memberIds=${_memberIds.length}: $_memberIds, splitMode=$_splitMode, amount=$amount');
+
     // -- Build split results --------------------------------------------------
     List<SplitResult> results;
     SplitType splitType;
 
     switch (_splitMode) {
-      case _SplitMode.even:
+      case SplitMode.even:
         results = SplitEngine.splitEven(
           total: amount,
           participantIds: _memberIds,
+          payerId: payerId,
         );
         splitType = SplitType.even;
-      case _SplitMode.percentage:
+      case SplitMode.percentage:
         final percents = _customCtrl
             .map((c) => Decimal.tryParse(c.text.trim()) ?? Decimal.zero)
             .toList();
@@ -247,7 +284,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           weights: percents,
         );
         splitType = SplitType.parts;
-      case _SplitMode.shares:
+      case SplitMode.shares:
         final shares = _customCtrl
             .map((c) => Decimal.tryParse(c.text.trim()) ?? Decimal.zero)
             .toList();
@@ -266,7 +303,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           weights: shares,
         );
         splitType = SplitType.parts;
-      case _SplitMode.manual:
+      case SplitMode.manual:
         final amounts = _customCtrl
             .map((c) =>
                 Decimal.tryParse(c.text.trim().replaceAll(',', '.')) ??
@@ -294,12 +331,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         splitType = SplitType.manual;
     }
 
-    // Map splits to SplitInsert objects
-    final splitsToStore = results.map((r) {
-      return SplitInsert(userId: r.userId, amountOwed: r.amountOwed);
-    }).toList();
-
-    final expense = await repo.addExpense(
+          // Map splits to SplitInsert objects
+          final splitsToStore = results.map((r) {
+            return SplitInsert(userId: r.userId, universalUsdOwed: r.amountOwed);
+          }).toList();
+        debugPrint('[AddExpense] splits generated: ${splitsToStore.map((s) => '${s.userId}=${s.universalUsdOwed}').join(', ')}');
+        final expense = await repo.addExpense(
       groupId: widget.groupId,
       payerId: payerId,
       amount: amount, // Original input amount
@@ -537,7 +574,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           SizedBox(height: 12.h),
 
           // Currency picker
-          _CurrencyPicker(
+          CurrencyPickerField(
             selected: _currency,
             onChanged: (code) {
               HapticUtils.selection();
@@ -611,25 +648,25 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
           SizedBox(height: 14.h),
-          SegmentedButton<_SplitMode>(
+          SegmentedButton<SplitMode>(
             segments: [
               ButtonSegment(
-                value: _SplitMode.even,
+                value: SplitMode.even,
                 label: Text('Even', style: TextStyle(fontSize: 11.sp)),
                 icon: Icon(Icons.equalizer, size: 14.sp),
               ),
               ButtonSegment(
-                value: _SplitMode.percentage,
+                value: SplitMode.percentage,
                 label: Text('%', style: TextStyle(fontSize: 11.sp)),
                 icon: Icon(Icons.percent, size: 14.sp),
               ),
               ButtonSegment(
-                value: _SplitMode.shares,
+                value: SplitMode.shares,
                 label: Text('Shares', style: TextStyle(fontSize: 11.sp)),
                 icon: Icon(Icons.pie_chart_outline, size: 14.sp),
               ),
               ButtonSegment(
-                value: _SplitMode.manual,
+                value: SplitMode.manual,
                 label: Text('Manual', style: TextStyle(fontSize: 11.sp)),
                 icon: Icon(Icons.edit, size: 14.sp),
               ),
@@ -655,12 +692,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               }),
             ),
           ),
-          if (_splitMode != _SplitMode.even) ...[
+          if (_splitMode != SplitMode.even) ...[
             SizedBox(height: 16.h),
             Text(
-              _splitMode == _SplitMode.percentage
+              _splitMode == SplitMode.percentage
                   ? 'Percentage per person (total = 100)'
-                  : _splitMode == _SplitMode.shares
+                  : _splitMode == SplitMode.shares
                       ? 'Relative shares per person'
                       : 'Exact amount per person',
               style: theme.textTheme.bodySmall?.copyWith(
@@ -696,9 +733,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                         style: TextStyle(fontSize: 13.sp),
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
-                          hintText: _splitMode == _SplitMode.percentage
+                          hintText: _splitMode == SplitMode.percentage
                               ? '%'
-                              : _splitMode == _SplitMode.shares
+                              : _splitMode == SplitMode.shares
                                   ? 'x'
                                   : _currency,
                           isDense: true,
@@ -717,12 +754,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               );
             }),
             // Percentage sum indicator
-            if (_splitMode == _SplitMode.percentage) ...[
+            if (_splitMode == SplitMode.percentage) ...[
               SizedBox(height: 8.h),
               _PercentageSumIndicator(controllers: _customCtrl),
             ],
             // Manual amount sum indicator
-            if (_splitMode == _SplitMode.manual) ...[
+            if (_splitMode == SplitMode.manual) ...[
               SizedBox(height: 8.h),
               _ManualSumIndicator(
                 controllers: _customCtrl,
@@ -807,6 +844,40 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             }).toList(),
           ),
           SizedBox(height: 16.h),
+          if (_memberIds.length > 1) ...
+            [
+              Text(
+                'Paid by',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11.sp,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              DropdownButtonFormField<String>(
+                initialValue: _memberIds.contains(_payerId) ? _payerId : null,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12.r),
+                    borderSide: BorderSide.none,
+                  ),
+                  isDense: true,
+                ),
+                items: List.generate(_memberIds.length, (i) {
+                  return DropdownMenuItem(
+                    value: _memberIds[i],
+                    child: Text(
+                      _memberNames.length > i ? _memberNames[i] : _memberIds[i],
+                      style: TextStyle(fontSize: 13.sp),
+                    ),
+                  );
+                }),
+                onChanged: (v) => setState(() => _payerId = v),
+              ),
+              SizedBox(height: 16.h),
+            ],
           TextFormField(
             controller: _descriptionCtrl,
             decoration: InputDecoration(
@@ -833,8 +904,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 // Reusable sub-widgets
 // ---------------------------------------------------------------------------
 
-class _CurrencyPicker extends StatelessWidget {
-  const _CurrencyPicker({
+class CurrencyPickerField extends StatelessWidget {
+  const CurrencyPickerField({
+    super.key,
     required this.selected,
     required this.onChanged,
   });
@@ -857,7 +929,7 @@ class _CurrencyPicker extends StatelessWidget {
           context: context,
           backgroundColor: Colors.transparent,
           isScrollControlled: true,
-          builder: (_) => _CurrencySearchSheet(selected: selected),
+          builder: (_) => CurrencySearchSheet(selected: selected),
         );
         if (result != null) onChanged(result);
       },
@@ -904,15 +976,15 @@ class _CurrencyPicker extends StatelessWidget {
   }
 }
 
-class _CurrencySearchSheet extends StatefulWidget {
-  const _CurrencySearchSheet({required this.selected});
+class CurrencySearchSheet extends StatefulWidget {
+  const CurrencySearchSheet({super.key, required this.selected});
   final String selected;
 
   @override
-  State<_CurrencySearchSheet> createState() => _CurrencySearchSheetState();
+  State<CurrencySearchSheet> createState() => _CurrencySearchSheetState();
 }
 
-class _CurrencySearchSheetState extends State<_CurrencySearchSheet> {
+class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
   String _query = '';
 
   List<Map<String, String>> get _filtered {

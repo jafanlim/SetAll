@@ -54,6 +54,9 @@ dependencies:
   # Responsive & scaling (base 390x844 — iPhone 16 Pro)
   flutter_screenutil: ^5.9.3
 
+  # Desktop window management (min size, title bar)
+  window_manager: ^0.4.3
+
   # Exchange rates (Phase 3)
   http: ^1.2.2
 
