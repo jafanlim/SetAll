@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:setall/core/services/currency_service.dart';
 import 'package:setall/core/utils/debt_simplification_engine.dart';
+import 'package:setall/data/models/split_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 // ---------------------------------------------------------------------------
@@ -73,20 +74,20 @@ Map<String, dynamic> _expense({
       'base_amount_at_entry': baseAmountAtEntry,
     };
 
-/// Build a split raw-map as the engine expects.
-Map<String, dynamic> _split({
+/// Build a SplitModel as the engine expects.
+SplitModel _split({
   required String expenseId,
   required String userId,
   required String amountOwed,
   String? universalUsdOwed,
 }) =>
-    {
-      'expense_id': expenseId,
-      'user_id': userId,
-      'amount_owed': amountOwed,
-      // Modern schema v4+ column – engine prefers this when present.
-      if (universalUsdOwed != null) 'universal_usd_owed': universalUsdOwed,
-    };
+    SplitModel(
+      id: '${expenseId}_${userId}',
+      expenseId: expenseId,
+      userId: userId,
+      // Engine uses universalUsdOwed; fall back to amountOwed for legacy tests.
+      universalUsdOwed: universalUsdOwed ?? amountOwed,
+    );
 
 // ---------------------------------------------------------------------------
 // REGRESSION GUARD SUITE

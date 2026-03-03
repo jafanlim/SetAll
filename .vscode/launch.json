@@ -12,6 +12,15 @@
             "request": "launch",
             "type": "dart",
             "args": ["-d", "macos"]
+        },
+        {
+            "name": "Regression Guard Tests",
+            "request": "launch",
+            "type": "dart",
+            "codeLens": {
+                "for": ["run-test", "run-test-file", "debug-test", "debug-test-file"]
+            },
+            "program": "test/integration/engine_regression_guard_test.dart"
         }
     ]
 }

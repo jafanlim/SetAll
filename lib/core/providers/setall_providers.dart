@@ -101,11 +101,11 @@ final currentUserIdProvider = Provider<String?>((ref) {
 /// changes their preferred currency. Conversion math uses [Decimal] (no
 /// floating-point rounding errors) via [BalanceService.getBalanceSummary].
 final balanceSummaryProvider = FutureProvider<BalanceSummary>((ref) async {
-  final targetCurrency = await ref.watch(baseCurrencyProvider.future);
+  ref.watch(baseCurrencyProvider);
   ref.watch(currencyServiceProvider);
   return ref
       .watch(balanceServiceProvider)
-      .getBalanceSummary(targetCurrency: targetCurrency);
+      .getBalanceSummary();
 });
 
 /// Group-scoped balance lazily localized to the user's [default_currency].
