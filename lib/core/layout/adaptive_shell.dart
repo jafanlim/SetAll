@@ -1,16 +1,26 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
+import '../providers/desktop_providers.dart';
+import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
 
-/// Breakpoint for desktop navigation rail: 800dp.
-const double kAdaptiveBreakpoint = 800;
+/// Breakpoint: side rail replaces bottom nav (tablet / small desktop).
+const double kAdaptiveBreakpoint = 600;
 
-/// Adaptive shell: Bottom Nav on mobile (<=800dp), Side Rail on desktop (>800dp).
-/// Tabs: Dashboard (0), Friends (1), Groups (2), Settings (3 — desktop only).
-/// Settings is accessed via the toolbar icon on the Dashboard on mobile.
+/// Breakpoint: full macOS-style sidebar with labels + settings at bottom.
+const double kDesktopBreakpoint = 900;
+
+/// Max width for content column on large screens so it stays readable.
+const double kContentMaxWidth = 780;
+
+/// Adaptive shell:
+///   < 600dp  → BottomNavigationBar (mobile)
+///  600–900dp → NavigationRail compact (tablet)
+///  >= 900dp  → Full sidebar with text labels + Settings shortcut (macOS/desktop)
 class AdaptiveShell extends ConsumerStatefulWidget {
   const AdaptiveShell({
     super.key,
@@ -43,6 +53,8 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
 
   void _onTap(int index) {
     HapticUtils.selection();
+    // Clear the detail pane when switching tabs on desktop.
+    ref.read(selectedGroupProvider.notifier).clear();
     switch (index) {
       case 0:
         setState(() => _selectedIndex = 0);
@@ -61,37 +73,199 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isDesktop = constraints.maxWidth > kAdaptiveBreakpoint;
+    final width = MediaQuery.sizeOf(context).width;
+    final useDesktopSidebar = width >= kDesktopBreakpoint;
+    final useRail = !useDesktopSidebar && width >= kAdaptiveBreakpoint;
 
-        if (isDesktop) {
-          return Scaffold(
-            body: Row(
+    if (useDesktopSidebar) {
+      return _buildDesktopLayout(context);
+    }
+
+    return Scaffold(
+      body: Row(
+        children: [
+          if (useRail) _buildRail(context),
+          Expanded(child: widget.child),
+        ],
+      ),
+      bottomNavigationBar: !useRail ? _buildBottomNav(context) : null,
+    );
+  }
+
+  Widget _buildDesktopLayout(BuildContext context) {
+    final selectedGroup = ref.watch(selectedGroupProvider);
+    final hasDetail = selectedGroup.groupId != null;
+
+    return Scaffold(
+      body: Row(
+        children: [
+          _buildSidebar(context),
+          // Master list — always flex:1, capped at kContentMaxWidth
+          Expanded(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+              child: widget.child,
+            ),
+          ),
+          // Detail pane — group detail or placeholder
+          VerticalDivider(
+            width: 1,
+            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+          Expanded(
+            child: hasDetail
+                ? GroupDetailScreen(
+                    key: ValueKey(selectedGroup.groupId),
+                    groupId: selectedGroup.groupId!,
+                    groupName: selectedGroup.groupName ?? 'Group',
+                  )
+                : const _DetailPlaceholder(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Full desktop sidebar ─────────────────────────────────────────────────
+  Widget _buildSidebar(BuildContext context) {
+    final theme = Theme.of(context);
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+
+    const teal = Color(0xFF00D9B0);
+    final bg = theme.colorScheme.surfaceContainerLow;
+    final selectedBg = theme.colorScheme.primaryContainer.withValues(alpha: 0.45);
+    final selectedFg = teal;
+    final unselectedFg = theme.colorScheme.onSurfaceVariant;
+
+    final items = [
+      (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard,       label: 'Dashboard', index: 0),
+      (icon: Icons.people_outline,      selectedIcon: Icons.people,          label: 'Friends',   index: 1),
+      (icon: Icons.group_outlined,      selectedIcon: Icons.group,           label: 'Groups',    index: 2),
+    ];
+
+    return Container(
+      width: 200,
+      decoration: BoxDecoration(
+        color: bg,
+        border: Border(
+          right: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
+        ),
+      ),
+      child: Column(
+        children: [
+          // macOS traffic-light area spacer
+          SizedBox(height: isMac ? 28 : 16),
+          // App title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
               children: [
-                _buildRail(context),
-                const VerticalDivider(thickness: 1, width: 1),
-                Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 850),
-                      child: widget.child,
-                    ),
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: teal.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(Icons.currency_exchange, size: 16, color: teal),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'SetAll',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                    color: theme.colorScheme.onSurface,
+                    letterSpacing: -0.3,
                   ),
                 ),
               ],
             ),
-          );
-        }
-
-        return Scaffold(
-          body: widget.child,
-          bottomNavigationBar: _buildBottomNav(context),
-        );
-      },
+          ),
+          const SizedBox(height: 8),
+          // Nav items
+          ...items.map((item) {
+            final isSelected = _selectedIndex == item.index;
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+              child: Material(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(10),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(10),
+                  onTap: () => _onTap(item.index),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? selectedBg : Colors.transparent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelected ? item.selectedIcon : item.icon,
+                          size: 18,
+                          color: isSelected ? selectedFg : unselectedFg,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                            color: isSelected ? selectedFg : unselectedFg,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }),
+          const Spacer(),
+          // Settings at bottom
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            child: Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(10),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: () {
+                  HapticUtils.primaryTap();
+                  context.push(AppRouter.settings);
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  child: Row(
+                    children: [
+                      Icon(Icons.settings_outlined, size: 18, color: unselectedFg),
+                      const SizedBox(width: 10),
+                      Text(
+                        'Settings',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          color: unselectedFg,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+      ),
     );
   }
 
+  // ── Compact navigation rail (tablet) ────────────────────────────────────
   Widget _buildRail(BuildContext context) {
     return NavigationRail(
       selectedIndex: _selectedIndex,
@@ -122,6 +296,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
     );
   }
 
+  // ── Bottom nav (mobile) ──────────────────────────────────────────────────
   Widget _buildBottomNav(BuildContext context) {
     return NavigationBar(
       selectedIndex: _selectedIndex,
@@ -143,6 +318,38 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
           label: 'Groups',
         ),
       ],
+    );
+  }
+}
+
+/// Shown in the detail pane on desktop when no group is selected yet.
+class _DetailPlaceholder extends StatelessWidget {
+  const _DetailPlaceholder();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      color: theme.colorScheme.surfaceContainerLow,
+      alignment: Alignment.center,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.group_outlined,
+            size: 48,
+            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Select a group to view details',
+            style: TextStyle(
+              fontSize: 14,
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -5,50 +5,58 @@ import 'currency_service.dart';
 class BalanceService {
   BalanceService({
     required SetAllRepository repository,
-    required CurrencyService currencyService, // Kept for DI compatibility
+    required CurrencyService currencyService,
   })  : _repo = repository,
-        _currency = currencyService;
+        _fx = currencyService;
 
   final SetAllRepository _repo;
-  final CurrencyService _currency;
+  final CurrencyService _fx;
 
   Future<String> getBaseCurrency() async {
     final profile = await _repo.getCurrentUserProfile();
     return profile?.defaultCurrency ?? 'USD';
   }
 
-  Future<BalanceSummary> getBalanceSummary({String? targetCurrency}) async {
+  /// Convert a list of [BalanceEntry] amounts (stored in USD) into [baseCurrency].
+  Future<Decimal> _sumInBase(
+    List<BalanceEntry> entries,
+    String baseCurrency,
+  ) async {
+    var total = Decimal.zero;
+    for (final e in entries) {
+      final amountUsd = e.amount;
+      if (amountUsd == Decimal.zero) continue;
+      if (baseCurrency == 'USD') {
+        total += amountUsd;
+      } else {
+        final rate = await _fx.getRate('USD', baseCurrency);
+        total += (amountUsd * rate).round(scale: 2);
+      }
+    }
+    return total;
+  }
+
+  Future<BalanceSummary> getBalanceSummary() async {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
     try { await _repo.syncIfOnline(); } catch (_) {}
-    
-    final baseCurrency = targetCurrency ?? await getBaseCurrency();
+
+    final baseCurrency = await getBaseCurrency();
     final raw = await _repo.getBalanceRawData(uid);
-    var youOwe = Decimal.zero;
-    var youAreOwed = Decimal.zero;
 
-    // Splits are natively in USD! Sum them, then convert to base currency.
-    for (final e in raw.youOwe) {
-      youOwe += e.amount;
-    }
-    for (final e in raw.youAreOwed) {
-      youAreOwed += e.amount;
-    }
+    final rawOwed = await _sumInBase(raw.youAreOwed, baseCurrency);
+    final rawOwe  = await _sumInBase(raw.youOwe,     baseCurrency);
 
-    // Convert final totals from USD to user's base currency.
-    Decimal rateToBase = Decimal.one;
-    if (baseCurrency != 'USD') {
-      rateToBase = await _currency.getRate('USD', baseCurrency);
-    }
-    
-    final youOweConverted = (youOwe * rateToBase).round(scale: 2);
-    final youAreOwedConverted = (youAreOwed * rateToBase).round(scale: 2);
+    // Net mutual debts: only the larger side survives; the other becomes zero.
+    final net = rawOwed - rawOwe;
+    final youAreOwed = net > Decimal.zero ? net  : Decimal.zero;
+    final youOwe     = net < Decimal.zero ? -net : Decimal.zero;
 
     return BalanceSummary(
-      youOwe: youOweConverted.toStringAsFixed(2),
-      youAreOwed: youAreOwedConverted.toStringAsFixed(2),
-      currency: baseCurrency,
+      youOwe:      youOwe.toStringAsFixed(2),
+      youAreOwed:  youAreOwed.toStringAsFixed(2),
+      currency:    baseCurrency,
     );
   }
 
@@ -62,29 +70,19 @@ class BalanceService {
     final raw = await _repo.getGroupBalanceRawData(uid, groupId);
     if (raw == null) return BalanceSummary(currency: baseCurrency);
 
-    var youOwe = Decimal.zero;
-    var youAreOwed = Decimal.zero;
-    
-    for (final e in raw.youOwe) {
-      youOwe += e.amount;
-    }
-    for (final e in raw.youAreOwed) {
-      youAreOwed += e.amount;
-    }
+    final rawOwed = await _sumInBase(raw.youAreOwed, baseCurrency);
+    final rawOwe  = await _sumInBase(raw.youOwe,     baseCurrency);
 
-    // Convert final totals from USD to user's base currency.
-    Decimal rateToBase = Decimal.one;
-    if (baseCurrency != 'USD') {
-      rateToBase = await _currency.getRate('USD', baseCurrency);
-    }
-
-    final youOweConverted = (youOwe * rateToBase).round(scale: 2);
-    final youAreOwedConverted = (youAreOwed * rateToBase).round(scale: 2);
+    // Net mutual debts within this group.
+    final net = rawOwed - rawOwe;
+    final youAreOwed = net > Decimal.zero ? net  : Decimal.zero;
+    final youOwe     = net < Decimal.zero ? -net : Decimal.zero;
 
     return BalanceSummary(
-      youOwe: youOweConverted.toStringAsFixed(2),
-      youAreOwed: youAreOwedConverted.toStringAsFixed(2),
-      currency: baseCurrency,
+      youOwe:      youOwe.toStringAsFixed(2),
+      youAreOwed:  youAreOwed.toStringAsFixed(2),
+      currency:    baseCurrency,
     );
   }
-} 
+}
+    

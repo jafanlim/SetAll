@@ -4,11 +4,11 @@ class Split {
     required this.id,
     required this.expenseId,
     required this.userId,
-    required this.amountOwed,
+    required this.universalUsdOwed,
   });
 
   final String id;
   final String expenseId;
   final String userId;
-  final String amountOwed; // Use string for Decimal compatibility
+  final String universalUsdOwed; // Use string for Decimal compatibility
 }

@@ -1,0 +1,708 @@
+This file is a merged representation of a subset of the codebase, containing specifically included files, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of a subset of the repository's contents that is considered the most important context.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Only files matching these patterns are included: lib/data/models/*.dart, lib/core/services/*.dart
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+lib/
+  core/
+    services/
+      balance_service.dart
+      biometric_platform_io.dart
+      biometric_platform_stub.dart
+      biometric_service.dart
+      currency_service.dart
+      currency_sync_service.dart
+  data/
+    models/
+      expense_model.dart
+      group_model.dart
+      profile_model.dart
+      split_model.dart
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="lib/core/services/biometric_platform_io.dart">
+import 'dart:io';
+
+import 'package:flutter/foundation.dart' show kIsWeb;
+
+bool get kBiometricPlatformMobile =>
+    !kIsWeb && (Platform.isIOS || Platform.isAndroid);
+</file>
+
+<file path="lib/core/services/biometric_platform_stub.dart">
+bool get kBiometricPlatformMobile => false;
+</file>
+
+<file path="lib/core/services/biometric_service.dart">
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:local_auth/local_auth.dart';
+
+import 'biometric_platform_stub.dart'
+    if (dart.library.io) 'biometric_platform_io.dart' as platform;
+
+/// Manages Face ID / Touch ID and the "use biometric to unlock" preference.
+class BiometricService {
+  BiometricService._();
+  static final BiometricService _instance = BiometricService._();
+  static BiometricService get instance => _instance;
+
+  static const _keyUseBiometric = 'setall_use_biometric';
+  final LocalAuthentication _auth = LocalAuthentication();
+  final FlutterSecureStorage _storage = const FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
+  );
+
+  bool get _isMobile => platform.kBiometricPlatformMobile;
+
+  /// Whether we can use biometrics on this device (Face ID / Touch ID).
+  Future<bool> canUseBiometrics() async {
+    if (!_isMobile) return false;
+    try {
+      return await _auth.canCheckBiometrics && await _auth.isDeviceSupported();
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Whether the user has opted in to unlock the app with Face ID.
+  Future<bool> getUseBiometric() async {
+    if (!_isMobile) return false;
+    try {
+      final v = await _storage.read(key: _keyUseBiometric);
+      return v == 'true';
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Set whether to require Face ID on next app open.
+  Future<void> setUseBiometric(bool value) async {
+    if (!_isMobile) return;
+    try {
+      if (value) {
+        await _storage.write(key: _keyUseBiometric, value: 'true');
+      } else {
+        await _storage.delete(key: _keyUseBiometric);
+      }
+    } catch (_) {}
+  }
+
+  /// Perform biometric authentication. Returns true on success.
+  Future<bool> authenticate({String? reason}) async {
+    if (!_isMobile) return false;
+    try {
+      return await _auth.authenticate(
+        localizedReason: reason ?? 'Unlock SetAll',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// List of available biometric types (e.g. face, fingerprint).
+  Future<List<BiometricType>> getAvailableBiometrics() async {
+    if (!_isMobile) return [];
+    try {
+      return await _auth.getAvailableBiometrics();
+    } catch (_) {
+      return [];
+    }
+  }
+}
+</file>
+
+<file path="lib/core/services/currency_sync_service.dart">
+import 'dart:convert';
+
+import 'package:decimal/decimal.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+/// Fetches exchange rates from the Supabase `exchange_rates` table, which is
+/// populated by the `sync-exchange-rates` Edge Function every 24 hours.
+///
+/// This is the **single source of truth** for all currency conversions:
+///  - One network round-trip per 24h for the entire platform (not per device).
+///  - Rates are cached to SharedPreferences for full offline support.
+///  - All Flutter clients read from the local cache; the Edge Function is the
+///    only consumer of the external third-party API.
+class CurrencySyncService {
+  CurrencySyncService({SupabaseClient? client}) : _client = client;
+
+  final SupabaseClient? _client;
+
+  static const String _cacheKey = 'setall_v2_exchange_rates';
+  static const String _cacheTimeKey = 'setall_v2_exchange_rates_ts';
+
+  /// In-memory cache (avoids repeated SharedPreferences reads within a session).
+  Map<String, Decimal>? _memCache;
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /// Returns rate: 1 [from] = ? [to].
+  /// All Supabase rates are stored as: 1 USD = X target.
+  /// Cross-rates are computed as: (to_rate / from_rate).
+  Future<Decimal?> getRate(String from, String to) async {
+    if (from == to) return Decimal.one;
+    final rates = await _getRates();
+    if (rates == null || rates.isEmpty) return null;
+    return _crossRate(rates, from.toUpperCase(), to.toUpperCase());
+  }
+
+  /// Sync rates from Supabase now and store to cache.
+  /// Call once on app startup (non-blocking – errors are swallowed).
+  Future<void> syncRates() async {
+    try {
+      final fresh = await _fetchFromSupabase();
+      if (fresh != null && fresh.isNotEmpty) {
+        _memCache = fresh;
+        await _persist(fresh);
+      }
+    } catch (_) {
+      // Sync is best-effort; offline users will use cached rates.
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal helpers
+  // ---------------------------------------------------------------------------
+
+  Future<Map<String, Decimal>?> _getRates() async {
+    if (_memCache != null) return _memCache;
+
+    // Try Supabase first (if online)
+    try {
+      final fresh = await _fetchFromSupabase();
+      if (fresh != null && fresh.isNotEmpty) {
+        _memCache = fresh;
+        await _persist(fresh);
+        return _memCache;
+      }
+    } catch (_) {}
+
+    // Fall back to local cache
+    final cached = await _loadCache();
+    _memCache = cached;
+    return cached;
+  }
+
+  Future<Map<String, Decimal>?> _fetchFromSupabase() async {
+    if (_client == null) return null;
+    final rows = await _client
+        .from('exchange_rates')
+        .select('target_currency, rate')
+        .eq('base_currency', 'USD') as List;
+
+    if (rows.isEmpty) return null;
+    final map = <String, Decimal>{};
+    for (final row in rows) {
+      final r = row as Map<String, dynamic>;
+      final target = (r['target_currency'] as String).toUpperCase();
+      final rate = Decimal.tryParse(r['rate'].toString());
+      if (rate != null && rate > Decimal.zero) {
+        map[target] = rate;
+      }
+    }
+    return map;
+  }
+
+  /// Compute cross-rate from stored USD-based rates.
+  /// 1 USD = fromRate [from], 1 USD = toRate [to]
+  /// 1 [from] = toRate / fromRate [to]
+  Decimal? _crossRate(Map<String, Decimal> rates, String from, String to) {
+    if (from == 'USD') return rates[to];
+    if (to == 'USD') {
+      final fromRate = rates[from];
+      if (fromRate == null || fromRate == Decimal.zero) return null;
+      return (Decimal.one / fromRate).toDecimal(scaleOnInfinitePrecision: 10);
+    }
+    final fromRate = rates[from];
+    final toRate = rates[to];
+    if (fromRate == null || fromRate == Decimal.zero || toRate == null) return null;
+    return (toRate / fromRate).toDecimal(scaleOnInfinitePrecision: 10);
+  }
+
+  Future<void> _persist(Map<String, Decimal> rates) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final encoded = jsonEncode(rates.map((k, v) => MapEntry(k, v.toString())));
+      await prefs.setString(_cacheKey, encoded);
+      await prefs.setInt(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
+  }
+
+  Future<Map<String, Decimal>> _loadCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final json = prefs.getString(_cacheKey);
+      if (json == null) return {};
+      final raw = jsonDecode(json) as Map<String, dynamic>;
+      return raw.map((k, v) {
+        final rate = Decimal.tryParse(v.toString()) ?? Decimal.zero;
+        return MapEntry(k, rate);
+      });
+    } catch (_) {
+      return {};
+    }
+  }
+}
+</file>
+
+<file path="lib/core/services/currency_service.dart">
+import 'dart:convert';
+
+import 'package:decimal/decimal.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
+
+import 'currency_sync_service.dart';
+
+/// Resolves exchange rates with a three-tier priority:
+///
+///  1. **Manual override** – a user-entered rate for this specific transaction
+///     (e.g. bank fee, cash exchange).  Stored in SharedPreferences.
+///  2. **Supabase DB rates** – fetched by [CurrencySyncService] from the
+///     `exchange_rates` table (Edge Function updates it every 24h).  Cached in
+///     SharedPreferences → works fully offline.
+///  3. **Live Frankfurter API** – last-resort fallback when DB rates are not yet
+///     populated (first launch with no cache) AND the device is online.
+///
+/// All monetary arithmetic uses [Decimal] – no floating-point rounding errors.
+class CurrencyService {
+  CurrencyService({
+    http.Client? client,
+    SharedPreferences? prefs,
+    CurrencySyncService? syncService,
+  })  : _client = client ?? http.Client(),
+        _prefs = prefs,
+        _syncService = syncService;
+
+  static const String _baseUrl = 'https://api.frankfurter.dev/latest';
+  static const String _prefsPrefix = 'setall_rate_override_';
+
+  final http.Client _client;
+  final SharedPreferences? _prefs;
+  final CurrencySyncService? _syncService;
+
+  /// In-memory live-API cache (15-min TTL, fallback only).
+  final Map<String, Decimal> _liveCache = {};
+  DateTime? _liveCacheTime;
+  static const Duration _liveCacheValid = Duration(minutes: 15);
+
+  // ---------------------------------------------------------------------------
+  // Public API
+  // ---------------------------------------------------------------------------
+
+  /// Get rate: 1 [fromCurrency] = ? [toCurrency].
+  ///
+  /// Resolution order:
+  ///   Manual override → Supabase DB rates → Frankfurter live API.
+  Future<Decimal> getRate(String fromCurrency, String toCurrency) async {
+    if (fromCurrency == toCurrency) return Decimal.one;
+
+    final key = '${fromCurrency}_$toCurrency';
+
+    // --- 1. Manual override (highest priority) ---
+    var override = await _getManualOverride(fromCurrency, toCurrency);
+    if (override == null) {
+      // Check stored inverse (e.g. if user stored USD→EUR, derive EUR→USD)
+      final inv = await _getManualOverride(toCurrency, fromCurrency);
+      if (inv != null && inv > Decimal.zero) {
+        override = (Decimal.one / inv).toDecimal(scaleOnInfinitePrecision: 6);
+        _liveCache[key] = override;
+      }
+    }
+    if (override != null) return override;
+
+    // --- 2. Supabase DB rates (primary source, cached offline) ---
+    if (_syncService != null) {
+      try {
+        final dbRate = await _syncService.getRate(fromCurrency, toCurrency);
+        if (dbRate != null && dbRate > Decimal.zero) {
+          _liveCache[key] = dbRate;
+          return dbRate;
+        }
+      } catch (_) {}
+    }
+
+    // --- 3. Live Frankfurter API (last resort) ---
+    if (_liveCache.containsKey(key) &&
+        _liveCacheTime != null &&
+        DateTime.now().difference(_liveCacheTime!) < _liveCacheValid) {
+      return _liveCache[key]!;
+    }
+    try {
+      final rate = await _fetchLiveRate(fromCurrency, toCurrency);
+      _liveCache[key] = rate;
+      _liveCacheTime = DateTime.now();
+      return rate;
+    } catch (_) {
+      return _liveCache[key] ?? Decimal.one;
+    }
+  }
+
+  /// Convenience: convert [amount] from [fromCurrency] to [toCurrency].
+  Future<Decimal> convert(
+    Decimal amount,
+    String fromCurrency,
+    String toCurrency,
+  ) async {
+    final rate = await getRate(fromCurrency, toCurrency);
+    return (amount * rate).round(scale: 2);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Manual override (per-transaction)
+  // ---------------------------------------------------------------------------
+
+  /// Persist a manual rate: 1 [from] = [rate] [to].
+  Future<void> setManualOverride(
+    String fromCurrency,
+    String toCurrency,
+    Decimal rate,
+  ) async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    await prefs.setString(
+      '$_prefsPrefix${fromCurrency}_$toCurrency',
+      rate.toString(),
+    );
+    _liveCache['${fromCurrency}_$toCurrency'] = rate;
+    _liveCacheTime = DateTime.now();
+  }
+
+  /// Remove manual override for this pair.
+  Future<void> clearManualOverride(
+    String fromCurrency,
+    String toCurrency,
+  ) async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    await prefs.remove('$_prefsPrefix${fromCurrency}_$toCurrency');
+    _liveCache.remove('${fromCurrency}_$toCurrency');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------------------
+
+  Future<Decimal?> _getManualOverride(String from, String to) async {
+    final prefs = _prefs ?? await SharedPreferences.getInstance();
+    final s = prefs.getString('$_prefsPrefix${from}_$to');
+    if (s == null || s.isEmpty) return null;
+    return Decimal.tryParse(s);
+  }
+
+  Future<Decimal> _fetchLiveRate(String from, String to) async {
+    final uri = Uri.parse('$_baseUrl?from=$from&to=$to');
+    final response = await _client.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('Rate fetch failed: ${response.statusCode}');
+    }
+    final json = jsonDecode(response.body) as Map<String, dynamic>;
+    final rates = json['rates'] as Map<String, dynamic>?;
+    if (rates == null || !rates.containsKey(to)) {
+      throw Exception('Rate not found for $to');
+    }
+    final value = rates[to];
+    if (value is num) return Decimal.parse(value.toString());
+    throw Exception('Invalid rate value');
+  }
+}
+</file>
+
+<file path="lib/data/models/group_model.dart">
+import '../../domain/entities/group.dart';
+
+class GroupModel extends Group {
+  const GroupModel({
+    required super.id,
+    required super.name,
+    required super.creatorId,
+    super.type = GroupType.normal,
+  });
+
+  static GroupType _typeFromString(String? v) {
+    if (v == 'direct') return GroupType.direct;
+    return GroupType.normal;
+  }
+
+  factory GroupModel.fromJson(Map<String, dynamic> json) {
+    return GroupModel(
+      id: json['id'] as String,
+      name: (json['name'] as String?) ?? '',
+      creatorId: json['creator_id'] as String,
+      type: _typeFromString(json['type'] as String?),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'creator_id': creatorId,
+        'type': type.name,
+      };
+}
+</file>
+
+<file path="lib/data/models/profile_model.dart">
+import '../../domain/entities/profile.dart';
+
+class ProfileModel extends Profile {
+  const ProfileModel({
+    required super.id,
+    required super.name,
+    super.nickname,
+    super.avatarUrl,
+    super.defaultCurrency = 'USD',
+    super.isGhost = false,
+  });
+
+  factory ProfileModel.fromJson(Map<String, dynamic> json) {
+    // SQLite stores booleans as integers (0/1); Supabase returns true Dart bools.
+    final rawGhost = json['is_ghost'];
+    final isGhost = (rawGhost == true || rawGhost == 1 || rawGhost == '1');
+
+    return ProfileModel(
+      id: json['id'] as String,
+      name: (json['name'] as String?) ?? '',
+      nickname: json['nickname'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      defaultCurrency: (json['default_currency'] as String?) ?? 'USD',
+      isGhost: isGhost,
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        if (nickname != null) 'nickname': nickname,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+        'default_currency': defaultCurrency,
+        'is_ghost': isGhost,
+      };
+}
+</file>
+
+<file path="lib/data/models/split_model.dart">
+import '../../domain/entities/split.dart';
+
+class SplitModel extends Split {
+  const SplitModel({
+    required super.id,
+    required super.expenseId,
+    required super.userId,
+    required super.amountOwed,
+  });
+
+   factory SplitModel.fromJson(Map<String, dynamic> json) {
+    return SplitModel(
+      id: json['id'] as String,
+      expenseId: json['expense_id'] as String,
+      userId: json['user_id'] as String,
+      // CHANGED: Support both num (Supabase) and String (SQLite)
+      amountOwed: (json['universal_usd_owed'] ?? '0').toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'expense_id': expenseId,
+        'user_id': userId,
+        // CHANGED
+        'universal_usd_owed': amountOwed,
+      };
+}
+</file>
+
+<file path="lib/core/services/balance_service.dart">
+import 'package:decimal/decimal.dart';
+import '../../data/repositories/setall_repository.dart';
+import 'currency_service.dart';
+
+class BalanceService {
+  BalanceService({
+    required SetAllRepository repository,
+    required CurrencyService currencyService, // Kept for DI compatibility
+  })  : _repo = repository,
+        _currency = currencyService;
+
+  final SetAllRepository _repo;
+  final CurrencyService _currency;
+
+  Future<String> getBaseCurrency() async {
+    final profile = await _repo.getCurrentUserProfile();
+    return profile?.defaultCurrency ?? 'USD';
+  }
+
+  Future<BalanceSummary> getBalanceSummary() async {
+    final uid = await _repo.ensureUser();
+    if (uid == null) return const BalanceSummary();
+
+    try { await _repo.syncIfOnline(); } catch (_) {}
+    
+    final raw = await _repo.getBalanceRawData(uid);
+    var youOwe = Decimal.zero;
+    var youAreOwed = Decimal.zero;
+
+    // Splits are already in USD natively from the DB. Just sum them.
+    for (final e in raw.youOwe) {
+      youOwe += e.amount;
+    }
+    for (final e in raw.youAreOwed) {
+      youAreOwed += e.amount;
+    }
+
+    return BalanceSummary(
+      youOwe: youOwe.toStringAsFixed(2),
+      youAreOwed: youAreOwed.toStringAsFixed(2),
+      currency: 'USD', // The raw balance is ALWAYS USD now.
+    );
+  }
+
+  Future<BalanceSummary> getGroupBalanceSummary(String groupId) async {
+    final uid = await _repo.ensureUser();
+    if (uid == null) return const BalanceSummary();
+
+    try { await _repo.syncIfOnline(); } catch (_) {}
+
+    final raw = await _repo.getGroupBalanceRawData(uid, groupId);
+    if (raw == null) return const BalanceSummary(currency: 'USD');
+
+    var youOwe = Decimal.zero;
+    var youAreOwed = Decimal.zero;
+    
+    for (final e in raw.youOwe) {
+      youOwe += e.amount;
+    }
+    for (final e in raw.youAreOwed) {
+      youAreOwed += e.amount;
+    }
+
+    return BalanceSummary(
+      youOwe: youOwe.toStringAsFixed(2),
+      youAreOwed: youAreOwed.toStringAsFixed(2),
+      currency: 'USD',
+    );
+  }
+}
+</file>
+
+<file path="lib/data/models/expense_model.dart">
+import '../../domain/entities/expense.dart';
+
+class ExpenseModel extends Expense {
+  const ExpenseModel({
+    required super.id,
+    required super.groupId,
+    required super.payerId,
+    required super.amount,
+    super.description = '',
+    super.currency = 'USD',
+    super.splitType = SplitType.even,
+    super.category = 'General',
+    super.createdAt,
+    super.originalAmount,
+    super.originalCurrency,
+    super.exchangeRateApplied,
+    super.baseAmountAtEntry,
+  });
+
+  static SplitType _splitTypeFromString(String? v) {
+    switch (v) {
+      case 'manual':
+        return SplitType.manual;
+      case 'parts':
+        return SplitType.parts;
+      default:
+        return SplitType.even;
+    }
+  }
+
+  factory ExpenseModel.fromJson(Map<String, dynamic> json) {
+    return ExpenseModel(
+      id: json['id'] as String,
+      groupId: json['group_id'] as String,
+      // Support both payer_id (legacy/local) and created_by (Supabase)
+      payerId: (json['payer_id'] ?? json['created_by'] ?? '').toString(),
+      // Support both amount (legacy/local) and total_amount (Supabase)
+      amount: (json['amount'] ?? json['total_amount'] ?? '0').toString(),
+      description: (json['description'] as String?) ?? '',
+      currency: (json['currency'] as String?) ?? 'USD',
+      splitType: _splitTypeFromString(json['split_type'] as String?),
+      category: (json['category'] as String?) ?? 'General',
+      createdAt: json['created_at'] as String?,
+      originalAmount: json['original_amount']?.toString(),
+      originalCurrency: json['original_currency'] as String?,
+      exchangeRateApplied: json['exchange_rate_applied']?.toString(),
+      // CHANGED: Match 'universal_usd_amount' as instructed
+      baseAmountAtEntry: (json['universal_usd_amount'] ?? json['base_amount_at_entry'])?.toString(),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'group_id': groupId,
+        'payer_id': payerId,
+        'amount': amount,
+        'description': description,
+        'currency': currency,
+        'split_type': splitType.name,
+        'category': category,
+        'created_at': createdAt,
+        if (originalAmount != null) 'original_amount': originalAmount,
+        if (originalCurrency != null) 'original_currency': originalCurrency,
+        if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
+        // CHANGED: Mapped to universal_usd_amount
+        if (baseAmountAtEntry != null) 'universal_usd_amount': baseAmountAtEntry,
+      };
+}
+</file>
+
+</files>
