@@ -298,6 +298,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
 
     final newPassword = newPwCtrl.text;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      newPwCtrl.dispose();
+      confirmCtrl.dispose();
+    });
     if (confirmed != true || !mounted) return;
 
     // Capture messenger before any async gap so we never call it on a
@@ -376,6 +380,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ),
     );
     final newEmail = ctrl.text.trim().toLowerCase();
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
     if (confirmed != true || !mounted) return;
     if (newEmail.isEmpty || !newEmail.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -480,7 +485,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         scrolledUnderElevation: 0.5,
         leading: IconButton(
           icon: const Icon(Icons.close),
-          onPressed: () { HapticUtils.lightTap(); context.pop(); },
+          onPressed: () { HapticUtils.lightTap(); context.canPop() ? context.pop() : context.go('/'); },
         ),
       ),
       body: ListView(

@@ -208,6 +208,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ref.invalidate(groupMembersProvider(groupId));
           ref.invalidate(groupExpensesProvider(groupId));
           ref.invalidate(groupBalanceSummaryProvider(groupId));
+          ref.invalidate(simplifiedDebtsProvider(groupId));
         },
         child: CustomScrollView(
           slivers: [
@@ -222,9 +223,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                           children: [
                             Icon(Icons.check_circle_outline, color: _teal, size: 18.sp),
                             SizedBox(width: 8.w),
-                            Text(
-                              'Marked as settled',
-                              style: TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13.sp),
+                            Expanded(
+                              child: Text(
+                                'Marked as settled',
+                                style: TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13.sp),
+                              ),
                             ),
                           ],
                         ),
@@ -236,6 +239,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                       ),
               ),
             ),
+
+            // ── Settlement Plan section ──────────────────────────────────
+            if (!_manuallySettled)
+              SliverToBoxAdapter(
+                child: _SettlementPlanSection(groupId: groupId),
+              ),
 
             // ── Members section ──────────────────────────────────────────
             SliverToBoxAdapter(
@@ -814,5 +823,129 @@ class _ExpenseTile extends ConsumerWidget {
     } else if (result == 'delete') {
       _confirmDelete(context, ref);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Settlement Plan section
+// ---------------------------------------------------------------------------
+class _SettlementPlanSection extends ConsumerWidget {
+  const _SettlementPlanSection({required this.groupId});
+  final String groupId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final debtsAsync = ref.watch(simplifiedDebtsProvider(groupId));
+    final membersAsync = ref.watch(groupMembersProvider(groupId));
+    final currentUid = ref.watch(currentUserIdProvider);
+
+    return debtsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (debts) {
+        if (debts.isEmpty) return const SizedBox.shrink();
+
+        final memberMap = {
+          for (final m in membersAsync.valueOrNull ?? <ProfileModel>[]) m.id: m,
+        };
+
+        String displayName(String uid) {
+          if (uid == currentUid) return 'You';
+          final m = memberMap[uid];
+          if (m == null) return uid.substring(0, 8);
+          return m.nickname?.isNotEmpty == true ? m.nickname! : m.name;
+        }
+
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Settlement Plan',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15.sp,
+                ),
+              ),
+              SizedBox(height: 8.h),
+              GlassCard(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Column(
+                  children: debts.map((debt) {
+                    final fromName = displayName(debt.fromUserId);
+                    final toName = displayName(debt.toUserId);
+                    final isCurrentUserDebtor = debt.fromUserId == currentUid;
+                    final amountStr =
+                        '${debt.currency} ${debt.amount.toStringAsFixed(2)}';
+
+                    return ListTile(
+                      dense: true,
+                      leading: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: isCurrentUserDebtor
+                              ? const Color(0x26FF8C42)
+                              : _tealDim,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          size: 16,
+                          color: isCurrentUserDebtor ? _orange : _teal,
+                        ),
+                      ),
+                      title: Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: fromName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.sp,
+                                color: isCurrentUserDebtor
+                                    ? _orange
+                                    : theme.colorScheme.onSurface,
+                              ),
+                            ),
+                            TextSpan(
+                              text: ' owes ',
+                              style: TextStyle(
+                                fontSize: 13.sp,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                            TextSpan(
+                              text: toName,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13.sp,
+                                color: debt.toUserId == currentUid
+                                    ? _teal
+                                    : theme.colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      trailing: Text(
+                        amountStr,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13.sp,
+                          color: isCurrentUserDebtor ? _orange : _teal,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

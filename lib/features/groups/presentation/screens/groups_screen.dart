@@ -240,26 +240,31 @@ class _GroupCard extends ConsumerWidget {
                 ),
 
                 // ── Quick invite icon ────────────────────────────────────
-                IconButton(
-                  icon: Icon(
-                    Icons.person_add_outlined,
-                    size: 18.sp,
-                    color: theme.colorScheme.onSurfaceVariant,
+                SizedBox(
+                  width: 36,
+                  height: 36,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: Icon(
+                      Icons.person_add_outlined,
+                      size: 18,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                    onPressed: () {
+                      HapticUtils.lightTap();
+                      context.push(
+                        '/group/${group.id}/invite',
+                        extra: {'groupName': group.name},
+                      );
+                    },
+                    tooltip: 'Add member',
                   ),
-                  onPressed: () {
-                    HapticUtils.lightTap();
-                    context.push(
-                      '/group/${group.id}/invite',
-                      extra: {'groupName': group.name},
-                    );
-                  },
-                  tooltip: 'Add member',
                 ),
 
                 Icon(
                   Icons.chevron_right,
                   color: theme.colorScheme.onSurfaceVariant,
-                  size: 18.sp,
+                  size: 18,
                 ),
               ],
             ),
