@@ -1765,11 +1765,17 @@ class SetAllRepository {
           .from('splits')
           .select()
           .inFilter('expense_id', expenseIds) as List;
+      // Convert raw split data to SplitModel objects
+      final splitModels = splitRows.map((row) {
+        final splitMap = row as Map<String, dynamic>;
+        return SplitModel.fromJson(splitMap);
+      }).toList();
+      
       return DebtSimplificationEngine.simplify(
         groupId: groupId,
         currency: baseCurrency,
         expenses: expenseRows.cast<Map<String, dynamic>>(),
-        splits: splitRows.cast<Map<String, dynamic>>(),
+        splits: splitModels,
       );
     }
     final expenseRows = await LocalDatabase.db.query(
@@ -1785,11 +1791,17 @@ class SetAllRepository {
       where: 'expense_id IN ($placeholders)',
       whereArgs: expenseIds,
     );
+    // Convert raw split data to SplitModel objects
+    final splitModels = splitRows.map((row) {
+      final splitMap = row as Map<String, dynamic>;
+      return SplitModel.fromJson(splitMap);
+    }).toList();
+    
     return DebtSimplificationEngine.simplify(
       groupId: groupId,
       currency: baseCurrency,
       expenses: expenseRows,
-      splits: splitRows,
+      splits: splitModels,
     );
   }
 
