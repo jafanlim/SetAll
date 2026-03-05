@@ -34,10 +34,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      // StreamProviders (myGroupsProvider, groupExpensesProvider) update
+      // automatically via notifySyncComplete(). Only non-stream providers need
+      // explicit invalidation after sync.
       ref.read(syncServiceProvider).performFullSync().then((_) {
         if (mounted) {
           ref.invalidate(balanceSummaryProvider);
-          ref.invalidate(myGroupsProvider);
           ref.invalidate(recentExpensesProvider);
         }
       });

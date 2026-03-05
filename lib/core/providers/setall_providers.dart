@@ -144,8 +144,10 @@ final groupBalanceSummaryProvider =
 // ---------------------------------------------------------------------------
 
 /// Normal (non-direct) groups for the Groups/Dashboard tab.
-final myGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
-  return ref.watch(setAllRepositoryProvider).getMyGroups();
+/// StreamProvider — emits immediately from SQLite, then re-emits on every
+/// local write or sync completion. No manual invalidation needed.
+final myGroupsProvider = StreamProvider<List<GroupModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchGroups();
 });
 
 /// Direct (1-on-1 friend) groups for the Friends tab.
@@ -157,9 +159,11 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
+/// Expenses for a specific group.
+/// StreamProvider.family — re-emits automatically on any local change.
 final groupExpensesProvider =
-    FutureProvider.family<List<ExpenseModel>, String>((ref, groupId) async {
-  return ref.watch(setAllRepositoryProvider).getExpensesForGroup(groupId);
+    StreamProvider.family<List<ExpenseModel>, String>((ref, groupId) {
+  return ref.watch(setAllRepositoryProvider).watchGroupExpenses(groupId);
 });
 
 final groupMembersProvider =

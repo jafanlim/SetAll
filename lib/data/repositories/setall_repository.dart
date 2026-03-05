@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -81,6 +83,16 @@ class SetAllRepository {
   final SupabaseClient? _client;
   final CurrencyService? _currencyService;
   String? _deviceUserId;
+
+  final _changeController = StreamController<void>.broadcast();
+
+  /// Emits a change event so all active [watchGroups] / [watchGroupExpenses]
+  /// streams re-query SQLite and push fresh data to the UI.
+  void _notify() => _changeController.add(null);
+
+  /// Called by [SyncService] after a successful Supabase pull to trigger
+  /// a UI refresh without any provider invalidation.
+  void notifySyncComplete() => _notify();
 
   bool get isConfigured => _client != null;
 
@@ -537,6 +549,23 @@ class SetAllRepository {
 
   /// Returns all normal (non-direct) groups the user belongs to.
   /// Direct groups are shown separately in the Friends tab via [getDirectGroups].
+  /// Emits the current group list immediately, then re-emits after every
+  /// local write or sync completion. The UI never needs to be invalidated.
+  Stream<List<GroupModel>> watchGroups() async* {
+    yield await getMyGroups();
+    await for (final _ in _changeController.stream) {
+      yield await getMyGroups();
+    }
+  }
+
+  /// Emits expenses for [groupId] immediately, then re-emits on every change.
+  Stream<List<ExpenseModel>> watchGroupExpenses(String groupId) async* {
+    yield await getExpensesForGroup(groupId);
+    await for (final _ in _changeController.stream) {
+      yield await getExpensesForGroup(groupId);
+    }
+  }
+
   Future<List<GroupModel>> getMyGroups() async {
     final all = await _getGroupsByType(type: 'normal', includePersonal: true);
     // Deduplicate: keep only the first personal group encountered.
@@ -673,6 +702,7 @@ class SetAllRepository {
         debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
       }
     }
+    _notify();
     return GroupModel(id: id, name: name, creatorId: uid);
   }
 
@@ -717,6 +747,7 @@ class SetAllRepository {
         await _client.from('expenses').delete().eq('group_id', groupId);
         await _client.from('group_members').delete().eq('group_id', groupId);
         await _client.from('groups').delete().eq('id', groupId);
+        _notify();
         return true;
       } catch (_) {
         return false;
@@ -766,6 +797,7 @@ class SetAllRepository {
         await _client.from('groups').delete().eq('id', groupId);
       } catch (_) {}
     }
+    _notify();
     return true;
   }
 
@@ -819,6 +851,7 @@ class SetAllRepository {
             params: {'p_group_id': groupId, 'p_user_id': userId});
       } catch (_) {}
     }
+    _notify();
     return (ok: true, error: null);
   }
 
@@ -864,6 +897,7 @@ class SetAllRepository {
             .eq('creator_id', uid);
       } catch (_) {}
     }
+    _notify();
     return true;
   }
 
@@ -1445,6 +1479,7 @@ class SetAllRepository {
     // the members list even if they were never formally invited.
     await _ensureSplitParticipantsAreMembers(groupId, splits.map((s) => s.userId).toList());
 
+    _notify();
     return expense;
   }
 
@@ -1616,7 +1651,9 @@ class SetAllRepository {
       whereArgs: [expenseId],
     );
     if (updatedRow.isEmpty) return null;
-    return ExpenseModel.fromJson(updatedRow.first);
+    final result = ExpenseModel.fromJson(updatedRow.first);
+    _notify();
+    return result;
   }
 
   Future<bool> deleteExpense(String expenseId) async {
@@ -1645,6 +1682,7 @@ class SetAllRepository {
         await _client.from('expenses').delete().eq('id', expenseId);
       } catch (_) {}
     }
+    _notify();
     return true;
   }
 
