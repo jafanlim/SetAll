@@ -745,21 +745,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   onTap: () async {
                     try {
-                      await Supabase.instance.client.auth.signOut();
+                      // Wipe SQLite BEFORE signOut so the auth-state listener
+                      // never races with the delete and re-populates the cache.
                       await LocalDatabase.db.delete('splits');
                       await LocalDatabase.db.delete('expenses');
                       await LocalDatabase.db.delete('group_members');
                       await LocalDatabase.db.delete('groups');
                       await LocalDatabase.db.delete('profiles');
-                      debugPrint('🧹 Local cache wiped. Clean state for next user.');
-                      // Invalidate all cached providers so the next user
-                      // never sees data that belonged to the previous session.
-                      ref.invalidate(currentProfileProvider);
-                      ref.invalidate(myGroupsProvider);
-                      ref.invalidate(friendGroupsProvider);
-                      ref.invalidate(recentExpensesProvider);
-                      ref.invalidate(balanceSummaryProvider);
-                      ref.invalidate(baseCurrencyProvider);
+                      await Supabase.instance.client.auth.signOut();
+                      // app.dart _onAuthChange(signedOut) handles provider
+                      // invalidation — no need to duplicate it here.
                       if (context.mounted) context.go('/login');
                     } catch (e) {
                       debugPrint('❌ Logout Error: $e');
