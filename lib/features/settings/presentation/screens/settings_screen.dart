@@ -745,6 +745,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   onTap: () async {
                     try {
+                      // Push any pending local writes before wiping so
+                      // offline-created data isn't permanently lost on logout.
+                      await ref.read(syncServiceProvider).performFullSync();
                       // Wipe SQLite BEFORE signOut so the auth-state listener
                       // never races with the delete and re-populates the cache.
                       await LocalDatabase.db.delete('splits');
