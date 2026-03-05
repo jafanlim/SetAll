@@ -552,18 +552,44 @@ class SetAllRepository {
   /// Emits the current group list immediately, then re-emits after every
   /// local write or sync completion. The UI never needs to be invalidated.
   Stream<List<GroupModel>> watchGroups() async* {
-    yield await getMyGroups();
+    var last = await getMyGroups();
+    yield last;
     await for (final _ in _changeController.stream) {
-      yield await getMyGroups();
+      final next = await getMyGroups();
+      if (_groupListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
     }
   }
 
   /// Emits expenses for [groupId] immediately, then re-emits on every change.
   Stream<List<ExpenseModel>> watchGroupExpenses(String groupId) async* {
-    yield await getExpensesForGroup(groupId);
+    var last = await getExpensesForGroup(groupId);
+    yield last;
     await for (final _ in _changeController.stream) {
-      yield await getExpensesForGroup(groupId);
+      final next = await getExpensesForGroup(groupId);
+      if (_expenseListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
     }
+  }
+
+  static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
+    if (a.length != b.length) return true;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].name != b[i].name) return true;
+    }
+    return false;
+  }
+
+  static bool _expenseListChanged(List<ExpenseModel> a, List<ExpenseModel> b) {
+    if (a.length != b.length) return true;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].amount != b[i].amount) return true;
+    }
+    return false;
   }
 
   Future<List<GroupModel>> getMyGroups() async {
