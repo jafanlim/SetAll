@@ -1405,10 +1405,14 @@ class SetAllRepository {
           );
     
           final expenseData = expense.toJson();
+          // Strip local-only / schema-mismatched fields before sending to Supabase.
+          final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
+            ..remove('created_by')
+            ..remove('base_amount_at_entry');
     
           if (_isWeb && _client != null) {
             try {
-                        await _client.from('expenses').insert(expenseData);
+                        await _client.from('expenses').insert(supabaseExpenseData);
                         for (final s in splits) {
                           // Calculate proportional universal_usd_owed
                           final usdOwed = (s.universalUsdOwed * rateToUsd).round(scale: 2);
@@ -1460,7 +1464,7 @@ class SetAllRepository {
               
                     if (await _isOnline && _client != null) {
                       try {
-                        await _client.from('expenses').insert(expenseData);
+                        await _client.from('expenses').insert(supabaseExpenseData);
                         for (final split in splitModels) {
                           await _client.from('splits').insert(split.toJson());
                         }
