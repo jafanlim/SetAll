@@ -5,7 +5,7 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:setall/core/services/currency_service.dart';
-import 'package:setall/core/utils/debt_simplification_engine.dart';
+import 'package:setall/domain/services/settlement_engine.dart';
 import 'package:setall/data/models/split_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -189,7 +189,7 @@ void main() {
 
       test('1c — Greedy Flow emits exactly 3 payments, all to the payer',
           () {
-        final debts = DebtSimplificationEngine.simplify(
+        final debts = SettlementEngine.simplify(
           groupId: groupId,
           currency: 'USD',
           expenses: expenses,
@@ -229,7 +229,7 @@ void main() {
       });
 
       test('1d — payer has zero net balance after settlement', () {
-        final debts = DebtSimplificationEngine.simplify(
+        final debts = SettlementEngine.simplify(
           groupId: groupId,
           currency: 'USD',
           expenses: expenses,
@@ -314,7 +314,7 @@ void main() {
 
       test('2a — net balance for every participant is 0.00 (fully settled)',
           () {
-        final debts = DebtSimplificationEngine.simplify(
+        final debts = SettlementEngine.simplify(
           groupId: groupId,
           currency: 'USD',
           expenses: expenses,
@@ -328,7 +328,7 @@ void main() {
       });
 
       test('2b — no participant appears in any suggested payment', () {
-        final debts = DebtSimplificationEngine.simplify(
+        final debts = SettlementEngine.simplify(
           groupId: groupId,
           currency: 'USD',
           expenses: expenses,
@@ -446,7 +446,7 @@ void main() {
         ];
 
         // Step 1: Engine returns the USD debt.
-        final debts = DebtSimplificationEngine.simplify(
+        final debts = SettlementEngine.simplify(
           groupId: groupId,
           currency: 'USD',
           expenses: expenses,

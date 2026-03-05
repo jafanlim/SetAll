@@ -6,7 +6,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-import '../../core/utils/debt_simplification_engine.dart';
+import '../../domain/services/settlement_engine.dart';
 import '../../domain/entities/expense.dart';
 import '../local/local_database.dart';
 import '../models/expense_model.dart';
@@ -1791,10 +1791,10 @@ class SetAllRepository {
       ///
       /// [baseCurrency] should be the user's base currency (e.g. from
       /// [BalanceService.getBaseCurrency]). Amounts are normalised to base currency
-      /// via [universal_usd_amount] (schema v8+). The returned [SimplifiedDebt.currency]
+      /// via [universal_usd_amount] (schema v8+). The returned [SettlementTransaction.currency]
       /// is [baseCurrency] so the UI can show a consistent denomination.
   
-  Future<List<SimplifiedDebt>> getSimplifiedDebts(
+  Future<List<SettlementTransaction>> getSimplifiedDebts(
     String groupId, {
     String baseCurrency = 'USD',
   }) async {
@@ -1816,7 +1816,7 @@ class SetAllRepository {
         return SplitModel.fromJson(splitMap);
       }).toList();
       
-      return DebtSimplificationEngine.simplify(
+      return SettlementEngine.simplify(
         groupId: groupId,
         currency: baseCurrency,
         expenses: expenseRows.cast<Map<String, dynamic>>(),
@@ -1842,7 +1842,7 @@ class SetAllRepository {
       return SplitModel.fromJson(splitMap);
     }).toList();
     
-    return DebtSimplificationEngine.simplify(
+    return SettlementEngine.simplify(
       groupId: groupId,
       currency: baseCurrency,
       expenses: expenseRows,
