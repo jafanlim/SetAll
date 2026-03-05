@@ -70,6 +70,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: summaryAsync.when(
+                skipLoadingOnReload: true,
                 data: (summary) {
                   final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
                   final owe = Decimal.tryParse(summary.youOwe) ?? Decimal.zero;
@@ -585,6 +586,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                             ),
                             const SizedBox(height: 4),
                             balanceAsync.when(
+                              skipLoadingOnReload: true,
                               data: (s) {
                                 final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
                                 final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
