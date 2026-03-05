@@ -40,8 +40,6 @@ class BalanceService {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
 
-    try { await _repo.syncIfOnline(); } catch (_) {}
-
     final baseCurrency = await getBaseCurrency();
     final raw = await _repo.getBalanceRawData(uid);
 
@@ -63,8 +61,6 @@ class BalanceService {
   Future<BalanceSummary> getGroupBalanceSummary(String groupId, {String? targetCurrency}) async {
     final uid = await _repo.ensureUser();
     if (uid == null) return const BalanceSummary();
-
-    try { await _repo.syncIfOnline(); } catch (_) {}
 
     final baseCurrency = targetCurrency ?? await getBaseCurrency();
     final raw = await _repo.getGroupBalanceRawData(uid, groupId);

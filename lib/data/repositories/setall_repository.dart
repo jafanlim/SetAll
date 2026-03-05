@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,7 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
-import '../../core/utils/debt_simplification_engine.dart';
+import '../../domain/services/settlement_engine.dart';
 import '../../domain/entities/expense.dart';
 import '../local/local_database.dart';
 import '../models/expense_model.dart';
@@ -82,6 +84,16 @@ class SetAllRepository {
   final CurrencyService? _currencyService;
   String? _deviceUserId;
 
+  final _changeController = StreamController<void>.broadcast();
+
+  /// Emits a change event so all active [watchGroups] / [watchGroupExpenses]
+  /// streams re-query SQLite and push fresh data to the UI.
+  void _notify() => _changeController.add(null);
+
+  /// Called by [SyncService] after a successful Supabase pull to trigger
+  /// a UI refresh without any provider invalidation.
+  void notifySyncComplete() => _notify();
+
   bool get isConfigured => _client != null;
 
   bool get _isWeb => LocalDatabase.isWeb;
@@ -111,13 +123,9 @@ class SetAllRepository {
     return id;
   }
 
-  Future<void> syncIfOnline() async {
-    if (_isWeb) return;
-    final uid = await ensureUser();
-    if (uid != null && await _isOnline && _client != null) {
-      await _syncFromSupabase(uid);
-    }
-  }
+  /// Sync is now handled by [SyncService.performFullSync].
+  /// This stub exists only for compatibility during the transition period.
+  Future<void> syncIfOnline() async {}
 
   Future<bool> get _isOnline async {
     if (kIsWeb) return _client != null;
@@ -513,11 +521,7 @@ class SetAllRepository {
           .insert({'group_id': id, 'user_id': uid});
       return GroupModel(id: id, name: _personalGroupName, creatorId: uid);
     }
-    // Sync from Supabase first so we find any existing personal group
-    // before creating a new one (prevents duplicates across devices).
-    if (_client != null && await _isOnline) {
-      try { await _syncFromSupabase(uid); } catch (_) {}
-    }
+    // Personal group lookup is now SQLite-only; SyncService keeps it fresh.
     final rows = await LocalDatabase.db.query(
       'groups',
       where: 'creator_id = ? AND name = ?',
@@ -545,6 +549,49 @@ class SetAllRepository {
 
   /// Returns all normal (non-direct) groups the user belongs to.
   /// Direct groups are shown separately in the Friends tab via [getDirectGroups].
+  /// Emits the current group list immediately, then re-emits after every
+  /// local write or sync completion. The UI never needs to be invalidated.
+  Stream<List<GroupModel>> watchGroups() async* {
+    var last = await getMyGroups();
+    yield last;
+    await for (final _ in _changeController.stream) {
+      final next = await getMyGroups();
+      if (_groupListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
+  /// Emits expenses for [groupId] immediately, then re-emits on every change.
+  Stream<List<ExpenseModel>> watchGroupExpenses(String groupId) async* {
+    var last = await getExpensesForGroup(groupId);
+    yield last;
+    await for (final _ in _changeController.stream) {
+      final next = await getExpensesForGroup(groupId);
+      if (_expenseListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
+  static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
+    if (a.length != b.length) return true;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].name != b[i].name) return true;
+    }
+    return false;
+  }
+
+  static bool _expenseListChanged(List<ExpenseModel> a, List<ExpenseModel> b) {
+    if (a.length != b.length) return true;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].id != b[i].id || a[i].amount != b[i].amount) return true;
+    }
+    return false;
+  }
+
   Future<List<GroupModel>> getMyGroups() async {
     final all = await _getGroupsByType(type: 'normal', includePersonal: true);
     // Deduplicate: keep only the first personal group encountered.
@@ -595,13 +642,6 @@ class SetAllRepository {
           .eq('type', type)
           .order('updated_at', ascending: false) as List;
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
-    }
-
-    if (await _isOnline && _client != null) {
-      try {
-        await syncPendingToSupabase();
-        await _syncFromSupabase(uid);
-      } catch (_) {}
     }
 
     final memberRows = await LocalDatabase.db.query(
@@ -688,6 +728,7 @@ class SetAllRepository {
         debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
       }
     }
+    _notify();
     return GroupModel(id: id, name: name, creatorId: uid);
   }
 
@@ -712,36 +753,83 @@ class SetAllRepository {
     return rows.first['creator_id'] as String?;
   }
 
-  /// Delete a group. Only the creator can perform this action.
+  /// Delete a group. Any member of the group can perform this action.
   Future<bool> deleteGroup(String groupId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
+        // Fetch expense IDs first so we can delete their splits.
+        final expenseRows = await _client
+            .from('expenses')
+            .select('id')
+            .eq('group_id', groupId) as List;
+        final expenseIds =
+            expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+        if (expenseIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', expenseIds);
+        }
+        await _client.from('expenses').delete().eq('group_id', groupId);
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
+        _notify();
         return true;
       } catch (_) {
         return false;
       }
     }
 
-    // Local check
+    // Local check — any member may delete.
     final rows = await LocalDatabase.db.query(
       'groups',
-      where: 'id = ? AND creator_id = ?',
-      whereArgs: [groupId, uid],
+      where: 'id = ?',
+      whereArgs: [groupId],
     );
     if (rows.isEmpty) return false;
 
+    // Remote-first: delete from Supabase before removing locally so other
+    // devices' reconciler will prune the group on their next pull.
+    if (await _isOnline && _client != null) {
+      try {
+        final remoteExpenseRows = await _client
+            .from('expenses')
+            .select('id')
+            .eq('group_id', groupId) as List;
+        final remoteExpenseIds = remoteExpenseRows
+            .map((r) => (r as Map<String, dynamic>)['id'] as String)
+            .toList();
+        if (remoteExpenseIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
+        }
+        await _client.from('expenses').delete().eq('group_id', groupId);
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
+      } catch (e) {
+        debugPrint('[deleteGroup] Supabase delete failed: $e');
+        // Continue with local delete so the UI stays responsive.
+      }
+    }
+
+    // Collect local expense IDs for this group.
+    final expenseRows = await LocalDatabase.db.query(
+      'expenses',
+      columns: ['id'],
+      where: 'group_id = ?',
+      whereArgs: [groupId],
+    );
+    for (final row in expenseRows) {
+      await LocalDatabase.db.delete(
+        'splits',
+        where: 'expense_id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
 
-    if (await _isOnline && _client != null) {
-      try {
-        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
-      } catch (_) {}
-    }
+    _notify();
     return true;
   }
 
@@ -795,6 +883,7 @@ class SetAllRepository {
             params: {'p_group_id': groupId, 'p_user_id': userId});
       } catch (_) {}
     }
+    _notify();
     return (ok: true, error: null);
   }
 
@@ -840,6 +929,7 @@ class SetAllRepository {
             .eq('creator_id', uid);
       } catch (_) {}
     }
+    _notify();
     return true;
   }
 
@@ -1217,7 +1307,6 @@ class SetAllRepository {
       return rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
     }
 
-    if (await _isOnline && _client != null) await _syncFromSupabase(uid);
     final memberRows = await LocalDatabase.db.query(
       'group_members',
       where: 'user_id = ?',
@@ -1312,6 +1401,8 @@ class SetAllRepository {
     String? originalCurrency,
     String? exchangeRateApplied,
   }) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
     final expenseId = const Uuid().v4();
     final now = _now();
 
@@ -1332,6 +1423,7 @@ class SetAllRepository {
             splitType: splitType,
             category: category,
             createdAt: now,
+            createdBy: uid,
             originalAmount: originalAmount?.toString(),
             originalCurrency: originalCurrency,
             exchangeRateApplied: exchangeRateApplied ?? rateToUsd.toString(),
@@ -1339,10 +1431,14 @@ class SetAllRepository {
           );
     
           final expenseData = expense.toJson();
+          // Strip local-only / schema-mismatched fields before sending to Supabase.
+          final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
+            ..remove('created_by')
+            ..remove('base_amount_at_entry');
     
           if (_isWeb && _client != null) {
             try {
-                        await _client.from('expenses').insert(expenseData);
+                        await _client.from('expenses').insert(supabaseExpenseData);
                         for (final s in splits) {
                           // Calculate proportional universal_usd_owed
                           final usdOwed = (s.universalUsdOwed * rateToUsd).round(scale: 2);
@@ -1394,7 +1490,7 @@ class SetAllRepository {
               
                     if (await _isOnline && _client != null) {
                       try {
-                        await _client.from('expenses').insert(expenseData);
+                        await _client.from('expenses').insert(supabaseExpenseData);
                         for (final split in splitModels) {
                           await _client.from('splits').insert(split.toJson());
                         }
@@ -1419,6 +1515,7 @@ class SetAllRepository {
     // the members list even if they were never formally invited.
     await _ensureSplitParticipantsAreMembers(groupId, splits.map((s) => s.userId).toList());
 
+    _notify();
     return expense;
   }
 
@@ -1469,6 +1566,8 @@ class SetAllRepository {
     required List<SplitInsert> splits,
     String category = 'General',
   }) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
     final now = _now();
 
     // -- Anchor logic: Always re-compute USD value on update --
@@ -1489,6 +1588,7 @@ class SetAllRepository {
             category: category,
             universalUsdAmount: universalUsdAmount.toString(),
             exchangeRateApplied: rateToUsd.toString(),
+            createdBy: uid,
           );
     
           // Strip created_at so we never overwrite the original timestamp.
@@ -1587,7 +1687,9 @@ class SetAllRepository {
       whereArgs: [expenseId],
     );
     if (updatedRow.isEmpty) return null;
-    return ExpenseModel.fromJson(updatedRow.first);
+    final result = ExpenseModel.fromJson(updatedRow.first);
+    _notify();
+    return result;
   }
 
   Future<bool> deleteExpense(String expenseId) async {
@@ -1600,6 +1702,20 @@ class SetAllRepository {
         return false;
       }
     }
+
+    // Remote-first: delete from Supabase before removing locally.
+    // This ensures the deletion is authoritative — the reconciler in
+    // _pullFromSupabase will not re-insert rows that were deleted on another device.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('splits').delete().eq('expense_id', expenseId);
+        await _client.from('expenses').delete().eq('id', expenseId);
+      } catch (e) {
+        debugPrint('[deleteExpense] Supabase delete failed: $e');
+        // Proceed with local delete anyway so the UI stays responsive.
+      }
+    }
+
     await LocalDatabase.db.delete(
       'splits',
       where: 'expense_id = ?',
@@ -1610,12 +1726,86 @@ class SetAllRepository {
       where: 'id = ?',
       whereArgs: [expenseId],
     );
+    _notify();
+    return true;
+  }
+
+  /// Records a settlement by inserting a negating expense (category: 'Settlement')
+  /// so the SettlementEngine sees the debt as zero on next calculation.
+  ///
+  /// [from] is the debtor (payer of the settlement expense).
+  /// [to] is the creditor (the single split recipient).
+  /// [amount] is the USD-normalised value from [SettlementTransaction].
+  /// [currency] is the display currency label.
+  Future<bool> recordSettlement({
+    required String groupId,
+    required String fromUserId,
+    required String toUserId,
+    required String amount,
+    required String currency,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    final expenseId = const Uuid().v4();
+    final splitId   = const Uuid().v4();
+    final now       = _now();
+
+    final expenseRow = {
+      'id':                   expenseId,
+      'group_id':             groupId,
+      'payer_id':             fromUserId,
+      'amount':               amount,
+      'description':          'Settlement',
+      'currency':             currency,
+      'split_type':           'even',
+      'category':             'Settlement',
+      'created_at':           now,
+      'universal_usd_amount': amount,
+    };
+
+    final splitRow = {
+      'id':                 splitId,
+      'expense_id':         expenseId,
+      'user_id':            toUserId,
+      'universal_usd_owed': amount,
+      'created_at':         now,
+    };
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('expenses').insert(expenseRow);
+        await _client.from('splits').insert(splitRow);
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[recordSettlement] Supabase error: $e');
+        return false;
+      }
+    }
+
+    // Local-first path: write to SQLite immediately, sync later.
+    try {
+      await LocalDatabase.db.insert('expenses', {...expenseRow, 'synced_at': null});
+      await LocalDatabase.db.insert('splits',   {...splitRow,   'synced_at': null});
+    } catch (e) {
+      debugPrint('[recordSettlement] SQLite error: $e');
+      return false;
+    }
+
+    // Best-effort push to Supabase.
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('splits').delete().eq('expense_id', expenseId);
-        await _client.from('expenses').delete().eq('id', expenseId);
+        await _client.from('expenses').insert(expenseRow);
+        await _client.from('splits').insert(splitRow);
+        await LocalDatabase.db.update('expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'id = ?', whereArgs: [expenseId]);
+        await LocalDatabase.db.update('splits', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'id = ?', whereArgs: [splitId]);
       } catch (_) {}
     }
+
+    _notify();
     return true;
   }
 
@@ -1698,7 +1888,6 @@ class SetAllRepository {
           );
         }
   
-        if (await _isOnline && _client != null) await _syncFromSupabase(uid);
         final raw = await getBalanceRawData(uid);
         var youOwe = Decimal.zero;
         var youAreOwed = Decimal.zero;
@@ -1746,10 +1935,10 @@ class SetAllRepository {
       ///
       /// [baseCurrency] should be the user's base currency (e.g. from
       /// [BalanceService.getBaseCurrency]). Amounts are normalised to base currency
-      /// via [universal_usd_amount] (schema v8+). The returned [SimplifiedDebt.currency]
+      /// via [universal_usd_amount] (schema v8+). The returned [SettlementTransaction.currency]
       /// is [baseCurrency] so the UI can show a consistent denomination.
   
-  Future<List<SimplifiedDebt>> getSimplifiedDebts(
+  Future<List<SettlementTransaction>> getSimplifiedDebts(
     String groupId, {
     String baseCurrency = 'USD',
   }) async {
@@ -1771,7 +1960,7 @@ class SetAllRepository {
         return SplitModel.fromJson(splitMap);
       }).toList();
       
-      return DebtSimplificationEngine.simplify(
+      return SettlementEngine.simplify(
         groupId: groupId,
         currency: baseCurrency,
         expenses: expenseRows.cast<Map<String, dynamic>>(),
@@ -1797,7 +1986,7 @@ class SetAllRepository {
       return SplitModel.fromJson(splitMap);
     }).toList();
     
-    return DebtSimplificationEngine.simplify(
+    return SettlementEngine.simplify(
       groupId: groupId,
       currency: baseCurrency,
       expenses: expenseRows,
@@ -1806,228 +1995,15 @@ class SetAllRepository {
   }
 
   // ---------------------------------------------------------------------------
-  // Sync
+  // Private helpers
   // ---------------------------------------------------------------------------
 
-  Future<void> _syncFromSupabase(String uid) async {
-    if (_client == null || _isWeb) return;
-    try {
-      final memberRows = await _client
-          .from('group_members')
-          .select('group_id')
-          .eq('user_id', uid);
-      final memberIds = (memberRows as List)
-          .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
-          .toSet()
-          .toList();
-      final created =
-          await _client.from('groups').select('id').eq('creator_id', uid);
-      for (final r in created as List) {
-        memberIds.add((r as Map<String, dynamic>)['id'] as String);
-      }
-      if (memberIds.isEmpty) return;
+  String _now() => DateTime.now().toUtc().toIso8601String();
 
-      final groups =
-          await _client.from('groups').select().inFilter('id', memberIds.toList());
-      for (final g in groups as List) {
-        final map = g as Map<String, dynamic>;
-        await LocalDatabase.db.insert(
-          'groups',
-          {
-            'id': map['id'],
-            'name': map['name'],
-            'creator_id': map['creator_id'],
-            'created_at': map['created_at']?.toString(),
-            'updated_at': map['updated_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
+  GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
 
-      final gMembers = await _client
-          .from('group_members')
-          .select()
-          .inFilter('group_id', memberIds.toList());
-      final allMemberUserIds = <String>{uid};
-      for (final m in gMembers as List) {
-        final map = m as Map<String, dynamic>;
-        allMemberUserIds.add(map['user_id'] as String);
-        await LocalDatabase.db.insert(
-          'group_members',
-          {
-            'group_id': map['group_id'],
-            'user_id': map['user_id'],
-            'joined_at': map['joined_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
+  ExpenseModel _rowToExpense(Map<String, dynamic> row) =>
+      ExpenseModel.fromJson(row);
 
-      // Sync all member profiles (including current user) so local SQLite
-      // always has fresh name / nickname / avatar_url / default_currency.
-      try {
-        final profileRows = await _client
-            .from('profiles')
-            .select()
-            .inFilter('id', allMemberUserIds.toList()) as List;
-        for (final p in profileRows) {
-          await _upsertProfileToSQLite(p as Map<String, dynamic>);
-        }
-      } catch (_) {}
-
-      final expenses =
-          await _client.from('expenses').select().inFilter('group_id', memberIds.toList());
-      for (final e in expenses as List) {
-        final map = e as Map<String, dynamic>;
-        final expense = ExpenseModel.fromJson(map);
-        await LocalDatabase.db.insert(
-          'expenses',
-          {
-            ...expense.toJson(),
-            'updated_at': map['updated_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-
-      final expenseIds = (expenses as List)
-          .map((e) => (e as Map<String, dynamic>)['id'] as String)
-          .toList();
-      if (expenseIds.isNotEmpty) {
-        final splits = await _client
-            .from('splits')
-            .select()
-            .inFilter('expense_id', expenseIds);
-        for (final s in splits as List) {
-          final map = s as Map<String, dynamic>;
-          final split = SplitModel.fromJson(map);
-          // INSERT OR REPLACE leverages the UNIQUE(expense_id, user_id) index
-          // (schema v9) to upsert without pre-deleting. If Supabase is missing
-          // a split that exists locally (e.g. its INSERT failed), the local row
-          // is left untouched because we only process what Supabase returns.
-          await LocalDatabase.db.insert(
-            'splits',
-            {
-              ...split.toJson(),
-              'created_at': map['created_at']?.toString(),
-              'synced_at': DateTime.now().millisecondsSinceEpoch,
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> syncPendingToSupabase() async {
-    if (_client == null || !await _isOnline || _isWeb) return;
-    final uid = await ensureUser();
-    if (uid == null) return;
-
-    final pendingGroups =
-        await LocalDatabase.db.query('groups', where: 'synced_at IS NULL');
-    for (final row in pendingGroups) {
-      try {
-        await _client.from('groups').insert({
-          'id': row['id'],
-          'name': row['name'],
-          'creator_id': row['creator_id'],
-          'type': row['type'] ?? 'normal',
-        });
-        await LocalDatabase.db.update(
-          'groups',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-        await _client.from('group_members').insert({
-          'group_id': row['id'],
-          'user_id': row['creator_id'],
-        });
-        await LocalDatabase.db.update(
-          'group_members',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'group_id = ?',
-          whereArgs: [row['id']],
-        );
-      } catch (_) {}
-    }
-
-        final pendingExpenses =
-            await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
-        for (final row in pendingExpenses) {
-          try {
-            final expense = ExpenseModel.fromJson(row);
-            await _client.from('expenses').insert(expense.toJson());
-            await LocalDatabase.db.update(
-              'expenses',
-              {'synced_at': DateTime.now().millisecondsSinceEpoch},
-              where: 'id = ?',
-              whereArgs: [row['id']],
-            );
-          } catch (e) {
-            if (e is PostgrestException) {
-              if (e.code == '23505') {
-                // DUPLICATE KEY: already in Supabase — mark synced locally.
-                debugPrint('⚠️ Expense already exists in cloud. Marking as synced locally.');
-              } else {
-                // RLS violation (42501) or other permanent error — this row can
-                // never be pushed by this user (e.g. stale test data with a
-                // different payer_id). Mark synced to stop retrying.
-                debugPrint('⚠️ Expense skipped (${e.code}): ${e.message}');
-              }
-              await LocalDatabase.db.update(
-                'expenses',
-                {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                where: 'id = ?',
-                whereArgs: [row['id']],
-              );
-            }
-          }
-        }
-    
-        final pendingSplits =
-            await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
-        for (final row in pendingSplits) {
-          try {
-            final split = SplitModel.fromJson(row);
-            await _client.from('splits').insert(split.toJson());
-            await LocalDatabase.db.update(
-              'splits',
-              {'synced_at': DateTime.now().millisecondsSinceEpoch},
-              where: 'id = ?',
-              whereArgs: [row['id']],
-            );
-          } catch (e) {
-            if (e is PostgrestException) {
-              if (e.code != '23505') {
-                debugPrint('⚠️ Split skipped (${e.code}): ${e.message}');
-              }
-              await LocalDatabase.db.update(
-                'splits',
-                {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                where: 'id = ?',
-                whereArgs: [row['id']],
-              );
-            }
-          }
-        }
-      }
-    
-      // ---------------------------------------------------------------------------
-      // Private helpers
-      // ---------------------------------------------------------------------------
-    
-      String _now() => DateTime.now().toUtc().toIso8601String();
-    
-      GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
-    
-      ExpenseModel _rowToExpense(Map<String, dynamic> row) =>
-          ExpenseModel.fromJson(row);
-    
-      SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
-    }
-    
+  SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
+}

@@ -2,7 +2,6 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -385,7 +384,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       appBar: AppBar(
         title: Text(
           'Add expense · ${_step + 1}/$_totalSteps',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
@@ -401,33 +400,33 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           children: [
             if (widget.groupName.isNotEmpty)
               Padding(
-                padding: EdgeInsets.only(bottom: 10.h),
+                padding: const EdgeInsets.only(bottom: 10),
                 child: Row(
                   children: [
                     Icon(Icons.group_outlined,
-                        size: 14.sp,
+                        size: 14,
                         color: theme.colorScheme.onSurfaceVariant),
-                    SizedBox(width: 6.w),
+                    const SizedBox(width: 6),
                     Text(
                       widget.groupName,
                       style: theme.textTheme.titleSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
-                        fontSize: 12.sp,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
             _stepIndicator(theme),
-            SizedBox(height: 20.h),
+            const SizedBox(height: 20),
             if (_step == 0) _buildStepAmount(theme),
             if (_step == 1) _buildStepSplit(theme),
             if (_step == 2) _buildStepDetails(theme),
-            SizedBox(height: 24.h),
+            const SizedBox(height: 24),
             Row(
               children: [
                 if (_step > 0)
@@ -456,8 +455,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     ),
                     icon: _isSubmitting
                         ? SizedBox(
-                            width: 18.w,
-                            height: 18.w,
+                            width: 18,
+                            height: 18,
                             child: const CircularProgressIndicator(
                               strokeWidth: 2,
                               color: Colors.black54,
@@ -468,7 +467,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   ),
               ],
             ),
-            SizedBox(height: 32.h),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -486,17 +485,17 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         final done = i < _step;
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: 2.w),
+            padding: const EdgeInsets.symmetric(horizontal: 2),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              height: 4.h,
+              height: 4,
               decoration: BoxDecoration(
                 color: active
                     ? _teal
                     : done
                         ? _teal.withValues(alpha: 0.4)
                         : theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(2.r),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
@@ -528,7 +527,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         : null;
 
     return GlassCard(
-      padding: EdgeInsets.all(20.w),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -536,30 +535,30 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             'Amount & currency',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              fontSize: 15.sp,
+              fontSize: 15,
             ),
           ),
-          SizedBox(height: 16.h),
+          const SizedBox(height: 16),
 
           // Amount field
           TextFormField(
             controller: _amountCtrl,
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(
-              fontSize: 22.sp,
+            style: const TextStyle(
+              fontSize: 22,
               fontWeight: FontWeight.w700,
               color: _teal,
             ),
             decoration: InputDecoration(
               labelText: 'Amount',
-              labelStyle: TextStyle(fontSize: 13.sp),
+              labelStyle: const TextStyle(fontSize: 13),
               prefixIcon: _CurrencySymbolIcon(currency: _currency),
               filled: true,
               fillColor:
                   theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -571,7 +570,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               return null;
             },
           ),
-          SizedBox(height: 12.h),
+          const SizedBox(height: 12),
 
           // Currency picker
           CurrencyPickerField(
@@ -584,7 +583,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               });
             },
           ),
-          SizedBox(height: 12.h),
+          const SizedBox(height: 12),
 
           // Conversion preview
           if (convertedPreview != null && base != null)
@@ -597,13 +596,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
           // DB rate display + manual override
           if (base != null && base != _currency) ...[
-            SizedBox(height: 12.h),
+            const SizedBox(height: 12),
             _RateDisplayRow(
               fromCurrency: _currency,
               toCurrency: base,
               rateAsync: rateAsync,
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             _ManualRateRow(
               rateCtrl: _rateOverrideCtrl,
               fromCurrency: _currency,
@@ -636,7 +635,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _buildStepSplit(ThemeData theme) {
     return GlassCard(
-      padding: EdgeInsets.all(20.w),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -644,31 +643,31 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             'How to split',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              fontSize: 15.sp,
+              fontSize: 15,
             ),
           ),
-          SizedBox(height: 14.h),
+          const SizedBox(height: 14),
           SegmentedButton<SplitMode>(
             segments: [
               ButtonSegment(
                 value: SplitMode.even,
-                label: Text('Even', style: TextStyle(fontSize: 11.sp)),
-                icon: Icon(Icons.equalizer, size: 14.sp),
+                label: Text('Even', style: const TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.equalizer, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.percentage,
-                label: Text('%', style: TextStyle(fontSize: 11.sp)),
-                icon: Icon(Icons.percent, size: 14.sp),
+                label: Text('%', style: const TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.percent, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.shares,
-                label: Text('Shares', style: TextStyle(fontSize: 11.sp)),
-                icon: Icon(Icons.pie_chart_outline, size: 14.sp),
+                label: Text('Shares', style: const TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.pie_chart_outline, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.manual,
-                label: Text('Manual', style: TextStyle(fontSize: 11.sp)),
-                icon: Icon(Icons.edit, size: 14.sp),
+                label: Text('Manual', style: const TextStyle(fontSize: 11)),
+                icon: const Icon(Icons.edit, size: 14),
               ),
             ],
             selected: {_splitMode},
@@ -693,7 +692,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
           if (_splitMode != SplitMode.even) ...[
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
             Text(
               _splitMode == SplitMode.percentage
                   ? 'Percentage per person (total = 100)'
@@ -702,14 +701,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       : 'Exact amount per person',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
-                fontSize: 11.sp,
+                fontSize: 11,
               ),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             ...List.generate(_memberIds.length, (i) {
               if (_customCtrl.length <= i) return const SizedBox.shrink();
               return Padding(
-                padding: EdgeInsets.only(bottom: 8.h),
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
                   children: [
                     Expanded(
@@ -719,18 +718,18 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             ? _memberNames[i]
                             : 'Member ${i + 1}',
                         style: theme.textTheme.bodyMedium
-                            ?.copyWith(fontSize: 13.sp),
+                            ?.copyWith(fontSize: 13),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    SizedBox(width: 12.w),
+                    const SizedBox(width: 12),
                     SizedBox(
-                      width: 90.w,
+                      width: 90,
                       child: TextFormField(
                         controller: _customCtrl[i],
                         keyboardType: const TextInputType.numberWithOptions(
                             decimal: true),
-                        style: TextStyle(fontSize: 13.sp),
+                        style: const TextStyle(fontSize: 13),
                         onChanged: (_) => setState(() {}),
                         decoration: InputDecoration(
                           hintText: _splitMode == SplitMode.percentage
@@ -743,7 +742,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                           fillColor: theme.colorScheme.surfaceContainerHighest
                               .withValues(alpha: 0.4),
                           border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(8.r),
+                            borderRadius: BorderRadius.circular(8),
                             borderSide: BorderSide.none,
                           ),
                         ),
@@ -755,12 +754,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             }),
             // Percentage sum indicator
             if (_splitMode == SplitMode.percentage) ...[
-              SizedBox(height: 8.h),
+              const SizedBox(height: 8),
               _PercentageSumIndicator(controllers: _customCtrl),
             ],
             // Manual amount sum indicator
             if (_splitMode == SplitMode.manual) ...[
-              SizedBox(height: 8.h),
+              const SizedBox(height: 8),
               _ManualSumIndicator(
                 controllers: _customCtrl,
                 total: Decimal.tryParse(
@@ -771,20 +770,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               ),
             ],
           ] else ...[
-            SizedBox(height: 14.h),
+            const SizedBox(height: 14),
             Container(
-              padding: EdgeInsets.all(12.w),
+              padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: _teal.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(10.r),
+                borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.equalizer, color: _teal, size: 16.sp),
-                  SizedBox(width: 8.w),
+                  const Icon(Icons.equalizer, color: _teal, size: 16),
+                  const SizedBox(width: 8),
                   Text(
                     'Split evenly among ${_memberIds.length} members',
-                    style: TextStyle(color: _teal, fontSize: 12.sp),
+                    style: const TextStyle(color: _teal, fontSize: 12),
                   ),
                 ],
               ),
@@ -801,7 +800,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _buildStepDetails(ThemeData theme) {
     return GlassCard(
-      padding: EdgeInsets.all(20.w),
+      padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -809,26 +808,26 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             'Details',
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              fontSize: 15.sp,
+              fontSize: 15,
             ),
           ),
-          SizedBox(height: 16.h),
+          const SizedBox(height: 16),
           // Category chips
           Text(
             'Category',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 11.sp,
+              fontSize: 11,
             ),
           ),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           Wrap(
-            spacing: 8.w,
-            runSpacing: 6.h,
+            spacing: 8,
+            runSpacing: 6,
             children: kExpenseCategories.map((cat) {
               final selected = _category == cat;
               return FilterChip(
-                label: Text(cat, style: TextStyle(fontSize: 11.sp)),
+                label: Text(cat, style: const TextStyle(fontSize: 11)),
                 selected: selected,
                 selectedColor: _teal.withValues(alpha: 0.15),
                 checkmarkColor: _teal,
@@ -843,24 +842,24 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               );
             }).toList(),
           ),
-          SizedBox(height: 16.h),
+          const SizedBox(height: 16),
           if (_memberIds.length > 1) ...
             [
               Text(
                 'Paid by',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 11.sp,
+                  fontSize: 11,
                 ),
               ),
-              SizedBox(height: 8.h),
+              const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 initialValue: _memberIds.contains(_payerId) ? _payerId : null,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   isDense: true,
@@ -870,25 +869,25 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     value: _memberIds[i],
                     child: Text(
                       _memberNames.length > i ? _memberNames[i] : _memberIds[i],
-                      style: TextStyle(fontSize: 13.sp),
+                      style: const TextStyle(fontSize: 13),
                     ),
                   );
                 }),
                 onChanged: (v) => setState(() => _payerId = v),
               ),
-              SizedBox(height: 16.h),
+              const SizedBox(height: 16),
             ],
           TextFormField(
             controller: _descriptionCtrl,
             decoration: InputDecoration(
               labelText: 'Description (optional)',
-              labelStyle: TextStyle(fontSize: 13.sp),
+              labelStyle: const TextStyle(fontSize: 13),
               prefixIcon: const Icon(Icons.notes_outlined),
               filled: true,
               fillColor:
                   theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(12),
                 borderSide: BorderSide.none,
               ),
             ),
@@ -933,18 +932,18 @@ class CurrencyPickerField extends StatelessWidget {
         );
         if (result != null) onChanged(result);
       },
-      borderRadius: BorderRadius.circular(12.r),
+      borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color:
               theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-          borderRadius: BorderRadius.circular(12.r),
+          borderRadius: BorderRadius.circular(12),
         ),
         child: Row(
           children: [
-            Text(entry['flag'] ?? '', style: TextStyle(fontSize: 20.sp)),
-            SizedBox(width: 10.w),
+            Text(entry['flag'] ?? '', style: const TextStyle(fontSize: 20)),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -953,14 +952,14 @@ class CurrencyPickerField extends StatelessWidget {
                     entry['code']!,
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 14.sp,
+                      fontSize: 14,
                       color: _teal,
                     ),
                   ),
                   Text(
                     entry['name']!,
                     style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
@@ -968,7 +967,7 @@ class CurrencyPickerField extends StatelessWidget {
               ),
             ),
             Icon(Icons.expand_more,
-                color: theme.colorScheme.onSurfaceVariant, size: 18.sp),
+                color: theme.colorScheme.onSurfaceVariant, size: 18),
           ],
         ),
       ),
@@ -1007,21 +1006,21 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
       builder: (_, ctrl) => Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             Container(
-              width: 36.w,
-              height: 4.h,
+              width: 36,
+              height: 4,
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2.r),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
             Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 8.h),
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
                 autofocus: true,
                 decoration: InputDecoration(
@@ -1030,7 +1029,7 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   isDense: true,
@@ -1048,18 +1047,18 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
                   return ListTile(
                     dense: true,
                     leading: Text(c['flag'] ?? '',
-                        style: TextStyle(fontSize: 22.sp)),
+                        style: const TextStyle(fontSize: 22)),
                     title: Text(
                       c['code']!,
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 13.sp,
+                        fontSize: 13,
                         color: isSelected ? _teal : null,
                       ),
                     ),
                     subtitle: Text(
                       c['name']!,
-                      style: TextStyle(fontSize: 11.sp),
+                      style: const TextStyle(fontSize: 11),
                     ),
                     trailing: isSelected
                         ? const Icon(Icons.check_circle, color: _teal)
@@ -1095,23 +1094,23 @@ class _ConversionPreviewChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: _teal.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(8),
         border: Border.all(color: _teal.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.swap_horiz, color: _teal, size: 14.sp),
-          SizedBox(width: 6.w),
+          const Icon(Icons.swap_horiz, color: _teal, size: 14),
+          const SizedBox(width: 6),
           Text(
             '$fromAmount $fromCurrency  →  ≈ $toAmount $toCurrency',
-            style: TextStyle(
+            style: const TextStyle(
               color: _teal,
               fontWeight: FontWeight.w600,
-              fontSize: 12.sp,
+              fontSize: 12,
             ),
           ),
         ],
@@ -1143,13 +1142,13 @@ class _RateDisplayRow extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(Icons.bolt, color: _orange, size: 14.sp),
-        SizedBox(width: 4.w),
+        const Icon(Icons.bolt, color: _orange, size: 14),
+        const SizedBox(width: 4),
         Text(
           rateStr,
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
-            fontSize: 11.sp,
+            fontSize: 11,
           ),
         ),
       ],
@@ -1181,24 +1180,24 @@ class _PercentageSumIndicator extends StatelessWidget {
             : 'Sum: $sum% — $diff% over budget';
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Icon(
             isExact ? Icons.check_circle_outline : Icons.warning_amber_outlined,
             color: color,
-            size: 13.sp,
+            size: 13,
           ),
-          SizedBox(width: 6.w),
+          const SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
               color: color,
-              fontSize: 11.sp,
+              fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -1237,25 +1236,25 @@ class _ManualSumIndicator extends StatelessWidget {
                 : 'Sum: $currency $sum — ${sum - total} over total';
 
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 6.h),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(8.r),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Icon(
             isExact ? Icons.check_circle_outline : Icons.info_outline,
             color: color,
-            size: 13.sp,
+            size: 13,
           ),
-          SizedBox(width: 6.w),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               label,
               style: TextStyle(
                 color: color,
-                fontSize: 11.sp,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -1288,31 +1287,31 @@ class _ManualRateRow extends StatelessWidget {
           child: TextFormField(
             controller: rateCtrl,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            style: TextStyle(fontSize: 12.sp),
+            style: const TextStyle(fontSize: 12),
             decoration: InputDecoration(
               labelText: 'Manual rate (bank / cash)',
               hintText: '1 $fromCurrency = ? $toCurrency',
-              labelStyle: TextStyle(fontSize: 11.sp),
+              labelStyle: const TextStyle(fontSize: 11),
               isDense: true,
               filled: true,
               fillColor:
                   theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(8.r),
+                borderRadius: BorderRadius.circular(8),
                 borderSide: BorderSide.none,
               ),
             ),
           ),
         ),
-        SizedBox(width: 8.w),
+        const SizedBox(width: 8),
         OutlinedButton(
           onPressed: onApply,
           style: OutlinedButton.styleFrom(
             side: const BorderSide(color: _teal),
             foregroundColor: _teal,
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
-          child: Text('Apply', style: TextStyle(fontSize: 12.sp)),
+          child: const Text('Apply', style: TextStyle(fontSize: 12)),
         ),
       ],
     );
@@ -1333,7 +1332,7 @@ class _CurrencySymbolIcon extends StatelessWidget {
     // shrink the font so it fits in the prefix icon area.
     final fontSize = sym.length > 2 ? 11.0 : 16.0;
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Center(
         widthFactor: 1,
         child: Text(
@@ -1341,7 +1340,7 @@ class _CurrencySymbolIcon extends StatelessWidget {
           style: TextStyle(
             color: _teal,
             fontWeight: FontWeight.w800,
-            fontSize: fontSize.sp,
+            fontSize: fontSize,
           ),
         ),
       ),

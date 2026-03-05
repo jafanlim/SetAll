@@ -45,21 +45,52 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
   Future<void> _onAuthChange(AuthState state) async {
     final newUid = state.session?.user.id;
 
-    if (state.event == AuthChangeEvent.signedIn && newUid != null) {
-      // Wipe SQLite when the user actually changed (covers account-switch).
-      if (_lastUserId != null && newUid != _lastUserId) {
+    // Handle all events that mean "we have a valid authenticated session":
+    //   • signedIn       — fresh login
+    //   • initialSession — cold start with a stored session (most common case)
+    //   • tokenRefreshed — silent token renewal
+    final isAuthenticatedEvent =
+        state.event == AuthChangeEvent.signedIn ||
+        state.event == AuthChangeEvent.initialSession ||
+        state.event == AuthChangeEvent.tokenRefreshed;
+
+    if (isAuthenticatedEvent && newUid != null) {
+      final isUserSwitch = _lastUserId != null && newUid != _lastUserId;
+      final isFirstLogin  = _lastUserId == null;
+
+      if (isUserSwitch) {
+        // Push any unsynced local writes before wiping for the new user.
+        try { await ref.read(syncServiceProvider).performFullSync(); } catch (_) {}
+        // Different account — wipe SQLite and all provider caches.
         await _wipeSQLiteCache();
+        _invalidateAllProviders();
+      } else if (isFirstLogin) {
+        // First login this session — invalidate caches only (no SQLite wipe).
+        _invalidateAllProviders();
       }
-      // Always invalidate on every sign-in — covers first login where
-      // _lastUserId is null and stale provider cache may be present.
-      _invalidateAllProviders();
+      // Token refresh / session-restore with same user: do nothing extra —
+      // the StreamController and its listeners stay intact.
+
       _lastUserId = newUid;
+
+      final sync = ref.read(syncServiceProvider);
+      // subscribeToRealtime is idempotent — cancels existing channel/timer
+      // before creating new ones. Safe to call on every token refresh.
+      sync.subscribeToRealtime();
+      unawaited(
+        sync.performFullSync().then((_) {
+          if (!mounted) return;
+          ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(recentExpensesProvider);
+        }),
+      );
     }
 
     // On sign-out always invalidate so the login screen starts clean.
     if (state.event == AuthChangeEvent.signedOut) {
       _lastUserId = null;
       _invalidateAllProviders();
+      ref.read(syncServiceProvider).unsubscribeFromRealtime();
     }
   }
 
@@ -77,8 +108,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
   }
 
   void _invalidateAllProviders() {
-    ref.invalidate(setAllRepositoryProvider);
-    ref.invalidate(balanceServiceProvider);
+    // Do NOT invalidate setAllRepositoryProvider — it owns the StreamController
+    // that backs watchGroups()/watchGroupExpenses(). Destroying it kills all
+    // active stream listeners and creates a new instance that notifySyncComplete()
+    // can never reach.
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(baseCurrencyProvider);
     ref.invalidate(currentProfileProvider);
@@ -97,9 +130,6 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     final themeMode = ref.watch(themeModeProvider);
     final isDesktop = _isDesktop;
 
-    const desktopDesignSize = Size(1440, 900);
-    const mobileDesignSize = Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
-
     return MaterialApp.router(
       title: 'SetAll',
       debugShowCheckedModeBanner: false,
@@ -111,19 +141,15 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
         // On desktop, pass the actual window size as the design size so every
         // .w / .h / .sp call is a 1:1 identity (no upscaling from mobile baseline).
         // Mobile keeps the 390×844 iPhone 16 Pro baseline.
-        final windowSize = MediaQuery.sizeOf(context);
         final designSize = isDesktop
-            ? windowSize                                        // 1:1 on desktop
+            ? const Size(1440, 900)
             : const Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
 
-        // On desktop clamp text scale to 1.0 so system accessibility settings
-        // don't inflate every font. Mobile keeps the user's preferred scale.
-        // Temporarily disabled to test keyboard input issue.
         final inner = child ?? const SizedBox.shrink();
 
         return ScreenUtilInit(
           designSize: designSize,
-          minTextAdapt: false,
+          minTextAdapt: !isDesktop,
           splitScreenMode: false,
           builder: (_, _) {
             ScalingUtility.init(context);

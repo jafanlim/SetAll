@@ -11,6 +11,7 @@ class ExpenseModel extends Expense {
     super.splitType = SplitType.even,
     super.category = 'General',
     super.createdAt,
+    super.createdBy,
     super.originalAmount,
     super.originalCurrency,
     super.exchangeRateApplied,
@@ -40,6 +41,7 @@ class ExpenseModel extends Expense {
       splitType: _splitTypeFromString(json['split_type'] as String?),
       category: (json['category'] as String?) ?? 'General',
       createdAt: json['created_at'] as String?,
+      createdBy: json['created_by'] as String?,
       originalAmount: json['original_amount']?.toString(),
       originalCurrency: json['original_currency'] as String?,
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
@@ -58,6 +60,7 @@ class ExpenseModel extends Expense {
         'split_type': splitType.name,
         'category': category,
         'created_at': createdAt,
+        if (createdBy != null) 'created_by': createdBy,
         'universal_usd_amount': universalUsdAmount, // Key MUST be universal_usd_amount
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,

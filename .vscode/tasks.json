@@ -1,0 +1,19 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "checkout develop",
+            "type": "shell",
+            "command": "git checkout develop",
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared",
+                "close": true
+            },
+            "problemMatcher": []
+        }
+    ]
+}

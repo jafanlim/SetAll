@@ -6,16 +6,21 @@ import 'package:go_router/go_router.dart';
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
 import '../providers/desktop_providers.dart';
-import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
 
 /// Breakpoint: side rail replaces bottom nav (tablet / small desktop).
 const double kAdaptiveBreakpoint = 600;
 
 /// Breakpoint: full macOS-style sidebar with labels + settings at bottom.
-const double kDesktopBreakpoint = 900;
+const double kDesktopBreakpoint = 900.0;
 
 /// Max width for content column on large screens so it stays readable.
-const double kContentMaxWidth = 780;
+const double kContentMaxWidth = 850.0;
+
+// ── Brand colours used by the desktop sidebar ────────────────────────────
+const Color _kSidebarBg     = Color(0xFF0F172A);
+const Color _kContentBg     = Color(0xFF020617);
+const Color _kTeal          = Color(0xFF14B8A6);
+const Color _kBorderColor   = Color(0x0DFFFFFF); // white @ 5 % opacity
 
 /// Adaptive shell:
 ///   < 600dp  → BottomNavigationBar (mobile)
@@ -53,7 +58,6 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
 
   void _onTap(int index) {
     HapticUtils.selection();
-    // Clear the detail pane when switching tabs on desktop.
     ref.read(selectedGroupProvider.notifier).clear();
     switch (index) {
       case 0:
@@ -78,198 +82,275 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
     final useRail = !useDesktopSidebar && width >= kAdaptiveBreakpoint;
 
     if (useDesktopSidebar) {
-      return _buildDesktopLayout(context);
+      return _DesktopLayout(
+        selectedIndex: _selectedIndex,
+        onTap: _onTap,
+        child: widget.child,
+      );
     }
 
+    return _MobileLayout(
+      selectedIndex: _selectedIndex,
+      onTap: _onTap,
+      useRail: useRail,
+      child: widget.child,
+    );
+  }
+}
+
+// ── Desktop layout ────────────────────────────────────────────────────────
+
+class _DesktopLayout extends ConsumerWidget {
+  const _DesktopLayout({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.child,
+  });
+
+  final int selectedIndex;
+  final void Function(int) onTap;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: _kContentBg,
+      body: Row(
+        children: [
+          _PremiumSidebar(
+            selectedIndex: selectedIndex,
+            onTap: onTap,
+          ),
+          Expanded(
+            child: Container(
+              color: _kContentBg,
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Premium sidebar ───────────────────────────────────────────────────────
+
+class _PremiumSidebar extends StatelessWidget {
+  const _PremiumSidebar({
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final int selectedIndex;
+  final void Function(int) onTap;
+
+  static const _navItems = [
+    (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: 'Dashboard', index: 0),
+    (icon: Icons.group_outlined,     selectedIcon: Icons.group,     label: 'Groups',    index: 2),
+    (icon: Icons.people_outline,     selectedIcon: Icons.people,    label: 'Friends',   index: 1),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+    const unselectedFg = Color(0xFF94A3B8);
+
+    return Container(
+      width: 260,
+      decoration: const BoxDecoration(
+        color: _kSidebarBg,
+        border: Border(
+          right: BorderSide(color: _kBorderColor),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // macOS traffic-light area spacer
+          SizedBox(height: isMac ? 28 : 20),
+
+          // ── Brand header ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _kTeal,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.account_balance_wallet_outlined, size: 20, color: Colors.white),
+                ),
+                const SizedBox(width: 12),
+                const Flexible(
+                  child: Text(
+                    'SetAll',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 16,
+                      color: Colors.white,
+                      letterSpacing: -0.4,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── Navigation items ─────────────────────────────────────────
+          ..._navItems.map((item) {
+            final isSelected = selectedIndex == item.index;
+            return _SidebarNavItem(
+              icon: item.icon,
+              selectedIcon: item.selectedIcon,
+              label: item.label,
+              isSelected: isSelected,
+              onTap: () => onTap(item.index),
+            );
+          }),
+
+          const Spacer(),
+
+          // ── Settings (pinned at bottom) ───────────────────────────────
+          _SidebarNavItem(
+            icon: Icons.settings_outlined,
+            selectedIcon: Icons.settings,
+            label: 'Settings',
+            isSelected: selectedIndex == 3,
+            onTap: () => onTap(3),
+            unselectedColor: unselectedFg,
+          ),
+
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Individual sidebar nav item with hover state ──────────────────────────
+
+class _SidebarNavItem extends StatefulWidget {
+  const _SidebarNavItem({
+    required this.icon,
+    required this.selectedIcon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    this.unselectedColor,
+  });
+
+  final IconData icon;
+  final IconData selectedIcon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final Color? unselectedColor;
+
+  @override
+  State<_SidebarNavItem> createState() => _SidebarNavItemState();
+}
+
+class _SidebarNavItemState extends State<_SidebarNavItem> {
+  bool _hovered = false;
+
+  static const _tealHoverBg  = Color(0x1A14B8A6); // teal @ 10 % opacity
+  static const _unselectedFg = Color(0xFF94A3B8);
+
+  @override
+  Widget build(BuildContext context) {
+    final fg = widget.isSelected
+        ? _kTeal
+        : (widget.unselectedColor ?? _unselectedFg);
+
+    Color bgColor = Colors.transparent;
+    if (widget.isSelected) {
+      bgColor = _tealHoverBg;
+    } else if (_hovered) {
+      bgColor = _tealHoverBg;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit:  (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+            decoration: BoxDecoration(
+              color: bgColor,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  widget.isSelected ? widget.selectedIcon : widget.icon,
+                  size: 18,
+                  color: fg,
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  widget.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w500,
+                    color: fg,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Mobile layout (< 900 dp) ──────────────────────────────────────────────
+
+class _MobileLayout extends StatelessWidget {
+  const _MobileLayout({
+    required this.selectedIndex,
+    required this.onTap,
+    required this.useRail,
+    required this.child,
+  });
+
+  final int selectedIndex;
+  final void Function(int) onTap;
+  final bool useRail;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       body: Row(
         children: [
           if (useRail) _buildRail(context),
-          Expanded(child: widget.child),
+          Expanded(child: child),
         ],
       ),
       bottomNavigationBar: !useRail ? _buildBottomNav(context) : null,
     );
   }
 
-  Widget _buildDesktopLayout(BuildContext context) {
-    final selectedGroup = ref.watch(selectedGroupProvider);
-    final hasDetail = selectedGroup.groupId != null;
-
-    return Scaffold(
-      body: Row(
-        children: [
-          _buildSidebar(context),
-          // Master list — always flex:1, capped at kContentMaxWidth
-          Expanded(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
-              child: widget.child,
-            ),
-          ),
-          // Detail pane — group detail or placeholder
-          VerticalDivider(
-            width: 1,
-            color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-          Expanded(
-            child: hasDetail
-                ? GroupDetailScreen(
-                    key: ValueKey(selectedGroup.groupId),
-                    groupId: selectedGroup.groupId!,
-                    groupName: selectedGroup.groupName ?? 'Group',
-                  )
-                : const _DetailPlaceholder(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Full desktop sidebar ─────────────────────────────────────────────────
-  Widget _buildSidebar(BuildContext context) {
-    final theme = Theme.of(context);
-    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
-
-    const teal = Color(0xFF00D9B0);
-    final bg = theme.colorScheme.surfaceContainerLow;
-    final selectedBg = theme.colorScheme.primaryContainer.withValues(alpha: 0.45);
-    final selectedFg = teal;
-    final unselectedFg = theme.colorScheme.onSurfaceVariant;
-
-    final items = [
-      (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard,       label: 'Dashboard', index: 0),
-      (icon: Icons.people_outline,      selectedIcon: Icons.people,          label: 'Friends',   index: 1),
-      (icon: Icons.group_outlined,      selectedIcon: Icons.group,           label: 'Groups',    index: 2),
-    ];
-
-    return Container(
-      width: 200,
-      decoration: BoxDecoration(
-        color: bg,
-        border: Border(
-          right: BorderSide(
-            color: theme.colorScheme.outlineVariant.withValues(alpha: 0.4),
-          ),
-        ),
-      ),
-      child: Column(
-        children: [
-          // macOS traffic-light area spacer
-          SizedBox(height: isMac ? 28 : 16),
-          // App title
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: teal.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(Icons.currency_exchange, size: 16, color: teal),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  'SetAll',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    fontSize: 16,
-                    color: theme.colorScheme.onSurface,
-                    letterSpacing: -0.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Nav items
-          ...items.map((item) {
-            final isSelected = _selectedIndex == item.index;
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              child: Material(
-                color: Colors.transparent,
-                borderRadius: BorderRadius.circular(10),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(10),
-                  onTap: () => _onTap(item.index),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isSelected ? selectedBg : Colors.transparent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          isSelected ? item.selectedIcon : item.icon,
-                          size: 18,
-                          color: isSelected ? selectedFg : unselectedFg,
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          item.label,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                            color: isSelected ? selectedFg : unselectedFg,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }),
-          const Spacer(),
-          // Settings at bottom
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            child: Material(
-              color: Colors.transparent,
-              borderRadius: BorderRadius.circular(10),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: () {
-                  HapticUtils.primaryTap();
-                  context.push(AppRouter.settings);
-                },
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                  child: Row(
-                    children: [
-                      Icon(Icons.settings_outlined, size: 18, color: unselectedFg),
-                      const SizedBox(width: 10),
-                      Text(
-                        'Settings',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w500,
-                          color: unselectedFg,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  // ── Compact navigation rail (tablet) ────────────────────────────────────
   Widget _buildRail(BuildContext context) {
     return NavigationRail(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: _onTap,
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onTap,
       labelType: NavigationRailLabelType.all,
       destinations: const [
         NavigationRailDestination(
@@ -296,11 +377,10 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
     );
   }
 
-  // ── Bottom nav (mobile) ──────────────────────────────────────────────────
   Widget _buildBottomNav(BuildContext context) {
     return NavigationBar(
-      selectedIndex: _selectedIndex,
-      onDestinationSelected: _onTap,
+      selectedIndex: selectedIndex,
+      onDestinationSelected: onTap,
       destinations: const [
         NavigationDestination(
           icon: Icon(Icons.dashboard_outlined),
@@ -322,34 +402,3 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   }
 }
 
-/// Shown in the detail pane on desktop when no group is selected yet.
-class _DetailPlaceholder extends StatelessWidget {
-  const _DetailPlaceholder();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      color: theme.colorScheme.surfaceContainerLow,
-      alignment: Alignment.center,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            Icons.group_outlined,
-            size: 48,
-            color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'Select a group to view details',
-            style: TextStyle(
-              fontSize: 14,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

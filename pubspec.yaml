@@ -67,6 +67,9 @@ dependencies:
   # Image picker (profile avatar)
   image_picker: ^1.1.2
 
+  # Deep linking — catches setall:// OAuth/email redirects on Windows (and mobile)
+  app_links: ^6.4.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -77,6 +80,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+
+  # In-memory SQLite for integration tests (avoids path_provider dependency)
+  sqflite_common_ffi: ^2.3.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
