@@ -290,6 +290,13 @@ class SyncService {
     for (final r in created as List) {
       memberIds.add((r as Map<String, dynamic>)['id'] as String);
     }
+
+    // ── Reconciler: remove local orphans ────────────────────────────────────
+    // If memberIds is empty the user has no groups — wipe everything local.
+    // Otherwise diff cloud vs local and delete rows that no longer exist in
+    // Supabase (i.e. were deleted on another device).
+    await _reconcileLocalOrphans(uid, memberIds);
+
     if (memberIds.isEmpty) return;
 
     final groups = await _client
@@ -397,6 +404,94 @@ class SyncService {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Reconciler: prune local orphans not present in Supabase
+  // ---------------------------------------------------------------------------
+
+  /// Deletes local SQLite rows whose IDs are no longer in the cloud.
+  ///
+  /// This is the mechanism that propagates remote deletions to this device.
+  /// When User A deletes a group/expense, User B's next [_pullFromSupabase]
+  /// call will discover the missing IDs and prune them here.
+  ///
+  /// [cloudGroupIds] is the authoritative set of group IDs for [uid].
+  Future<void> _reconcileLocalOrphans(
+    String uid,
+    List<String> cloudGroupIds,
+  ) async {
+    // ── Groups ───────────────────────────────────────────────────────────────
+    final localGroups = await LocalDatabase.db.query('groups', columns: ['id']);
+    final localGroupIds =
+        localGroups.map((r) => r['id'] as String).toSet();
+    final cloudGroupIdSet = cloudGroupIds.toSet();
+
+    final orphanGroupIds = localGroupIds.difference(cloudGroupIdSet);
+    for (final gid in orphanGroupIds) {
+      debugPrint('[SyncService] reconciler: pruning orphan group $gid');
+      // Cascade: delete expenses and splits for this group first.
+      final expRows = await LocalDatabase.db
+          .query('expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [gid]);
+      for (final row in expRows) {
+        await LocalDatabase.db.delete(
+          'splits',
+          where: 'expense_id = ?',
+          whereArgs: [row['id']],
+        );
+      }
+      await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [gid]);
+      await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [gid]);
+      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [gid]);
+    }
+
+    if (cloudGroupIds.isEmpty) return;
+
+    // ── Expenses ─────────────────────────────────────────────────────────────
+    // Fetch the authoritative expense IDs for the user's groups from Supabase.
+    try {
+      final cloudExpenseRows = await _client!
+          .from('expenses')
+          .select('id')
+          .inFilter('group_id', cloudGroupIds) as List;
+      final cloudExpenseIds =
+          cloudExpenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toSet();
+
+      final localExpenses =
+          await LocalDatabase.db.query('expenses', columns: ['id']);
+      for (final row in localExpenses) {
+        final eid = row['id'] as String;
+        if (!cloudExpenseIds.contains(eid)) {
+          debugPrint('[SyncService] reconciler: pruning orphan expense $eid');
+          await LocalDatabase.db.delete('splits', where: 'expense_id = ?', whereArgs: [eid]);
+          await LocalDatabase.db.delete('expenses', where: 'id = ?', whereArgs: [eid]);
+        }
+      }
+
+      // ── Splits ─────────────────────────────────────────────────────────────
+      // Any split whose expense_id is no longer in local DB is already gone
+      // (cascade above). Also remove splits for expenses that exist locally
+      // but whose split row was removed in Supabase.
+      if (cloudExpenseIds.isNotEmpty) {
+        final cloudSplitRows = await _client
+            .from('splits')
+            .select('id')
+            .inFilter('expense_id', cloudExpenseIds.toList()) as List;
+        final cloudSplitIds =
+            cloudSplitRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toSet();
+
+        final localSplits = await LocalDatabase.db.query('splits', columns: ['id']);
+        for (final row in localSplits) {
+          final sid = row['id'] as String;
+          if (!cloudSplitIds.contains(sid)) {
+            debugPrint('[SyncService] reconciler: pruning orphan split $sid');
+            await LocalDatabase.db.delete('splits', where: 'id = ?', whereArgs: [sid]);
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[SyncService] reconciler error (non-fatal): $e');
     }
   }
 }

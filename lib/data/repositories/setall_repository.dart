@@ -762,6 +762,29 @@ class SetAllRepository {
     );
     if (rows.isEmpty) return false;
 
+    // Remote-first: delete from Supabase before removing locally so other
+    // devices' reconciler will prune the group on their next pull.
+    if (await _isOnline && _client != null) {
+      try {
+        final remoteExpenseRows = await _client
+            .from('expenses')
+            .select('id')
+            .eq('group_id', groupId) as List;
+        final remoteExpenseIds = remoteExpenseRows
+            .map((r) => (r as Map<String, dynamic>)['id'] as String)
+            .toList();
+        if (remoteExpenseIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
+        }
+        await _client.from('expenses').delete().eq('group_id', groupId);
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
+      } catch (e) {
+        debugPrint('[deleteGroup] Supabase delete failed: $e');
+        // Continue with local delete so the UI stays responsive.
+      }
+    }
+
     // Collect local expense IDs for this group.
     final expenseRows = await LocalDatabase.db.query(
       'expenses',
@@ -780,23 +803,6 @@ class SetAllRepository {
     await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
 
-    if (await _isOnline && _client != null) {
-      try {
-        final remoteExpenseRows = await _client
-            .from('expenses')
-            .select('id')
-            .eq('group_id', groupId) as List;
-        final remoteExpenseIds = remoteExpenseRows
-            .map((r) => (r as Map<String, dynamic>)['id'] as String)
-            .toList();
-        if (remoteExpenseIds.isNotEmpty) {
-          await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
-        }
-        await _client.from('expenses').delete().eq('group_id', groupId);
-        await _client.from('group_members').delete().eq('group_id', groupId);
-        await _client.from('groups').delete().eq('id', groupId);
-      } catch (_) {}
-    }
     _notify();
     return true;
   }
@@ -1666,6 +1672,20 @@ class SetAllRepository {
         return false;
       }
     }
+
+    // Remote-first: delete from Supabase before removing locally.
+    // This ensures the deletion is authoritative — the reconciler in
+    // _pullFromSupabase will not re-insert rows that were deleted on another device.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('splits').delete().eq('expense_id', expenseId);
+        await _client.from('expenses').delete().eq('id', expenseId);
+      } catch (e) {
+        debugPrint('[deleteExpense] Supabase delete failed: $e');
+        // Proceed with local delete anyway so the UI stays responsive.
+      }
+    }
+
     await LocalDatabase.db.delete(
       'splits',
       where: 'expense_id = ?',
@@ -1676,12 +1696,6 @@ class SetAllRepository {
       where: 'id = ?',
       whereArgs: [expenseId],
     );
-    if (await _isOnline && _client != null) {
-      try {
-        await _client.from('splits').delete().eq('expense_id', expenseId);
-        await _client.from('expenses').delete().eq('id', expenseId);
-      } catch (_) {}
-    }
     _notify();
     return true;
   }
