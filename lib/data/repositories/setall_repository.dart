@@ -1686,6 +1686,85 @@ class SetAllRepository {
     return true;
   }
 
+  /// Records a settlement by inserting a negating expense (category: 'Settlement')
+  /// so the SettlementEngine sees the debt as zero on next calculation.
+  ///
+  /// [from] is the debtor (payer of the settlement expense).
+  /// [to] is the creditor (the single split recipient).
+  /// [amount] is the USD-normalised value from [SettlementTransaction].
+  /// [currency] is the display currency label.
+  Future<bool> recordSettlement({
+    required String groupId,
+    required String fromUserId,
+    required String toUserId,
+    required String amount,
+    required String currency,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    final expenseId = const Uuid().v4();
+    final splitId   = const Uuid().v4();
+    final now       = _now();
+
+    final expenseRow = {
+      'id':                   expenseId,
+      'group_id':             groupId,
+      'payer_id':             fromUserId,
+      'amount':               amount,
+      'description':          'Settlement',
+      'currency':             currency,
+      'split_type':           'even',
+      'category':             'Settlement',
+      'created_at':           now,
+      'universal_usd_amount': amount,
+    };
+
+    final splitRow = {
+      'id':                 splitId,
+      'expense_id':         expenseId,
+      'user_id':            toUserId,
+      'universal_usd_owed': amount,
+      'created_at':         now,
+    };
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('expenses').insert(expenseRow);
+        await _client.from('splits').insert(splitRow);
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[recordSettlement] Supabase error: $e');
+        return false;
+      }
+    }
+
+    // Local-first path: write to SQLite immediately, sync later.
+    try {
+      await LocalDatabase.db.insert('expenses', {...expenseRow, 'synced_at': null});
+      await LocalDatabase.db.insert('splits',   {...splitRow,   'synced_at': null});
+    } catch (e) {
+      debugPrint('[recordSettlement] SQLite error: $e');
+      return false;
+    }
+
+    // Best-effort push to Supabase.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('expenses').insert(expenseRow);
+        await _client.from('splits').insert(splitRow);
+        await LocalDatabase.db.update('expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'id = ?', whereArgs: [expenseId]);
+        await LocalDatabase.db.update('splits', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'id = ?', whereArgs: [splitId]);
+      } catch (_) {}
+    }
+
+    _notify();
+    return true;
+  }
+
   /// Wipe all expenses and splits — local SQLite + Supabase.
   /// Supabase delete is scoped to groups the current user belongs to.
   Future<void> clearAllExpenses() async {
