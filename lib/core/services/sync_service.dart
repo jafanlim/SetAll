@@ -102,7 +102,9 @@ class SyncService {
     for (final row in pendingExpenses) {
       try {
         final expense = ExpenseModel.fromJson(row);
-        await _client.from('expenses').insert(expense.toJson());
+        // Strip local-only / schema-mismatched fields before sending to Supabase.
+        final payload = expense.toJson()..remove('created_by');
+        await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
           'expenses',
           {'synced_at': DateTime.now().millisecondsSinceEpoch},
@@ -127,8 +129,14 @@ class SyncService {
       }
     }
 
-    final pendingSplits =
-        await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
+    // Only push splits whose parent expense is already confirmed in Supabase.
+    // If the expense push failed, the split will also fail with a 42501 RLS
+    // error because Supabase can't find a matching expense row.
+    final pendingSplits = await LocalDatabase.db.rawQuery('''
+      SELECT s.* FROM splits s
+      INNER JOIN expenses e ON s.expense_id = e.id
+      WHERE s.synced_at IS NULL AND e.synced_at IS NOT NULL
+    ''');
     for (final row in pendingSplits) {
       try {
         final split = SplitModel.fromJson(row);
