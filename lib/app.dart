@@ -44,12 +44,13 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
 
   Future<void> _onAuthChange(AuthState state) async {
     final newUid = state.session?.user.id;
-
     if (state.event == AuthChangeEvent.signedIn && newUid != null) {
       final isUserSwitch = _lastUserId != null && newUid != _lastUserId;
       final isFirstLogin  = _lastUserId == null;
 
       if (isUserSwitch) {
+        // Push any unsynced local writes before wiping for the new user.
+        try { await ref.read(syncServiceProvider).performFullSync(); } catch (_) {}
         // Different account — wipe SQLite and all provider caches.
         await _wipeSQLiteCache();
         _invalidateAllProviders();
