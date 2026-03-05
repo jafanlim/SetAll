@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -55,7 +54,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
       appBar: AppBar(
         title: Text(
           'Invite member',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -69,19 +68,19 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
         ),
       ),
       body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         children: [
           // ── Group context card ─────────────────────────────────────────
           GlassCard(
-            padding: EdgeInsets.all(16.w),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Container(
-                  width: 44.w,
-                  height: 44.w,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: _tealDim,
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Center(
                     child: Text(
@@ -91,12 +90,12 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                       style: TextStyle(
                         color: _teal,
                         fontWeight: FontWeight.w800,
-                        fontSize: 16.sp,
+                        fontSize: 16,
                       ),
                     ),
                   ),
                 ),
-                SizedBox(width: 12.w),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,13 +104,13 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                         widget.groupName,
                         style: TextStyle(
                           fontWeight: FontWeight.w700,
-                          fontSize: 14.sp,
+                          fontSize: 14,
                         ),
                       ),
                       Text(
                         'Add members to this group',
                         style: TextStyle(
-                          fontSize: 11.sp,
+                          fontSize: 11,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -122,27 +121,24 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
             ),
           ),
 
-          SizedBox(height: 20.h),
+          const SizedBox(height: 20),
 
           // ── Add Person CTA ────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
+          ElevatedButton.icon(
               onPressed: _openAddPersonModal,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.black,
-                padding: EdgeInsets.symmetric(vertical: 14.h),
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               icon: const Icon(Icons.person_search_outlined),
               label: Text(
                 'Search & Add Person',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
-            ),
           ),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Last result feedback ───────────────────────────────────────
           if (_lastResult != null)
@@ -151,11 +147,11 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
               onAddAnother: () => setState(() => _lastResult = null),
             ),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Info section ──────────────────────────────────────────────
           GlassCard(
-            padding: EdgeInsets.all(16.w),
+            padding: const EdgeInsets.all(16),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -165,7 +161,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                   title: 'Find by name, @nickname, or email',
                   body: 'Search instantly searches all SetAll users.',
                 ),
-                SizedBox(height: 12.h),
+                const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.send_outlined,
                   color: _orange,
@@ -175,7 +171,7 @@ class _InviteMemberScreenState extends ConsumerState<InviteMemberScreen> {
                       'them as a placeholder. Their debts are tracked immediately '
                       'and automatically claimed when they sign up.',
                 ),
-                SizedBox(height: 12.h),
+                const SizedBox(height: 12),
                 _InfoRow(
                   icon: Icons.lock_outline,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -210,18 +206,18 @@ class _LastResultCard extends StatelessWidget {
         : '${(result as AddPersonResultReal).profile.name} added!';
 
     return GlassCard(
-      padding: EdgeInsets.all(12.w),
+      padding: const EdgeInsets.all(12),
       child: Row(
         children: [
-          Icon(icon, color: color, size: 18.sp),
-          SizedBox(width: 10.w),
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               title,
               style: TextStyle(
                 color: color,
                 fontWeight: FontWeight.w600,
-                fontSize: 13.sp,
+                fontSize: 13,
               ),
             ),
           ),
@@ -229,7 +225,7 @@ class _LastResultCard extends StatelessWidget {
             onPressed: onAddAnother,
             child: Text(
               'Add another',
-              style: TextStyle(color: color, fontSize: 12.sp),
+              style: TextStyle(color: color, fontSize: 12),
             ),
           ),
         ],
@@ -260,14 +256,14 @@ class _InfoRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: EdgeInsets.all(6.w),
+          padding: const EdgeInsets.all(6),
           decoration: BoxDecoration(
             color: color.withAlpha(40),
-            borderRadius: BorderRadius.circular(6.r),
+            borderRadius: BorderRadius.circular(6),
           ),
-          child: Icon(icon, color: color, size: 14.sp),
+          child: Icon(icon, color: color, size: 14),
         ),
-        SizedBox(width: 10.w),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,13 +272,13 @@ class _InfoRow extends StatelessWidget {
                 title,
                 style: TextStyle(
                   fontWeight: FontWeight.w700,
-                  fontSize: 12.sp,
+                  fontSize: 12,
                 ),
               ),
               Text(
                 body,
                 style: TextStyle(
-                  fontSize: 11.sp,
+                  fontSize: 11,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),

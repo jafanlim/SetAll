@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -153,7 +152,7 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
         ),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -161,19 +160,19 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
             // ── Handle ───────────────────────────────────────────────────
             Center(
               child: Container(
-                margin: EdgeInsets.symmetric(vertical: 10.h),
-                width: 36.w,
-                height: 4.h,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                   color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                  borderRadius: BorderRadius.circular(2.r),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
 
             // ── Header ────────────────────────────────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   Expanded(
@@ -184,13 +183,13 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
                           'Add Person',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 17.sp,
+                            fontSize: 17,
                           ),
                         ),
                         Text(
                           widget.groupName,
                           style: TextStyle(
-                            fontSize: 12.sp,
+                            fontSize: 12,
                             color: _teal,
                           ),
                         ),
@@ -205,11 +204,11 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
               ),
             ),
 
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
 
             // ── Search field ──────────────────────────────────────────────
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _ctrl,
                 autofocus: false,
@@ -230,24 +229,24 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
                 ),
               ),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
 
             // ── Feedback ─────────────────────────────────────────────────
             if (_error != null)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: GlassCard(
-                  padding: EdgeInsets.all(10.w),
+                  padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
                       Icon(Icons.error_outline,
-                          color: theme.colorScheme.error, size: 15.sp),
-                      SizedBox(width: 8.w),
+                          color: theme.colorScheme.error, size: 15),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
                           style: TextStyle(
-                              color: theme.colorScheme.error, fontSize: 12.sp),
+                              color: theme.colorScheme.error, fontSize: 12),
                         ),
                       ),
                     ],
@@ -257,17 +256,17 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
 
             if (_success != null)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: GlassCard(
-                  padding: EdgeInsets.all(10.w),
+                  padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle_outline,
-                          color: _teal, size: 15.sp),
-                      SizedBox(width: 8.w),
+                      const Icon(Icons.check_circle_outline,
+                          color: _teal, size: 15),
+                      const SizedBox(width: 8),
                       Text(
                         _success!,
-                        style: TextStyle(color: _teal, fontSize: 12.sp),
+                        style: const TextStyle(color: _teal, fontSize: 12),
                       ),
                     ],
                   ),
@@ -299,15 +298,15 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
                               onInvite: _addGhostUser,
                             )
                           : ListView(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 16.w, vertical: 4.h),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
                               children: [
                                 ...results.map((p) => _UserResultTile(
                                   profile: p,
                                   adding: _adding,
                                   onAdd: () => _addRealUser(p),
                                 )),
-                                SizedBox(height: 8.h),
+                                const SizedBox(height: 8),
                                 // Always show ghost invite below results
                                 if (_looksLikeEmail)
                                   _GhostInviteSection(
@@ -321,7 +320,7 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
                     ),
             ),
 
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -351,19 +350,19 @@ class _UserResultTile extends StatelessWidget {
         leading: _Avatar(profile: profile),
         title: Text(
           profile.name,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
         ),
         subtitle: profile.nickname != null
             ? Text(
                 '@${profile.nickname}',
-                style: TextStyle(fontSize: 11.sp, color: _teal),
+                style: const TextStyle(fontSize: 11, color: _teal),
               )
             : null,
         trailing: adding
-            ? SizedBox(
-                height: 20.h,
-                width: 20.w,
-                child: const CircularProgressIndicator(strokeWidth: 2),
+            ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
               )
             : FilledButton(
                 onPressed: onAdd,
@@ -371,9 +370,9 @@ class _UserResultTile extends StatelessWidget {
                   backgroundColor: _teal,
                   foregroundColor: Colors.black,
                   padding:
-                      EdgeInsets.symmetric(horizontal: 14.w, vertical: 6.h),
-                  textStyle: TextStyle(
-                      fontSize: 12.sp, fontWeight: FontWeight.w700),
+                      const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                  textStyle: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w700),
                   minimumSize: const Size(0, 0),
                 ),
                 child: const Text('Add'),
@@ -404,26 +403,26 @@ class _GhostInviteSection extends StatelessWidget {
     final theme = Theme.of(context);
     if (!looksLikeEmail) {
       return Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
         child: Center(
           child: Column(
             children: [
               Icon(Icons.person_search,
-                  size: 40.sp, color: theme.colorScheme.onSurfaceVariant),
-              SizedBox(height: 12.h),
+                  size: 40, color: theme.colorScheme.onSurfaceVariant),
+              const SizedBox(height: 12),
               Text(
                 'No users found for "$email".',
                 style: TextStyle(
-                  fontSize: 13.sp,
+                  fontSize: 13,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 6.h),
+              const SizedBox(height: 6),
               Text(
                 'Try a full email address to send a ghost invite.',
                 style: TextStyle(
-                  fontSize: 12.sp,
+                  fontSize: 12,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
                 textAlign: TextAlign.center,
@@ -435,40 +434,40 @@ class _GhostInviteSection extends StatelessWidget {
     }
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: GlassCard(
-        padding: EdgeInsets.all(16.w),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: EdgeInsets.all(6.w),
+                  padding: const EdgeInsets.all(6),
                   decoration: BoxDecoration(
                     color: _orangeDim,
-                    borderRadius: BorderRadius.circular(8.r),
+                    borderRadius: BorderRadius.circular(8),
                   ),
-                  child: Icon(Icons.send_outlined,
-                      color: _orange, size: 16.sp),
+                  child: const Icon(Icons.send_outlined,
+                      color: _orange, size: 16),
                 ),
-                SizedBox(width: 10.w),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Ghost Invite',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 14.sp,
+                      fontSize: 14,
                     ),
                   ),
                 ),
               ],
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             Text(
               'No SetAll account found for:',
               style: TextStyle(
-                fontSize: 12.sp,
+                fontSize: 12,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
@@ -476,45 +475,42 @@ class _GhostInviteSection extends StatelessWidget {
               email,
               style: TextStyle(
                 fontWeight: FontWeight.w700,
-                fontSize: 13.sp,
+                fontSize: 13,
                 color: _orange,
               ),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             Text(
               'They\'ll be added as a placeholder. When they sign up with this '
               'email, their expenses and debts will be automatically claimed.',
               style: TextStyle(
-                fontSize: 11.sp,
+                fontSize: 11,
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
             ),
-            SizedBox(height: 12.h),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
+            const SizedBox(height: 12),
+            ElevatedButton.icon(
                 onPressed: adding ? null : () => onInvite(email),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _orange,
                   foregroundColor: Colors.white,
                 ),
                 icon: adding
-                    ? SizedBox(
-                        height: 14.h,
-                        width: 14.w,
-                        child: const CircularProgressIndicator(
+                    ? const SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white),
                       )
                     : const Icon(Icons.person_add_outlined, size: 16),
                 label: Text(
                   'Send Ghost Invite',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 13.sp,
+                    fontSize: 13,
                   ),
                 ),
-              ),
             ),
           ],
         ),
@@ -531,26 +527,26 @@ class _EmptySearchHint extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 24.h),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       child: Column(
         children: [
-          Icon(Icons.search, size: 40.sp,
+          Icon(Icons.search, size: 40,
               color: theme.colorScheme.onSurfaceVariant),
-          SizedBox(height: 12.h),
+          const SizedBox(height: 12),
           Text(
             'Search by name, @nickname, or email address.',
             style: TextStyle(
-              fontSize: 13.sp,
+              fontSize: 13,
               color: theme.colorScheme.onSurfaceVariant,
             ),
             textAlign: TextAlign.center,
           ),
-          SizedBox(height: 6.h),
+          const SizedBox(height: 6),
           Text(
             'Enter a full email address to send a ghost invite if the person '
             'doesn\'t have an account yet.',
             style: TextStyle(
-              fontSize: 11.sp,
+              fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant.withAlpha(170),
             ),
             textAlign: TextAlign.center,
@@ -571,23 +567,23 @@ class _Avatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 40.w,
-      height: 40.w,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           colors: [_teal, Color(0xFF00A896)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(12.r),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Center(
         child: Text(
           profile.displayInitial,
-          style: TextStyle(
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.w800,
-            fontSize: 14.sp,
+            fontSize: 14,
           ),
         ),
       ),

@@ -1,10 +1,14 @@
 [Setup]
 AppName=SetAll
-AppVersion=1.0.3
+AppVersion=1.0.4
 DefaultDirName={autopf}\SetAll
 OutputDir=..\build\windows\installer
 OutputBaseFilename=SetAll-Windows
-# ... other settings ...
+Compression=lzma
+SolidCompression=yes
+ArchitecturesAllowed=x64
+ArchitecturesInstallIn64BitMode=x64
+SetupIconFile=..\windows\runner\resources\app_icon.ico
 
 [Registry]
 Root: HKCR; Subkey: "setall"; ValueType: string; ValueName: ""; ValueData: "URL:SetAll Protocol"; Flags: uninsdeletekey

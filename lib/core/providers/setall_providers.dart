@@ -4,7 +4,8 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/balance_service.dart';
 import '../services/currency_service.dart';
 import '../services/currency_sync_service.dart';
-import '../utils/debt_simplification_engine.dart';
+import '../services/sync_service.dart';
+import '../../domain/services/settlement_engine.dart';
 import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
@@ -74,6 +75,21 @@ final setAllRepositoryProvider = Provider<SetAllRepository>((ref) {
   }
 });
 
+/// Standalone sync coordinator. Call [SyncService.performFullSync] to trigger
+/// a full push-then-pull cycle outside the data-fetch loop.
+final syncServiceProvider = Provider<SyncService>((ref) {
+  try {
+    return SyncService(
+      repository: ref.watch(setAllRepositoryProvider),
+      client: Supabase.instance.client,
+    );
+  } catch (_) {
+    return SyncService(
+      repository: ref.watch(setAllRepositoryProvider),
+    );
+  }
+});
+
 /// Balance service: correct multi-currency conversion using [baseAmountAtEntry].
 final balanceServiceProvider = Provider<BalanceService>((ref) {
   return BalanceService(
@@ -103,6 +119,8 @@ final currentUserIdProvider = Provider<String?>((ref) {
 final balanceSummaryProvider = FutureProvider<BalanceSummary>((ref) async {
   ref.watch(baseCurrencyProvider);
   ref.watch(currencyServiceProvider);
+  // Watch the groups stream so the total refreshes when sync pulls new data.
+  ref.watch(myGroupsProvider);
   return ref
       .watch(balanceServiceProvider)
       .getBalanceSummary();
@@ -118,6 +136,10 @@ final groupBalanceSummaryProvider =
     FutureProvider.family<BalanceSummary, String>((ref, groupId) async {
   final targetCurrency = await ref.watch(baseCurrencyProvider.future);
   ref.watch(currencyServiceProvider);
+  // Watch the expense stream so this provider recomputes automatically
+  // whenever a sync pull or local write changes expenses — no manual
+  // ref.invalidate(groupBalanceSummaryProvider) needed anywhere.
+  ref.watch(groupExpensesProvider(groupId));
   return ref
       .watch(balanceServiceProvider)
       .getGroupBalanceSummary(groupId, targetCurrency: targetCurrency);
@@ -128,8 +150,10 @@ final groupBalanceSummaryProvider =
 // ---------------------------------------------------------------------------
 
 /// Normal (non-direct) groups for the Groups/Dashboard tab.
-final myGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
-  return ref.watch(setAllRepositoryProvider).getMyGroups();
+/// StreamProvider — emits immediately from SQLite, then re-emits on every
+/// local write or sync completion. No manual invalidation needed.
+final myGroupsProvider = StreamProvider<List<GroupModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchGroups();
 });
 
 /// Direct (1-on-1 friend) groups for the Friends tab.
@@ -141,9 +165,11 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
+/// Expenses for a specific group.
+/// StreamProvider.family — re-emits automatically on any local change.
 final groupExpensesProvider =
-    FutureProvider.family<List<ExpenseModel>, String>((ref, groupId) async {
-  return ref.watch(setAllRepositoryProvider).getExpensesForGroup(groupId);
+    StreamProvider.family<List<ExpenseModel>, String>((ref, groupId) {
+  return ref.watch(setAllRepositoryProvider).watchGroupExpenses(groupId);
 });
 
 final groupMembersProvider =
@@ -163,7 +189,7 @@ final groupCreatorProvider =
 
 /// Simplified debts for a group, amounts expressed in the user's base currency.
 final simplifiedDebtsProvider =
-    FutureProvider.family<List<SimplifiedDebt>, String>((ref, groupId) async {
+    FutureProvider.family<List<SettlementTransaction>, String>((ref, groupId) async {
   final baseCurrency = await ref.watch(baseCurrencyProvider.future);
   return ref
       .watch(setAllRepositoryProvider)

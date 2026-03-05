@@ -2,12 +2,13 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../data/repositories/setall_repository.dart' show BalanceSummary;
+import '../../../../domain/services/settlement_engine.dart' show SettlementTransaction;
+import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
@@ -89,7 +90,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete group?'),
-        content: Text('Delete "$_groupName"? This cannot be undone.'),
+        content: Text('Delete "$_groupName" and all its expenses?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
@@ -101,16 +102,33 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       ),
     );
     if (confirm != true || !mounted) return;
+    final doubleConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Are you sure?'),
+        content: const Text('This action is irreversible. All expenses and balances in this group will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirm != true || !mounted) return;
     final ok = await ref.read(setAllRepositoryProvider).deleteGroup(widget.groupId);
     if (!mounted) return;
     if (ok) {
       ref.invalidate(myGroupsProvider);
       ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
       HapticUtils.success();
       router.pop();
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Only the group creator can delete it')),
+        const SnackBar(content: Text('Could not delete group.')),
       );
     }
   }
@@ -130,7 +148,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       appBar: AppBar(
         title: Text(
           groupName,
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -215,24 +233,25 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             // ── Balance summary ──────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
                 child: _manuallySettled
                     ? GlassCard(
-                        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         child: Row(
                           children: [
-                            Icon(Icons.check_circle_outline, color: _teal, size: 18.sp),
-                            SizedBox(width: 8.w),
+                            const Icon(Icons.check_circle_outline, color: _teal, size: 18),
+                            const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 'Marked as settled',
-                                style: TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13.sp),
+                                style: const TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13),
                               ),
                             ),
                           ],
                         ),
                       )
                     : balanceAsync.when(
+                        skipLoadingOnReload: true,
                         data: (s) => _GroupBalanceCard(summary: s),
                         loading: () => const SizedBox.shrink(),
                         error: (_, _) => const SizedBox.shrink(),
@@ -249,19 +268,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             // ── Members section ──────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 8.h),
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                 child: Text(
                   'Members',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    fontSize: 15.sp,
+                    fontSize: 15,
                   ),
                 ),
               ),
             ),
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: membersAsync.when(
                   data: (members) => _MemberList(
                     members: members,
@@ -276,7 +295,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   ),
                   error: (e, _) => Text(
                     'Could not load members',
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13.sp),
+                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
                   ),
                 ),
               ),
@@ -285,12 +304,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             // ── Expenses section ─────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 8.h),
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                 child: Text(
                   'Expenses',
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
-                    fontSize: 15.sp,
+                    fontSize: 15,
                   ),
                 ),
               ),
@@ -300,12 +319,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 if (expenses.isEmpty) {
                   return SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                      child: Text(
-                        'No expenses yet. Tap + to add one.',
-                        style: TextStyle(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontSize: 13.sp,
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        child: Text(
+                          'No expenses yet. Tap + to add one.',
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 13,
                         ),
                       ),
                     ),
@@ -338,16 +357,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               ),
               error: (e, _) => SliverToBoxAdapter(
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'Could not load expenses',
-                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13.sp),
+                    style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
                   ),
                 ),
               ),
             ),
 
-            SliverToBoxAdapter(child: SizedBox(height: 96.h)),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
           ],
         ),
       ),
@@ -364,7 +383,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         icon: const Icon(Icons.add),
         label: Text(
           'Add expense',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
     );
@@ -407,7 +426,7 @@ class _GroupBalanceCard extends StatelessWidget {
     }
 
     return GlassCard(
-      padding: EdgeInsets.all(16.w),
+      padding: const EdgeInsets.all(16),
       child: Row(
         children: [
           if (owed > Decimal.zero)
@@ -418,16 +437,16 @@ class _GroupBalanceCard extends StatelessWidget {
                   Text(
                     'Owed to you',
                     style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   Text(
-                    '+${summary.currency} ${summary.youAreOwed}',
-                    style: TextStyle(
+                    '+${summary.currency} ${formatAmount(summary.youAreOwed)}',
+                    style: const TextStyle(
                       color: _teal,
                       fontWeight: FontWeight.w700,
-                      fontSize: 16.sp,
+                      fontSize: 16,
                     ),
                   ),
                 ],
@@ -441,16 +460,16 @@ class _GroupBalanceCard extends StatelessWidget {
                   Text(
                     'You owe',
                     style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                   Text(
-                    '-${summary.currency} ${summary.youOwe}',
-                    style: TextStyle(
+                    '-${summary.currency} ${formatAmount(summary.youOwe)}',
+                    style: const TextStyle(
                       color: _orange,
                       fontWeight: FontWeight.w700,
-                      fontSize: 16.sp,
+                      fontSize: 16,
                     ),
                   ),
                 ],
@@ -620,7 +639,7 @@ class _ExpenseTile extends ConsumerWidget {
     final theme = Theme.of(context);
     final icon =
         _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
-    final displayAmount = expense.originalAmount ?? expense.amount;
+    final displayAmount = formatAmount(expense.originalAmount ?? expense.amount);
     final displayCurrency = expense.originalCurrency ?? expense.currency;
     final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
     final baseCurrency = baseCurrencyAsync.valueOrNull ?? 'USD';
@@ -637,7 +656,7 @@ class _ExpenseTile extends ConsumerWidget {
         : null;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 3.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: SwipeActionCard(
         actionsPanelWidth: 140,
         actions: [
@@ -663,9 +682,9 @@ class _ExpenseTile extends ConsumerWidget {
               ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
               : null,
           child: GlassCard(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(12),
               onTap: () => context.push(
                 '/group/$groupId/expense/${expense.id}',
                 extra: {'groupName': groupName},
@@ -673,50 +692,50 @@ class _ExpenseTile extends ConsumerWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 36.w,
-                    height: 36.w,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, size: 16.sp, color: theme.colorScheme.onSurfaceVariant),
+                    child: Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
                   ),
-                SizedBox(width: 10.w),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         expense.description.isEmpty ? expense.category : expense.description,
-                        style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp),
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         overflow: TextOverflow.ellipsis,
                       ),
                       if (convertedAmount != null)
                         Text(
                           '≈ $baseCurrency $convertedAmount',
                           style: TextStyle(
-                            fontSize: 10.sp,
+                            fontSize: 10,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         )
                       else if (expense.originalCurrency != null &&
                           expense.originalCurrency != expense.currency)
                         Text(
-                          '${expense.currency} ${expense.amount} base',
+                          '${expense.currency} ${formatAmount(expense.amount)} base',
                           style: TextStyle(
-                            fontSize: 10.sp,
+                            fontSize: 10,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                         ),
                     ],
                   ),
                 ),
-                SizedBox(width: 8.w),
+                const SizedBox(width: 8),
                 Text(
                   '$displayCurrency $displayAmount',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 13.sp,
+                    fontSize: 13,
                     color: _teal,
                   ),
                 ),
@@ -770,8 +789,7 @@ class _ExpenseTile extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete expense?'),
         content: Text(
-          'Remove "${expense.description.isEmpty ? expense.amount : expense.description}"? '
-          'This cannot be undone.',
+          'Remove "${expense.description.isEmpty ? expense.category : expense.description}"?',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
@@ -783,15 +801,30 @@ class _ExpenseTile extends ConsumerWidget {
         ],
       ),
     );
-    if (confirm == true && context.mounted) {
-      await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
-      if (context.mounted) {
-        onDeleted();
-        HapticUtils.success();
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Expense deleted')),
-        );
-      }
+    if (confirm != true || !context.mounted) return;
+    final doubleConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Are you sure?'),
+        content: const Text('This action is irreversible. This expense and its splits will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirm != true || !context.mounted) return;
+    await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
+    if (context.mounted) {
+      onDeleted();
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Expense deleted')),
+      );
     }
   }
 
@@ -829,6 +862,102 @@ class _ExpenseTile extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 // Settlement Plan section
 // ---------------------------------------------------------------------------
+
+/// Button shown next to a debt row when the current user is the debtor.
+/// Confirms then calls [SetAllRepository.recordSettlement].
+class _SettleButton extends ConsumerStatefulWidget {
+  const _SettleButton({
+    required this.groupId,
+    required this.debt,
+    required this.amountStr,
+  });
+
+  final String groupId;
+  final SettlementTransaction debt;
+  final String amountStr;
+
+  @override
+  ConsumerState<_SettleButton> createState() => _SettleButtonState();
+}
+
+class _SettleButtonState extends ConsumerState<_SettleButton> {
+  bool _loading = false;
+
+  Future<void> _settle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Record settlement?'),
+        content: Text(
+          'This records that you paid ${widget.amountStr}. '
+          'The debt will disappear from the settlement plan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Settle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _loading = true);
+    final ok = await ref.read(setAllRepositoryProvider).recordSettlement(
+      groupId: widget.groupId,
+      fromUserId: widget.debt.fromUserId,
+      toUserId: widget.debt.toUserId,
+      amount: widget.debt.amount.toString(),
+      currency: widget.debt.currency,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (ok) {
+      ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
+      ref.invalidate(simplifiedDebtsProvider(widget.groupId));
+      ref.invalidate(balanceSummaryProvider);
+      HapticUtils.success();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not record settlement. Try again.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+      );
+    }
+    return TextButton(
+      onPressed: _settle,
+      style: TextButton.styleFrom(
+        foregroundColor: _teal,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text(
+        'Settle',
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+      ),
+    );
+  }
+}
+
 class _SettlementPlanSection extends ConsumerWidget {
   const _SettlementPlanSection({required this.groupId});
   final String groupId;
@@ -858,7 +987,7 @@ class _SettlementPlanSection extends ConsumerWidget {
         }
 
         return Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 0),
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -866,10 +995,10 @@ class _SettlementPlanSection extends ConsumerWidget {
                 'Settlement Plan',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontSize: 15.sp,
+                  fontSize: 15,
                 ),
               ),
-              SizedBox(height: 8.h),
+              const SizedBox(height: 8),
               GlassCard(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
@@ -904,7 +1033,7 @@ class _SettlementPlanSection extends ConsumerWidget {
                               text: fromName,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 13.sp,
+                                fontSize: 13,
                                 color: isCurrentUserDebtor
                                     ? _orange
                                     : theme.colorScheme.onSurface,
@@ -913,7 +1042,7 @@ class _SettlementPlanSection extends ConsumerWidget {
                             TextSpan(
                               text: ' owes ',
                               style: TextStyle(
-                                fontSize: 13.sp,
+                                fontSize: 13,
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
@@ -921,7 +1050,7 @@ class _SettlementPlanSection extends ConsumerWidget {
                               text: toName,
                               style: TextStyle(
                                 fontWeight: FontWeight.w700,
-                                fontSize: 13.sp,
+                                fontSize: 13,
                                 color: debt.toUserId == currentUid
                                     ? _teal
                                     : theme.colorScheme.onSurface,
@@ -930,14 +1059,20 @@ class _SettlementPlanSection extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      trailing: Text(
-                        amountStr,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13.sp,
-                          color: isCurrentUserDebtor ? _orange : _teal,
-                        ),
-                      ),
+                      trailing: isCurrentUserDebtor
+                          ? _SettleButton(
+                              groupId: groupId,
+                              debt: debt,
+                              amountStr: amountStr,
+                            )
+                          : Text(
+                              amountStr,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _teal,
+                              ),
+                            ),
                     );
                   }).toList(),
                 ),
