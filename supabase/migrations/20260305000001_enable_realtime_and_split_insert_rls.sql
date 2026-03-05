@@ -1,28 +1,27 @@
 -- =============================================================================
--- SetAll: Enable Realtime publication + ensure splits INSERT is open to all
---         group members (not just the expense payer).
+-- SetAll: Enable Supabase Realtime for sync-critical tables.
 --
--- Context:
---   • fix/cloud-reactivity-realtime subscribes to Postgres changes via
---     supabase.channel('setall-sync').onPostgresChanges(...).
---     Realtime events are ONLY emitted for tables that are members of the
---     supabase_realtime publication.  Without this the websocket channel
---     subscribes successfully but never fires any callbacks.
---
---   • The previous splits INSERT policy (20260302000003) uses FOR ALL which
---     covers INSERT via WITH CHECK.  This migration is a no-op for splits RLS
---     but documents the intent clearly.
+-- Two things are required for onPostgresChanges() to fire:
+--   1. The table must be in the supabase_realtime logical replication
+--      publication.
+--   2. The table must have REPLICA IDENTITY FULL so the WAL record contains
+--      the full row, not just the PK.  Without FULL, DELETE events carry no
+--      usable data and UPDATE events may be suppressed.
 --
 -- Safe to re-run (all statements are idempotent).
 -- =============================================================================
 
--- ── 1. Add tables to the Realtime publication ─────────────────────────────────
---    supabase_realtime is the default logical replication publication created
---    by the Supabase platform.  Adding tables here enables row-level change
---    events for all subscribed clients.
+-- ── 1. REPLICA IDENTITY FULL ─────────────────────────────────────────────────
+--    Must be set before adding to the publication or Realtime events will be
+--    incomplete / silently dropped.
+ALTER TABLE public.groups        REPLICA IDENTITY FULL;
+ALTER TABLE public.group_members REPLICA IDENTITY FULL;
+ALTER TABLE public.expenses      REPLICA IDENTITY FULL;
+ALTER TABLE public.splits        REPLICA IDENTITY FULL;
+
+-- ── 2. Add tables to the Realtime publication ─────────────────────────────────
 DO $$
 BEGIN
-  -- groups
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND tablename = 'groups'
@@ -30,7 +29,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.groups;
   END IF;
 
-  -- group_members
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND tablename = 'group_members'
@@ -38,7 +36,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.group_members;
   END IF;
 
-  -- expenses
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND tablename = 'expenses'
@@ -46,7 +43,6 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.expenses;
   END IF;
 
-  -- splits
   IF NOT EXISTS (
     SELECT 1 FROM pg_publication_tables
     WHERE pubname = 'supabase_realtime' AND tablename = 'splits'
@@ -55,6 +51,5 @@ BEGIN
   END IF;
 END $$;
 
--- ── 2. Notify PostgREST to reload its schema cache ───────────────────────────
---    Required after any DDL change so PostgREST picks up the publication list.
+-- ── 3. Notify PostgREST to reload its schema cache ───────────────────────────
 NOTIFY pgrst, 'reload schema';
