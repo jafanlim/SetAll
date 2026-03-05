@@ -67,6 +67,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       // Using a local capture of syncServiceProvider so we don't touch
       // ref after the widget might be disposed.
       final sync = ref.read(syncServiceProvider);
+      // Establish realtime subscription so changes from other devices are
+      // received automatically. Safe to call multiple times — it cancels any
+      // existing channel before creating a new one.
+      sync.subscribeToRealtime();
       unawaited(
         sync.performFullSync().then((_) {
           if (!mounted) return;
@@ -80,6 +84,7 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     if (state.event == AuthChangeEvent.signedOut) {
       _lastUserId = null;
       _invalidateAllProviders();
+      ref.read(syncServiceProvider).unsubscribeFromRealtime();
     }
   }
 
