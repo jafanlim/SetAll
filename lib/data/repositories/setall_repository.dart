@@ -712,34 +712,73 @@ class SetAllRepository {
     return rows.first['creator_id'] as String?;
   }
 
-  /// Delete a group. Only the creator can perform this action.
+  /// Delete a group. Any member of the group can perform this action.
   Future<bool> deleteGroup(String groupId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
+        // Fetch expense IDs first so we can delete their splits.
+        final expenseRows = await _client
+            .from('expenses')
+            .select('id')
+            .eq('group_id', groupId) as List;
+        final expenseIds =
+            expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+        if (expenseIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', expenseIds);
+        }
+        await _client.from('expenses').delete().eq('group_id', groupId);
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
         return true;
       } catch (_) {
         return false;
       }
     }
 
-    // Local check
+    // Local check — any member may delete.
     final rows = await LocalDatabase.db.query(
       'groups',
-      where: 'id = ? AND creator_id = ?',
-      whereArgs: [groupId, uid],
+      where: 'id = ?',
+      whereArgs: [groupId],
     );
     if (rows.isEmpty) return false;
 
+    // Collect local expense IDs for this group.
+    final expenseRows = await LocalDatabase.db.query(
+      'expenses',
+      columns: ['id'],
+      where: 'group_id = ?',
+      whereArgs: [groupId],
+    );
+    for (final row in expenseRows) {
+      await LocalDatabase.db.delete(
+        'splits',
+        where: 'expense_id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+    await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
 
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('groups').delete().eq('id', groupId).eq('creator_id', uid);
+        final remoteExpenseRows = await _client
+            .from('expenses')
+            .select('id')
+            .eq('group_id', groupId) as List;
+        final remoteExpenseIds = remoteExpenseRows
+            .map((r) => (r as Map<String, dynamic>)['id'] as String)
+            .toList();
+        if (remoteExpenseIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
+        }
+        await _client.from('expenses').delete().eq('group_id', groupId);
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
       } catch (_) {}
     }
     return true;
@@ -1312,6 +1351,8 @@ class SetAllRepository {
     String? originalCurrency,
     String? exchangeRateApplied,
   }) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
     final expenseId = const Uuid().v4();
     final now = _now();
 
@@ -1332,6 +1373,7 @@ class SetAllRepository {
             splitType: splitType,
             category: category,
             createdAt: now,
+            createdBy: uid,
             originalAmount: originalAmount?.toString(),
             originalCurrency: originalCurrency,
             exchangeRateApplied: exchangeRateApplied ?? rateToUsd.toString(),
@@ -1469,6 +1511,8 @@ class SetAllRepository {
     required List<SplitInsert> splits,
     String category = 'General',
   }) async {
+    final uid = await ensureUser();
+    if (uid == null) return null;
     final now = _now();
 
     // -- Anchor logic: Always re-compute USD value on update --
@@ -1489,6 +1533,7 @@ class SetAllRepository {
             category: category,
             universalUsdAmount: universalUsdAmount.toString(),
             exchangeRateApplied: rateToUsd.toString(),
+            createdBy: uid,
           );
     
           // Strip created_at so we never overwrite the original timestamp.

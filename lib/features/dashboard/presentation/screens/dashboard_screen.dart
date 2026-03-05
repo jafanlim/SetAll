@@ -2,11 +2,11 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -51,7 +51,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           // ── Net Balance Hero ──────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 16.h, 16.w, 12.h),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: summaryAsync.when(
                 data: (summary) {
                   final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
@@ -76,13 +76,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           // ── Groups ───────────────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 20.h, 16.w, 10.h),
+              padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
               child: Text(
                 'Your groups',
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontSize: 15.sp,
-                  letterSpacing: 0.3,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
@@ -91,7 +92,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             data: (groups) => groups.isEmpty
                 ? SliverToBoxAdapter(
                     child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 24.h),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                       child: Center(
                         child: Text(
                           'No groups yet. Tap Add expense to create one.',
@@ -111,13 +112,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
             loading: () => SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(24.w),
+                padding: const EdgeInsets.all(24),
                 child: const Center(child: CircularProgressIndicator()),
               ),
             ),
             error: (e, _) => SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.all(24.w),
+                padding: const EdgeInsets.all(24),
                 child: Center(
                   child: Text(
                     'Could not load groups',
@@ -131,55 +132,83 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           // ── Recent Activity ───────────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.fromLTRB(16.w, 24.h, 16.w, 10.h),
+              padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
               child: Text(
                 'Recent activity',
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.labelLarge?.copyWith(
                   fontWeight: FontWeight.w700,
-                  fontSize: 15.sp,
-                  letterSpacing: 0.3,
+                  fontSize: 13,
+                  letterSpacing: 0.5,
+                  color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
             ),
           ),
-          expensesAsync.when(
-            data: (expenses) => expenses.isEmpty
-                ? SliverToBoxAdapter(
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                      child: Text(
-                        'No expenses yet. Tap + to get started.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+          groupsAsync.when(
+            data: (groups) {
+              final groupNameMap = {for (final g in groups) g.id: g.name};
+              return expensesAsync.when(
+                data: (expenses) => expenses.isEmpty
+                    ? SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          child: Text(
+                            'No expenses yet. Tap + to get started.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) => _ActivityTile(
+                            expense: expenses[index],
+                            groupId: expenses[index].groupId,
+                            groupName: groupNameMap[expenses[index].groupId] ?? '',
+                          ),
+                          childCount: expenses.length,
                         ),
                       ),
-                    ),
-                  )
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) => _ActivityTile(expense: expenses[index], groupId: expenses[index].groupId),
-                      childCount: expenses.length,
-                    ),
+                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              );
+            },
+            loading: () => expensesAsync.when(
+              data: (expenses) => SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _ActivityTile(
+                    expense: expenses[index],
+                    groupId: expenses[index].groupId,
+                    groupName: '',
                   ),
-            loading: () => SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: const Center(child: CircularProgressIndicator()),
-              ),
-            ),
-            error: (e, _) => SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.all(24.w),
-                child: Center(
-                  child: Text(
-                    'Could not load activity',
-                    style: TextStyle(color: theme.colorScheme.error),
-                  ),
+                  childCount: expenses.length,
                 ),
               ),
+              loading: () => SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+              ),
+              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            ),
+            error: (_, _) => expensesAsync.when(
+              data: (expenses) => SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) => _ActivityTile(
+                    expense: expenses[index],
+                    groupId: expenses[index].groupId,
+                    groupName: '',
+                  ),
+                  childCount: expenses.length,
+                ),
+              ),
+              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
           ),
-          SliverToBoxAdapter(child: SizedBox(height: 96.h)),
+          const SliverToBoxAdapter(child: SizedBox(height: 96)),
         ],
       ),
     );
@@ -187,11 +216,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'SetAll',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 20.sp,
+            fontSize: 20,
             letterSpacing: -0.3,
           ),
         ),
@@ -199,16 +228,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              HapticUtils.primaryTap();
-              context.push(AppRouter.settings);
-            },
-            tooltip: 'Settings',
-          ),
-        ],
+        automaticallyImplyLeading: false,
       ),
       body: body,
       floatingActionButton: FloatingActionButton.extended(
@@ -219,9 +239,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         backgroundColor: _teal,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
-        label: Text(
+        label: const Text(
           'Add expense',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
     );
@@ -448,7 +468,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete group?'),
-        content: Text('Delete "${widget.group.name}" and all its expenses? This cannot be undone.'),
+        content: Text('Delete "${widget.group.name}" and all its expenses?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
@@ -459,16 +479,33 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !mounted) return;
+    final doubleConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Are you sure?'),
+        content: const Text('This action is irreversible. All expenses and balances in this group will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirmed != true || !mounted) return;
     final ok = await ref.read(setAllRepositoryProvider).deleteGroup(widget.group.id);
     if (!mounted) return;
     if (ok) {
       ref.invalidate(myGroupsProvider);
       ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete. Only the group creator can delete.')),
+        const SnackBar(content: Text('Could not delete group.')),
       );
     }
   }
@@ -480,9 +517,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SizedBox(
-        width: double.infinity,
-        child: SwipeActionCard(
+      child: SwipeActionCard(
           actionsPanelWidth: 140,
           actions: [
             SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: _rename),
@@ -546,14 +581,14 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                                     children: [
                                       if (owed > Decimal.zero)
                                         TextSpan(
-                                          text: '+${s.currency} ${s.youAreOwed}',
+                                          text: '+${s.currency} ${formatAmount(s.youAreOwed)}',
                                           style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
                                         ),
                                       if (owed > Decimal.zero && owe > Decimal.zero)
                                         const TextSpan(text: '  '),
                                       if (owe > Decimal.zero)
                                         TextSpan(
-                                          text: '-${s.currency} ${s.youOwe}',
+                                          text: '-${s.currency} ${formatAmount(s.youOwe)}',
                                           style: const TextStyle(color: _orange, fontWeight: FontWeight.w600),
                                         ),
                                     ],
@@ -574,7 +609,6 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             ),
           ),
         ),
-      ),
     );
   }
 
@@ -637,9 +671,10 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 // Activity tile  (tap → Edit, swipe left → Delete, right-click → menu)
 // ---------------------------------------------------------------------------
 class _ActivityTile extends ConsumerWidget {
-  const _ActivityTile({required this.expense, required this.groupId});
+  const _ActivityTile({required this.expense, required this.groupId, required this.groupName});
   final ExpenseModel expense;
   final String groupId;
+  final String groupName;
 
   static const Map<String, IconData> _categoryIcons = {
     'Food & drink': Icons.restaurant_outlined,
@@ -658,8 +693,7 @@ class _ActivityTile extends ConsumerWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete expense?'),
         content: Text(
-          'Remove "${expense.description.isEmpty ? expense.amount : expense.description}"? '
-          'This cannot be undone.',
+          'Remove "${expense.description.isEmpty ? expense.category : expense.description}"?',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
@@ -671,7 +705,23 @@ class _ActivityTile extends ConsumerWidget {
         ],
       ),
     );
-    if (confirmed != true) return;
+    if (confirmed != true || !context.mounted) return;
+    final doubleConfirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Are you sure?'),
+        content: const Text('This action is irreversible. This expense and its splits will be permanently deleted.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Yes, delete forever'),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirmed != true || !context.mounted) return;
     await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(balanceSummaryProvider);
@@ -752,11 +802,11 @@ class _ActivityTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final icon = _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
-    final displayAmount = expense.originalAmount ?? expense.amount;
+    final displayAmount = formatAmount(expense.originalAmount ?? expense.amount);
     final displayCurrency = expense.originalCurrency ?? expense.currency;
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 3.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: SwipeActionCard(
         actionsPanelWidth: 140,
         actions: [
@@ -769,9 +819,9 @@ class _ActivityTile extends ConsumerWidget {
               ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
               : null,
           child: GlassCard(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: InkWell(
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(12),
               onTap: () => context.push(
                 '/group/$groupId/expense/${expense.id}',
                 extra: {'groupName': ''},
@@ -779,35 +829,46 @@ class _ActivityTile extends ConsumerWidget {
               child: Row(
                 children: [
                   Container(
-                    width: 38.w,
-                    height: 38.w,
+                    width: 38,
+                    height: 38,
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10.r),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(icon, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
+                    child: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   ),
-                SizedBox(width: 12.w),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                       Text(
                         expense.description.isEmpty ? expense.category : expense.description,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          fontSize: 13.sp,
+                          fontSize: 13,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (expense.originalCurrency != null &&
-                          expense.originalCurrency != expense.currency) ...[
-                        SizedBox(height: 2.h),
+                      if (groupName.isNotEmpty) ...[
+                        const SizedBox(height: 2),
                         Text(
-                          '${expense.currency} ${expense.amount} base',
+                          groupName,
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: 10.sp,
+                            fontSize: 10,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      if (expense.originalCurrency != null &&
+                          expense.originalCurrency != expense.currency) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${expense.currency} ${formatAmount(expense.amount)} base',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                            fontSize: 10,
                           ),
                         ),
                       ],

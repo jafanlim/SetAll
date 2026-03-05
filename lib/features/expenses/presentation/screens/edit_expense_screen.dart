@@ -1,7 +1,6 @@
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -263,27 +262,27 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: EdgeInsets.all(16.w),
+          padding: const EdgeInsets.all(16),
           children: [
             Text(
               widget.groupName,
               style: theme.textTheme.titleMedium
                   ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
-            SizedBox(height: 20.h),
+            const SizedBox(height: 20),
 
             // ── Amount ──────────────────────────────────────────────────────
             TextFormField(
               controller: _amountController,
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.w700, color: _teal),
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _teal),
               decoration: InputDecoration(
                 labelText: 'Amount',
-                labelStyle: TextStyle(fontSize: 13.sp),
+                labelStyle: const TextStyle(fontSize: 13),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
               ),
@@ -295,7 +294,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 return null;
               },
             ),
-            SizedBox(height: 12.h),
+            const SizedBox(height: 12),
 
             // ── Currency ─────────────────────────────────────────────────────
             CurrencyPickerField(
@@ -305,7 +304,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 setState(() => _currency = code);
               },
             ),
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
 
             // ── Category ─────────────────────────────────────────────────────
             DropdownButtonFormField<String>(
@@ -315,7 +314,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
                 isDense: true,
@@ -325,7 +324,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   .toList(),
               onChanged: (v) => setState(() => _category = v ?? 'General'),
             ),
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
 
             // ── Description ──────────────────────────────────────────────────
             TextFormField(
@@ -336,13 +335,13 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12.r),
+                  borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide.none,
                 ),
               ),
               maxLines: 2,
             ),
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
 
             // ── Paid by ──────────────────────────────────────────────────────
             if (_members.length > 1) ...[
@@ -353,7 +352,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12.r),
+                    borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
                   ),
                   isDense: true,
@@ -363,7 +362,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                     .toList(),
                 onChanged: (v) => setState(() => _payerId = v),
               ),
-              SizedBox(height: 16.h),
+              const SizedBox(height: 16),
             ],
 
             if (_expense?.createdAt != null) ...[
@@ -372,7 +371,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 style: theme.textTheme.bodySmall
                     ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
               ),
-              SizedBox(height: 20.h),
+              const SizedBox(height: 20),
             ],
 
             // ── Split mode ───────────────────────────────────────────────────
@@ -381,28 +380,28 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
               style: theme.textTheme.titleSmall
                   ?.copyWith(fontWeight: FontWeight.w700),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             SegmentedButton<SplitMode>(
               segments: [
                 ButtonSegment(
                   value: SplitMode.even,
-                  label: Text('Even', style: TextStyle(fontSize: 11.sp)),
-                  icon: Icon(Icons.equalizer, size: 14.sp),
+                  label: Text('Even', style: const TextStyle(fontSize: 11)),
+                  icon: const Icon(Icons.equalizer, size: 14),
                 ),
                 ButtonSegment(
                   value: SplitMode.percentage,
-                  label: Text('%', style: TextStyle(fontSize: 11.sp)),
-                  icon: Icon(Icons.percent, size: 14.sp),
+                  label: Text('%', style: const TextStyle(fontSize: 11)),
+                  icon: const Icon(Icons.percent, size: 14),
                 ),
                 ButtonSegment(
                   value: SplitMode.shares,
-                  label: Text('Shares', style: TextStyle(fontSize: 11.sp)),
-                  icon: Icon(Icons.pie_chart_outline, size: 14.sp),
+                  label: Text('Shares', style: const TextStyle(fontSize: 11)),
+                  icon: const Icon(Icons.pie_chart_outline, size: 14),
                 ),
                 ButtonSegment(
                   value: SplitMode.manual,
-                  label: Text('Manual', style: TextStyle(fontSize: 11.sp)),
-                  icon: Icon(Icons.edit, size: 14.sp),
+                  label: Text('Manual', style: const TextStyle(fontSize: 11)),
+                  icon: const Icon(Icons.edit, size: 14),
                 ),
               ],
               selected: {_splitMode},
@@ -428,7 +427,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             ),
 
             if (_splitMode != SplitMode.even) ...[
-              SizedBox(height: 16.h),
+              const SizedBox(height: 16),
               Text(
                 _splitMode == SplitMode.percentage
                     ? 'Percentage per person (total = 100)'
@@ -437,15 +436,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         : 'Exact amount per person',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 11.sp,
+                  fontSize: 11,
                 ),
               ),
-              SizedBox(height: 8.h),
+              const SizedBox(height: 8),
               ..._members.map((m) {
                 final c = _customCtrl[m.id];
                 if (c == null) return const SizedBox.shrink();
                 return Padding(
-                  padding: EdgeInsets.only(bottom: 8.h),
+                  padding: const EdgeInsets.only(bottom: 8),
                   child: Row(
                     children: [
                       Expanded(
@@ -453,17 +452,17 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                         child: Text(
                           m.name,
                           style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontSize: 13.sp),
+                              ?.copyWith(fontSize: 13),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      SizedBox(width: 12.w),
+                      const SizedBox(width: 12),
                       SizedBox(
-                        width: 90.w,
+                        width: 90,
                         child: TextFormField(
                           controller: c,
                           keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: TextStyle(fontSize: 13.sp),
+                          style: const TextStyle(fontSize: 13),
                           onChanged: (_) => setState(() {}),
                           decoration: InputDecoration(
                             hintText: _splitMode == SplitMode.percentage
@@ -476,7 +475,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                             fillColor: theme.colorScheme.surfaceContainerHighest
                                 .withValues(alpha: 0.4),
                             border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8.r),
+                              borderRadius: BorderRadius.circular(8),
                               borderSide: BorderSide.none,
                             ),
                           ),
@@ -487,7 +486,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 );
               }),
               if (_splitMode == SplitMode.manual) ...[
-                SizedBox(height: 8.h),
+                const SizedBox(height: 8),
                 Builder(builder: (ctx) {
                   final entered = _members.fold<Decimal>(
                     Decimal.zero,
@@ -501,7 +500,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   return Text(
                     'Total entered: $entered / $amountForTotal',
                     style: TextStyle(
-                      fontSize: 11.sp,
+                      fontSize: 11,
                       color: ok ? _teal : _orange,
                       fontWeight: FontWeight.w600,
                     ),
@@ -509,33 +508,33 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 }),
               ],
             ] else ...[
-              SizedBox(height: 12.h),
+              const SizedBox(height: 12),
               Container(
-                padding: EdgeInsets.all(12.w),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: _teal.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10.r),
+                  borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.equalizer, color: _teal, size: 16.sp),
-                    SizedBox(width: 8.w),
+                    const Icon(Icons.equalizer, color: _teal, size: 16),
+                    const SizedBox(width: 8),
                     Text(
                       'Split evenly among ${_members.length} members',
-                      style: TextStyle(color: _teal, fontSize: 12.sp),
+                      style: const TextStyle(color: _teal, fontSize: 12),
                     ),
                   ],
                 ),
               ),
             ],
 
-            SizedBox(height: 40.h),
+            const SizedBox(height: 40),
             FilledButton(
               onPressed: _isSubmitting ? null : _submit,
               style: FilledButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.black,
-                padding: EdgeInsets.symmetric(vertical: 14.h),
+                padding: const EdgeInsets.symmetric(vertical: 14),
               ),
               child: _isSubmitting
                   ? const SizedBox(
@@ -544,7 +543,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                     )
                   : const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w700)),
             ),
-            SizedBox(height: 32.h),
+            const SizedBox(height: 32),
           ],
         ),
       ),
