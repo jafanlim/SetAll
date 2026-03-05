@@ -251,6 +251,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                         ),
                       )
                     : balanceAsync.when(
+                        skipLoadingOnReload: true,
                         data: (s) => _GroupBalanceCard(summary: s),
                         loading: () => const SizedBox.shrink(),
                         error: (_, _) => const SizedBox.shrink(),

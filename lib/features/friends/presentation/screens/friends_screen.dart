@@ -208,6 +208,7 @@ class _FriendCard extends ConsumerWidget {
                       ),
                       const SizedBox(height: 4),
                       balanceAsync.when(
+                        skipLoadingOnReload: true,
                         data: (s) => _BalanceSubtitle(summary: s),
                         loading: () => const SizedBox(height: 12),
                         error: (_, _) => const SizedBox.shrink(),
