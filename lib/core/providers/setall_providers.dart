@@ -4,7 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/balance_service.dart';
 import '../services/currency_service.dart';
 import '../services/currency_sync_service.dart';
-import '../utils/debt_simplification_engine.dart';
+import '../../domain/services/settlement_engine.dart';
 import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
@@ -163,7 +163,7 @@ final groupCreatorProvider =
 
 /// Simplified debts for a group, amounts expressed in the user's base currency.
 final simplifiedDebtsProvider =
-    FutureProvider.family<List<SimplifiedDebt>, String>((ref, groupId) async {
+    FutureProvider.family<List<SettlementTransaction>, String>((ref, groupId) async {
   final baseCurrency = await ref.watch(baseCurrencyProvider.future);
   return ref
       .watch(setAllRepositoryProvider)
