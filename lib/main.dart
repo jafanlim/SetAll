@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/services/currency_sync_service.dart';
+import 'core/services/deep_link_service.dart';
 import 'data/local/local_database.dart';
 
 /// SetAll Supabase project (organisation: Shoko12).
@@ -151,6 +152,8 @@ class _AppLoaderState extends State<_AppLoader> {
         authFlowType: AuthFlowType.pkce,
       ),
     );
+    // Start listening for setall:// deep links (Windows OAuth / email redirects).
+    await DeepLinkService.instance.init();
   }
 
   /// Kick off a background rate sync. Errors are swallowed – the app has a

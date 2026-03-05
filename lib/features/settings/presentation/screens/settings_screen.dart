@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -230,7 +229,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     child: Text(
                       'Add a password so you can also sign in with email + password.',
                       style: TextStyle(
-                        fontSize: 12.sp,
+                        fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -351,9 +350,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             children: [
               Text(
                 'Current: ${_currentEmail ?? '—'}',
-                style: TextStyle(fontSize: 12.sp, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+                style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
               ),
-              SizedBox(height: 12.h),
+              const SizedBox(height: 12),
               TextField(
                 controller: ctrl,
                 autofocus: true,
@@ -476,24 +475,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Settings',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        leading: IconButton(
-          icon: const Icon(Icons.close),
-          onPressed: () { HapticUtils.lightTap(); context.canPop() ? context.pop() : context.go('/'); },
-        ),
+        automaticallyImplyLeading: false,
       ),
       body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           // ── Profile ─────────────────────────────────────────────────────
           _SectionHeader(label: 'Profile'),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           profileAsync.when(
             data: (profile) => _ProfileSection(
               nameCtrl:         _nameCtrl,
@@ -517,31 +513,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Base Currency ────────────────────────────────────────────────
           _SectionHeader(label: 'Base Currency'),
           Text(
             'All dashboard totals are displayed in this currency.',
             style: TextStyle(
-              fontSize: 12.sp,
+              fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: 10.h),
+          const SizedBox(height: 10),
           _CurrencyDropdown(
             selected:   _selectedCurrency ?? 'USD',
             saving:     _currencySaving,
             onSelected: _saveCurrency,
           ),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Security ─────────────────────────────────────────────────────
           _SectionHeader(label: 'Security'),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           GlassCard(
-            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
             child: Column(
               children: [
                 if (_biometricLoading)
@@ -551,17 +547,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   )
                 else if (!_biometricAvailable)
                   Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Row(
                       children: [
                         Icon(Icons.fingerprint,
                             color: theme.colorScheme.onSurfaceVariant),
-                        SizedBox(width: 12.w),
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'Biometrics not available on this device.',
                             style: TextStyle(
-                              fontSize: 13.sp,
+                              fontSize: 13,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -572,17 +568,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 else ...[
                   SwitchListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(
+                    title: const Text(
                       'Face ID / Touch ID',
                       style: TextStyle(
-                        fontSize: 14.sp,
+                        fontSize: 14,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     subtitle: Text(
                       'Require biometric unlock when opening the app.',
                       style: TextStyle(
-                        fontSize: 11.sp,
+                        fontSize: 11,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -591,29 +587,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     onChanged: _toggleBiometric,
                   ),
                   if (_biometricEnabled) ...[
-                    Divider(height: 1.h, indent: 0, endIndent: 0),
+                    const Divider(height: 1, indent: 0, endIndent: 0),
                     Padding(
-                      padding: EdgeInsets.symmetric(vertical: 8.h),
+                      padding: const EdgeInsets.symmetric(vertical: 8),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Grace Period',
                             style: TextStyle(
-                              fontSize: 13.sp,
+                              fontSize: 13,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
                           Text(
                             'Skip Face ID if app was closed less than this long ago.',
                             style: TextStyle(
-                              fontSize: 11.sp,
+                              fontSize: 11,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
-                          SizedBox(height: 8.h),
+                          const SizedBox(height: 8),
                           Wrap(
-                            spacing: 8.w,
+                            spacing: 8,
                             children: kGracePeriodOptions.map((opt) {
                               final active = _gracePeriodSeconds == opt.seconds;
                               return ChoiceChip(
@@ -625,7 +621,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   fontWeight: active
                                       ? FontWeight.w700
                                       : FontWeight.w400,
-                                  fontSize: 12.sp,
+                                  fontSize: 12,
                                 ),
                                 onSelected: (_) => _setGracePeriod(opt.seconds),
                               );
@@ -640,18 +636,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Appearance ───────────────────────────────────────────────────
           _SectionHeader(label: 'Appearance'),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           _ThemeSection(),
 
-          SizedBox(height: 24.h),
+          const SizedBox(height: 24),
 
           // ── Account ──────────────────────────────────────────────────────
           _SectionHeader(label: 'Account'),
-          SizedBox(height: 8.h),
+          const SizedBox(height: 8),
           GlassCard(
             padding: EdgeInsets.zero,
             child: Column(
@@ -660,36 +656,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   leading: const Icon(Icons.email_outlined),
                   title: Text(
                     _currentEmail ?? '—',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
                     'Tap to change email',
-                    style: TextStyle(fontSize: 11.sp, color: theme.colorScheme.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   trailing: _emailChanging
-                      ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(Icons.edit_outlined, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.edit_outlined, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   onTap: _emailChanging ? null : _showChangeEmailDialog,
                 ),
-                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: Text(
                     _hasPasswordIdentity ? 'Change Password' : 'Set Password',
-                    style: TextStyle(fontSize: 13.sp, fontWeight: FontWeight.w500),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
                     _hasPasswordIdentity
                         ? 'Update your sign-in password'
                         : 'Add a password to enable email + password login',
-                    style: TextStyle(fontSize: 11.sp, color: theme.colorScheme.onSurfaceVariant),
+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   trailing: _passwordChanging
-                      ? SizedBox(width: 18.w, height: 18.w, child: const CircularProgressIndicator(strokeWidth: 2))
-                      : Icon(Icons.chevron_right, size: 18.sp, color: theme.colorScheme.onSurfaceVariant),
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   onTap: _passwordChanging ? null : _showSetPasswordDialog,
                 ),
-                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.delete_sweep_outlined, color: Colors.orangeAccent),
                   title: const Text(
@@ -737,7 +733,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     }
                   },
                 ),
-                Divider(height: 1.h, indent: 16.w, endIndent: 16.w),
+                const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.redAccent),
                   title: const Text(
@@ -774,7 +770,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             ),
           ),
 
-                        SizedBox(height: 32.h),
+                        const SizedBox(height: 32),
                       ],
                     ),
                   );
@@ -824,7 +820,7 @@ class _ProfileSection extends StatelessWidget {
     }
 
     return GlassCard(
-      padding: EdgeInsets.all(16.w),
+      padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -836,8 +832,8 @@ class _ProfileSection extends StatelessWidget {
                 child: Stack(
                   children: [
                     Container(
-                      width: 64.w,
-                      height: 64.w,
+                      width: 64,
+                      height: 64,
                       decoration: BoxDecoration(
                         gradient: avatarImage == null
                             ? const LinearGradient(
@@ -852,16 +848,16 @@ class _ProfileSection extends StatelessWidget {
                                 fit: BoxFit.cover,
                               )
                             : null,
-                        borderRadius: BorderRadius.circular(18.r),
+                        borderRadius: BorderRadius.circular(18),
                       ),
                       child: avatarImage == null
                           ? Center(
                               child: Text(
                                 initials,
-                                style: TextStyle(
+                                style: const TextStyle(
                                   color: Colors.black,
                                   fontWeight: FontWeight.w800,
-                                  fontSize: 22.sp,
+                                  fontSize: 22,
                                 ),
                               ),
                             )
@@ -873,7 +869,7 @@ class _ProfileSection extends StatelessWidget {
                         child: Container(
                           decoration: BoxDecoration(
                             color: Colors.black45,
-                            borderRadius: BorderRadius.circular(18.r),
+                            borderRadius: BorderRadius.circular(18),
                           ),
                           child: const Center(
                             child: CircularProgressIndicator(
@@ -889,8 +885,8 @@ class _ProfileSection extends StatelessWidget {
                         right: 0,
                         bottom: 0,
                         child: Container(
-                          width: 22.w,
-                          height: 22.w,
+                          width: 22,
+                          height: 22,
                           decoration: BoxDecoration(
                             color: _teal,
                             shape: BoxShape.circle,
@@ -899,9 +895,9 @@ class _ProfileSection extends StatelessWidget {
                               width: 2,
                             ),
                           ),
-                          child: Icon(
+                          child: const Icon(
                             Icons.camera_alt,
-                            size: 11.sp,
+                            size: 11,
                             color: Colors.black,
                           ),
                         ),
@@ -909,30 +905,30 @@ class _ProfileSection extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(width: 14.w),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       profile?.name ?? '',
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 15.sp,
+                        fontSize: 15,
                       ),
                     ),
                     if (profile?.nickname != null)
                       Text(
                         '@${profile!.nickname}',
-                        style: TextStyle(fontSize: 12.sp, color: _teal),
+                        style: const TextStyle(fontSize: 12, color: _teal),
                       ),
-                    SizedBox(height: 4.h),
+                    const SizedBox(height: 4),
                     GestureDetector(
                       onTap: avatarUploading ? null : onPickAvatar,
                       child: Text(
                         avatarUploading ? 'Uploading…' : 'Change photo',
                         style: TextStyle(
-                          fontSize: 11.sp,
+                          fontSize: 11,
                           color: avatarUploading
                               ? theme.colorScheme.onSurfaceVariant
                               : _teal,
@@ -945,16 +941,16 @@ class _ProfileSection extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 16.h),
+          const SizedBox(height: 16),
           Text(
             'Display Name',
             style: TextStyle(
-              fontSize: 12.sp,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: 6.h),
+          const SizedBox(height: 6),
           TextField(
             controller: nameCtrl,
             textInputAction: TextInputAction.next,
@@ -963,16 +959,16 @@ class _ProfileSection extends StatelessWidget {
               prefixIcon: Icon(Icons.person_outline),
             ),
           ),
-          SizedBox(height: 12.h),
+          const SizedBox(height: 12),
           Text(
             'Nickname (optional)',
             style: TextStyle(
-              fontSize: 12.sp,
+              fontSize: 12,
               fontWeight: FontWeight.w600,
               color: theme.colorScheme.onSurfaceVariant,
             ),
           ),
-          SizedBox(height: 6.h),
+          const SizedBox(height: 6),
           TextField(
             controller: nicknameCtrl,
             textInputAction: TextInputAction.done,
@@ -983,48 +979,45 @@ class _ProfileSection extends StatelessWidget {
             ),
           ),
           if (error != null) ...[
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             Text(
               error!,
-              style: TextStyle(color: theme.colorScheme.error, fontSize: 12.sp),
+              style: TextStyle(color: theme.colorScheme.error, fontSize: 12),
             ),
           ],
           if (saved) ...[
-            SizedBox(height: 8.h),
-            Row(
+            const SizedBox(height: 8),
+            const Row(
               children: [
-                Icon(Icons.check_circle_outline, color: _teal, size: 14.sp),
-                SizedBox(width: 6.w),
-                Text('Saved', style: TextStyle(color: _teal, fontSize: 12.sp)),
+                Icon(Icons.check_circle_outline, color: _teal, size: 14),
+                SizedBox(width: 6),
+                Text('Saved', style: TextStyle(color: _teal, fontSize: 12)),
               ],
             ),
           ],
-          SizedBox(height: 14.h),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
+          const SizedBox(height: 14),
+          ElevatedButton(
               onPressed: saving ? null : onSave,
               style: ElevatedButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.black,
               ),
               child: saving
-                  ? SizedBox(
-                      height: 16.h,
-                      width: 16.w,
-                      child: const CircularProgressIndicator(
+                  ? const SizedBox(
+                      height: 16,
+                      width: 16,
+                      child: CircularProgressIndicator(
                         strokeWidth: 2,
                         color: Colors.black,
                       ),
                     )
-                  : Text(
+                  : const Text(
                       'Save Profile',
                       style: TextStyle(
                         fontWeight: FontWeight.w700,
-                        fontSize: 14.sp,
+                        fontSize: 14,
                       ),
                     ),
-            ),
           ),
         ],
       ),
@@ -1062,11 +1055,11 @@ class _CurrencyDropdown extends StatelessWidget {
     final selected = this.selected;
 
     return GlassCard(
-      padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 4.h),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
       child: saving
-          ? Padding(
-              padding: EdgeInsets.symmetric(vertical: 14.h),
-              child: const Center(
+          ? const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Center(
                 child: SizedBox(
                   width: 20,
                   height: 20,
@@ -1081,7 +1074,7 @@ class _CurrencyDropdown extends StatelessWidget {
                     : ordered.first['code'],
                 isExpanded: true,
                 icon: const Icon(Icons.expand_more),
-                borderRadius: BorderRadius.circular(12.r),
+                borderRadius: BorderRadius.circular(12),
                 onChanged: saving
                     ? null
                     : (code) {
@@ -1092,12 +1085,12 @@ class _CurrencyDropdown extends StatelessWidget {
                           alignment: Alignment.centerLeft,
                           child: Row(
                             children: [
-                              Text(c['flag']!, style: TextStyle(fontSize: 18.sp)),
-                              SizedBox(width: 10.w),
+                              Text(c['flag']!, style: const TextStyle(fontSize: 18)),
+                              const SizedBox(width: 10),
                               Text(
                                 '${c['code']!}  —  ${c['name']!}',
                                 style: TextStyle(
-                                  fontSize: 13.sp,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w600,
                                   color: theme.colorScheme.onSurface,
                                 ),
@@ -1112,8 +1105,8 @@ class _CurrencyDropdown extends StatelessWidget {
                     value: c['code'],
                     child: Row(
                       children: [
-                        Text(c['flag']!, style: TextStyle(fontSize: 18.sp)),
-                        SizedBox(width: 10.w),
+                        Text(c['flag']!, style: const TextStyle(fontSize: 18)),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1122,7 +1115,7 @@ class _CurrencyDropdown extends StatelessWidget {
                               Text(
                                 c['code']!,
                                 style: TextStyle(
-                                  fontSize: 13.sp,
+                                  fontSize: 13,
                                   fontWeight: FontWeight.w700,
                                   color: isSelected
                                       ? _teal
@@ -1132,7 +1125,7 @@ class _CurrencyDropdown extends StatelessWidget {
                               Text(
                                 c['name']!,
                                 style: TextStyle(
-                                  fontSize: 11.sp,
+                                  fontSize: 11,
                                   color: theme.colorScheme.onSurfaceVariant,
                                 ),
                               ),
@@ -1140,7 +1133,7 @@ class _CurrencyDropdown extends StatelessWidget {
                           ),
                         ),
                         if (isSelected)
-                          Icon(Icons.check_circle, color: _teal, size: 14.sp),
+                          const Icon(Icons.check_circle, color: _teal, size: 14),
                       ],
                     ),
                   );
@@ -1159,7 +1152,7 @@ class _ThemeSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     return GlassCard(
-      padding: EdgeInsets.symmetric(vertical: 4.h),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Column(
         children: [
           _ThemeTile(
@@ -1215,17 +1208,17 @@ class _ThemeTile extends StatelessWidget {
       dense: true,
       leading: Icon(icon,
           color: active ? _teal : theme.colorScheme.onSurfaceVariant,
-          size: 20.sp),
+          size: 20),
       title: Text(
         label,
         style: TextStyle(
           fontWeight: active ? FontWeight.w700 : FontWeight.w400,
           color: active ? _teal : theme.colorScheme.onSurface,
-          fontSize: 13.sp,
+          fontSize: 13,
         ),
       ),
       trailing: active
-          ? Icon(Icons.check, color: _teal, size: 16.sp)
+          ? const Icon(Icons.check, color: _teal, size: 16)
           : null,
       onTap: onTap,
     );
@@ -1242,11 +1235,11 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: EdgeInsets.only(bottom: 2.h),
+      padding: const EdgeInsets.only(bottom: 2),
       child: Text(
         label.toUpperCase(),
         style: TextStyle(
-          fontSize: 11.sp,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
           letterSpacing: 0.8,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
