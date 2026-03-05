@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/balance_service.dart';
 import '../services/currency_service.dart';
 import '../services/currency_sync_service.dart';
+import '../services/sync_service.dart';
 import '../../domain/services/settlement_engine.dart';
 import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
@@ -70,6 +71,21 @@ final setAllRepositoryProvider = Provider<SetAllRepository>((ref) {
   } catch (_) {
     return SetAllRepository(
       currencyService: ref.watch(currencyServiceProvider),
+    );
+  }
+});
+
+/// Standalone sync coordinator. Call [SyncService.performFullSync] to trigger
+/// a full push-then-pull cycle outside the data-fetch loop.
+final syncServiceProvider = Provider<SyncService>((ref) {
+  try {
+    return SyncService(
+      repository: ref.watch(setAllRepositoryProvider),
+      client: Supabase.instance.client,
+    );
+  } catch (_) {
+    return SyncService(
+      repository: ref.watch(setAllRepositoryProvider),
     );
   }
 });

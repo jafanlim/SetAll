@@ -111,13 +111,9 @@ class SetAllRepository {
     return id;
   }
 
-  Future<void> syncIfOnline() async {
-    if (_isWeb) return;
-    final uid = await ensureUser();
-    if (uid != null && await _isOnline && _client != null) {
-      await _syncFromSupabase(uid);
-    }
-  }
+  /// Sync is now handled by [SyncService.performFullSync].
+  /// This stub exists only for compatibility during the transition period.
+  Future<void> syncIfOnline() async {}
 
   Future<bool> get _isOnline async {
     if (kIsWeb) return _client != null;
@@ -513,11 +509,7 @@ class SetAllRepository {
           .insert({'group_id': id, 'user_id': uid});
       return GroupModel(id: id, name: _personalGroupName, creatorId: uid);
     }
-    // Sync from Supabase first so we find any existing personal group
-    // before creating a new one (prevents duplicates across devices).
-    if (_client != null && await _isOnline) {
-      try { await _syncFromSupabase(uid); } catch (_) {}
-    }
+    // Personal group lookup is now SQLite-only; SyncService keeps it fresh.
     final rows = await LocalDatabase.db.query(
       'groups',
       where: 'creator_id = ? AND name = ?',
@@ -595,13 +587,6 @@ class SetAllRepository {
           .eq('type', type)
           .order('updated_at', ascending: false) as List;
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
-    }
-
-    if (await _isOnline && _client != null) {
-      try {
-        await syncPendingToSupabase();
-        await _syncFromSupabase(uid);
-      } catch (_) {}
     }
 
     final memberRows = await LocalDatabase.db.query(
@@ -1256,7 +1241,6 @@ class SetAllRepository {
       return rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
     }
 
-    if (await _isOnline && _client != null) await _syncFromSupabase(uid);
     final memberRows = await LocalDatabase.db.query(
       'group_members',
       where: 'user_id = ?',
@@ -1743,7 +1727,6 @@ class SetAllRepository {
           );
         }
   
-        if (await _isOnline && _client != null) await _syncFromSupabase(uid);
         final raw = await getBalanceRawData(uid);
         var youOwe = Decimal.zero;
         var youAreOwed = Decimal.zero;
@@ -1851,228 +1834,15 @@ class SetAllRepository {
   }
 
   // ---------------------------------------------------------------------------
-  // Sync
+  // Private helpers
   // ---------------------------------------------------------------------------
 
-  Future<void> _syncFromSupabase(String uid) async {
-    if (_client == null || _isWeb) return;
-    try {
-      final memberRows = await _client
-          .from('group_members')
-          .select('group_id')
-          .eq('user_id', uid);
-      final memberIds = (memberRows as List)
-          .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
-          .toSet()
-          .toList();
-      final created =
-          await _client.from('groups').select('id').eq('creator_id', uid);
-      for (final r in created as List) {
-        memberIds.add((r as Map<String, dynamic>)['id'] as String);
-      }
-      if (memberIds.isEmpty) return;
+  String _now() => DateTime.now().toUtc().toIso8601String();
 
-      final groups =
-          await _client.from('groups').select().inFilter('id', memberIds.toList());
-      for (final g in groups as List) {
-        final map = g as Map<String, dynamic>;
-        await LocalDatabase.db.insert(
-          'groups',
-          {
-            'id': map['id'],
-            'name': map['name'],
-            'creator_id': map['creator_id'],
-            'created_at': map['created_at']?.toString(),
-            'updated_at': map['updated_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
+  GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
 
-      final gMembers = await _client
-          .from('group_members')
-          .select()
-          .inFilter('group_id', memberIds.toList());
-      final allMemberUserIds = <String>{uid};
-      for (final m in gMembers as List) {
-        final map = m as Map<String, dynamic>;
-        allMemberUserIds.add(map['user_id'] as String);
-        await LocalDatabase.db.insert(
-          'group_members',
-          {
-            'group_id': map['group_id'],
-            'user_id': map['user_id'],
-            'joined_at': map['joined_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
+  ExpenseModel _rowToExpense(Map<String, dynamic> row) =>
+      ExpenseModel.fromJson(row);
 
-      // Sync all member profiles (including current user) so local SQLite
-      // always has fresh name / nickname / avatar_url / default_currency.
-      try {
-        final profileRows = await _client
-            .from('profiles')
-            .select()
-            .inFilter('id', allMemberUserIds.toList()) as List;
-        for (final p in profileRows) {
-          await _upsertProfileToSQLite(p as Map<String, dynamic>);
-        }
-      } catch (_) {}
-
-      final expenses =
-          await _client.from('expenses').select().inFilter('group_id', memberIds.toList());
-      for (final e in expenses as List) {
-        final map = e as Map<String, dynamic>;
-        final expense = ExpenseModel.fromJson(map);
-        await LocalDatabase.db.insert(
-          'expenses',
-          {
-            ...expense.toJson(),
-            'updated_at': map['updated_at']?.toString(),
-            'synced_at': DateTime.now().millisecondsSinceEpoch,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-
-      final expenseIds = (expenses as List)
-          .map((e) => (e as Map<String, dynamic>)['id'] as String)
-          .toList();
-      if (expenseIds.isNotEmpty) {
-        final splits = await _client
-            .from('splits')
-            .select()
-            .inFilter('expense_id', expenseIds);
-        for (final s in splits as List) {
-          final map = s as Map<String, dynamic>;
-          final split = SplitModel.fromJson(map);
-          // INSERT OR REPLACE leverages the UNIQUE(expense_id, user_id) index
-          // (schema v9) to upsert without pre-deleting. If Supabase is missing
-          // a split that exists locally (e.g. its INSERT failed), the local row
-          // is left untouched because we only process what Supabase returns.
-          await LocalDatabase.db.insert(
-            'splits',
-            {
-              ...split.toJson(),
-              'created_at': map['created_at']?.toString(),
-              'synced_at': DateTime.now().millisecondsSinceEpoch,
-            },
-            conflictAlgorithm: ConflictAlgorithm.replace,
-          );
-        }
-      }
-    } catch (_) {}
-  }
-
-  Future<void> syncPendingToSupabase() async {
-    if (_client == null || !await _isOnline || _isWeb) return;
-    final uid = await ensureUser();
-    if (uid == null) return;
-
-    final pendingGroups =
-        await LocalDatabase.db.query('groups', where: 'synced_at IS NULL');
-    for (final row in pendingGroups) {
-      try {
-        await _client.from('groups').insert({
-          'id': row['id'],
-          'name': row['name'],
-          'creator_id': row['creator_id'],
-          'type': row['type'] ?? 'normal',
-        });
-        await LocalDatabase.db.update(
-          'groups',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-        await _client.from('group_members').insert({
-          'group_id': row['id'],
-          'user_id': row['creator_id'],
-        });
-        await LocalDatabase.db.update(
-          'group_members',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'group_id = ?',
-          whereArgs: [row['id']],
-        );
-      } catch (_) {}
-    }
-
-        final pendingExpenses =
-            await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
-        for (final row in pendingExpenses) {
-          try {
-            final expense = ExpenseModel.fromJson(row);
-            await _client.from('expenses').insert(expense.toJson());
-            await LocalDatabase.db.update(
-              'expenses',
-              {'synced_at': DateTime.now().millisecondsSinceEpoch},
-              where: 'id = ?',
-              whereArgs: [row['id']],
-            );
-          } catch (e) {
-            if (e is PostgrestException) {
-              if (e.code == '23505') {
-                // DUPLICATE KEY: already in Supabase — mark synced locally.
-                debugPrint('⚠️ Expense already exists in cloud. Marking as synced locally.');
-              } else {
-                // RLS violation (42501) or other permanent error — this row can
-                // never be pushed by this user (e.g. stale test data with a
-                // different payer_id). Mark synced to stop retrying.
-                debugPrint('⚠️ Expense skipped (${e.code}): ${e.message}');
-              }
-              await LocalDatabase.db.update(
-                'expenses',
-                {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                where: 'id = ?',
-                whereArgs: [row['id']],
-              );
-            }
-          }
-        }
-    
-        final pendingSplits =
-            await LocalDatabase.db.query('splits', where: 'synced_at IS NULL');
-        for (final row in pendingSplits) {
-          try {
-            final split = SplitModel.fromJson(row);
-            await _client.from('splits').insert(split.toJson());
-            await LocalDatabase.db.update(
-              'splits',
-              {'synced_at': DateTime.now().millisecondsSinceEpoch},
-              where: 'id = ?',
-              whereArgs: [row['id']],
-            );
-          } catch (e) {
-            if (e is PostgrestException) {
-              if (e.code != '23505') {
-                debugPrint('⚠️ Split skipped (${e.code}): ${e.message}');
-              }
-              await LocalDatabase.db.update(
-                'splits',
-                {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                where: 'id = ?',
-                whereArgs: [row['id']],
-              );
-            }
-          }
-        }
-      }
-    
-      // ---------------------------------------------------------------------------
-      // Private helpers
-      // ---------------------------------------------------------------------------
-    
-      String _now() => DateTime.now().toUtc().toIso8601String();
-    
-      GroupModel _rowToGroup(Map<String, dynamic> row) => GroupModel.fromJson(row);
-    
-      ExpenseModel _rowToExpense(Map<String, dynamic> row) =>
-          ExpenseModel.fromJson(row);
-    
-      SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
-    }
-    
+  SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
+}
