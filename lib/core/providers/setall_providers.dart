@@ -134,6 +134,10 @@ final groupBalanceSummaryProvider =
     FutureProvider.family<BalanceSummary, String>((ref, groupId) async {
   final targetCurrency = await ref.watch(baseCurrencyProvider.future);
   ref.watch(currencyServiceProvider);
+  // Watch the expense stream so this provider recomputes automatically
+  // whenever a sync pull or local write changes expenses — no manual
+  // ref.invalidate(groupBalanceSummaryProvider) needed anywhere.
+  ref.watch(groupExpensesProvider(groupId));
   return ref
       .watch(balanceServiceProvider)
       .getGroupBalanceSummary(groupId, targetCurrency: targetCurrency);

@@ -461,12 +461,15 @@ class SyncService {
     List<String> cloudGroupIds,
   ) async {
     // ── Groups ───────────────────────────────────────────────────────────────
-    final localGroups = await LocalDatabase.db.query('groups', columns: ['id']);
-    final localGroupIds =
-        localGroups.map((r) => r['id'] as String).toSet();
     final cloudGroupIdSet = cloudGroupIds.toSet();
 
-    final orphanGroupIds = localGroupIds.difference(cloudGroupIdSet);
+    // Only prune groups that have been confirmed in Supabase (synced_at NOT NULL).
+    // Groups with synced_at IS NULL are pending push — don't delete them.
+    final syncedLocalGroups = await LocalDatabase.db.query(
+      'groups', columns: ['id'], where: 'synced_at IS NOT NULL');
+    final syncedLocalGroupIds =
+        syncedLocalGroups.map((r) => r['id'] as String).toSet();
+    final orphanGroupIds = syncedLocalGroupIds.difference(cloudGroupIdSet);
     for (final gid in orphanGroupIds) {
       debugPrint('[SyncService] reconciler: pruning orphan group $gid');
       // Cascade: delete expenses and splits for this group first.
@@ -496,8 +499,10 @@ class SyncService {
       final cloudExpenseIds =
           cloudExpenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toSet();
 
-      final localExpenses =
-          await LocalDatabase.db.query('expenses', columns: ['id']);
+      // Only reconcile expenses that have been synced — unsynced rows
+      // (synced_at IS NULL) are pending push and must not be pruned.
+      final localExpenses = await LocalDatabase.db.query(
+        'expenses', columns: ['id'], where: 'synced_at IS NOT NULL');
       for (final row in localExpenses) {
         final eid = row['id'] as String;
         if (!cloudExpenseIds.contains(eid)) {
@@ -519,7 +524,9 @@ class SyncService {
         final cloudSplitIds =
             cloudSplitRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toSet();
 
-        final localSplits = await LocalDatabase.db.query('splits', columns: ['id']);
+        // Same: only reconcile splits that have been confirmed in Supabase.
+        final localSplits = await LocalDatabase.db.query(
+          'splits', columns: ['id'], where: 'synced_at IS NOT NULL');
         for (final row in localSplits) {
           final sid = row['id'] as String;
           if (!cloudSplitIds.contains(sid)) {
