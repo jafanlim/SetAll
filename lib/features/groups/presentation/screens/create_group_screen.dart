@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -139,7 +138,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       appBar: AppBar(
         title: Text(
           'New Group',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16.sp),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -153,20 +152,20 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         children: [
           Expanded(
             child: ListView(
-              padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               children: [
 
                 // ── Group name ───────────────────────────────────────────────
                 Text(
                   'Group name',
                   style: TextStyle(
-                    fontSize: 12.sp,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.onSurfaceVariant,
                     letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 6.h),
+                const SizedBox(height: 6),
                 TextField(
                   controller: _nameCtrl,
                   autofocus: true,
@@ -181,29 +180,29 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   },
                 ),
 
-                SizedBox(height: 24.h),
+                const SizedBox(height: 24),
 
                 // ── Selected members chips ───────────────────────────────────
                 if (_selected.isNotEmpty) ...[
                   Text(
                     'Members (${_selected.length})',
                     style: TextStyle(
-                      fontSize: 12.sp,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: theme.colorScheme.onSurfaceVariant,
                       letterSpacing: 0.5,
                     ),
                   ),
-                  SizedBox(height: 8.h),
+                  const SizedBox(height: 8),
                   Wrap(
-                    spacing: 8.w,
-                    runSpacing: 6.h,
+                    spacing: 8,
+                    runSpacing: 6,
                     children: _selected
                         .map((p) => Chip(
                               label: Text(
                                 p.name,
-                                style: TextStyle(
-                                  fontSize: 12.sp,
+                                style: const TextStyle(
+                                  fontSize: 12,
                                   fontWeight: FontWeight.w600,
                                 ),
                               ),
@@ -213,32 +212,32 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                                   p.name.isNotEmpty
                                       ? p.name[0].toUpperCase()
                                       : '?',
-                                  style: TextStyle(
-                                    fontSize: 10.sp,
+                                  style: const TextStyle(
+                                    fontSize: 10,
                                     color: _teal,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
                               ),
-                              deleteIcon: Icon(Icons.close, size: 14.sp),
+                              deleteIcon: const Icon(Icons.close, size: 14),
                               onDeleted: () => _toggleMember(p),
                             ))
                         .toList(),
                   ),
-                  SizedBox(height: 16.h),
+                  const SizedBox(height: 16),
                 ],
 
                 // ── Add members section ──────────────────────────────────────
                 Text(
                   'Add members (optional)',
                   style: TextStyle(
-                    fontSize: 12.sp,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: theme.colorScheme.onSurfaceVariant,
                     letterSpacing: 0.5,
                   ),
                 ),
-                SizedBox(height: 6.h),
+                const SizedBox(height: 6),
                 TextField(
                   controller: _searchCtrl,
                   onChanged: _onQueryChanged,
@@ -258,21 +257,21 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   ),
                 ),
 
-                SizedBox(height: 8.h),
+                const SizedBox(height: 8),
 
                 // ── Search results ───────────────────────────────────────────
                 if (_query.length >= 2)
                   searchAsync.when(
                     loading: () => Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16.h),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                       child: const Center(child: CircularProgressIndicator()),
                     ),
                     error: (_, _) => Padding(
-                      padding: EdgeInsets.symmetric(vertical: 12.h),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
                       child: Text(
                         'Search unavailable. Check connection.',
                         style: TextStyle(
-                          fontSize: 12.sp,
+                          fontSize: 12,
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
                       ),
@@ -280,11 +279,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     data: (results) {
                       if (results.isEmpty) {
                         return Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Text(
                             'No users found for "$_query".',
                             style: TextStyle(
-                              fontSize: 12.sp,
+                              fontSize: 12,
                               color: theme.colorScheme.onSurfaceVariant,
                             ),
                           ),
@@ -295,16 +294,16 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                           final isSelected =
                               _selected.any((s) => s.id == p.id);
                           return Padding(
-                            padding: EdgeInsets.only(bottom: 6.h),
+                            padding: const EdgeInsets.only(bottom: 6),
                             child: GlassCard(
                               padding: EdgeInsets.zero,
                               child: ListTile(
                                 leading: Container(
-                                  width: 40.w,
-                                  height: 40.w,
+                                  width: 40,
+                                  height: 40,
                                   decoration: BoxDecoration(
                                     color: isSelected ? _teal : _tealDim,
-                                    borderRadius: BorderRadius.circular(12.r),
+                                    borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Center(
                                     child: Text(
@@ -316,33 +315,33 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                                             ? Colors.black
                                             : _teal,
                                         fontWeight: FontWeight.w800,
-                                        fontSize: 14.sp,
+                                        fontSize: 14,
                                       ),
                                     ),
                                   ),
                                 ),
                                 title: Text(
                                   p.name,
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 13.sp,
+                                    fontSize: 13,
                                   ),
                                 ),
                                 subtitle: p.nickname != null
                                     ? Text(
                                         '@${p.nickname}',
                                         style: TextStyle(
-                                          fontSize: 11.sp,
+                                          fontSize: 11,
                                           color: _teal,
                                         ),
                                       )
                                     : null,
                                 trailing: isSelected
-                                    ? Icon(Icons.check_circle,
-                                        color: _teal, size: 22.sp)
+                                    ? const Icon(Icons.check_circle,
+                                        color: _teal, size: 22)
                                     : Icon(Icons.add_circle_outline,
                                         color: theme.colorScheme.onSurfaceVariant,
-                                        size: 22.sp),
+                                        size: 22),
                                 onTap: () => _toggleMember(p),
                               ),
                             ),
@@ -353,25 +352,25 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   )
                 else if (_query.isEmpty)
                   Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12.h),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
                       'You can add members now or later from the group page.',
                       style: TextStyle(
-                        fontSize: 12.sp,
+                        fontSize: 12,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ),
 
-                SizedBox(height: 100.h), // space for bottom button
+                const SizedBox(height: 100), // space for bottom button
               ],
             ),
           ),
 
           // ── Create button ────────────────────────────────────────────────
           Container(
-            padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w,
-                MediaQuery.paddingOf(context).bottom + 16.h),
+            padding: EdgeInsets.fromLTRB(16, 12, 16,
+                MediaQuery.paddingOf(context).bottom + 16),
             decoration: BoxDecoration(
               color: theme.colorScheme.surface,
               border: Border(
@@ -381,20 +380,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 ),
               ),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
+            child: FilledButton.icon(
                 onPressed: _creating ? null : _create,
                 style: FilledButton.styleFrom(
                   backgroundColor: _teal,
                   foregroundColor: Colors.black,
-                  padding: EdgeInsets.symmetric(vertical: 14.h),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 icon: _creating
-                    ? SizedBox(
-                        width: 18.w,
-                        height: 18.h,
-                        child: const CircularProgressIndicator(
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.black),
                       )
                     : const Icon(Icons.check_rounded),
@@ -404,12 +401,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                       : _selected.isEmpty
                           ? 'Create Group'
                           : 'Create Group with ${_selected.length} member${_selected.length == 1 ? '' : 's'}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w700,
-                    fontSize: 15.sp,
+                    fontSize: 15,
                   ),
                 ),
-              ),
             ),
           ),
         ],

@@ -6,6 +6,7 @@ import '../layout/adaptive_shell.dart';
 import '../services/biometric_service.dart';
 import '../../features/auth/presentation/screens/biometric_gate_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/register_screen.dart';
 import '../../features/dashboard/presentation/screens/dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
 import '../../features/dashboard/presentation/screens/invite_member_screen.dart';
@@ -21,6 +22,7 @@ final class AppRouter {
   AppRouter._();
 
   static const String login = '/login';
+  static const String register = '/register';
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
   static const String friends = '/friends';
@@ -106,6 +108,16 @@ final class AppRouter {
           ),
         ),
         GoRoute(
+          path: register,
+          name: 'register',
+          pageBuilder: (context, state) => NoTransitionPage(
+            child: Material(
+              color: const Color(0xFF0F172A),
+              child: const RegisterScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
           path: biometricGate,
           name: 'biometricGate',
           pageBuilder: (context, state) => NoTransitionPage(
@@ -116,7 +128,7 @@ final class AppRouter {
           ),
         ),
 
-        // ── Shell: persistent nav bar wrapping Dashboard + Friends ─────────
+        // ── Shell: AdaptiveShell wraps Dashboard, Friends, Groups, Settings ──
         ShellRoute(
           builder: (context, state, child) => AdaptiveShell(
             currentPath: state.matchedLocation,
@@ -153,6 +165,16 @@ final class AppRouter {
                 ),
               ),
             ),
+            GoRoute(
+              path: settings,
+              name: 'settings',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const SettingsScreen(),
+                ),
+              ),
+            ),
           ],
         ),
 
@@ -169,18 +191,6 @@ final class AppRouter {
               ),
             );
           },
-        ),
-
-        // ── Settings (modal push, no shell nav bar) ───────────────────────
-        GoRoute(
-          path: settings,
-          name: 'settings',
-          pageBuilder: (context, state) => MaterialPage(
-            child: Material(
-              color: Theme.of(context).colorScheme.surface,
-              child: const SettingsScreen(),
-            ),
-          ),
         ),
 
         // ── Modal flows (push on top, no shell nav bar) ────────────────────
@@ -273,8 +283,12 @@ final class AppRouter {
 /// Notifies when Supabase auth state changes so the router can redirect.
 class _AuthRefresh extends ChangeNotifier {
   _AuthRefresh() {
-    Supabase.instance.client.auth.onAuthStateChange.listen((_) {
-      notifyListeners();
-    });
+    try {
+      Supabase.instance.client.auth.onAuthStateChange.listen((_) {
+        notifyListeners();
+      });
+    } catch (_) {
+      // Supabase not initialized (e.g. widget tests without credentials) — skip.
+    }
   }
 }

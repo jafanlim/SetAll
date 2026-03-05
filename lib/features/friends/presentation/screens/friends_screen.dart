@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/navigation_utils.dart';
@@ -50,26 +49,27 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: Text(
+        title: const Text(
           'Friends',
           style: TextStyle(
             fontWeight: FontWeight.w800,
-            fontSize: 20.sp,
+            fontSize: 20,
             letterSpacing: -0.3,
           ),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
+        automaticallyImplyLeading: false,
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showAddFriend,
         backgroundColor: _teal,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.person_add_outlined),
-        label: Text(
+        label: const Text(
           'Add friend',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14.sp),
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
       body: RefreshIndicator(
@@ -84,7 +84,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               return _EmptyFriendsView(onAdd: _showAddFriend);
             }
             return ListView.builder(
-              padding: EdgeInsets.fromLTRB(0, 8.h, 0, 96.h),
+              padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
               itemCount: friends.length,
               itemBuilder: (_, i) => _FriendCard(group: friends[i]),
             );
@@ -92,12 +92,12 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) => Center(
             child: Padding(
-              padding: EdgeInsets.all(24.w),
+              padding: const EdgeInsets.all(24),
               child: Text(
                 'Could not load friends',
                 style: TextStyle(
                   color: theme.colorScheme.error,
-                  fontSize: 14.sp,
+                  fontSize: 14,
                 ),
               ),
             ),
@@ -120,34 +120,34 @@ class _EmptyFriendsView extends StatelessWidget {
     final theme = Theme.of(context);
     return Center(
       child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 32.w),
+        padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.people_outline,
-              size: 64.sp,
+              size: 48,
               color: theme.colorScheme.onSurfaceVariant,
             ),
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
             Text(
               'No friends yet',
               style: TextStyle(
-                fontSize: 18.sp,
+                fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: theme.colorScheme.onSurface,
               ),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
             Text(
               'Add a friend by email to track 1-on-1 expenses.',
               style: TextStyle(
-                fontSize: 13.sp,
+                fontSize: 13,
                 color: theme.colorScheme.onSurfaceVariant,
               ),
               textAlign: TextAlign.center,
             ),
-            SizedBox(height: 24.h),
+            const SizedBox(height: 24),
             ElevatedButton.icon(
               onPressed: onAdd,
               icon: const Icon(Icons.person_add_outlined),
@@ -175,7 +175,7 @@ class _FriendCard extends ConsumerWidget {
     final currentUid = ref.watch(currentUserIdProvider);
 
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: GlassCard(
         child: InkWell(
           onTap: () {
@@ -190,13 +190,13 @@ class _FriendCard extends ConsumerWidget {
             }
             navigateToGroup(context: context, ref: ref, groupId: group.id, groupName: friendName);
           },
-          borderRadius: BorderRadius.circular(16.r),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: EdgeInsets.all(16.w),
+            padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 _FriendAvatar(membersAsync: membersAsync, currentUid: currentUid),
-                SizedBox(width: 12.w),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -206,19 +206,19 @@ class _FriendCard extends ConsumerWidget {
                         currentUid: currentUid,
                         theme: theme,
                       ),
-                      SizedBox(height: 4.h),
+                      const SizedBox(height: 4),
                       balanceAsync.when(
                         data: (s) => _BalanceSubtitle(summary: s),
-                        loading: () => SizedBox(height: 12.h),
+                        loading: () => const SizedBox(height: 12),
                         error: (_, _) => const SizedBox.shrink(),
                       ),
                     ],
                   ),
                 ),
-                Icon(
+                const Icon(
                   Icons.chevron_right,
-                  color: theme.colorScheme.onSurfaceVariant,
-                  size: 20.sp,
+                  color: Colors.white38,
+                  size: 20,
                 ),
               ],
             ),
@@ -245,8 +245,8 @@ class _FriendAvatar extends StatelessWidget {
       }
     }
     return Container(
-      width: 44.w,
-      height: 44.w,
+      width: 40,
+      height: 40,
       decoration: BoxDecoration(
         color: _tealDim,
         shape: BoxShape.circle,
@@ -254,10 +254,10 @@ class _FriendAvatar extends StatelessWidget {
       child: Center(
         child: Text(
           initial,
-          style: TextStyle(
+          style: const TextStyle(
             color: _teal,
             fontWeight: FontWeight.w800,
-            fontSize: 18.sp,
+            fontSize: 16,
           ),
         ),
       ),
@@ -278,10 +278,10 @@ class _FriendName extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (membersAsync.isLoading) {
-      return SizedBox(
-        height: 14.h,
-        width: 100.w,
-        child: const LinearProgressIndicator(),
+      return const SizedBox(
+        height: 14,
+        width: 100,
+        child: LinearProgressIndicator(),
       );
     }
     String name = 'Friend';
@@ -294,7 +294,7 @@ class _FriendName extends StatelessWidget {
       name,
       style: theme.textTheme.titleSmall?.copyWith(
         fontWeight: FontWeight.w700,
-        fontSize: 14.sp,
+        fontSize: 14,
       ),
     );
   }
@@ -315,7 +315,7 @@ class _BalanceSubtitle extends StatelessWidget {
         'Settled up',
         style: theme.textTheme.bodySmall?.copyWith(
           color: _teal,
-          fontSize: 11.sp,
+          fontSize: 11,
         ),
       );
     }
@@ -339,7 +339,7 @@ class _BalanceSubtitle extends StatelessWidget {
 
     return RichText(
       text: TextSpan(
-        style: TextStyle(fontSize: 11.sp),
+        style: const TextStyle(fontSize: 11),
         children: parts,
       ),
     );
@@ -429,7 +429,7 @@ class _AddFriendSearchSheetState
             BoxConstraints(maxHeight: MediaQuery.sizeOf(context).height * 0.85),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -437,19 +437,19 @@ class _AddFriendSearchSheetState
             // Handle
             Center(
               child: Container(
-                margin: EdgeInsets.symmetric(vertical: 10.h),
-                width: 36.w,
-                height: 4.h,
+                margin: const EdgeInsets.symmetric(vertical: 10),
+                width: 36,
+                height: 4,
                 decoration: BoxDecoration(
                   color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
-                  borderRadius: BorderRadius.circular(2.r),
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
 
             // Header
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20.w),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 children: [
                   Expanded(
@@ -460,13 +460,13 @@ class _AddFriendSearchSheetState
                           'Add a Friend',
                           style: TextStyle(
                             fontWeight: FontWeight.w800,
-                            fontSize: 17.sp,
+                            fontSize: 17,
                           ),
                         ),
                         Text(
                           'Search by name, @nickname or email',
                           style: TextStyle(
-                            fontSize: 12.sp,
+                            fontSize: 12,
                             color: _teal,
                           ),
                         ),
@@ -481,11 +481,11 @@ class _AddFriendSearchSheetState
               ),
             ),
 
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
 
             // Search field
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16.w),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: TextField(
                 controller: _ctrl,
                 autofocus: true,
@@ -506,24 +506,24 @@ class _AddFriendSearchSheetState
                 ),
               ),
             ),
-            SizedBox(height: 8.h),
+            const SizedBox(height: 8),
 
             // Feedback
             if (_error != null)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: GlassCard(
-                  padding: EdgeInsets.all(10.w),
+                  padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
                       Icon(Icons.error_outline,
-                          color: theme.colorScheme.error, size: 15.sp),
-                      SizedBox(width: 8.w),
+                          color: theme.colorScheme.error, size: 15),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           _error!,
                           style: TextStyle(
-                              color: theme.colorScheme.error, fontSize: 12.sp),
+                              color: theme.colorScheme.error, fontSize: 12),
                         ),
                       ),
                     ],
@@ -533,17 +533,17 @@ class _AddFriendSearchSheetState
 
             if (_success != null)
               Padding(
-                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 child: GlassCard(
-                  padding: EdgeInsets.all(10.w),
+                  padding: const EdgeInsets.all(10),
                   child: Row(
                     children: [
-                      Icon(Icons.check_circle_outline,
-                          color: _teal, size: 15.sp),
-                      SizedBox(width: 8.w),
+                      const Icon(Icons.check_circle_outline,
+                          color: _teal, size: 15),
+                      const SizedBox(width: 8),
                       Text(
                         _success!,
-                        style: TextStyle(color: _teal, fontSize: 12.sp),
+                        style: const TextStyle(color: _teal, fontSize: 12),
                       ),
                     ],
                   ),
@@ -554,13 +554,13 @@ class _AddFriendSearchSheetState
             Flexible(
               child: _query.length < 2
                   ? Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 24.w, vertical: 24.h),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 24),
                       child: Center(
                         child: Text(
                           'Type at least 2 characters to search for friends.',
                           style: TextStyle(
-                            fontSize: 13.sp,
+                            fontSize: 13,
                             color: theme.colorScheme.onSurfaceVariant,
                           ),
                           textAlign: TextAlign.center,
@@ -576,11 +576,11 @@ class _AddFriendSearchSheetState
                       ),
                       error: (_, _) => Center(
                         child: Padding(
-                          padding: EdgeInsets.all(24.w),
+                          padding: const EdgeInsets.all(24),
                           child: Text(
                             'Search unavailable. Check your connection.',
                             style: TextStyle(
-                                fontSize: 13.sp,
+                                fontSize: 13,
                                 color: theme.colorScheme.onSurfaceVariant),
                           ),
                         ),
@@ -588,19 +588,19 @@ class _AddFriendSearchSheetState
                       data: (results) => results.isEmpty
                           ? Center(
                               child: Padding(
-                                padding: EdgeInsets.all(24.w),
+                                padding: const EdgeInsets.all(24),
                                 child: Text(
                                   'No users found for "$_query".',
                                   style: TextStyle(
-                                      fontSize: 13.sp,
+                                      fontSize: 13,
                                       color: theme.colorScheme.onSurfaceVariant),
                                   textAlign: TextAlign.center,
                                 ),
                               ),
                             )
                           : ListView(
-                              padding: EdgeInsets.symmetric(
-                                  horizontal: 16.w, vertical: 4.h),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 16, vertical: 4),
                               children: results
                                   .map((p) => _FriendResultTile(
                                         profile: p,
@@ -612,7 +612,7 @@ class _AddFriendSearchSheetState
                     ),
             ),
 
-            SizedBox(height: 16.h),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -641,57 +641,57 @@ class _FriendResultTile extends StatelessWidget {
         : '?';
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 6.h),
+      padding: const EdgeInsets.only(bottom: 6),
       child: GlassCard(
         padding: EdgeInsets.zero,
         child: ListTile(
           leading: Container(
-            width: 40.w,
-            height: 40.w,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 colors: [_teal, Color(0xFF00A896)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
-              borderRadius: BorderRadius.circular(12.r),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Center(
               child: Text(
                 initial,
-                style: TextStyle(
+                style: const TextStyle(
                   color: Colors.black,
                   fontWeight: FontWeight.w800,
-                  fontSize: 14.sp,
+                  fontSize: 14,
                 ),
               ),
             ),
           ),
           title: Text(
             profile.name,
-            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.sp),
+            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
           ),
           subtitle: profile.nickname != null
               ? Text(
                   '@${profile.nickname}',
-                  style: TextStyle(fontSize: 11.sp, color: _teal),
+                  style: const TextStyle(fontSize: 11, color: _teal),
                 )
               : null,
           trailing: adding
-              ? SizedBox(
-                  height: 20.h,
-                  width:  20.w,
-                  child:  const CircularProgressIndicator(strokeWidth: 2),
+              ? const SizedBox(
+                  height: 20,
+                  width:  20,
+                  child:  CircularProgressIndicator(strokeWidth: 2),
                 )
               : FilledButton(
                   onPressed: onAdd,
                   style: FilledButton.styleFrom(
                     backgroundColor: _teal,
                     foregroundColor: Colors.black,
-                    padding: EdgeInsets.symmetric(
-                        horizontal: 14.w, vertical: 6.h),
-                    textStyle: TextStyle(
-                        fontSize: 12.sp, fontWeight: FontWeight.w700),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    textStyle: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w700),
                     minimumSize: const Size(0, 0),
                   ),
                   child: const Text('Add'),

@@ -97,9 +97,6 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     final themeMode = ref.watch(themeModeProvider);
     final isDesktop = _isDesktop;
 
-    const desktopDesignSize = Size(1440, 900);
-    const mobileDesignSize = Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
-
     return MaterialApp.router(
       title: 'SetAll',
       debugShowCheckedModeBanner: false,
@@ -111,19 +108,15 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
         // On desktop, pass the actual window size as the design size so every
         // .w / .h / .sp call is a 1:1 identity (no upscaling from mobile baseline).
         // Mobile keeps the 390×844 iPhone 16 Pro baseline.
-        final windowSize = MediaQuery.sizeOf(context);
         final designSize = isDesktop
-            ? windowSize                                        // 1:1 on desktop
+            ? const Size(1440, 900)
             : const Size(ScalingUtility.designWidth, ScalingUtility.designHeight);
 
-        // On desktop clamp text scale to 1.0 so system accessibility settings
-        // don't inflate every font. Mobile keeps the user's preferred scale.
-        // Temporarily disabled to test keyboard input issue.
         final inner = child ?? const SizedBox.shrink();
 
         return ScreenUtilInit(
           designSize: designSize,
-          minTextAdapt: false,
+          minTextAdapt: !isDesktop,
           splitScreenMode: false,
           builder: (_, _) {
             ScalingUtility.init(context);

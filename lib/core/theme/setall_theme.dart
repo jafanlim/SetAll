@@ -36,7 +36,11 @@ class SetAllTheme {
     labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5),
   );
 
-  static ThemeData get desktopDark  => dark.copyWith(textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onSurface, displayColor: _onSurface));
+  static ThemeData get desktopDark  => dark.copyWith(
+    scaffoldBackgroundColor: const Color(0xFF020617),
+    colorScheme: dark.colorScheme.copyWith(surface: const Color(0xFF020617)),
+    textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onSurface, displayColor: _onSurface),
+  );
   static ThemeData get desktopLight => light.copyWith(textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onGold, displayColor: _onGold));
 
   static ThemeData get dark {
