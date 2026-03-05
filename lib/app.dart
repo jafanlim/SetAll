@@ -54,6 +54,17 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       // _lastUserId is null and stale provider cache may be present.
       _invalidateAllProviders();
       _lastUserId = newUid;
+      // Pull remote data immediately now that a valid session exists.
+      // This is the canonical sync trigger for first-launch and OAuth sign-in
+      // where DashboardScreen.initState may have already fired with a null uid.
+      unawaited(
+        ref.read(syncServiceProvider).performFullSync().then((_) {
+          if (mounted) {
+            ref.invalidate(balanceSummaryProvider);
+            ref.invalidate(recentExpensesProvider);
+          }
+        }),
+      );
     }
 
     // On sign-out always invalidate so the login screen starts clean.
