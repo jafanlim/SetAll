@@ -24,6 +24,7 @@ class Expense {
     this.splitType = SplitType.even,
     this.category = 'General',
     this.createdAt,
+    this.createdBy,
     this.originalAmount,
     this.originalCurrency,
     this.exchangeRateApplied,
@@ -45,6 +46,9 @@ class Expense {
   final SplitType splitType;
   final String category;
   final String? createdAt;
+
+  /// The user ID who created this expense (maps to Supabase auth.uid()).
+  final String? createdBy;
 
   /// Original amount before USD conversion (null when entered in USD).
   final String? originalAmount;
