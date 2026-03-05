@@ -103,7 +103,9 @@ class SyncService {
       try {
         final expense = ExpenseModel.fromJson(row);
         // Strip local-only / schema-mismatched fields before sending to Supabase.
-        final payload = expense.toJson()..remove('created_by');
+        final payload = expense.toJson()
+          ..remove('created_by')
+          ..remove('base_amount_at_entry');
         await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
           'expenses',

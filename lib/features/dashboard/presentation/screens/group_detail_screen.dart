@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../data/repositories/setall_repository.dart' show BalanceSummary;
+import '../../../../domain/services/settlement_engine.dart' show SettlementTransaction;
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -860,6 +861,102 @@ class _ExpenseTile extends ConsumerWidget {
 // ---------------------------------------------------------------------------
 // Settlement Plan section
 // ---------------------------------------------------------------------------
+
+/// Button shown next to a debt row when the current user is the debtor.
+/// Confirms then calls [SetAllRepository.recordSettlement].
+class _SettleButton extends ConsumerStatefulWidget {
+  const _SettleButton({
+    required this.groupId,
+    required this.debt,
+    required this.amountStr,
+  });
+
+  final String groupId;
+  final SettlementTransaction debt;
+  final String amountStr;
+
+  @override
+  ConsumerState<_SettleButton> createState() => _SettleButtonState();
+}
+
+class _SettleButtonState extends ConsumerState<_SettleButton> {
+  bool _loading = false;
+
+  Future<void> _settle() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Record settlement?'),
+        content: Text(
+          'This records that you paid ${widget.amountStr}. '
+          'The debt will disappear from the settlement plan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+            ),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Settle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _loading = true);
+    final ok = await ref.read(setAllRepositoryProvider).recordSettlement(
+      groupId: widget.groupId,
+      fromUserId: widget.debt.fromUserId,
+      toUserId: widget.debt.toUserId,
+      amount: widget.debt.amount.toString(),
+      currency: widget.debt.currency,
+    );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (ok) {
+      ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
+      ref.invalidate(simplifiedDebtsProvider(widget.groupId));
+      ref.invalidate(balanceSummaryProvider);
+      HapticUtils.success();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not record settlement. Try again.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const SizedBox(
+        width: 20,
+        height: 20,
+        child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+      );
+    }
+    return TextButton(
+      onPressed: _settle,
+      style: TextButton.styleFrom(
+        foregroundColor: _teal,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: const Text(
+        'Settle',
+        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+      ),
+    );
+  }
+}
+
 class _SettlementPlanSection extends ConsumerWidget {
   const _SettlementPlanSection({required this.groupId});
   final String groupId;
@@ -961,14 +1058,20 @@ class _SettlementPlanSection extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      trailing: Text(
-                        amountStr,
-                        style: TextStyle(
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                          color: isCurrentUserDebtor ? _orange : _teal,
-                        ),
-                      ),
+                      trailing: isCurrentUserDebtor
+                          ? _SettleButton(
+                              groupId: groupId,
+                              debt: debt,
+                              amountStr: amountStr,
+                            )
+                          : Text(
+                              amountStr,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 13,
+                                color: _teal,
+                              ),
+                            ),
                     );
                   }).toList(),
                 ),
