@@ -15,6 +15,8 @@ import '../../data/repositories/setall_repository.dart';
 /// pull-to-refresh, or on network reconnect).
 ///
 /// Call [performFullSync] to run a complete push-then-pull cycle.
+/// Call [subscribeToRealtime] once after sign-in to enable live cross-device sync.
+/// Call [unsubscribeFromRealtime] on sign-out to release the websocket channel.
 class SyncService {
   SyncService({
     required SetAllRepository repository,
@@ -24,6 +26,9 @@ class SyncService {
 
   final SetAllRepository _repo;
   final SupabaseClient? _client;
+
+  bool _isSyncing = false;
+  RealtimeChannel? _channel;
 
   bool get _isWeb => LocalDatabase.isWeb;
 
@@ -39,25 +44,125 @@ class SyncService {
 
   /// Full sync cycle: push pending local writes, then pull remote state.
   ///
-  /// Safe to call at any time — no-ops when offline or on web.
-  /// Errors are swallowed so a network failure never crashes the caller.
+  /// Safe to call at any time — no-ops when offline, on web, or if already
+  /// running. The [_isSyncing] flag prevents "sync storms" when many realtime
+  /// events arrive simultaneously.
   Future<void> performFullSync() async {
+    if (_isSyncing) return;
     if (_isWeb || _client == null) return;
     if (!await _isOnline) return;
     final uid = await _repo.ensureUser();
     if (uid == null) return;
 
+    _isSyncing = true;
     try {
-      await _pushPendingToSupabase(uid);
-    } catch (e) {
-      debugPrint('[SyncService] push error: $e');
+      try {
+        await _pushPendingToSupabase(uid);
+      } catch (e) {
+        debugPrint('[SyncService] push error: $e');
+      }
+
+      try {
+        await _pullFromSupabase(uid);
+        _repo.notifySyncComplete();
+      } catch (e) {
+        debugPrint('[SyncService] pull error: $e');
+      }
+    } finally {
+      _isSyncing = false;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Realtime: Supabase → local (cross-device push)
+  // ---------------------------------------------------------------------------
+
+  /// Subscribes to Postgres changes for all sync-relevant tables.
+  /// When a remote change is detected that the current user didn't author,
+  /// a full sync is triggered automatically.
+  ///
+  /// Safe to call multiple times — cancels any existing channel first.
+  void subscribeToRealtime() {
+    if (_isWeb || _client == null) return;
+    unsubscribeFromRealtime();
+
+    void onRemoteChange(PostgresChangePayload payload) {
+      // Fire-and-forget: errors are swallowed inside performFullSync.
+      performFullSync();
     }
 
-    try {
-      await _pullFromSupabase(uid);
-      _repo.notifySyncComplete();
-    } catch (e) {
-      debugPrint('[SyncService] pull error: $e');
+    _channel = _client
+        .channel('setall-sync')
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'expenses',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'expenses',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'expenses',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'splits',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'splits',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'groups',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'groups',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'groups',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'group_members',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'group_members',
+          callback: onRemoteChange,
+        )
+        .subscribe((status, [error]) {
+          debugPrint('[SyncService] realtime status=$status error=$error');
+        });
+  }
+
+  /// Removes the realtime channel and releases the websocket subscription.
+  void unsubscribeFromRealtime() {
+    if (_channel != null) {
+      _client?.removeChannel(_channel!);
+      _channel = null;
     }
   }
 
