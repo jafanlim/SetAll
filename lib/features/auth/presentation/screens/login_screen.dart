@@ -158,7 +158,10 @@ class _LoginScreenState extends State<LoginScreen> {
       await Supabase.instance.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: redirectUrl,
-        authScreenLaunchMode: LaunchMode.platformDefault,
+        // externalBrowser lets the OS handle the com.jafa.setall:// redirect
+        // and return to the app automatically. platformDefault opens an
+        // in-app SFSafariViewController on iOS that never auto-dismisses.
+        authScreenLaunchMode: kIsWeb ? LaunchMode.platformDefault : LaunchMode.externalApplication,
         queryParams: const {'prompt': 'select_account'},
       );
       if (mounted) setState(() => _loading = false);
