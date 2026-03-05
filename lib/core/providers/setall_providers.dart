@@ -119,6 +119,8 @@ final currentUserIdProvider = Provider<String?>((ref) {
 final balanceSummaryProvider = FutureProvider<BalanceSummary>((ref) async {
   ref.watch(baseCurrencyProvider);
   ref.watch(currencyServiceProvider);
+  // Watch the groups stream so the total refreshes when sync pulls new data.
+  ref.watch(myGroupsProvider);
   return ref
       .watch(balanceServiceProvider)
       .getBalanceSummary();
