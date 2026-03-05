@@ -46,23 +46,31 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     final newUid = state.session?.user.id;
 
     if (state.event == AuthChangeEvent.signedIn && newUid != null) {
-      // Wipe SQLite when the user actually changed (covers account-switch).
-      if (_lastUserId != null && newUid != _lastUserId) {
+      final isUserSwitch = _lastUserId != null && newUid != _lastUserId;
+      final isFirstLogin  = _lastUserId == null;
+
+      if (isUserSwitch) {
+        // Different account — wipe SQLite and all provider caches.
         await _wipeSQLiteCache();
+        _invalidateAllProviders();
+      } else if (isFirstLogin) {
+        // First login this session — invalidate caches only (no SQLite wipe).
+        _invalidateAllProviders();
       }
-      // Always invalidate on every sign-in — covers first login where
-      // _lastUserId is null and stale provider cache may be present.
-      _invalidateAllProviders();
+      // Token refresh / session-restore with same user: do nothing extra —
+      // the StreamController and its listeners stay intact.
+
       _lastUserId = newUid;
-      // Pull remote data immediately now that a valid session exists.
-      // This is the canonical sync trigger for first-launch and OAuth sign-in
-      // where DashboardScreen.initState may have already fired with a null uid.
+
+      // Pull remote data now that a valid session exists.
+      // Using a local capture of syncServiceProvider so we don't touch
+      // ref after the widget might be disposed.
+      final sync = ref.read(syncServiceProvider);
       unawaited(
-        ref.read(syncServiceProvider).performFullSync().then((_) {
-          if (mounted) {
-            ref.invalidate(balanceSummaryProvider);
-            ref.invalidate(recentExpensesProvider);
-          }
+        sync.performFullSync().then((_) {
+          if (!mounted) return;
+          ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(recentExpensesProvider);
         }),
       );
     }
@@ -88,8 +96,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
   }
 
   void _invalidateAllProviders() {
-    ref.invalidate(setAllRepositoryProvider);
-    ref.invalidate(balanceServiceProvider);
+    // Do NOT invalidate setAllRepositoryProvider — it owns the StreamController
+    // that backs watchGroups()/watchGroupExpenses(). Destroying it kills all
+    // active stream listeners and creates a new instance that notifySyncComplete()
+    // can never reach.
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(baseCurrencyProvider);
     ref.invalidate(currentProfileProvider);
