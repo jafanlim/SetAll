@@ -55,6 +55,7 @@ class SyncService {
 
     try {
       await _pullFromSupabase(uid);
+      _repo.notifySyncComplete();
     } catch (e) {
       debugPrint('[SyncService] pull error: $e');
     }
