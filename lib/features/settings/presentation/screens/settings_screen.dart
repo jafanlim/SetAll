@@ -735,6 +735,66 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
+                  leading: const Icon(Icons.refresh, color: Colors.orangeAccent),
+                  title: const Text(
+                    'Reset Local Cache',
+                    style: TextStyle(
+                      color: Colors.orangeAccent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Wipes local DB and re-syncs from cloud. Fixes ghost data.',
+                    style: TextStyle(fontSize: 11),
+                  ),
+                  onTap: () async {
+                    final confirmed = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: const Text('Reset local cache?'),
+                        content: const Text(
+                          'All local data will be wiped and re-downloaded from '
+                          'the cloud. Use this to fix ghost groups or missing expenses.',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: const Text('Cancel'),
+                          ),
+                          FilledButton(
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Colors.orangeAccent,
+                              foregroundColor: Colors.black,
+                            ),
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: const Text('Reset & Sync'),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirmed != true || !context.mounted) return;
+                    try {
+                      await LocalDatabase.db.delete('splits');
+                      await LocalDatabase.db.delete('expenses');
+                      await LocalDatabase.db.delete('group_members');
+                      await LocalDatabase.db.delete('groups');
+                      await LocalDatabase.db.delete('profiles');
+                      await ref.read(syncServiceProvider).performFullSync();
+                      ref.invalidate(myGroupsProvider);
+                      ref.invalidate(balanceSummaryProvider);
+                      ref.invalidate(recentExpensesProvider);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Cache reset and synced from cloud')),
+                        );
+                      }
+                    } catch (e) {
+                      debugPrint('Reset Local Cache error: $e');
+                    }
+                  },
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
                   leading: const Icon(Icons.logout, color: Colors.redAccent),
                   title: const Text(
                     'Sign out',
