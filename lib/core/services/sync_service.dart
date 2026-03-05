@@ -110,18 +110,19 @@ class SyncService {
           whereArgs: [row['id']],
         );
       } catch (e) {
-        if (e is PostgrestException) {
-          if (e.code == '23505') {
-            debugPrint('⚠️ Expense already exists in cloud. Marking as synced locally.');
-          } else {
-            debugPrint('⚠️ Expense skipped (${e.code}): ${e.message}');
-          }
+        if (e is PostgrestException && e.code == '23505') {
+          // Duplicate key: row is already in Supabase — mark synced locally.
+          debugPrint('[SyncService] expense already in cloud, marking synced: ${row['id']}');
           await LocalDatabase.db.update(
             'expenses',
             {'synced_at': DateTime.now().millisecondsSinceEpoch},
             where: 'id = ?',
             whereArgs: [row['id']],
           );
+        } else {
+          // Any other error (RLS, network, bad data): leave synced_at=null
+          // so this row is retried on the next sync cycle.
+          debugPrint('[SyncService] expense push failed, will retry: $e');
         }
       }
     }
@@ -139,16 +140,16 @@ class SyncService {
           whereArgs: [row['id']],
         );
       } catch (e) {
-        if (e is PostgrestException) {
-          if (e.code != '23505') {
-            debugPrint('⚠️ Split skipped (${e.code}): ${e.message}');
-          }
+        if (e is PostgrestException && e.code == '23505') {
+          // Duplicate key: already in Supabase — mark synced.
           await LocalDatabase.db.update(
             'splits',
             {'synced_at': DateTime.now().millisecondsSinceEpoch},
             where: 'id = ?',
             whereArgs: [row['id']],
           );
+        } else {
+          debugPrint('[SyncService] split push failed, will retry: $e');
         }
       }
     }
