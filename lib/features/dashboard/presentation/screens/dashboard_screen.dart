@@ -31,6 +31,20 @@ class DashboardScreen extends ConsumerStatefulWidget {
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(syncServiceProvider).performFullSync().then((_) {
+        if (mounted) {
+          ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(myGroupsProvider);
+          ref.invalidate(recentExpensesProvider);
+        }
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
@@ -42,6 +56,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       color: _teal,
       onRefresh: () async {
         HapticUtils.lightTap();
+        await ref.read(syncServiceProvider).performFullSync();
         ref.invalidate(balanceSummaryProvider);
         ref.invalidate(myGroupsProvider);
         ref.invalidate(recentExpensesProvider);
