@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:sqflite/sqflite.dart';
@@ -28,7 +30,10 @@ class SyncService {
   final SupabaseClient? _client;
 
   bool _isSyncing = false;
+  bool _syncPending = false;
   RealtimeChannel? _channel;
+  Timer? _periodicTimer;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   bool get _isWeb => LocalDatabase.isWeb;
 
@@ -44,17 +49,22 @@ class SyncService {
 
   /// Full sync cycle: push pending local writes, then pull remote state.
   ///
-  /// Safe to call at any time — no-ops when offline, on web, or if already
-  /// running. The [_isSyncing] flag prevents "sync storms" when many realtime
-  /// events arrive simultaneously.
+  /// Safe to call at any time — no-ops when offline or on web.
+  /// If a sync is already running, sets [_syncPending] so the cycle reruns
+  /// immediately after the current one finishes. This ensures no change event
+  /// is ever silently dropped.
   Future<void> performFullSync() async {
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      _syncPending = true;
+      return;
+    }
     if (_isWeb || _client == null) return;
     if (!await _isOnline) return;
     final uid = await _repo.ensureUser();
     if (uid == null) return;
 
     _isSyncing = true;
+    _syncPending = false;
     try {
       try {
         await _pushPendingToSupabase(uid);
@@ -70,6 +80,11 @@ class SyncService {
       }
     } finally {
       _isSyncing = false;
+      // If an event arrived while we were syncing, run one more cycle now.
+      if (_syncPending) {
+        _syncPending = false;
+        unawaited(performFullSync());
+      }
     }
   }
 
@@ -77,14 +92,33 @@ class SyncService {
   // Realtime: Supabase → local (cross-device push)
   // ---------------------------------------------------------------------------
 
-  /// Subscribes to Postgres changes for all sync-relevant tables.
-  /// When a remote change is detected that the current user didn't author,
-  /// a full sync is triggered automatically.
+  /// Starts all background sync mechanisms:
+  ///  1. Supabase Realtime websocket (best-effort, fires on cloud changes).
+  ///  2. Periodic timer every 30 s (reliable fallback for when Realtime
+  ///     events are missed due to app backgrounding or network switches).
+  ///  3. Connectivity change listener (re-syncs immediately on reconnect).
   ///
-  /// Safe to call multiple times — cancels any existing channel first.
+  /// Safe to call multiple times — cancels existing subscriptions first.
   void subscribeToRealtime() {
     if (_isWeb || _client == null) return;
     unsubscribeFromRealtime();
+
+    // ── Periodic timer ──────────────────────────────────────────────────────
+    _periodicTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      debugPrint('[SyncService] periodic sync tick');
+      performFullSync();
+    });
+
+    // ── Connectivity change listener ─────────────────────────────────────────
+    _connectivitySub = Connectivity()
+        .onConnectivityChanged
+        .listen((results) {
+      final isOnline = results.any((r) => r != ConnectivityResult.none);
+      if (isOnline) {
+        debugPrint('[SyncService] connectivity restored — syncing');
+        performFullSync();
+      }
+    });
 
     void onRemoteChange(PostgresChangePayload payload) {
       // Fire-and-forget: errors are swallowed inside performFullSync.
@@ -158,8 +192,12 @@ class SyncService {
         });
   }
 
-  /// Removes the realtime channel and releases the websocket subscription.
+  /// Cancels all background sync mechanisms.
   void unsubscribeFromRealtime() {
+    _periodicTimer?.cancel();
+    _periodicTimer = null;
+    _connectivitySub?.cancel();
+    _connectivitySub = null;
     if (_channel != null) {
       _client?.removeChannel(_channel!);
       _channel = null;
