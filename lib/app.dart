@@ -44,7 +44,17 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
 
   Future<void> _onAuthChange(AuthState state) async {
     final newUid = state.session?.user.id;
-    if (state.event == AuthChangeEvent.signedIn && newUid != null) {
+
+    // Handle all events that mean "we have a valid authenticated session":
+    //   • signedIn       — fresh login
+    //   • initialSession — cold start with a stored session (most common case)
+    //   • tokenRefreshed — silent token renewal
+    final isAuthenticatedEvent =
+        state.event == AuthChangeEvent.signedIn ||
+        state.event == AuthChangeEvent.initialSession ||
+        state.event == AuthChangeEvent.tokenRefreshed;
+
+    if (isAuthenticatedEvent && newUid != null) {
       final isUserSwitch = _lastUserId != null && newUid != _lastUserId;
       final isFirstLogin  = _lastUserId == null;
 
@@ -63,13 +73,9 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
 
       _lastUserId = newUid;
 
-      // Pull remote data now that a valid session exists.
-      // Using a local capture of syncServiceProvider so we don't touch
-      // ref after the widget might be disposed.
       final sync = ref.read(syncServiceProvider);
-      // Establish realtime subscription so changes from other devices are
-      // received automatically. Safe to call multiple times — it cancels any
-      // existing channel before creating a new one.
+      // subscribeToRealtime is idempotent — cancels existing channel/timer
+      // before creating new ones. Safe to call on every token refresh.
       sync.subscribeToRealtime();
       unawaited(
         sync.performFullSync().then((_) {
