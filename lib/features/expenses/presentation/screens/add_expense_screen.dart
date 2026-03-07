@@ -115,11 +115,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Future<void> _loadMembers() async {
     final repo = ref.read(setAllRepositoryProvider);
     final uid = await repo.ensureUser();
-    final members = await repo.getGroupMembers(widget.groupId);
+    // wallet mode — no group, no members to load; skip the Supabase call
+    // entirely to avoid sending '' as a UUID which Postgres rejects.
+    final members = widget.groupId.isEmpty
+        ? await Future.value(<dynamic>[])
+        : await repo.getGroupMembers(widget.groupId);
     if (!mounted) return;
 
-    var ids   = members.map((m) => m.id).toList();
-    var names = members.map((m) => m.name).toList();
+    var ids   = members.map((m) => m.id   as String).toList();
+    var names = members.map((m) => m.name as String).toList();
 
     debugPrint('[AddExpense] _loadMembers: uid=$uid, members=${ids.length}: $ids');
 

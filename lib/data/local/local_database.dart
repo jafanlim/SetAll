@@ -157,9 +157,24 @@ class LocalDatabase {
       ''');
     }
     if (oldVersion < 11) {
-      // Fix: rebuild expenses table so group_id is nullable AND all existing
-      // columns (including base_amount_at_entry from v4) are preserved.
-      // Using explicit column copy avoids SELECT * failures when schemas diverge.
+      // Rebuild expenses so group_id is nullable.
+      // Use PRAGMA table_info to discover which columns actually exist in the
+      // current (pre-migration) expenses table — handles every upgrade path
+      // regardless of which prior migrations ran on this device.
+      const desiredColumns = [
+        'id', 'group_id', 'payer_id', 'created_by', 'amount', 'total_amount',
+        'base_amount_at_entry', 'description', 'currency', 'split_type',
+        'category', 'original_amount', 'original_currency',
+        'exchange_rate_applied', 'universal_usd_amount', 'created_at',
+        'updated_at', 'synced_at',
+      ];
+      final pragmaRows = await db.rawQuery('PRAGMA table_info(expenses)');
+      final existingCols =
+          pragmaRows.map((r) => r['name'] as String).toSet();
+      final colsToCopy =
+          desiredColumns.where((c) => existingCols.contains(c)).toList();
+      final colList = colsToCopy.join(', ');
+
       await db.execute('''
         CREATE TABLE IF NOT EXISTS expenses_v11 (
           id                    TEXT PRIMARY KEY,
@@ -182,28 +197,17 @@ class LocalDatabase {
           synced_at             INTEGER
         )
       ''');
-      // Copy only the columns that exist in BOTH old and new schema.
-      await db.execute('''
-        INSERT OR IGNORE INTO expenses_v11 (
-          id, group_id, payer_id, created_by, amount, total_amount,
-          base_amount_at_entry, description, currency, split_type, category,
-          original_amount, original_currency, exchange_rate_applied,
-          universal_usd_amount, created_at, updated_at, synced_at
-        )
-        SELECT
-          id, group_id, payer_id, created_by, amount, total_amount,
-          base_amount_at_entry, description, currency, split_type, category,
-          original_amount, original_currency, exchange_rate_applied,
-          universal_usd_amount, created_at, updated_at, synced_at
-        FROM expenses
-      ''');
+      // Only copy columns present in both tables.
+      await db.execute(
+        'INSERT OR IGNORE INTO expenses_v11 ($colList) SELECT $colList FROM expenses',
+      );
       await db.execute('DROP TABLE IF EXISTS expenses');
       await db.execute('ALTER TABLE expenses_v11 RENAME TO expenses');
-      // Restore the unique index on splits (may have been lost if v9 ran before v10).
+      // Restore unique index on splits.
       await db.execute(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
       );
-      // Track groups the user has voluntarily left so sync never re-pulls them.
+      // Persist groups the user voluntarily left so sync never re-pulls them.
       await db.execute('''
         CREATE TABLE IF NOT EXISTS left_groups (
           group_id TEXT PRIMARY KEY,

@@ -1574,9 +1574,15 @@ class SetAllRepository {
     
           final expenseData = expense.toJson();
           // Strip local-only / schema-mismatched fields before sending to Supabase.
+          // Remap is_income: SQLite stores 0/1 int, Postgres expects boolean.
+          // Also coerce empty-string groupId to null (wallet entries).
           final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
             ..remove('created_by')
-            ..remove('base_amount_at_entry');
+            ..remove('base_amount_at_entry')
+            ..['is_income'] = (expenseData['is_income'] as int? ?? 0) != 0
+            ..['group_id'] = (expenseData['group_id'] as String?)?.isEmpty == true
+                ? null
+                : expenseData['group_id'];
     
           if (_isWeb && _client != null) {
             try {
