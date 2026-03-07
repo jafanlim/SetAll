@@ -9,6 +9,7 @@ import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 import '../../domain/services/settlement_engine.dart';
+import '../../domain/entities/activity_event.dart';
 import '../../domain/entities/expense.dart';
 import '../local/local_database.dart';
 import '../models/expense_model.dart';
@@ -1678,6 +1679,175 @@ class SetAllRepository {
     results.addAll(personalExpRows.map(_rowToExpense));
     results.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
     return results.take(limit).toList();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Omni Activity Feed — polymorphic event stream
+  // ---------------------------------------------------------------------------
+
+  /// Streams a unified, chronological list of [ActivityEvent]s aggregating
+  /// expenses (group + personal), group-creation events, and settlements.
+  Stream<List<ActivityEvent>> watchOmniActivity({int limit = 80}) async* {
+    yield await _buildOmniActivity(limit);
+    await for (final _ in _changeController.stream) {
+      yield await _buildOmniActivity(limit);
+    }
+  }
+
+  Future<List<ActivityEvent>> _buildOmniActivity(int limit) async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    final List<ActivityEvent> events = [];
+
+    // ── 1. Groups the current user belongs to / created ─────────────────────
+    List<Map<String, dynamic>> groupRows;
+    if (_isWeb && _client != null) {
+      final memberGidRows = await _client
+          .from('group_members')
+          .select('group_id')
+          .eq('user_id', uid) as List;
+      final gids = memberGidRows
+          .map((r) => (r as Map<String, dynamic>)['group_id'] as String)
+          .toSet()
+          .toList();
+      final createdRows =
+          await _client.from('groups').select('id').eq('creator_id', uid) as List;
+      for (final r in createdRows) {
+        gids.add((r as Map<String, dynamic>)['id'] as String);
+      }
+      if (gids.isEmpty) {
+        groupRows = [];
+      } else {
+        final raw = await _client
+            .from('groups')
+            .select('id, name, creator_id, created_at')
+            .inFilter('id', gids) as List;
+        groupRows = raw.cast<Map<String, dynamic>>();
+      }
+    } else {
+      final memberGidRows = await LocalDatabase.db.query(
+        'group_members',
+        columns: ['group_id'],
+        where: 'user_id = ?',
+        whereArgs: [uid],
+      );
+      final gids = memberGidRows.map((r) => r['group_id'] as String).toSet().toList();
+      final createdRows = await LocalDatabase.db.query(
+        'groups',
+        columns: ['id'],
+        where: 'creator_id = ?',
+        whereArgs: [uid],
+      );
+      for (final r in createdRows) {
+        gids.add(r['id'] as String);
+      }
+      if (gids.isNotEmpty) {
+        final raw = await LocalDatabase.db.query(
+          'groups',
+          columns: ['id', 'name', 'creator_id', 'created_at'],
+          where: 'id IN (${gids.map((_) => '?').join(',')})',
+          whereArgs: gids,
+        );
+        groupRows = raw;
+      } else {
+        groupRows = [];
+      }
+    }
+
+    // Build group name map for expense enrichment
+    final groupNameMap = <String, String>{
+      for (final g in groupRows)
+        (g['id'] as String): (g['name'] as String? ?? ''),
+    };
+
+    // ── 2. Group-created events ──────────────────────────────────────────────
+    for (final g in groupRows) {
+      final ts = (g['created_at'] as String?) ?? '';
+      events.add(GroupCreatedEvent(
+        timestamp: ts,
+        groupId: g['id'] as String,
+        groupName: g['name'] as String? ?? '',
+        createdByYou: (g['creator_id'] as String?) == uid,
+      ));
+    }
+
+    // ── 3. Expenses (group + personal) ───────────────────────────────────────
+    final gids = groupRows.map((g) => g['id'] as String).toList();
+
+    if (_isWeb && _client != null) {
+      if (gids.isNotEmpty) {
+        final raw = await _client
+            .from('expenses')
+            .select()
+            .inFilter('group_id', gids)
+            .order('created_at', ascending: false)
+            .limit(limit) as List;
+        for (final r in raw) {
+          final m = r as Map<String, dynamic>;
+          final e = _rowToExpense(m);
+          events.add(ExpenseEvent(
+            timestamp: e.createdAt ?? '',
+            expense: e,
+            groupName: groupNameMap[e.groupId] ?? '',
+          ));
+        }
+      }
+      // Personal
+      final personal = await _client
+          .from('expenses')
+          .select()
+          .isFilter('group_id', null)
+          .eq('payer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      for (final r in personal) {
+        final e = _rowToExpense(r as Map<String, dynamic>);
+        events.add(ExpenseEvent(
+          timestamp: e.createdAt ?? '',
+          expense: e,
+          groupName: '',
+        ));
+      }
+    } else {
+      if (gids.isNotEmpty) {
+        final raw = await LocalDatabase.db.query(
+          'expenses',
+          where: 'group_id IN (${gids.map((_) => '?').join(',')})',
+          whereArgs: gids,
+          orderBy: 'created_at DESC',
+          limit: limit,
+        );
+        for (final r in raw) {
+          final e = _rowToExpense(r);
+          events.add(ExpenseEvent(
+            timestamp: e.createdAt ?? '',
+            expense: e,
+            groupName: groupNameMap[e.groupId] ?? '',
+          ));
+        }
+      }
+      // Personal
+      final personal = await LocalDatabase.db.query(
+        'expenses',
+        where: 'group_id IS NULL AND payer_id = ?',
+        whereArgs: [uid],
+        orderBy: 'created_at DESC',
+        limit: limit,
+      );
+      for (final r in personal) {
+        final e = _rowToExpense(r);
+        events.add(ExpenseEvent(
+          timestamp: e.createdAt ?? '',
+          expense: e,
+          groupName: '',
+        ));
+      }
+    }
+
+    // ── 4. Sort newest-first, cap at limit ───────────────────────────────────
+    events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+    return events.take(limit).toList();
   }
 
   /// Silently adds any split participant who is missing from group_members.
