@@ -19,8 +19,6 @@ import '../models/split_model.dart';
 import '../../core/services/currency_service.dart';
 
 const String _deviceUserIdKey = 'device_user_id';
-const String _personalGroupName = 'Personal';
-
 /// Thrown when [SetAllRepository.createDirectGroup] cannot find a user with
 /// the given email address in the Supabase auth system.
 class DirectGroupUserNotFoundException implements Exception {
@@ -86,6 +84,7 @@ class SetAllRepository {
   String? _deviceUserId;
 
   final _changeController = StreamController<void>.broadcast();
+  final _pendingDeletedGroups = <_DeletedGroupRecord>[];
 
   /// Emits a change event so all active [watchGroups] / [watchGroupExpenses]
   /// streams re-query SQLite and push fresh data to the UI.
@@ -505,48 +504,6 @@ class SetAllRepository {
   // Groups
   // ---------------------------------------------------------------------------
 
-  Future<GroupModel> _getOrCreatePersonalGroup(String uid) async {
-    if (_isWeb && _client != null) {
-      final rows = await _client
-          .from('groups')
-          .select()
-          .eq('creator_id', uid)
-          .eq('name', _personalGroupName) as List;
-      if (rows.isNotEmpty) return _rowToGroup(rows.first as Map<String, dynamic>);
-      final id = const Uuid().v4();
-      await _client
-          .from('groups')
-          .insert({'id': id, 'name': _personalGroupName, 'creator_id': uid});
-      await _client
-          .from('group_members')
-          .insert({'group_id': id, 'user_id': uid});
-      return GroupModel(id: id, name: _personalGroupName, creatorId: uid);
-    }
-    // Personal group lookup is now SQLite-only; SyncService keeps it fresh.
-    final rows = await LocalDatabase.db.query(
-      'groups',
-      where: 'creator_id = ? AND name = ?',
-      whereArgs: [uid, _personalGroupName],
-    );
-    if (rows.isNotEmpty) return _rowToGroup(rows.first);
-    final id = const Uuid().v4();
-    final now = _now();
-    await LocalDatabase.db.insert('groups', {
-      'id': id,
-      'name': _personalGroupName,
-      'creator_id': uid,
-      'created_at': now,
-      'updated_at': now,
-      'synced_at': null,
-    });
-    await LocalDatabase.db.insert('group_members', {
-      'group_id': id,
-      'user_id': uid,
-      'joined_at': now,
-      'synced_at': null,
-    });
-    return GroupModel(id: id, name: _personalGroupName, creatorId: uid);
-  }
 
   /// Returns all normal (non-direct) groups the user belongs to.
   /// Direct groups are shown separately in the Friends tab via [getDirectGroups].
@@ -594,18 +551,7 @@ class SetAllRepository {
   }
 
   Future<List<GroupModel>> getMyGroups() async {
-    final all = await _getGroupsByType(type: 'normal', includePersonal: true);
-    // Deduplicate: keep only the first personal group encountered.
-    bool seenPersonal = false;
-    final deduped = <GroupModel>[];
-    for (final g in all) {
-      if (g.name == _personalGroupName) {
-        if (seenPersonal) continue;
-        seenPersonal = true;
-      }
-      deduped.add(g);
-    }
-    return deduped;
+    return _getGroupsByType(type: 'normal', includePersonal: false);
   }
 
   /// Returns all 1-on-1 direct groups the user belongs to.
@@ -619,7 +565,6 @@ class SetAllRepository {
   }) async {
     final uid = await ensureUser();
     if (uid == null) return [];
-    if (includePersonal) await _getOrCreatePersonalGroup(uid);
 
     if (_isWeb && _client != null) {
       final memberRows = await _client
@@ -761,6 +706,12 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
+        // Snapshot name for activity log before deleting.
+        String webGroupName = groupId;
+        try {
+          final nameRows = await _client.from('groups').select('name').eq('id', groupId).limit(1) as List;
+          if (nameRows.isNotEmpty) webGroupName = (nameRows.first as Map<String, dynamic>)['name'] as String? ?? groupId;
+        } catch (_) {}
         // Fetch expense IDs first so we can delete their splits.
         final expenseRows = await _client
             .from('expenses')
@@ -774,6 +725,7 @@ class SetAllRepository {
         await _client.from('expenses').delete().eq('group_id', groupId);
         await _client.from('group_members').delete().eq('group_id', groupId);
         await _client.from('groups').delete().eq('id', groupId);
+        _logGroupDeletedEvents(uid, {groupId: webGroupName});
         _notify();
         return true;
       } catch (_) {
@@ -788,6 +740,7 @@ class SetAllRepository {
       whereArgs: [groupId],
     );
     if (rows.isEmpty) return false;
+    final groupName = rows.first['name'] as String? ?? groupId;
 
     // Remote-first: delete from Supabase before removing locally so other
     // devices' reconciler will prune the group on their next pull.
@@ -830,22 +783,115 @@ class SetAllRepository {
     await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
     await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
 
+    _logGroupDeletedEvents(uid, {groupId: groupName});
     _notify();
     return true;
   }
 
-  /// Batch-delete multiple groups. Runs each deletion in sequence and returns
-  /// true only if ALL succeed. Uses the existing [deleteGroup] logic so local
-  /// SQLite and Supabase are both cleaned up consistently.
+  /// Batch-delete multiple groups wrapped in a single local SQLite transaction.
+  /// Supabase deletions are attempted first (best-effort per group), then the
+  /// entire local cascade runs atomically so partial failures cannot leave
+  /// orphan splits / members / expenses behind.
   Future<bool> deleteGroups(List<String> ids) async {
     if (ids.isEmpty) return true;
-    bool allOk = true;
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    // Snapshot group names before deletion for activity logging.
+    final Map<String, String> groupNames = {};
     for (final id in ids) {
-      final ok = await deleteGroup(id);
-      if (!ok) allOk = false;
+      if (!_isWeb) {
+        final rows = await LocalDatabase.db.query(
+          'groups', columns: ['name'], where: 'id = ?', whereArgs: [id]);
+        if (rows.isNotEmpty) groupNames[id] = rows.first['name'] as String? ?? id;
+      } else if (_client != null) {
+        try {
+          final rows = await _client.from('groups').select('name').eq('id', id).limit(1) as List;
+          if (rows.isNotEmpty) groupNames[id] = (rows.first as Map<String, dynamic>)['name'] as String? ?? id;
+        } catch (_) {}
+      }
     }
+
+    // ── Supabase: best-effort delete each group ───────────────────────────
+    if (_isWeb && _client != null) {
+      bool allOk = true;
+      for (final id in ids) {
+        try {
+          final expRows = await _client.from('expenses').select('id').eq('group_id', id) as List;
+          final expIds = expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+          if (expIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', expIds);
+          }
+          await _client.from('expenses').delete().eq('group_id', id);
+          await _client.from('group_members').delete().eq('group_id', id);
+          await _client.from('groups').delete().eq('id', id);
+        } catch (e) {
+          debugPrint('[deleteGroups] Supabase delete failed for $id: $e');
+          allOk = false;
+        }
+      }
+      _logGroupDeletedEvents(uid, groupNames);
+      _notify();
+      return allOk;
+    }
+
+    // ── Online: push deletes to Supabase before local cleanup ─────────────
+    if (await _isOnline && _client != null) {
+      for (final id in ids) {
+        try {
+          final expRows = await _client.from('expenses').select('id').eq('group_id', id) as List;
+          final expIds = expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+          if (expIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', expIds);
+          }
+          await _client.from('expenses').delete().eq('group_id', id);
+          await _client.from('group_members').delete().eq('group_id', id);
+          await _client.from('groups').delete().eq('id', id);
+        } catch (e) {
+          debugPrint('[deleteGroups] Supabase delete failed for $id (continuing locally): $e');
+        }
+      }
+    }
+
+    // ── Local SQLite: single atomic transaction for all groups ────────────
+    final db = LocalDatabase.db;
+    try {
+      await db.transaction((txn) async {
+        for (final id in ids) {
+          final expRows = await txn.query(
+            'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [id]);
+          if (expRows.isNotEmpty) {
+            final placeholder = expRows.map((_) => '?').join(',');
+            final expIds = expRows.map((r) => r['id'] as String).toList();
+            await txn.delete('splits',
+                where: 'expense_id IN ($placeholder)', whereArgs: expIds);
+          }
+          await txn.delete('expenses', where: 'group_id = ?', whereArgs: [id]);
+          await txn.delete('group_members', where: 'group_id = ?', whereArgs: [id]);
+          await txn.delete('groups', where: 'id = ?', whereArgs: [id]);
+        }
+      });
+    } catch (e) {
+      debugPrint('[deleteGroups] SQLite transaction failed: $e');
+      _notify();
+      return false;
+    }
+
+    _logGroupDeletedEvents(uid, groupNames);
     _notify();
-    return allOk;
+    return true;
+  }
+
+  void _logGroupDeletedEvents(String uid, Map<String, String> groupNames) {
+    // Logged as in-memory events only; picked up by next _buildOmniActivity call.
+    for (final entry in groupNames.entries) {
+      _pendingDeletedGroups.add(_DeletedGroupRecord(
+        id: entry.key,
+        name: entry.value,
+        deletedAt: _now(),
+        deletedByUid: uid,
+      ));
+    }
   }
 
   /// Batch-delete multiple expenses by [ids]. Removes splits first, then the
@@ -1604,6 +1650,82 @@ class SetAllRepository {
     return rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
   }
 
+  // ---------------------------------------------------------------------------
+  // User Categories
+  // ---------------------------------------------------------------------------
+
+  /// Returns the current user's custom categories from local SQLite (or Supabase on web).
+  Future<List<Map<String, String>>> getUserCategories() async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      try {
+        final rows = await _client
+            .from('user_categories')
+            .select()
+            .eq('created_by', uid)
+            .order('created_at', ascending: true) as List;
+        return rows
+            .map((r) => Map<String, String>.from(
+                (r as Map<String, dynamic>).map((k, v) => MapEntry(k, v?.toString() ?? ''))))
+            .toList();
+      } catch (_) {
+        return [];
+      }
+    }
+
+    if (LocalDatabase.dbOrNull == null) return [];
+    final rows = await LocalDatabase.db.query(
+      'user_categories',
+      where: 'created_by = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at ASC',
+    );
+    return rows
+        .map((r) => r.map((k, v) => MapEntry(k, v?.toString() ?? '')))
+        .toList();
+  }
+
+  /// Creates a new custom category locally and syncs to Supabase.
+  /// [type] is 'expense' or 'income'.
+  Future<bool> createUserCategory({
+    required String name,
+    required String type,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+    final id = const Uuid().v4();
+    final now = _now();
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('user_categories').insert({
+          'id': id, 'name': name, 'type': type, 'created_by': uid, 'created_at': now,
+        });
+        return true;
+      } catch (e) {
+        debugPrint('[createUserCategory] Supabase error: $e');
+        return false;
+      }
+    }
+
+    await LocalDatabase.db.insert('user_categories', {
+      'id': id, 'name': name, 'type': type, 'created_by': uid, 'created_at': now,
+    });
+
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('user_categories').insert({
+          'id': id, 'name': name, 'type': type, 'created_by': uid, 'created_at': now,
+        });
+      } catch (e) {
+        debugPrint('[createUserCategory] Supabase sync failed (non-fatal): $e');
+      }
+    }
+    return true;
+  }
+
   /// Calculate wallet balance: income - personal expenses - user's share of group expenses.
   /// Returns amount in the user's base currency (USD fallback).
   Future<Decimal> getWalletBalance() async {
@@ -1899,7 +2021,18 @@ class SetAllRepository {
       }
     }
 
-    // ── 4. Sort newest-first, cap at limit ───────────────────────────────────
+    // ── 4. In-memory group-deleted events (logged on deleteGroup/deleteGroups) ─
+    for (final rec in _pendingDeletedGroups) {
+      if (rec.deletedByUid == uid) {
+        events.add(GroupDeletedEvent(
+          timestamp: rec.deletedAt,
+          groupId:   rec.id,
+          groupName: rec.name,
+        ));
+      }
+    }
+
+    // ── 5. Sort newest-first, cap at limit ───────────────────────────────────
     events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return events.take(limit).toList();
   }
@@ -2391,4 +2524,20 @@ class SetAllRepository {
       ExpenseModel.fromJson(row);
 
   SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
+}
+
+// ---------------------------------------------------------------------------
+// Internal record for pending group-deleted activity events
+// ---------------------------------------------------------------------------
+class _DeletedGroupRecord {
+  const _DeletedGroupRecord({
+    required this.id,
+    required this.name,
+    required this.deletedAt,
+    required this.deletedByUid,
+  });
+  final String id;
+  final String name;
+  final String deletedAt;
+  final String deletedByUid;
 }

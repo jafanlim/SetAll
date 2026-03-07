@@ -65,6 +65,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     });
   }
 
+  void _selectAllExpenses(List<String> ids) {
+    HapticUtils.selection();
+    setState(() => _selected.addAll(ids));
+  }
+
+  void _deselectAllExpenses() {
+    HapticUtils.selection();
+    setState(() => _selected.clear());
+  }
+
   Future<void> _deleteBatchExpenses() async {
     if (_selected.isEmpty) return;
     final count = _selected.length;
@@ -227,6 +237,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         scrolledUnderElevation: 0.5,
         actions: _editMode
             ? [
+                expensesAsync.whenData((expenses) {
+                  final allSelected = expenses.isNotEmpty &&
+                      expenses.every((e) => _selected.contains(e.id));
+                  return TextButton(
+                    onPressed: allSelected
+                        ? _deselectAllExpenses
+                        : () => _selectAllExpenses(expenses.map((e) => e.id).toList()),
+                    child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                  );
+                }).valueOrNull ?? const SizedBox.shrink(),
                 TextButton(
                   onPressed: _toggleEditMode,
                   child: const Text('Cancel'),

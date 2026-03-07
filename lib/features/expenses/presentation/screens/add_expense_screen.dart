@@ -893,7 +893,69 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   // Step 3 – Details
   // ---------------------------------------------------------------------------
 
+  Future<void> _showCreateCategoryDialog(ThemeData theme) async {
+    final ctrl = TextEditingController();
+    String catType = _isIncome ? 'income' : 'expense';
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('New category'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Category name',
+                  hintText: 'e.g. Gym, Salary…',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'expense', label: Text('Expense', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 'income',  label: Text('Income',  style: TextStyle(fontSize: 12))),
+                ],
+                selected: {catType},
+                onSelectionChanged: (s) => setDlg(() => catType = s.first),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+              onPressed: () {
+                final name = ctrl.text.trim();
+                if (name.isNotEmpty) Navigator.of(ctx).pop({'name': name, 'type': catType});
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
+    if (result == null || !mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    final ok = await repo.createUserCategory(name: result['name']!, type: result['type']!);
+    if (!mounted) return;
+    if (ok) {
+      HapticUtils.success();
+      ref.invalidate(userCategoriesProvider);
+      setState(() => _category = result['name']!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save category')),
+      );
+    }
+  }
+
   Widget _buildStepDetails(ThemeData theme) {
+    final userCatsAsync = ref.watch(userCategoriesProvider);
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -907,15 +969,45 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Category chips
-          Text(
-            'Category',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 11,
-            ),
+          // Category section header with "+" button
+          Row(
+            children: [
+              Text(
+                'Category',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => _showCreateCategoryDialog(theme),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add, size: 14, color: _teal),
+                      const SizedBox(width: 4),
+                      Text('New', style: const TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
+          // Standard categories
+          Text(
+            'Standard',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -936,6 +1028,67 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 },
               );
             }).toList(),
+          ),
+          // User categories
+          userCatsAsync.when(
+            data: (cats) {
+              if (cats.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your Categories',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: cats.map((cat) {
+                      final name = cat['name'] ?? '';
+                      final selected = _category == name;
+                      final isIncomeCat = cat['type'] == 'income';
+                      return FilterChip(
+                        avatar: Icon(
+                          isIncomeCat ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                          size: 12,
+                          color: selected
+                              ? (isIncomeCat ? const Color(0xFF22C55E) : _teal)
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        label: Text(name, style: const TextStyle(fontSize: 11)),
+                        selected: selected,
+                        selectedColor: (isIncomeCat
+                                ? const Color(0xFF22C55E)
+                                : _teal)
+                            .withValues(alpha: 0.15),
+                        checkmarkColor: isIncomeCat ? const Color(0xFF22C55E) : _teal,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? (isIncomeCat ? const Color(0xFF22C55E) : _teal)
+                              : null,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        onSelected: (_) {
+                          HapticUtils.selection();
+                          setState(() {
+                            _category = name;
+                            if (isIncomeCat) _isIncome = true;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (e, s) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 16),
           if (_memberIds.length > 1) ...

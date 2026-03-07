@@ -245,6 +245,11 @@ final rateToBaseProvider =
   return rate.toStringAsFixed(6);
 });
 
+/// Smart custom categories for the current user.
+final userCategoriesProvider = FutureProvider<List<Map<String, String>>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getUserCategories();
+});
+
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------

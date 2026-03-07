@@ -23,7 +23,10 @@ class LocalDatabase {
   /// Schema v9 adds:
   ///   • splits UNIQUE(expense_id, user_id) – prevents duplicate split rows
   ///     caused by local/Supabase UUID mismatch during sync
-  static const int _version = 9;
+  /// Schema v10 adds:
+  ///   • expenses.group_id made nullable (True Wallet: personal expenses use NULL)
+  ///   • user_categories table for smart custom categories
+  static const int _version = 10;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -136,6 +139,45 @@ class LocalDatabase {
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
       );
     }
+    if (oldVersion < 10) {
+      // True Wallet: personal expenses now use group_id = NULL.
+      // SQLite doesn't support ALTER COLUMN, so we recreate the expenses table
+      // without the NOT NULL constraint on group_id.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expenses_new (
+          id                   TEXT PRIMARY KEY,
+          group_id             TEXT,
+          payer_id             TEXT NOT NULL,
+          created_by           TEXT,
+          amount               TEXT NOT NULL,
+          total_amount         TEXT,
+          description          TEXT,
+          currency             TEXT,
+          split_type           TEXT,
+          category             TEXT,
+          original_amount      TEXT,
+          original_currency    TEXT,
+          exchange_rate_applied TEXT,
+          universal_usd_amount TEXT,
+          created_at           TEXT,
+          updated_at           TEXT,
+          synced_at            INTEGER
+        )
+      ''');
+      await db.execute('INSERT INTO expenses_new SELECT * FROM expenses');
+      await db.execute('DROP TABLE expenses');
+      await db.execute('ALTER TABLE expenses_new RENAME TO expenses');
+      // Smart user categories table.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_categories (
+          id         TEXT PRIMARY KEY,
+          name       TEXT NOT NULL,
+          type       TEXT NOT NULL DEFAULT 'expense',
+          created_by TEXT NOT NULL,
+          created_at TEXT
+        )
+      ''');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -176,10 +218,10 @@ class LocalDatabase {
         PRIMARY KEY (group_id, user_id)
       )
     ''');
-   await db.execute('''
+    await db.execute('''
       CREATE TABLE expenses (
         id                   TEXT PRIMARY KEY,
-        group_id             TEXT NOT NULL,
+        group_id             TEXT,
         payer_id             TEXT NOT NULL,
         created_by           TEXT, -- Schema v7
         amount               TEXT NOT NULL,
@@ -226,6 +268,15 @@ class LocalDatabase {
         rate            TEXT NOT NULL,
         last_updated    TEXT,
         PRIMARY KEY (base_currency, target_currency)
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE user_categories (
+        id         TEXT PRIMARY KEY,
+        name       TEXT NOT NULL,
+        type       TEXT NOT NULL DEFAULT 'expense',
+        created_by TEXT NOT NULL,
+        created_at TEXT
       )
     ''');
   }

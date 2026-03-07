@@ -107,6 +107,7 @@ class ActivityScreen extends ConsumerWidget {
         final ev = item.event!;
         if (ev is ExpenseEvent)      return _ExpenseTile(event: ev);
         if (ev is GroupCreatedEvent) return _GroupCreatedTile(event: ev);
+        if (ev is GroupDeletedEvent) return _GroupDeletedTile(event: ev);
         if (ev is SettlementEvent)   return _SettlementTile(event: ev);
         return const SizedBox.shrink();
       },
@@ -403,6 +404,28 @@ class _GroupCreatedTile extends StatelessWidget {
         HapticUtils.lightTap();
         context.push('/group/${event.groupId}');
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Group deleted event tile
+// ---------------------------------------------------------------------------
+class _GroupDeletedTile extends StatelessWidget {
+  const _GroupDeletedTile({required this.event});
+  final GroupDeletedEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return _buildEventTile(
+      context:   context,
+      theme:     theme,
+      accent:    Colors.redAccent,
+      icon:      Icons.delete_outline,
+      title:     'You deleted the group "${event.groupName}"',
+      badge:     'Deleted',
+      timestamp: event.timestamp,
     );
   }
 }
