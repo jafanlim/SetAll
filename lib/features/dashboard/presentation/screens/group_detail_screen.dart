@@ -18,6 +18,7 @@ import '../../../../data/models/profile_model.dart';
 const _teal = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
 const _orange = Color(0xFFFF8C42);
+const _brandOrange = Color(0xFFF97316);
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
   const GroupDetailScreen({
@@ -35,12 +36,81 @@ class GroupDetailScreen extends ConsumerStatefulWidget {
 
 class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   bool _manuallySettled = false;
+  bool _editMode = false;
+  final Set<String> _selected = {};
   late String _groupName;
 
   @override
   void initState() {
     super.initState();
     _groupName = widget.groupName;
+  }
+
+  void _toggleEditMode() {
+    HapticUtils.selection();
+    setState(() {
+      _editMode = !_editMode;
+      _selected.clear();
+    });
+  }
+
+  void _toggleExpense(String id) {
+    HapticUtils.selection();
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  Future<void> _deleteBatchExpenses() async {
+    if (_selected.isEmpty) return;
+    final count = _selected.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete expenses?'),
+        content: Text(
+          'Are you sure you want to delete $count expense${count == 1 ? '' : 's'}?\n\nThis is irreversible.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _brandOrange,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text('Delete ($count)'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final groupId = widget.groupId;
+    final ok = await ref.read(setAllRepositoryProvider).deleteExpenses(_selected.toList());
+    if (!mounted) return;
+    if (ok) {
+      HapticUtils.success();
+      ref.invalidate(groupExpensesProvider(groupId));
+      ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
+      ref.invalidate(groupBalanceSummaryProvider(groupId));
+      setState(() {
+        _editMode = false;
+        _selected.clear();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete some expenses.')),
+      );
+    }
   }
 
   Future<void> _renameGroup(BuildContext context) async {
@@ -153,71 +223,89 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
-        actions: [
-          if (_manuallySettled)
-            TextButton.icon(
-              icon: const Icon(Icons.undo, size: 16),
-              label: const Text('Reopen'),
-              style: TextButton.styleFrom(foregroundColor: _teal),
-              onPressed: () {
-                HapticUtils.selection();
-                setState(() => _manuallySettled = false);
-              },
-            )
-          else
-            TextButton.icon(
-              icon: const Icon(Icons.check_circle_outline, size: 16),
-              label: const Text('Settle'),
-              style: TextButton.styleFrom(foregroundColor: _teal),
-              onPressed: () async {
-                HapticUtils.primaryTap();
-                final confirm = await showDialog<bool>(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Mark as settled?'),
-                    content: const Text(
-                      'This hides the outstanding balance for this group. '
-                      'Existing expenses are kept. You can reopen it anytime.',
+        actions: _editMode
+            ? [
+                TextButton(
+                  onPressed: _toggleEditMode,
+                  child: const Text('Cancel'),
+                ),
+                if (_selected.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _deleteBatchExpenses,
+                    icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
+                    label: Text(
+                      'Delete (${_selected.length})',
+                      style: const TextStyle(color: _brandOrange),
                     ),
-                    actions: [
-                      TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                      FilledButton(
-                        style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
-                        onPressed: () => Navigator.of(ctx).pop(true),
-                        child: const Text('Settle'),
-                      ),
-                    ],
                   ),
-                );
-                if (confirm == true && mounted) setState(() => _manuallySettled = true);
-              },
-            ),
-          IconButton(
-            icon: const Icon(Icons.person_add_outlined),
-            tooltip: 'Invite member',
-            onPressed: () {
-              HapticUtils.primaryTap();
-              context.push(
-                '/group/$groupId/invite',
-                extra: {'groupName': groupName},
-              );
-            },
-          ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.more_vert),
-            onSelected: (value) {
-              if (value == 'rename') _renameGroup(context);
-              if (value == 'delete') _deleteGroup(context);
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'rename', child: Text('Rename group')),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('Delete group', style: TextStyle(color: Colors.redAccent)),
-              ),
-            ],
-          ),
-        ],
+              ]
+            : [
+                if (_manuallySettled)
+                  TextButton.icon(
+                    icon: const Icon(Icons.undo, size: 16),
+                    label: const Text('Reopen'),
+                    style: TextButton.styleFrom(foregroundColor: _teal),
+                    onPressed: () {
+                      HapticUtils.selection();
+                      setState(() => _manuallySettled = false);
+                    },
+                  )
+                else
+                  TextButton.icon(
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('Settle'),
+                    style: TextButton.styleFrom(foregroundColor: _teal),
+                    onPressed: () async {
+                      HapticUtils.primaryTap();
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Mark as settled?'),
+                          content: const Text(
+                            'This hides the outstanding balance for this group. '
+                            'Existing expenses are kept. You can reopen it anytime.',
+                          ),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+                              onPressed: () => Navigator.of(ctx).pop(true),
+                              child: const Text('Settle'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true && mounted) setState(() => _manuallySettled = true);
+                    },
+                  ),
+                IconButton(
+                  icon: const Icon(Icons.person_add_outlined),
+                  tooltip: 'Invite member',
+                  onPressed: () {
+                    HapticUtils.primaryTap();
+                    context.push(
+                      '/group/$groupId/invite',
+                      extra: {'groupName': groupName},
+                    );
+                  },
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert),
+                  onSelected: (value) {
+                    if (value == 'rename') _renameGroup(context);
+                    if (value == 'delete') _deleteGroup(context);
+                    if (value == 'editExpenses') _toggleEditMode();
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'rename', child: Text('Rename group')),
+                    const PopupMenuItem(value: 'editExpenses', child: Text('Select expenses')),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+                    ),
+                  ],
+                ),
+              ],
       ),
       body: RefreshIndicator(
         color: _teal,
@@ -332,17 +420,27 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 }
                 return SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (_, i) => _ExpenseTile(
-                      expense: expenses[i],
-                      groupId: groupId,
-                      groupName: groupName,
-                      onDeleted: () {
-                        ref.invalidate(groupExpensesProvider(groupId));
-                        ref.invalidate(balanceSummaryProvider);
-                        ref.invalidate(recentExpensesProvider);
-                        ref.invalidate(groupBalanceSummaryProvider(groupId));
-                      },
-                    ),
+                    (_, i) {
+                      final expense = expenses[i];
+                      if (_editMode) {
+                        return _ExpenseTileSelectable(
+                          expense: expense,
+                          selected: _selected.contains(expense.id),
+                          onToggle: () => _toggleExpense(expense.id),
+                        );
+                      }
+                      return _ExpenseTile(
+                        expense: expense,
+                        groupId: groupId,
+                        groupName: groupName,
+                        onDeleted: () {
+                          ref.invalidate(groupExpensesProvider(groupId));
+                          ref.invalidate(balanceSummaryProvider);
+                          ref.invalidate(recentExpensesProvider);
+                          ref.invalidate(groupBalanceSummaryProvider(groupId));
+                        },
+                      );
+                    },
                     childCount: expenses.length,
                   ),
                 );
@@ -603,6 +701,103 @@ class _MemberList extends ConsumerWidget {
                 : null,
           );
         }).toList(),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Selectable expense tile — used in batch Edit mode
+// ---------------------------------------------------------------------------
+class _ExpenseTileSelectable extends StatelessWidget {
+  const _ExpenseTileSelectable({
+    required this.expense,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final ExpenseModel expense;
+  final bool selected;
+  final VoidCallback onToggle;
+
+  static const Map<String, IconData> _categoryIcons = {
+    'Food & drink':      Icons.restaurant_outlined,
+    'Transport':         Icons.directions_car_outlined,
+    'Entertainment':     Icons.movie_outlined,
+    'Bills & utilities': Icons.receipt_long_outlined,
+    'Shopping':          Icons.shopping_bag_outlined,
+    'Travel':            Icons.flight_outlined,
+    'Other':             Icons.category_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final icon = _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
+    final label = expense.description.isEmpty ? expense.category : expense.description;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: GestureDetector(
+        onTap: onToggle,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: selected ? _brandOrange : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            child: Row(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  width: 22, height: 22,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: selected ? _brandOrange : Colors.transparent,
+                    border: Border.all(
+                      color: selected ? _brandOrange : theme.colorScheme.onSurfaceVariant,
+                      width: 2,
+                    ),
+                  ),
+                  child: selected
+                      ? const Icon(Icons.check, size: 13, color: Colors.white)
+                      : null,
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 36, height: 36,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '${expense.currency} ${formatAmount(expense.amount)}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: _teal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

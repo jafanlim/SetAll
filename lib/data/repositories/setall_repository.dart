@@ -834,7 +834,61 @@ class SetAllRepository {
     return true;
   }
 
- 
+  /// Batch-delete multiple groups. Runs each deletion in sequence and returns
+  /// true only if ALL succeed. Uses the existing [deleteGroup] logic so local
+  /// SQLite and Supabase are both cleaned up consistently.
+  Future<bool> deleteGroups(List<String> ids) async {
+    if (ids.isEmpty) return true;
+    bool allOk = true;
+    for (final id in ids) {
+      final ok = await deleteGroup(id);
+      if (!ok) allOk = false;
+    }
+    _notify();
+    return allOk;
+  }
+
+  /// Batch-delete multiple expenses by [ids]. Removes splits first, then the
+  /// expense rows — both locally (SQLite transaction) and on Supabase.
+  Future<bool> deleteExpenses(List<String> ids) async {
+    if (ids.isEmpty) return true;
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    // ── Supabase (web or online native) ──────────────────────────────────
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('splits').delete().inFilter('expense_id', ids);
+        await _client.from('expenses').delete().inFilter('id', ids);
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[deleteExpenses] Supabase error: $e');
+        return false;
+      }
+    }
+
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('splits').delete().inFilter('expense_id', ids);
+        await _client.from('expenses').delete().inFilter('id', ids);
+      } catch (e) {
+        debugPrint('[deleteExpenses] Supabase delete failed (continuing locally): $e');
+      }
+    }
+
+    // ── Local SQLite — single transaction ────────────────────────────────
+    final db = LocalDatabase.db;
+    final placeholder = ids.map((_) => '?').join(',');
+    await db.transaction((txn) async {
+      await txn.delete('splits',   where: 'expense_id IN ($placeholder)', whereArgs: ids);
+      await txn.delete('expenses', where: 'id IN ($placeholder)',          whereArgs: ids);
+    });
+
+    _notify();
+    return true;
+  }
+
   /// Remove a member from a group. Only the group creator can do this,
   /// and cannot remove themselves.
   Future<({bool ok, String? error})> removeGroupMember(
