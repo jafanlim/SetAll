@@ -7,6 +7,7 @@ import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../../data/models/expense_model.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -17,52 +18,176 @@ const _teal      = Color(0xFF00D9B0);
 const _tealDim   = Color(0x2600D9B0);
 const _orange    = Color(0xFFFF8C42);
 const _orangeDim = Color(0x26FF8C42);
+const _brandOrange = Color(0xFFF97316);
 
 /// Standalone Wallet screen — personal cash balance, true net worth,
-/// and spending breakdown by category.
-class WalletScreen extends ConsumerWidget {
+/// spending breakdown, and a selectable recent entries list.
+class WalletScreen extends ConsumerStatefulWidget {
   const WalletScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<WalletScreen> createState() => _WalletScreenState();
+}
+
+class _WalletScreenState extends ConsumerState<WalletScreen> {
+  bool _editMode = false;
+  final Set<String> _selected = {};
+
+  void _toggleEditMode() {
+    HapticUtils.selection();
+    setState(() { _editMode = !_editMode; _selected.clear(); });
+  }
+
+  void _toggleItem(String id) {
+    HapticUtils.selection();
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  void _selectAll(List<String> ids) {
+    HapticUtils.selection();
+    setState(() => _selected.addAll(ids));
+  }
+
+  void _deselectAll() {
+    HapticUtils.selection();
+    setState(() => _selected.clear());
+  }
+
+  Future<void> _deleteBatch() async {
+    if (_selected.isEmpty) return;
+    final count = _selected.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete entries?'),
+        content: Text(
+          'Delete $count wallet entr${count == 1 ? 'y' : 'ies'}? This cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _brandOrange,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text('Delete ($count)'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    for (final id in _selected.toList()) {
+      await repo.deleteExpense(id);
+    }
+    if (!mounted) return;
+    HapticUtils.success();
+    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletBalanceProvider);
+    ref.invalidate(balanceSummaryProvider);
+    setState(() { _editMode = false; _selected.clear(); });
+  }
+
+  Future<void> _deleteOne(String id) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete entry?'),
+        content: const Text('This wallet entry will be permanently removed.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _brandOrange, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(setAllRepositoryProvider).deleteExpense(id);
+    if (!mounted) return;
+    HapticUtils.success();
+    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletBalanceProvider);
+    ref.invalidate(balanceSummaryProvider);
+  }
+
+  void _editExpense(ExpenseModel expense) {
+    context.push(
+      '/group/${expense.groupId ?? 'wallet'}/expense/${expense.id}',
+      extra: expense,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme         = Theme.of(context);
     final walletAsync   = ref.watch(walletBalanceProvider);
     final personalAsync = ref.watch(personalExpensesProvider);
     final summaryAsync  = ref.watch(balanceSummaryProvider);
+
+    final expenses = personalAsync.valueOrNull ?? [];
+    final allIds   = expenses.map((e) => e.id).toList();
+    final allSelected = allIds.isNotEmpty && allIds.every(_selected.contains);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text(
           'Wallet',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-            letterSpacing: -0.3,
-          ),
+          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.3),
         ),
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        actions: _editMode
+            ? [
+                TextButton(
+                  onPressed: allSelected ? _deselectAll : () => _selectAll(allIds),
+                  child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                ),
+                if (_selected.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _deleteBatch,
+                    icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
+                    label: Text(
+                      'Delete (${_selected.length})',
+                      style: const TextStyle(color: _brandOrange),
+                    ),
+                  ),
+                TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
+              ]
+            : [
+                TextButton(onPressed: _toggleEditMode, child: const Text('Edit')),
+              ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          HapticUtils.primaryTap();
-          context.push(
-            AppRouter.addExpense,
-            extra: {'groupId': '', 'groupName': ''},
-          );
-        },
-        backgroundColor: _purple,
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text(
-          'Add wallet entry',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-      ),
+      floatingActionButton: _editMode
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () {
+                HapticUtils.primaryTap();
+                context.push(AppRouter.addExpense, extra: {'groupId': '', 'groupName': ''});
+              },
+              backgroundColor: _purple,
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('Add wallet entry',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            ),
       body: RefreshIndicator(
         color: _purple,
         onRefresh: () async {
@@ -73,7 +198,7 @@ class WalletScreen extends ConsumerWidget {
         },
         child: CustomScrollView(
           slivers: [
-            // ── Wallet Hero ────────────────────────────────────────────────
+            // ── Wallet Hero ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -84,10 +209,9 @@ class WalletScreen extends ConsumerWidget {
                     final summary   = summaryAsync.valueOrNull;
                     final owed = Decimal.tryParse(summary?.youAreOwed ?? '0') ?? Decimal.zero;
                     final owe  = Decimal.tryParse(summary?.youOwe     ?? '0') ?? Decimal.zero;
-                    final netPos = walletDec + owed - owe;
                     return WalletHero(
                       walletBalance: walletDec,
-                      netPosition: netPos,
+                      netPosition: walletDec + owed - owe,
                       currency: summary?.currency ?? 'USD',
                     );
                   },
@@ -97,25 +221,21 @@ class WalletScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── Spending Breakdown ─────────────────────────────────────────
+            // ── Spending Breakdown ───────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-                child: Text(
-                  'Spending breakdown',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                    letterSpacing: 0.5,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+                child: Text('Spending breakdown',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700, fontSize: 13,
+                      letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                    )),
               ),
             ),
             personalAsync.when(
-              data: (expenses) {
+              data: (exp) {
                 final spend = <String, Decimal>{};
-                for (final e in expenses) {
+                for (final e in exp) {
                   if (e.isIncome) continue;
                   final cat = e.category.isEmpty ? 'General' : e.category;
                   final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
@@ -126,56 +246,65 @@ class WalletScreen extends ConsumerWidget {
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                       child: Center(
-                        child: Column(
-                          children: [
-                            Icon(Icons.account_balance_wallet_outlined,
-                                size: 48, color: theme.colorScheme.onSurfaceVariant),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No personal expenses yet',
-                              style: TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700,
-                                color: theme.colorScheme.onSurface,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Tap + to add your first wallet entry.',
-                              style: TextStyle(
-                                fontSize: 13, color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
+                        child: Column(children: [
+                          Icon(Icons.account_balance_wallet_outlined,
+                              size: 48, color: theme.colorScheme.onSurfaceVariant),
+                          const SizedBox(height: 16),
+                          Text('No personal expenses yet',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                                  color: theme.colorScheme.onSurface)),
+                          const SizedBox(height: 8),
+                          Text('Tap + to add your first wallet entry.',
+                              style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                              textAlign: TextAlign.center),
+                        ]),
                       ),
                     ),
                   );
                 }
-                final sorted = spend.entries.toList()
-                  ..sort((a, b) => b.value.compareTo(a.value));
-                final total = sorted.fold(Decimal.zero, (s, e) => s + e.value);
+                final sorted = spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+                final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
                 return SliverList(
                   delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _CategoryRow(
-                      category: sorted[i].key,
-                      amount: sorted[i].value,
-                      total: total,
-                    ),
+                    (ctx, i) => _CategoryRow(category: sorted[i].key, amount: sorted[i].value, total: total),
                     childCount: sorted.length,
                   ),
                 );
               },
               loading: () => const SliverToBoxAdapter(
-                child: Padding(
-                  padding: EdgeInsets.all(24),
-                  child: Center(child: CircularProgressIndicator()),
-                ),
+                child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
               ),
               error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+            // ── Recent Entries ───────────────────────────────────────────
+            if (expenses.isNotEmpty) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+                  child: Text('Recent entries',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700, fontSize: 13,
+                        letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                      )),
+                ),
+              ),
+              SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (ctx, i) => _WalletEntryRow(
+                    expense: expenses[i],
+                    editMode: _editMode,
+                    selected: _selected.contains(expenses[i].id),
+                    onToggle: () => _toggleItem(expenses[i].id),
+                    onEdit: () => _editExpense(expenses[i]),
+                    onDelete: () => _deleteOne(expenses[i].id),
+                  ),
+                  childCount: expenses.length,
+                ),
+              ),
+            ],
+
+            const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
         ),
       ),
@@ -317,6 +446,134 @@ class _BalancePill extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wallet entry row — tap to edit, right-click context menu, checkbox in edit mode
+// ---------------------------------------------------------------------------
+class _WalletEntryRow extends StatelessWidget {
+  const _WalletEntryRow({
+    required this.expense,
+    required this.editMode,
+    required this.selected,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final ExpenseModel expense;
+  final bool         editMode;
+  final bool         selected;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme    = Theme.of(context);
+    final isIncome = expense.isIncome;
+    final amt      = Decimal.tryParse(expense.amount) ?? Decimal.zero;
+    final ccy      = expense.currency.isEmpty ? 'USD' : expense.currency;
+    final desc     = expense.description.isEmpty ? 'Wallet entry' : expense.description;
+
+    final tile = GestureDetector(
+      onTap: editMode ? onToggle : onEdit,
+      onSecondaryTapUp: (details) async {
+        final pos = details.globalPosition;
+        final result = await showMenu<_EntryAction>(
+          context: context,
+          position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
+          items: [
+            const PopupMenuItem(value: _EntryAction.edit,   child: _MenuRow(icon: Icons.edit_outlined,   label: 'Edit')),
+            const PopupMenuItem(value: _EntryAction.delete, child: _MenuRow(icon: Icons.delete_outlined, label: 'Delete')),
+          ],
+        );
+        if (result == _EntryAction.edit)   onEdit();
+        if (result == _EntryAction.delete) onDelete();
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: GlassCard(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              if (editMode)
+                Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: Checkbox(
+                    value: selected,
+                    onChanged: (_) => onToggle(),
+                    activeColor: _brandOrange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                  ),
+                ),
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: isIncome ? _teal.withAlpha(28) : _purple.withAlpha(28),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                  size: 16,
+                  color: isIncome ? _teal : _purple,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(desc,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600, fontSize: 13),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    const SizedBox(height: 2),
+                    Text(expense.category.isEmpty ? 'General' : expense.category,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '${isIncome ? '+' : '-'}$ccy ${amt.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: isIncome ? _teal : _purple,
+                ),
+              ),
+              if (!editMode)
+                const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    return tile;
+  }
+}
+
+enum _EntryAction { edit, delete }
+
+class _MenuRow extends StatelessWidget {
+  const _MenuRow({required this.icon, required this.label});
+  final IconData icon;
+  final String   label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(children: [
+      Icon(icon, size: 16),
+      const SizedBox(width: 10),
+      Text(label),
+    ]);
   }
 }
 
