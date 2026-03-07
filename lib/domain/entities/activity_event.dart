@@ -37,6 +37,18 @@ class GroupCreatedEvent extends ActivityEvent {
   final bool createdByYou;
 }
 
+/// A group was deleted by the current user.
+class GroupDeletedEvent extends ActivityEvent {
+  const GroupDeletedEvent({
+    required super.timestamp,
+    required this.groupId,
+    required this.groupName,
+  });
+
+  final String groupId;
+  final String groupName;
+}
+
 /// A settlement was recorded in a group.
 class SettlementEvent extends ActivityEvent {
   const SettlementEvent({
