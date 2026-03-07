@@ -18,6 +18,7 @@ import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -35,7 +36,8 @@ final class AppRouter {
   static const String editExpense = '/group/:id/expense/:expenseId';
   static const String groupPicker = '/add-expense/choose-group';
   static const String groupDetail = '/group/:id';
-  static const String inviteMember = '/group/:id/invite';
+  static const String inviteMember    = '/group/:id/invite';
+  static const String inviteFriend    = '/invite-friend';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -188,6 +190,18 @@ final class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // ── Invite friend (modal push, no shell nav bar) ─────────────────
+        GoRoute(
+          path: inviteFriend,
+          name: 'inviteFriend',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const InviteFriendScreen(),
+            ),
+          ),
         ),
 
         // ── Create group (modal push, no shell nav bar) ───────────────────
