@@ -827,98 +827,17 @@ class SetAllRepository {
     return true;
   }
 
-  /// Batch-delete multiple groups wrapped in a single local SQLite transaction.
-  /// Supabase deletions are attempted first (best-effort per group), then the
-  /// entire local cascade runs atomically so partial failures cannot leave
-  /// orphan splits / members / expenses behind.
+  /// Batch-delete multiple groups.
+  /// Delegates to [deleteGroup] so the owner-check, left_groups write, and
+  /// cascade are identical whether the user deletes one group or many.
   Future<bool> deleteGroups(List<String> ids) async {
     if (ids.isEmpty) return true;
-    final uid = await ensureUser();
-    if (uid == null) return false;
-
-    // Snapshot group names before deletion for activity logging.
-    final Map<String, String> groupNames = {};
+    bool allOk = true;
     for (final id in ids) {
-      if (!_isWeb) {
-        final rows = await LocalDatabase.db.query(
-          'groups', columns: ['name'], where: 'id = ?', whereArgs: [id]);
-        if (rows.isNotEmpty) groupNames[id] = rows.first['name'] as String? ?? id;
-      } else if (_client != null) {
-        try {
-          final rows = await _client.from('groups').select('name').eq('id', id).limit(1) as List;
-          if (rows.isNotEmpty) groupNames[id] = (rows.first as Map<String, dynamic>)['name'] as String? ?? id;
-        } catch (_) {}
-      }
+      final ok = await deleteGroup(id);
+      if (!ok) allOk = false;
     }
-
-    // ── Supabase: best-effort delete each group ───────────────────────────
-    if (_isWeb && _client != null) {
-      bool allOk = true;
-      for (final id in ids) {
-        try {
-          final expRows = await _client.from('expenses').select('id').eq('group_id', id) as List;
-          final expIds = expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
-          if (expIds.isNotEmpty) {
-            await _client.from('splits').delete().inFilter('expense_id', expIds);
-          }
-          await _client.from('expenses').delete().eq('group_id', id);
-          await _client.from('group_members').delete().eq('group_id', id);
-          await _client.from('groups').delete().eq('id', id);
-        } catch (e) {
-          debugPrint('[deleteGroups] Supabase delete failed for $id: $e');
-          allOk = false;
-        }
-      }
-      _logGroupDeletedEvents(uid, groupNames);
-      _notify();
-      return allOk;
-    }
-
-    // ── Online: push deletes to Supabase before local cleanup ─────────────
-    if (await _isOnline && _client != null) {
-      for (final id in ids) {
-        try {
-          final expRows = await _client.from('expenses').select('id').eq('group_id', id) as List;
-          final expIds = expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
-          if (expIds.isNotEmpty) {
-            await _client.from('splits').delete().inFilter('expense_id', expIds);
-          }
-          await _client.from('expenses').delete().eq('group_id', id);
-          await _client.from('group_members').delete().eq('group_id', id);
-          await _client.from('groups').delete().eq('id', id);
-        } catch (e) {
-          debugPrint('[deleteGroups] Supabase delete failed for $id (continuing locally): $e');
-        }
-      }
-    }
-
-    // ── Local SQLite: single atomic transaction for all groups ────────────
-    final db = LocalDatabase.db;
-    try {
-      await db.transaction((txn) async {
-        for (final id in ids) {
-          final expRows = await txn.query(
-            'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [id]);
-          if (expRows.isNotEmpty) {
-            final placeholder = expRows.map((_) => '?').join(',');
-            final expIds = expRows.map((r) => r['id'] as String).toList();
-            await txn.delete('splits',
-                where: 'expense_id IN ($placeholder)', whereArgs: expIds);
-          }
-          await txn.delete('expenses', where: 'group_id = ?', whereArgs: [id]);
-          await txn.delete('group_members', where: 'group_id = ?', whereArgs: [id]);
-          await txn.delete('groups', where: 'id = ?', whereArgs: [id]);
-        }
-      });
-    } catch (e) {
-      debugPrint('[deleteGroups] SQLite transaction failed: $e');
-      _notify();
-      return false;
-    }
-
-    _logGroupDeletedEvents(uid, groupNames);
-    _notify();
-    return true;
+    return allOk;
   }
 
   void _logGroupDeletedEvents(String uid, Map<String, String> groupNames) {
