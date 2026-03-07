@@ -706,25 +706,33 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        // Snapshot name for activity log before deleting.
+        // Snapshot name + creator before deleting.
         String webGroupName = groupId;
+        String? creatorId;
         try {
-          final nameRows = await _client.from('groups').select('name').eq('id', groupId).limit(1) as List;
-          if (nameRows.isNotEmpty) webGroupName = (nameRows.first as Map<String, dynamic>)['name'] as String? ?? groupId;
+          final infoRows = await _client.from('groups').select('name, creator_id').eq('id', groupId).limit(1) as List;
+          if (infoRows.isNotEmpty) {
+            final info = infoRows.first as Map<String, dynamic>;
+            webGroupName = info['name'] as String? ?? groupId;
+            creatorId    = info['creator_id'] as String?;
+          }
         } catch (_) {}
-        // Fetch expense IDs first so we can delete their splits.
-        final expenseRows = await _client
-            .from('expenses')
-            .select('id')
-            .eq('group_id', groupId) as List;
-        final expenseIds =
-            expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
-        if (expenseIds.isNotEmpty) {
-          await _client.from('splits').delete().inFilter('expense_id', expenseIds);
+
+        if (creatorId == uid) {
+          // Full delete — cascade expenses / splits / members / group.
+          final expenseRows = await _client.from('expenses').select('id').eq('group_id', groupId) as List;
+          final expenseIds  = expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+          if (expenseIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', expenseIds);
+          }
+          await _client.from('expenses').delete().eq('group_id', groupId);
+          await _client.from('group_members').delete().eq('group_id', groupId);
+          await _client.from('groups').delete().eq('id', groupId);
+        } else {
+          // Non-owner: leave only — remove this user from group_members.
+          await _client.from('group_members').delete()
+              .eq('group_id', groupId).eq('user_id', uid);
         }
-        await _client.from('expenses').delete().eq('group_id', groupId);
-        await _client.from('group_members').delete().eq('group_id', groupId);
-        await _client.from('groups').delete().eq('id', groupId);
         _logGroupDeletedEvents(uid, {groupId: webGroupName});
         _notify();
         return true;
@@ -733,7 +741,7 @@ class SetAllRepository {
       }
     }
 
-    // Local check — any member may delete.
+    // Local check — resolve creator and name.
     final rows = await LocalDatabase.db.query(
       'groups',
       where: 'id = ?',
@@ -741,47 +749,56 @@ class SetAllRepository {
     );
     if (rows.isEmpty) return false;
     final groupName = rows.first['name'] as String? ?? groupId;
+    final creatorId = rows.first['creator_id'] as String?;
+    final isOwner   = creatorId == uid;
 
-    // Remote-first: delete from Supabase before removing locally so other
-    // devices' reconciler will prune the group on their next pull.
-    if (await _isOnline && _client != null) {
-      try {
-        final remoteExpenseRows = await _client
-            .from('expenses')
-            .select('id')
-            .eq('group_id', groupId) as List;
-        final remoteExpenseIds = remoteExpenseRows
-            .map((r) => (r as Map<String, dynamic>)['id'] as String)
-            .toList();
-        if (remoteExpenseIds.isNotEmpty) {
-          await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
+    if (isOwner) {
+      // ── Owner: full cascade delete ──────────────────────────────────────
+      // Remote-first: delete from Supabase before removing locally so other
+      // devices' reconciler will prune the group on their next pull.
+      if (await _isOnline && _client != null) {
+        try {
+          final remoteExpenseRows = await _client
+              .from('expenses').select('id').eq('group_id', groupId) as List;
+          final remoteExpenseIds = remoteExpenseRows
+              .map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+          if (remoteExpenseIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
+          }
+          await _client.from('expenses').delete().eq('group_id', groupId);
+          await _client.from('group_members').delete().eq('group_id', groupId);
+          await _client.from('groups').delete().eq('id', groupId);
+        } catch (e) {
+          debugPrint('[deleteGroup] Supabase owner-delete failed: $e');
         }
-        await _client.from('expenses').delete().eq('group_id', groupId);
-        await _client.from('group_members').delete().eq('group_id', groupId);
-        await _client.from('groups').delete().eq('id', groupId);
-      } catch (e) {
-        debugPrint('[deleteGroup] Supabase delete failed: $e');
-        // Continue with local delete so the UI stays responsive.
       }
+      // Local cascade.
+      final expenseRows = await LocalDatabase.db.query(
+        'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
+      for (final row in expenseRows) {
+        await LocalDatabase.db.delete('splits',
+            where: 'expense_id = ?', whereArgs: [row['id']]);
+      }
+      await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
+      await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
+      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
+    } else {
+      // ── Non-owner: leave only ────────────────────────────────────────────
+      // Remove this user from group_members remotely (best-effort).
+      if (await _isOnline && _client != null) {
+        try {
+          await _client.from('group_members').delete()
+              .eq('group_id', groupId).eq('user_id', uid);
+        } catch (e) {
+          debugPrint('[deleteGroup] Supabase member-exit failed: $e');
+        }
+      }
+      // Remove locally — group row stays so SyncService can reconcile,
+      // but removing the member row hides it from watchGroups queries.
+      await LocalDatabase.db.delete('group_members',
+          where: 'group_id = ? AND user_id = ?', whereArgs: [groupId, uid]);
+      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
     }
-
-    // Collect local expense IDs for this group.
-    final expenseRows = await LocalDatabase.db.query(
-      'expenses',
-      columns: ['id'],
-      where: 'group_id = ?',
-      whereArgs: [groupId],
-    );
-    for (final row in expenseRows) {
-      await LocalDatabase.db.delete(
-        'splits',
-        where: 'expense_id = ?',
-        whereArgs: [row['id']],
-      );
-    }
-    await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
-    await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
-    await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
 
     _logGroupDeletedEvents(uid, {groupId: groupName});
     _notify();
@@ -1593,26 +1610,29 @@ class SetAllRepository {
               
                     if (await _isOnline && _client != null) {
                       try {
-                        await _client.from('expenses').insert(supabaseExpenseData);
-                        for (final split in splitModels) {
-                          await _client.from('splits').insert(split.toJson());
+                        // Timeout guard: never freeze on a remote constraint error.
+                        // The expense is already persisted locally; SyncService will
+                        // retry on the next pull.  8 s covers slow connections.
+                        await Future.wait([
+                          _client.from('expenses').insert(supabaseExpenseData),
+                          ...splitModels.map((s) => _client.from('splits').insert(s.toJson())),
+                        ]).timeout(const Duration(seconds: 8));
+
+                        await LocalDatabase.db.update(
+                          'expenses',
+                          {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                          where: 'id = ?',
+                          whereArgs: [expenseId],
+                        );
+                      } catch (e) {
+                        if (e is PostgrestException) {
+                          debugPrint(
+                              'PostgrestException in addExpense (mobile sync): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+                        } else {
+                          debugPrint('Error in addExpense (mobile sync): $e');
                         }
-              
-              await LocalDatabase.db.update(
-                'expenses',
-                {'synced_at': DateTime.now().millisecondsSinceEpoch},
-                where: 'id = ?',
-                whereArgs: [expenseId],
-              );
-            } catch (e) {
-              if (e is PostgrestException) {
-                debugPrint(
-                    'PostgrestException in addExpense (mobile sync): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
-              } else {
-                debugPrint('Error in addExpense (mobile sync): $e');
-              }
-            }
-          }
+                      }
+                    }
 
     // Ensure all split participants are in group_members so they appear in
     // the members list even if they were never formally invited.

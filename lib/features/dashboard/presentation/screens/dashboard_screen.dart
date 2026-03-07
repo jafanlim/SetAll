@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
@@ -66,6 +67,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: 'Invite via share',
+            icon: const Icon(Icons.ios_share_rounded),
+            onPressed: () {
+              HapticUtils.lightTap();
+              Share.share(
+                'Hey! Join me on SetAll to manage our expenses together: https://setall.app/join',
+                subject: 'Join me on SetAll',
+              );
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: RefreshIndicator(
         color: _teal,

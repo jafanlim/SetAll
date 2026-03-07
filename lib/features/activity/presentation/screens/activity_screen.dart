@@ -1,9 +1,9 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
-import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -17,13 +17,66 @@ const _purple = Color(0xFF8B5CF6);
 const _green  = Color(0xFF22C55E);
 const _slate  = Color(0xFF94A3B8);
 
+// ---------------------------------------------------------------------------
+// Filter / sort enums
+// ---------------------------------------------------------------------------
+enum _ActivityFilter { all, wallet, groups, income }
+enum _ActivitySort   { newest, largest }
+
 /// Omni Activity Hub — polymorphic audit trail.
 /// Shows group creation, shared expenses, personal wallet entries, and settlements.
-class ActivityScreen extends ConsumerWidget {
+class ActivityScreen extends ConsumerStatefulWidget {
   const ActivityScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ActivityScreen> createState() => _ActivityScreenState();
+}
+
+class _ActivityScreenState extends ConsumerState<ActivityScreen> {
+  _ActivityFilter _filter = _ActivityFilter.all;
+  _ActivitySort   _sort   = _ActivitySort.newest;
+
+  List<ActivityEvent> _applyFilterSort(List<ActivityEvent> feed) {
+    // Filter
+    var result = feed.where((ev) {
+      switch (_filter) {
+        case _ActivityFilter.all:
+          return true;
+        case _ActivityFilter.wallet:
+          return ev is ExpenseEvent && ev.expense.groupId == null;
+        case _ActivityFilter.groups:
+          return (ev is ExpenseEvent && ev.expense.groupId != null) ||
+              ev is GroupCreatedEvent ||
+              ev is GroupDeletedEvent;
+        case _ActivityFilter.income:
+          return ev is ExpenseEvent && ev.expense.isIncome;
+      }
+    }).toList();
+
+    // Sort
+    if (_sort == _ActivitySort.largest) {
+      result.sort((a, b) {
+        final amtA = _eventAmount(a);
+        final amtB = _eventAmount(b);
+        return amtB.compareTo(amtA);
+      });
+    }
+    // newest is already the default order from the provider
+    return result;
+  }
+
+  Decimal _eventAmount(ActivityEvent ev) {
+    if (ev is ExpenseEvent) {
+      return Decimal.tryParse(ev.expense.universalUsdAmount ?? ev.expense.amount) ?? Decimal.zero;
+    }
+    if (ev is SettlementEvent) {
+      return Decimal.tryParse(ev.amount) ?? Decimal.zero;
+    }
+    return Decimal.zero;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme     = Theme.of(context);
     final feedAsync = ref.watch(omniActivityProvider);
 
@@ -44,36 +97,88 @@ class ActivityScreen extends ConsumerWidget {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            tooltip: 'Invite friend',
-            icon: const Icon(Icons.person_add_outlined),
+            tooltip: _sort == _ActivitySort.newest ? 'Sort: Newest first' : 'Sort: Largest first',
+            icon: Icon(
+              _sort == _ActivitySort.newest
+                  ? Icons.sort_rounded
+                  : Icons.attach_money_rounded,
+              color: _sort == _ActivitySort.largest ? _teal : null,
+            ),
             onPressed: () {
-              HapticUtils.lightTap();
-              context.push(AppRouter.settings);
+              HapticUtils.selection();
+              setState(() {
+                _sort = _sort == _ActivitySort.newest
+                    ? _ActivitySort.largest
+                    : _ActivitySort.newest;
+              });
             },
           ),
           const SizedBox(width: 4),
         ],
       ),
-      body: RefreshIndicator(
-        color: _teal,
-        onRefresh: () async {
-          HapticUtils.lightTap();
-          ref.invalidate(omniActivityProvider);
-        },
-        child: feedAsync.when(
-          skipLoadingOnReload: true,
-          data:    (feed) => _buildFeed(context, feed, theme),
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error:   (e, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Could not load activity',
-                style: TextStyle(color: theme.colorScheme.error),
+      body: Column(
+        children: [
+          // ── Filter chips ───────────────────────────────────────────────
+          SizedBox(
+            height: 44,
+            child: ListView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              children: [
+                _FilterChip(
+                  label: 'All',
+                  selected: _filter == _ActivityFilter.all,
+                  onTap: () { HapticUtils.selection(); setState(() => _filter = _ActivityFilter.all); },
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Wallet',
+                  selected: _filter == _ActivityFilter.wallet,
+                  onTap: () { HapticUtils.selection(); setState(() => _filter = _ActivityFilter.wallet); },
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Groups',
+                  selected: _filter == _ActivityFilter.groups,
+                  onTap: () { HapticUtils.selection(); setState(() => _filter = _ActivityFilter.groups); },
+                ),
+                const SizedBox(width: 8),
+                _FilterChip(
+                  label: 'Income',
+                  selected: _filter == _ActivityFilter.income,
+                  onTap: () { HapticUtils.selection(); setState(() => _filter = _ActivityFilter.income); },
+                ),
+              ],
+            ),
+          ),
+          // ── Feed ───────────────────────────────────────────────────────
+          Expanded(
+            child: RefreshIndicator(
+              color: _teal,
+              onRefresh: () async {
+                HapticUtils.lightTap();
+                ref.invalidate(omniActivityProvider);
+              },
+              child: feedAsync.when(
+                skipLoadingOnReload: true,
+                data: (feed) {
+                  final filtered = _applyFilterSort(feed);
+                  return _buildFeed(context, filtered, theme);
+                },
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (e, _) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Could not load activity',
+                      style: TextStyle(color: theme.colorScheme.error),
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
-        ),
+        ],
       ),
     );
   }
@@ -86,18 +191,25 @@ class ActivityScreen extends ConsumerWidget {
     if (feed.isEmpty) return _EmptyActivityState(theme: theme);
 
     final items = <_FeedItem>[];
-    String? lastLabel;
-    for (final event in feed) {
-      final label = _dateSection(event.timestamp);
-      if (label != lastLabel) {
-        items.add(_FeedItem.header(label));
-        lastLabel = label;
+    // For largest sort, skip date headers (they'd be misleading).
+    if (_sort == _ActivitySort.newest) {
+      String? lastLabel;
+      for (final event in feed) {
+        final label = _dateSection(event.timestamp);
+        if (label != lastLabel) {
+          items.add(_FeedItem.header(label));
+          lastLabel = label;
+        }
+        items.add(_FeedItem.event(event));
       }
-      items.add(_FeedItem.event(event));
+    } else {
+      for (final event in feed) {
+        items.add(_FeedItem.event(event));
+      }
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 96),
       itemCount: items.length,
       itemBuilder: (_, i) {
         final item = items[i];
@@ -129,6 +241,43 @@ class ActivityScreen extends ConsumerWidget {
     } catch (_) {
       return 'Earlier';
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filter chip widget
+// ---------------------------------------------------------------------------
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({required this.label, required this.selected, required this.onTap});
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? _teal.withAlpha(38) : Colors.transparent,
+          border: Border.all(
+            color: selected ? _teal : Colors.white24,
+            width: selected ? 1.5 : 1,
+          ),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected ? _teal : _slate,
+          ),
+        ),
+      ),
+    );
   }
 }
 
