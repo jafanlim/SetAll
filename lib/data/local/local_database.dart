@@ -30,7 +30,12 @@ class LocalDatabase {
   ///   • Re-runs the v10 expenses table rebuild with base_amount_at_entry included
   ///     so the SELECT * migration no longer fails for users upgrading from v4-v9.
   ///   • Adds 'left_group_ids' table to persist groups the user has voluntarily left.
-  static const int _version = 11;
+  /// Schema v12 fixes:
+  ///   • Adds is_income column safely via ALTER TABLE (guaranteed even if rebuild
+  ///     in v11 failed silently on this device).
+  ///   • Ensures left_groups table exists.
+  ///   • Re-attempts full expenses rebuild using PRAGMA-based column detection.
+  static const int _version = 12;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -156,27 +161,49 @@ class LocalDatabase {
         )
       ''');
     }
-    if (oldVersion < 11) {
-      // Rebuild expenses so group_id is nullable.
-      // Use PRAGMA table_info to discover which columns actually exist in the
-      // current (pre-migration) expenses table — handles every upgrade path
-      // regardless of which prior migrations ran on this device.
+    if (oldVersion < 12) {
+      // Phase 1: Safe ALTER TABLE additions — these cannot fail and guarantee
+      // the columns exist regardless of what happened in v10/v11.
+      await _addColumnIfNotExists(db, 'expenses', 'is_income',            'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'expenses', 'group_id',             'TEXT');
+      await _addColumnIfNotExists(db, 'expenses', 'base_amount_at_entry', 'TEXT');
+      await _addColumnIfNotExists(db, 'expenses', 'total_amount',         'TEXT');
+      await _addColumnIfNotExists(db, 'expenses', 'universal_usd_amount', 'TEXT');
+      await _addColumnIfNotExists(db, 'expenses', 'updated_at',           'TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS left_groups (
+          group_id TEXT PRIMARY KEY,
+          left_at  TEXT
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS user_categories (
+          id         TEXT PRIMARY KEY,
+          name       TEXT NOT NULL,
+          type       TEXT NOT NULL DEFAULT 'expense',
+          created_by TEXT NOT NULL,
+          created_at TEXT
+        )
+      ''');
+
+      // Phase 2: Rebuild expenses table so group_id has no NOT NULL constraint.
+      // PRAGMA table_info detects which columns actually exist after Phase 1
+      // so the copy never references a missing column.
       const desiredColumns = [
         'id', 'group_id', 'payer_id', 'created_by', 'amount', 'total_amount',
-        'base_amount_at_entry', 'description', 'currency', 'split_type',
-        'category', 'original_amount', 'original_currency',
+        'base_amount_at_entry', 'is_income', 'description', 'currency',
+        'split_type', 'category', 'original_amount', 'original_currency',
         'exchange_rate_applied', 'universal_usd_amount', 'created_at',
         'updated_at', 'synced_at',
       ];
       final pragmaRows = await db.rawQuery('PRAGMA table_info(expenses)');
-      final existingCols =
-          pragmaRows.map((r) => r['name'] as String).toSet();
+      final existingCols = pragmaRows.map((r) => r['name'] as String).toSet();
       final colsToCopy =
           desiredColumns.where((c) => existingCols.contains(c)).toList();
       final colList = colsToCopy.join(', ');
 
       await db.execute('''
-        CREATE TABLE IF NOT EXISTS expenses_v11 (
+        CREATE TABLE IF NOT EXISTS expenses_v12 (
           id                    TEXT PRIMARY KEY,
           group_id              TEXT,
           payer_id              TEXT NOT NULL,
@@ -184,6 +211,7 @@ class LocalDatabase {
           amount                TEXT NOT NULL,
           total_amount          TEXT,
           base_amount_at_entry  TEXT,
+          is_income             INTEGER NOT NULL DEFAULT 0,
           description           TEXT,
           currency              TEXT,
           split_type            TEXT,
@@ -197,23 +225,15 @@ class LocalDatabase {
           synced_at             INTEGER
         )
       ''');
-      // Only copy columns present in both tables.
       await db.execute(
-        'INSERT OR IGNORE INTO expenses_v11 ($colList) SELECT $colList FROM expenses',
+        'INSERT OR IGNORE INTO expenses_v12 ($colList) SELECT $colList FROM expenses',
       );
       await db.execute('DROP TABLE IF EXISTS expenses');
-      await db.execute('ALTER TABLE expenses_v11 RENAME TO expenses');
-      // Restore unique index on splits.
+      await db.execute('ALTER TABLE expenses_v12 RENAME TO expenses');
+      // Restore splits unique index (may have been lost through prior rebuilds).
       await db.execute(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
       );
-      // Persist groups the user voluntarily left so sync never re-pulls them.
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS left_groups (
-          group_id TEXT PRIMARY KEY,
-          left_at  TEXT
-        )
-      ''');
     }
   }
 
@@ -257,23 +277,25 @@ class LocalDatabase {
     ''');
     await db.execute('''
       CREATE TABLE expenses (
-        id                   TEXT PRIMARY KEY,
-        group_id             TEXT,
-        payer_id             TEXT NOT NULL,
-        created_by           TEXT, -- Schema v7
-        amount               TEXT NOT NULL,
-        total_amount         TEXT, -- Schema v7
-        description          TEXT,
-        currency             TEXT,
-        split_type           TEXT,
-        category             TEXT,
-        original_amount      TEXT,
-        original_currency    TEXT,
+        id                    TEXT PRIMARY KEY,
+        group_id              TEXT,
+        payer_id              TEXT NOT NULL,
+        created_by            TEXT,
+        amount                TEXT NOT NULL,
+        total_amount          TEXT,
+        base_amount_at_entry  TEXT,
+        is_income             INTEGER NOT NULL DEFAULT 0,
+        description           TEXT,
+        currency              TEXT,
+        split_type            TEXT,
+        category              TEXT,
+        original_amount       TEXT,
+        original_currency     TEXT,
         exchange_rate_applied TEXT,
-        universal_usd_amount TEXT, -- Schema v8
-        created_at           TEXT,
-        updated_at           TEXT,
-        synced_at            INTEGER
+        universal_usd_amount  TEXT,
+        created_at            TEXT,
+        updated_at            TEXT,
+        synced_at             INTEGER
       )
     ''');
     await db.execute('''
