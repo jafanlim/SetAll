@@ -246,9 +246,17 @@ class SyncService {
       try {
         final expense = ExpenseModel.fromJson(row);
         // Strip local-only / schema-mismatched fields before sending to Supabase.
-        final payload = expense.toJson()
+        final raw = expense.toJson()
           ..remove('created_by')
           ..remove('base_amount_at_entry');
+        // Remap is_income int→bool and coerce empty group_id to null
+        final payload = <String, dynamic>{
+          ...raw,
+          'is_income': expense.isIncome,
+          'group_id': (raw['group_id'] as String?)?.isEmpty == true
+              ? null
+              : raw['group_id'],
+        };
         await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
           'expenses',
@@ -401,11 +409,24 @@ class SyncService {
       }
     } catch (_) {}
 
-    final expenses = await _client
+    final groupExpenses = await _client
         .from('expenses')
         .select()
         .inFilter('group_id', memberIds.toList());
-    for (final e in expenses as List) {
+
+    // Also pull personal (wallet) expenses owned by this user.
+    final personalExpenses = await _client
+        .from('expenses')
+        .select()
+        .isFilter('group_id', null)
+        .eq('payer_id', uid);
+
+    final expenses = [
+      ...(groupExpenses as List),
+      ...(personalExpenses as List),
+    ];
+
+    for (final e in expenses) {
       final map = e as Map<String, dynamic>;
       final expense = ExpenseModel.fromJson(map);
       await LocalDatabase.db.insert(
@@ -419,7 +440,7 @@ class SyncService {
       );
     }
 
-    final expenseIds = (expenses as List)
+    final expenseIds = expenses
         .map((e) => (e as Map<String, dynamic>)['id'] as String)
         .toList();
     if (expenseIds.isNotEmpty) {
@@ -501,8 +522,13 @@ class SyncService {
 
       // Only reconcile expenses that have been synced — unsynced rows
       // (synced_at IS NULL) are pending push and must not be pruned.
+      // Exclude personal (wallet) expenses: group_id IS NULL means they are
+      // never in cloudGroupIds, so they must never be treated as orphans.
       final localExpenses = await LocalDatabase.db.query(
-        'expenses', columns: ['id'], where: 'synced_at IS NOT NULL');
+        'expenses',
+        columns: ['id'],
+        where: 'synced_at IS NOT NULL AND group_id IS NOT NULL',
+      );
       for (final row in localExpenses) {
         final eid = row['id'] as String;
         if (!cloudExpenseIds.contains(eid)) {
