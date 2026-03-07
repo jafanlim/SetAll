@@ -69,6 +69,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
+            tooltip: 'Add friend',
+            icon: const Icon(Icons.person_add_outlined),
+            onPressed: () {
+              HapticUtils.lightTap();
+              context.push(AppRouter.inviteFriend);
+            },
+          ),
+          IconButton(
             tooltip: 'Invite via share',
             icon: const Icon(Icons.ios_share_rounded),
             onPressed: () {
