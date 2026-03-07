@@ -3,8 +3,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
@@ -74,17 +72,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             onPressed: () {
               HapticUtils.lightTap();
               context.push(AppRouter.inviteFriend);
-            },
-          ),
-          IconButton(
-            tooltip: 'Invite via share',
-            icon: const Icon(Icons.ios_share_rounded),
-            onPressed: () {
-              HapticUtils.lightTap();
-              Share.share(
-                'Hey! Join me on SetAll to manage our expenses together: https://setall.app/join',
-                subject: 'Join me on SetAll',
-              );
             },
           ),
           const SizedBox(width: 4),

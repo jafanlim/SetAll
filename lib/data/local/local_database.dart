@@ -26,7 +26,11 @@ class LocalDatabase {
   /// Schema v10 adds:
   ///   • expenses.group_id made nullable (True Wallet: personal expenses use NULL)
   ///   • user_categories table for smart custom categories
-  static const int _version = 10;
+  /// Schema v11 fixes:
+  ///   • Re-runs the v10 expenses table rebuild with base_amount_at_entry included
+  ///     so the SELECT * migration no longer fails for users upgrading from v4-v9.
+  ///   • Adds 'left_group_ids' table to persist groups the user has voluntarily left.
+  static const int _version = 11;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -140,34 +144,8 @@ class LocalDatabase {
       );
     }
     if (oldVersion < 10) {
-      // True Wallet: personal expenses now use group_id = NULL.
-      // SQLite doesn't support ALTER COLUMN, so we recreate the expenses table
-      // without the NOT NULL constraint on group_id.
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS expenses_new (
-          id                   TEXT PRIMARY KEY,
-          group_id             TEXT,
-          payer_id             TEXT NOT NULL,
-          created_by           TEXT,
-          amount               TEXT NOT NULL,
-          total_amount         TEXT,
-          description          TEXT,
-          currency             TEXT,
-          split_type           TEXT,
-          category             TEXT,
-          original_amount      TEXT,
-          original_currency    TEXT,
-          exchange_rate_applied TEXT,
-          universal_usd_amount TEXT,
-          created_at           TEXT,
-          updated_at           TEXT,
-          synced_at            INTEGER
-        )
-      ''');
-      await db.execute('INSERT INTO expenses_new SELECT * FROM expenses');
-      await db.execute('DROP TABLE expenses');
-      await db.execute('ALTER TABLE expenses_new RENAME TO expenses');
-      // Smart user categories table.
+      // Smart user categories table (safe to create even if v10 expenses
+      // rebuild below already created it — IF NOT EXISTS guards it).
       await db.execute('''
         CREATE TABLE IF NOT EXISTS user_categories (
           id         TEXT PRIMARY KEY,
@@ -175,6 +153,61 @@ class LocalDatabase {
           type       TEXT NOT NULL DEFAULT 'expense',
           created_by TEXT NOT NULL,
           created_at TEXT
+        )
+      ''');
+    }
+    if (oldVersion < 11) {
+      // Fix: rebuild expenses table so group_id is nullable AND all existing
+      // columns (including base_amount_at_entry from v4) are preserved.
+      // Using explicit column copy avoids SELECT * failures when schemas diverge.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expenses_v11 (
+          id                    TEXT PRIMARY KEY,
+          group_id              TEXT,
+          payer_id              TEXT NOT NULL,
+          created_by            TEXT,
+          amount                TEXT NOT NULL,
+          total_amount          TEXT,
+          base_amount_at_entry  TEXT,
+          description           TEXT,
+          currency              TEXT,
+          split_type            TEXT,
+          category              TEXT,
+          original_amount       TEXT,
+          original_currency     TEXT,
+          exchange_rate_applied TEXT,
+          universal_usd_amount  TEXT,
+          created_at            TEXT,
+          updated_at            TEXT,
+          synced_at             INTEGER
+        )
+      ''');
+      // Copy only the columns that exist in BOTH old and new schema.
+      await db.execute('''
+        INSERT OR IGNORE INTO expenses_v11 (
+          id, group_id, payer_id, created_by, amount, total_amount,
+          base_amount_at_entry, description, currency, split_type, category,
+          original_amount, original_currency, exchange_rate_applied,
+          universal_usd_amount, created_at, updated_at, synced_at
+        )
+        SELECT
+          id, group_id, payer_id, created_by, amount, total_amount,
+          base_amount_at_entry, description, currency, split_type, category,
+          original_amount, original_currency, exchange_rate_applied,
+          universal_usd_amount, created_at, updated_at, synced_at
+        FROM expenses
+      ''');
+      await db.execute('DROP TABLE IF EXISTS expenses');
+      await db.execute('ALTER TABLE expenses_v11 RENAME TO expenses');
+      // Restore the unique index on splits (may have been lost if v9 ran before v10).
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
+      );
+      // Track groups the user has voluntarily left so sync never re-pulls them.
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS left_groups (
+          group_id TEXT PRIMARY KEY,
+          left_at  TEXT
         )
       ''');
     }
@@ -277,6 +310,12 @@ class LocalDatabase {
         type       TEXT NOT NULL DEFAULT 'expense',
         created_by TEXT NOT NULL,
         created_at TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE left_groups (
+        group_id TEXT PRIMARY KEY,
+        left_at  TEXT
       )
     ''');
   }
