@@ -41,7 +41,11 @@ class ExpenseModel extends Expense {
       currency: (json['currency'] as String?) ?? 'USD',
       splitType: _splitTypeFromString(json['split_type'] as String?),
       category: (json['category'] as String?) ?? 'General',
-      isIncome: (json['is_income'] as int? ?? 0) != 0,
+      isIncome: switch (json['is_income']) {
+        final bool b => b,
+        final int i => i != 0,
+        _ => false,
+      },
       createdAt: json['created_at'] as String?,
       createdBy: json['created_by'] as String?,
       originalAmount: json['original_amount']?.toString(),

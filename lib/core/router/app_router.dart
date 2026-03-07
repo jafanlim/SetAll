@@ -265,16 +265,23 @@ final class AppRouter {
               path: 'expense/:expenseId',
               name: 'editExpense',
               pageBuilder: (context, state) {
-                final groupId = state.pathParameters['id']!;
+                final groupId   = state.pathParameters['id']!;
                 final expenseId = state.pathParameters['expenseId']!;
-                final extra = state.extra as Map<String, dynamic>?;
-                final groupName = extra?['groupName'] as String? ?? 'Group';
+                // extra can be an ExpenseModel (from wallet tap-to-edit)
+                // or a Map<String, dynamic> (from group detail screen).
+                final extra = state.extra;
+                final String groupName;
+                if (extra is Map<String, dynamic>) {
+                  groupName = extra['groupName'] as String? ?? 'Group';
+                } else {
+                  groupName = 'Wallet';
+                }
                 return MaterialPage(
                   child: Material(
                     color: Theme.of(context).colorScheme.surface,
                     child: EditExpenseScreen(
                       expenseId: expenseId,
-                      groupId: groupId,
+                      groupId: groupId == 'wallet' ? '' : groupId,
                       groupName: groupName,
                     ),
                   ),
