@@ -15,12 +15,87 @@ import '../../../../data/models/group_model.dart';
 const _teal    = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
 const _orange  = Color(0xFFFF8C42);
+const _brandOrange = Color(0xFFF97316);
 
-class GroupsScreen extends ConsumerWidget {
+class GroupsScreen extends ConsumerStatefulWidget {
   const GroupsScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<GroupsScreen> createState() => _GroupsScreenState();
+}
+
+class _GroupsScreenState extends ConsumerState<GroupsScreen> {
+  bool _editMode = false;
+  final Set<String> _selected = {};
+
+  void _toggleEditMode() {
+    HapticUtils.selection();
+    setState(() {
+      _editMode = !_editMode;
+      _selected.clear();
+    });
+  }
+
+  void _toggleItem(String id) {
+    HapticUtils.selection();
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  Future<void> _deleteBatch() async {
+    if (_selected.isEmpty) return;
+    final count = _selected.length;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete groups?'),
+        content: Text(
+          'Are you sure you want to delete $count item${count == 1 ? '' : 's'}?\n\nThis is irreversible — all expenses inside will be permanently removed.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton.icon(
+            style: FilledButton.styleFrom(
+              backgroundColor: _brandOrange,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_outline, size: 16),
+            label: Text('Delete ($count)'),
+            onPressed: () => Navigator.of(ctx).pop(true),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    final ok = await repo.deleteGroups(_selected.toList());
+    if (!mounted) return;
+    if (ok) {
+      HapticUtils.success();
+      ref.invalidate(myGroupsProvider);
+      ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
+      setState(() {
+        _editMode = false;
+        _selected.clear();
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not delete some groups.')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme       = Theme.of(context);
     final groupsAsync = ref.watch(myGroupsProvider);
 
@@ -39,20 +114,44 @@ class GroupsScreen extends ConsumerWidget {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        actions: _editMode
+            ? [
+                TextButton(
+                  onPressed: _toggleEditMode,
+                  child: const Text('Cancel'),
+                ),
+                if (_selected.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: _deleteBatch,
+                    icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
+                    label: Text(
+                      'Delete (${_selected.length})',
+                      style: const TextStyle(color: _brandOrange),
+                    ),
+                  ),
+              ]
+            : [
+                TextButton(
+                  onPressed: _toggleEditMode,
+                  child: const Text('Edit'),
+                ),
+              ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          HapticUtils.primaryTap();
-          context.push(AppRouter.createGroup);
-        },
-        backgroundColor: _teal,
-        foregroundColor: Colors.black,
-        icon: const Icon(Icons.group_add_outlined),
-        label: const Text(
-          'New group',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
-      ),
+      floatingActionButton: _editMode
+          ? null
+          : FloatingActionButton.extended(
+              onPressed: () {
+                HapticUtils.primaryTap();
+                context.push(AppRouter.createGroup);
+              },
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+              icon: const Icon(Icons.group_add_outlined),
+              label: const Text(
+                'New group',
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+              ),
+            ),
       body: RefreshIndicator(
         color: _teal,
         onRefresh: () async {
@@ -65,7 +164,17 @@ class GroupsScreen extends ConsumerWidget {
             return ListView.builder(
               padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
               itemCount: groups.length,
-              itemBuilder: (_, i) => _GroupCard(group: groups[i]),
+              itemBuilder: (_, i) {
+                final group = groups[i];
+                if (_editMode) {
+                  return _GroupCardSelectable(
+                    group: group,
+                    selected: _selected.contains(group.id),
+                    onToggle: () => _toggleItem(group.id),
+                  );
+                }
+                return _GroupCard(group: group);
+              },
             );
           },
           loading: () => const Center(child: CircularProgressIndicator()),
@@ -116,6 +225,122 @@ class _EmptyGroupsView extends StatelessWidget {
               textAlign: TextAlign.center,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Selectable group card — used in Edit mode
+// ---------------------------------------------------------------------------
+class _GroupCardSelectable extends ConsumerWidget {
+  const _GroupCardSelectable({
+    required this.group,
+    required this.selected,
+    required this.onToggle,
+  });
+
+  final GroupModel group;
+  final bool selected;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final balanceAsync = ref.watch(groupBalanceSummaryProvider(group.id));
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: GestureDetector(
+        onTap: onToggle,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected ? _brandOrange : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: GlassCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    width: 24, height: 24,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selected ? _brandOrange : Colors.transparent,
+                      border: Border.all(
+                        color: selected ? _brandOrange : theme.colorScheme.onSurfaceVariant,
+                        width: 2,
+                      ),
+                    ),
+                    child: selected
+                        ? const Icon(Icons.check, size: 14, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    width: 40, height: 40,
+                    decoration: BoxDecoration(
+                      color: _tealDim,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        group.name.isNotEmpty ? group.name[0].toUpperCase() : 'G',
+                        style: const TextStyle(
+                          color: _teal, fontWeight: FontWeight.w800, fontSize: 16,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          group.name,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700, fontSize: 14,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 3),
+                        balanceAsync.when(
+                          data: (s) {
+                            final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
+                            final owe  = Decimal.tryParse(s.youOwe)     ?? Decimal.zero;
+                            if (owed == Decimal.zero && owe == Decimal.zero) {
+                              return Text('Settled up',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                      color: _teal, fontSize: 11));
+                            }
+                            return Text(
+                              owed > Decimal.zero
+                                  ? '+${s.currency} ${s.youAreOwed}'
+                                  : '-${s.currency} ${s.youOwe}',
+                              style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w600,
+                                color: owed > Decimal.zero ? _teal : _orange,
+                              ),
+                            );
+                          },
+                          loading: () => const SizedBox(height: 11),
+                          error: (_, _) => const SizedBox.shrink(),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );

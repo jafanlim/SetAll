@@ -17,9 +17,9 @@ import '../../../../data/models/group_model.dart';
 // ---------------------------------------------------------------------------
 // Fintech colour palette
 // ---------------------------------------------------------------------------
-const _teal = Color(0xFF00D9B0);   // "You are owed" – Teal
-const _orange = Color(0xFFFF8C42); // "You owe" – Orange
-const _tealDim = Color(0x2600D9B0);
+const _teal     = Color(0xFF00D9B0);
+const _orange   = Color(0xFFFF8C42);
+const _tealDim  = Color(0x2600D9B0);
 const _orangeDim = Color(0x26FF8C42);
 
 class DashboardScreen extends ConsumerStatefulWidget {
@@ -30,9 +30,6 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  // 0 = Groups view, 1 = Wallet view
-  int _tab = 0;
-
   @override
   void initState() {
     super.initState();
@@ -41,8 +38,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         if (mounted) {
           ref.invalidate(balanceSummaryProvider);
           ref.invalidate(recentExpensesProvider);
-          ref.invalidate(walletBalanceProvider);
-          ref.invalidate(personalExpensesProvider);
         }
       });
     });
@@ -50,7 +45,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final theme         = Theme.of(context);
+    final summaryAsync  = ref.watch(balanceSummaryProvider);
+    final groupsAsync   = ref.watch(myGroupsProvider);
+    final expensesAsync = ref.watch(recentExpensesProvider);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -68,374 +66,161 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(44),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: _SegmentControl(
-              selected: _tab,
-              onChanged: (i) {
-                HapticUtils.selection();
-                setState(() => _tab = i);
-              },
-            ),
-          ),
-        ),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        child: _tab == 0
-            ? _GroupsView(key: const ValueKey('groups'))
-            : _WalletView(key: const ValueKey('wallet')),
+      body: RefreshIndicator(
+        color: _teal,
+        onRefresh: () async {
+          HapticUtils.lightTap();
+          await ref.read(syncServiceProvider).performFullSync();
+          ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(myGroupsProvider);
+          ref.invalidate(recentExpensesProvider);
+        },
+        child: CustomScrollView(
+          slivers: [
+            // ── Net Balance Hero ────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: summaryAsync.when(
+                  skipLoadingOnReload: true,
+                  data: (summary) {
+                    final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
+                    final owe  = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
+                    final net  = owed - owe;
+                    final isPos = net >= Decimal.zero;
+                    return _NetBalanceHero(
+                      netDisplay: (isPos ? net : -net).toStringAsFixed(2),
+                      currency: summary.currency,
+                      isPositive: isPos,
+                      youAreOwed: summary.youAreOwed,
+                      youOwe: summary.youOwe,
+                    );
+                  },
+                  loading: () => const _NetBalanceHero.loading(),
+                  error: (_, _) => const _NetBalanceHero.error(),
+                ),
+              ),
+            ),
+
+            // ── Groups ─────────────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                child: Text(
+                  'Your groups',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700, fontSize: 13,
+                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            groupsAsync.when(
+              data: (groups) => groups.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No groups yet. Tap Add expense to create one.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ))
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, i) => _GroupCard(group: groups[i]),
+                        childCount: groups.length,
+                      )),
+              loading: () => const SliverToBoxAdapter(
+                  child: Padding(padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()))),
+              error: (_, _) => SliverToBoxAdapter(
+                  child: Padding(padding: const EdgeInsets.all(24),
+                      child: Center(child: Text('Could not load groups',
+                          style: TextStyle(color: Theme.of(context).colorScheme.error))))),
+            ),
+
+            // ── Recent Activity ───────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
+                child: Text(
+                  'Recent activity',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700, fontSize: 13,
+                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+            groupsAsync.when(
+              data: (groups) {
+                final groupNameMap = {for (final g in groups) g.id: g.name};
+                return expensesAsync.when(
+                  data: (expenses) => expenses.isEmpty
+                      ? SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                            child: Text(
+                              'No expenses yet. Tap + to get started.',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant),
+                            )))
+                      : SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (ctx, i) => _ActivityTile(
+                              expense: expenses[i],
+                              groupId: expenses[i].groupId,
+                              groupName: groupNameMap[expenses[i].groupId] ?? ''),
+                            childCount: expenses.length,
+                          )),
+                  loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                  error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                );
+              },
+              loading: () => expensesAsync.when(
+                data: (expenses) => SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _ActivityTile(
+                        expense: expenses[i], groupId: expenses[i].groupId, groupName: ''),
+                    childCount: expenses.length,
+                  )),
+                loading: () => const SliverToBoxAdapter(
+                    child: Padding(padding: EdgeInsets.all(24),
+                        child: Center(child: CircularProgressIndicator()))),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              ),
+              error: (_, _) => expensesAsync.when(
+                data: (expenses) => SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (ctx, i) => _ActivityTile(
+                        expense: expenses[i], groupId: expenses[i].groupId, groupName: ''),
+                    childCount: expenses.length,
+                  )),
+                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           HapticUtils.primaryTap();
           context.push(AppRouter.groupPicker);
         },
-        backgroundColor: _tab == 0 ? _teal : _purple,
+        backgroundColor: _teal,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
-        label: Text(
-          _tab == 0 ? 'Add expense' : 'Add wallet entry',
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+        label: const Text(
+          'Add expense',
+          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Segment control  (Groups | Wallet)
-// ---------------------------------------------------------------------------
-const _purple    = Color(0xFF8B5CF6);
-const _purpleDim = Color(0x268B5CF6);
-
-class _SegmentControl extends StatelessWidget {
-  const _SegmentControl({required this.selected, required this.onChanged});
-  final int selected;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      height: 36,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(120),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          _Seg(label: 'Groups',  icon: Icons.group_outlined,                    index: 0, selected: selected, onTap: onChanged, activeColor: _teal),
-          _Seg(label: 'Wallet',  icon: Icons.account_balance_wallet_outlined,   index: 1, selected: selected, onTap: onChanged, activeColor: _purple),
-        ],
-      ),
-    );
-  }
-}
-
-class _Seg extends StatelessWidget {
-  const _Seg({
-    required this.label,
-    required this.icon,
-    required this.index,
-    required this.selected,
-    required this.onTap,
-    required this.activeColor,
-  });
-  final String label;
-  final IconData icon;
-  final int index;
-  final int selected;
-  final ValueChanged<int> onTap;
-  final Color activeColor;
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = selected == index;
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => onTap(index),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          margin: const EdgeInsets.all(3),
-          decoration: BoxDecoration(
-            color: isActive ? activeColor.withAlpha(38) : Colors.transparent,
-            borderRadius: BorderRadius.circular(7),
-            border: isActive ? Border.all(color: activeColor.withAlpha(80), width: 1) : null,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: isActive ? activeColor : const Color(0xFF94A3B8)),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                  color: isActive ? activeColor : const Color(0xFF94A3B8),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Groups view — balance hero + groups list + recent activity
-// ---------------------------------------------------------------------------
-class _GroupsView extends ConsumerWidget {
-  const _GroupsView({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme        = Theme.of(context);
-    final summaryAsync = ref.watch(balanceSummaryProvider);
-    final groupsAsync  = ref.watch(myGroupsProvider);
-    final expensesAsync = ref.watch(recentExpensesProvider);
-
-    return RefreshIndicator(
-      color: _teal,
-      onRefresh: () async {
-        HapticUtils.lightTap();
-        await ref.read(syncServiceProvider).performFullSync();
-        ref.invalidate(balanceSummaryProvider);
-        ref.invalidate(myGroupsProvider);
-        ref.invalidate(recentExpensesProvider);
-      },
-      child: CustomScrollView(
-        slivers: [
-          // ── Net Balance Hero ─────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: summaryAsync.when(
-                skipLoadingOnReload: true,
-                data: (summary) {
-                  final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
-                  final owe  = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
-                  final net  = owed - owe;
-                  final isPos = net >= Decimal.zero;
-                  return _NetBalanceHero(
-                    netDisplay: (isPos ? net : -net).toStringAsFixed(2),
-                    currency: summary.currency,
-                    isPositive: isPos,
-                    youAreOwed: summary.youAreOwed,
-                    youOwe: summary.youOwe,
-                  );
-                },
-                loading: () => const _NetBalanceHero.loading(),
-                error: (_, _) => const _NetBalanceHero.error(),
-              ),
-            ),
-          ),
-
-          // ── Groups ───────────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-              child: Text('Your groups',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700, fontSize: 13,
-                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant)),
-            ),
-          ),
-          groupsAsync.when(
-            data: (groups) => groups.isEmpty
-                ? SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                      child: Center(
-                        child: Text('No groups yet. Tap Add expense to create one.',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant),
-                          textAlign: TextAlign.center),
-                      ),
-                    ))
-                : SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (ctx, i) => _GroupCard(group: groups[i]),
-                      childCount: groups.length,
-                    )),
-            loading: () => const SliverToBoxAdapter(
-                child: Padding(padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()))),
-            error: (_, _) => SliverToBoxAdapter(
-                child: Padding(padding: const EdgeInsets.all(24),
-                    child: Center(child: Text('Could not load groups',
-                        style: TextStyle(color: Theme.of(context).colorScheme.error))))),
-          ),
-
-          // ── Recent Activity ───────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
-              child: Text('Recent activity',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700, fontSize: 13,
-                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant)),
-            ),
-          ),
-          groupsAsync.when(
-            data: (groups) {
-              final groupNameMap = {for (final g in groups) g.id: g.name};
-              return expensesAsync.when(
-                data: (expenses) => expenses.isEmpty
-                    ? SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: Text('No expenses yet. Tap + to get started.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant))))
-                    : SliverList(
-                        delegate: SliverChildBuilderDelegate(
-                          (ctx, i) => _ActivityTile(
-                            expense: expenses[i],
-                            groupId: expenses[i].groupId,
-                            groupName: groupNameMap[expenses[i].groupId] ?? ''),
-                          childCount: expenses.length,
-                        )),
-                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-              );
-            },
-            loading: () => expensesAsync.when(
-              data: (expenses) => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _ActivityTile(
-                      expense: expenses[i], groupId: expenses[i].groupId, groupName: ''),
-                  childCount: expenses.length,
-                )),
-              loading: () => const SliverToBoxAdapter(
-                  child: Padding(padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()))),
-              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-            ),
-            error: (_, _) => expensesAsync.when(
-              data: (expenses) => SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _ActivityTile(
-                      expense: expenses[i], groupId: expenses[i].groupId, groupName: ''),
-                  childCount: expenses.length,
-                )),
-              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
-              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-            ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Wallet view — cash balance + spending breakdown + net position
-// ---------------------------------------------------------------------------
-class _WalletView extends ConsumerWidget {
-  const _WalletView({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final theme          = Theme.of(context);
-    final walletAsync    = ref.watch(walletBalanceProvider);
-    final personalAsync  = ref.watch(personalExpensesProvider);
-    final summaryAsync   = ref.watch(balanceSummaryProvider);
-
-    return RefreshIndicator(
-      color: _purple,
-      onRefresh: () async {
-        HapticUtils.lightTap();
-        ref.invalidate(walletBalanceProvider);
-        ref.invalidate(personalExpensesProvider);
-        ref.invalidate(balanceSummaryProvider);
-      },
-      child: CustomScrollView(
-        slivers: [
-          // ── Wallet Hero ──────────────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-              child: walletAsync.when(
-                skipLoadingOnReload: true,
-                data: (walletStr) {
-                  final walletDec = Decimal.tryParse(walletStr) ?? Decimal.zero;
-                  final summary   = summaryAsync.valueOrNull;
-                  final owed = Decimal.tryParse(summary?.youAreOwed ?? '0') ?? Decimal.zero;
-                  final owe  = Decimal.tryParse(summary?.youOwe     ?? '0') ?? Decimal.zero;
-                  // Net position = wallet cash + owed to you - you owe
-                  final netPos = walletDec + owed - owe;
-                  return _WalletHero(
-                    walletBalance: walletDec,
-                    netPosition: netPos,
-                    currency: summary?.currency ?? 'USD',
-                  );
-                },
-                loading: () => _WalletHero.loading(),
-                error: (_, _) => _WalletHero.error(),
-              ),
-            ),
-          ),
-
-          // ── Spending Breakdown ───────────────────────────────────────────
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
-              child: Text('Spending breakdown',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700, fontSize: 13,
-                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant)),
-            ),
-          ),
-          personalAsync.when(
-            data: (expenses) {
-              // Aggregate by category (expenses only, not income)
-              final spend = <String, Decimal>{};
-              for (final e in expenses) {
-                if (e.isIncome) continue;
-                final cat = e.category.isEmpty ? 'General' : e.category;
-                final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
-                spend[cat] = (spend[cat] ?? Decimal.zero) + amt;
-              }
-              if (spend.isEmpty) {
-                return SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                    child: Center(
-                      child: Text('No personal expenses yet.',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant),
-                        textAlign: TextAlign.center),
-                    ),
-                  ),
-                );
-              }
-              final sorted = spend.entries.toList()
-                  ..sort((a, b) => b.value.compareTo(a.value));
-              final total = sorted.fold(Decimal.zero, (s, e) => s + e.value);
-              return SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (ctx, i) => _CategoryRow(
-                    category: sorted[i].key,
-                    amount: sorted[i].value,
-                    total: total,
-                  ),
-                  childCount: sorted.length,
-                ),
-              );
-            },
-            loading: () => const SliverToBoxAdapter(
-                child: Padding(padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()))),
-            error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 96)),
-        ],
       ),
     );
   }
@@ -510,91 +295,6 @@ class _NetBalanceHero extends StatelessWidget {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Wallet hero (wallet tab) — cash + net position
-// ---------------------------------------------------------------------------
-class _WalletHero extends StatelessWidget {
-  const _WalletHero({
-    required this.walletBalance,
-    required this.netPosition,
-    required this.currency,
-  }) : _loading = false, _error = false;
-
-  static final _zero = Decimal.zero;
-
-  _WalletHero.loading()
-      : walletBalance = _zero, netPosition = _zero,
-        currency = '', _loading = true, _error = false;
-
-  _WalletHero.error()
-      : walletBalance = _zero, netPosition = _zero,
-        currency = '', _loading = false, _error = true;
-
-  final Decimal walletBalance;
-  final Decimal netPosition;
-  final String  currency;
-  final bool    _loading;
-  final bool    _error;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme      = Theme.of(context);
-    final netIsPos   = netPosition >= Decimal.zero;
-    final walletIsPos = walletBalance >= Decimal.zero;
-    final ccy        = currency.isEmpty ? 'USD' : currency;
-
-    return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(children: [
-            Container(width: 7, height: 7,
-                decoration: const BoxDecoration(color: _purple, shape: BoxShape.circle)),
-            const SizedBox(width: 6),
-            Text('Personal wallet',
-                style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
-          ]),
-          const SizedBox(height: 6),
-          if (_loading)
-            const SizedBox(height: 28, child: LinearProgressIndicator(color: _purple))
-          else
-            Text(
-              '$ccy ${walletBalance.abs().toStringAsFixed(2)}',
-              style: TextStyle(
-                fontWeight: FontWeight.w800, fontSize: 26, letterSpacing: -0.5,
-                color: _error
-                    ? theme.colorScheme.onSurfaceVariant
-                    : (walletIsPos ? _purple : _orange),
-              ),
-              maxLines: 1, overflow: TextOverflow.ellipsis,
-            ),
-          const SizedBox(height: 12),
-          Row(children: [
-            Expanded(child: _BalancePill(
-              label: 'Cash balance',
-              amount: walletBalance.abs().toStringAsFixed(2),
-              currency: ccy,
-              color: walletIsPos ? _purple : _orange,
-              bgColor: walletIsPos ? _purpleDim : _orangeDim,
-            )),
-            const SizedBox(width: 8),
-            Expanded(child: _BalancePill(
-              label: 'True net worth',
-              amount: netPosition.abs().toStringAsFixed(2),
-              currency: ccy,
-              color: netIsPos ? _teal : _orange,
-              bgColor: netIsPos ? _tealDim : _orangeDim,
-            )),
-          ]),
-        ],
-      ),
-    );
-  }
-}
-
 class _BalancePill extends StatelessWidget {
   const _BalancePill({
     required this.label,
@@ -643,94 +343,6 @@ class _BalancePill extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
-      ),
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Category row — wallet spending breakdown
-// ---------------------------------------------------------------------------
-class _CategoryRow extends StatelessWidget {
-  const _CategoryRow({
-    required this.category,
-    required this.amount,
-    required this.total,
-  });
-
-  final String  category;
-  final Decimal amount;
-  final Decimal total;
-
-  static const Map<String, IconData> _icons = {
-    'Food & drink':      Icons.restaurant_outlined,
-    'Transport':         Icons.directions_car_outlined,
-    'Entertainment':     Icons.movie_outlined,
-    'Bills & utilities': Icons.receipt_long_outlined,
-    'Shopping':          Icons.shopping_bag_outlined,
-    'Travel':            Icons.flight_outlined,
-    'General':           Icons.category_outlined,
-    'Other':             Icons.category_outlined,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final theme   = Theme.of(context);
-    final pct     = total > Decimal.zero
-        ? ((amount / total).toDecimal(scaleOnInfinitePrecision: 6) * Decimal.fromInt(100)).toDouble()
-        : 0.0;
-    final icon    = _icons[category] ?? Icons.category_outlined;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-      child: GlassCard(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Row(
-          children: [
-            Container(
-              width: 36, height: 36,
-              decoration: BoxDecoration(
-                color: _purple.withAlpha(28),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, size: 16, color: _purple),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(category,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w600, fontSize: 13)),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(3),
-                    child: LinearProgressIndicator(
-                      value: pct / 100,
-                      backgroundColor: _purple.withAlpha(22),
-                      color: _purple,
-                      minHeight: 4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text('USD ${amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: _purple)),
-                Text('${pct.toStringAsFixed(1)}%',
-                    style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }

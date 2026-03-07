@@ -14,6 +14,7 @@ import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/activity/presentation/screens/activity_screen.dart';
+import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
@@ -26,6 +27,7 @@ final class AppRouter {
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
   static const String activity = '/activity';
+  static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
   static const String settings = '/settings';
@@ -128,7 +130,7 @@ final class AppRouter {
           ),
         ),
 
-        // ── Shell: AdaptiveShell wraps Dashboard, Friends, Groups, Settings ──
+        // ── Shell: AdaptiveShell wraps Dashboard, Wallet, Groups, Activity, Settings ──
         ShellRoute(
           builder: (context, state, child) => AdaptiveShell(
             currentPath: state.matchedLocation,
@@ -142,6 +144,16 @@ final class AppRouter {
                 child: Material(
                   color: Theme.of(context).colorScheme.surface,
                   child: const DashboardScreen(),
+                ),
+              ),
+            ),
+            GoRoute(
+              path: wallet,
+              name: 'wallet',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const WalletScreen(),
                 ),
               ),
             ),
