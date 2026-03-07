@@ -10,6 +10,7 @@ import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
+import '../../domain/entities/activity_event.dart';
 
 // Supported currencies with display names and emoji flags.
 // "Most used" group shown first in pickers.
@@ -172,6 +173,11 @@ final personalExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async 
 /// Unified activity feed stream: group + personal expenses, sorted newest-first.
 final activityFeedProvider = StreamProvider<List<ExpenseModel>>((ref) {
   return ref.watch(setAllRepositoryProvider).watchActivityFeed();
+});
+
+/// Omni activity feed: polymorphic [ActivityEvent] stream (expenses, group creation, settlements).
+final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchOmniActivity();
 });
 
 /// Net liquidity: income - personal spend - group share (in USD).

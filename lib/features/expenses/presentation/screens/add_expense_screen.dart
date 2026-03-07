@@ -99,6 +99,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String _category = 'General';
   SplitMode _splitMode = SplitMode.even;
   bool _isSubmitting = false;
+  bool _isIncome = false;
   String? _payerId;
 
   final List<TextEditingController> _customCtrl = [];
@@ -187,7 +188,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   void _nextStep() {
     if (_step == 0 && !_validateAmount()) return;
     HapticUtils.primaryTap();
-    setState(() { if (_step < _totalSteps - 1) _step++; });
+    setState(() { if (_step < _effectiveTotalSteps - 1) _step++; });
   }
 
   void _prevStep() {
@@ -235,12 +236,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
-    if (widget.groupId.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Choose a group first')));
-      return;
-    }
-    if (_memberIds.isEmpty) {
+    final isPersonal = widget.groupId.isEmpty;
+
+    if (!isPersonal && _memberIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No members in this group. Add members first.')),
       );
@@ -250,6 +248,42 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() => _isSubmitting = true);
 
     debugPrint('[AddExpense] _submit: payerId=$payerId currentUid=$currentUid memberIds=${_memberIds.length}: $_memberIds, splitMode=$_splitMode, amount=$amount');
+
+    // -- Personal (wallet) mode — no splits -----------------------------------
+    if (isPersonal) {
+      final expense = await repo.addExpense(
+        groupId: null,
+        payerId: payerId,
+        amount: amount,
+        description: _descriptionCtrl.text.trim(),
+        currency: _currency,
+        splitType: SplitType.even,
+        splits: [],
+        category: _category,
+        isIncome: _isIncome,
+      );
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        if (expense != null) {
+          HapticUtils.success();
+          ref.invalidate(walletBalanceProvider);
+          ref.invalidate(personalExpensesProvider);
+          ref.invalidate(recentExpensesProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isIncome ? 'Income recorded' : 'Personal expense saved'),
+              backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
+            ),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not save entry')),
+          );
+        }
+      }
+      return;
+    }
 
     // -- Build split results --------------------------------------------------
     List<SplitResult> results;
@@ -336,14 +370,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           }).toList();
         debugPrint('[AddExpense] splits generated: ${splitsToStore.map((s) => '${s.userId}=${s.universalUsdOwed}').join(', ')}');
         final expense = await repo.addExpense(
-      groupId: widget.groupId,
+      groupId: widget.groupId.isEmpty ? null : widget.groupId,
       payerId: payerId,
-      amount: amount, // Original input amount
+      amount: amount,
       description: _descriptionCtrl.text.trim(),
-      currency: _currency, // Original input currency
+      currency: _currency,
       splitType: splitType,
       splits: splitsToStore,
       category: _category,
+      isIncome: _isIncome,
     );
 
 
@@ -383,7 +418,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          'Add expense · ${_step + 1}/$_totalSteps',
+          'Add expense · ${_step + 1}/$_effectiveTotalSteps',
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -424,8 +459,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             _stepIndicator(theme),
             const SizedBox(height: 20),
             if (_step == 0) _buildStepAmount(theme),
-            if (_step == 1) _buildStepSplit(theme),
-            if (_step == 2) _buildStepDetails(theme),
+          if (_step == 1 && widget.groupId.isNotEmpty) _buildStepSplit(theme),
+          if ((_step == 1 && widget.groupId.isEmpty) || _step == 2) _buildStepDetails(theme),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -436,7 +471,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     label: const Text('Back'),
                   ),
                 const Spacer(),
-                if (_step < _totalSteps - 1)
+                if (_step < _effectiveTotalSteps - 1)
                   FilledButton.icon(
                     onPressed: _nextStep,
                     style: FilledButton.styleFrom(
@@ -480,7 +515,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _stepIndicator(ThemeData theme) {
     return Row(
-      children: List.generate(_totalSteps, (i) {
+      children: List.generate(_effectiveTotalSteps, (i) {
         final active = i == _step;
         final done = i < _step;
         return Expanded(
@@ -503,6 +538,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Step helpers
+  // ---------------------------------------------------------------------------
+
+  int get _effectiveTotalSteps => widget.groupId.isEmpty ? 2 : _totalSteps;
 
   // ---------------------------------------------------------------------------
   // Step 1 – Amount & Currency
@@ -622,6 +663,60 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 if (mounted) setState(() {});
                 HapticUtils.success();
               },
+            ),
+          ],
+
+          // ── Income toggle (personal wallet mode only) ──────────────────
+          if (widget.groupId.isEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _isIncome
+                    ? const Color(0xFF22C55E).withValues(alpha: 0.10)
+                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: _isIncome
+                    ? Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4))
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                    size: 18,
+                    color: _isIncome ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mark as Income',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: _isIncome ? const Color(0xFF22C55E) : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          _isIncome ? 'This entry adds to your wallet balance' : 'This entry subtracts from your wallet balance',
+                          style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isIncome,
+                    onChanged: (v) {
+                      HapticUtils.selection();
+                      setState(() => _isIncome = v);
+                    },
+                    activeColor: const Color(0xFF22C55E),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
