@@ -1389,7 +1389,7 @@ class SetAllRepository {
   /// The [universal_usd_amount] (USD anchor) is calculated internally via
   /// [CurrencyService] to ensure financial consistency.
   Future<ExpenseModel?> addExpense({
-    required String groupId,
+    String? groupId,
     required String payerId,
     required Decimal amount,
     required String description,
@@ -1397,6 +1397,7 @@ class SetAllRepository {
     required SplitType splitType,
     required List<SplitInsert> splits,
     String category = 'General',
+    bool isIncome = false,
     Decimal? originalAmount,
     String? originalCurrency,
     String? exchangeRateApplied,
@@ -1422,6 +1423,7 @@ class SetAllRepository {
             currency: currency,
             splitType: splitType,
             category: category,
+            isIncome: isIncome,
             createdAt: now,
             createdBy: uid,
             originalAmount: originalAmount?.toString(),
@@ -1513,10 +1515,169 @@ class SetAllRepository {
 
     // Ensure all split participants are in group_members so they appear in
     // the members list even if they were never formally invited.
-    await _ensureSplitParticipantsAreMembers(groupId, splits.map((s) => s.userId).toList());
+    if (groupId != null) {
+      await _ensureSplitParticipantsAreMembers(groupId, splits.map((s) => s.userId).toList());
+    }
 
     _notify();
     return expense;
+  }
+
+  /// Fetch personal (wallet) expenses – expenses with no group_id.
+  Future<List<ExpenseModel>> getPersonalExpenses({int limit = 50}) async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('expenses')
+          .select()
+          .isFilter('group_id', null)
+          .eq('payer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      return rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'expenses',
+      where: 'group_id IS NULL AND payer_id = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
+  }
+
+  /// Calculate wallet balance: income - personal expenses - user's share of group expenses.
+  /// Returns amount in the user's base currency (USD fallback).
+  Future<Decimal> getWalletBalance() async {
+    final uid = await ensureUser();
+    if (uid == null) return Decimal.zero;
+
+    // 1. Sum personal income entries
+    final personalRows = await getPersonalExpenses(limit: 1000);
+    Decimal income = Decimal.zero;
+    Decimal personalSpend = Decimal.zero;
+    for (final e in personalRows) {
+      final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+      if (e.isIncome) {
+        income += amt;
+      } else {
+        personalSpend += amt;
+      }
+    }
+
+    // 2. Sum the user's owed share from group splits
+    Decimal groupShare = Decimal.zero;
+    if (!_isWeb) {
+      final splitRows = await LocalDatabase.db.rawQuery(
+        'SELECT s.universal_usd_owed FROM splits s '
+        'INNER JOIN expenses e ON e.id = s.expense_id '
+        'WHERE s.user_id = ? AND e.group_id IS NOT NULL',
+        [uid],
+      );
+      for (final r in splitRows) {
+        groupShare += Decimal.tryParse(r['universal_usd_owed']?.toString() ?? '0') ?? Decimal.zero;
+      }
+    } else if (_client != null) {
+      final rows = await _client
+          .from('splits')
+          .select('universal_usd_owed')
+          .eq('user_id', uid) as List;
+      for (final r in rows) {
+        groupShare += Decimal.tryParse(
+                (r as Map<String, dynamic>)['universal_usd_owed']?.toString() ?? '0') ??
+            Decimal.zero;
+      }
+    }
+
+    return income - personalSpend - groupShare;
+  }
+
+  /// Stream a unified activity feed: group + personal expenses, sorted newest-first.
+  Stream<List<ExpenseModel>> watchActivityFeed({int limit = 50}) async* {
+    // Yield immediately from current data, then re-yield on every _notify()
+    yield await _buildActivityFeed(limit);
+    await for (final _ in _changeController.stream) {
+      yield await _buildActivityFeed(limit);
+    }
+  }
+
+  Future<List<ExpenseModel>> _buildActivityFeed(int limit) async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      // Group expenses
+      final memberRows = await _client
+          .from('group_members')
+          .select('group_id')
+          .eq('user_id', uid) as List;
+      final groupIds = memberRows
+          .map((r) => (r as Map<String, dynamic>)['group_id'] as String)
+          .toSet()
+          .toList();
+      final created =
+          await _client.from('groups').select('id').eq('creator_id', uid) as List;
+      for (final r in created) {
+        groupIds.add((r as Map<String, dynamic>)['id'] as String);
+      }
+
+      final List<ExpenseModel> results = [];
+      if (groupIds.isNotEmpty) {
+        final groupRows = await _client
+            .from('expenses')
+            .select()
+            .inFilter('group_id', groupIds)
+            .order('created_at', ascending: false)
+            .limit(limit) as List;
+        results.addAll(groupRows.map((r) => _rowToExpense(r as Map<String, dynamic>)));
+      }
+      // Personal expenses
+      final personalRows = await _client
+          .from('expenses')
+          .select()
+          .isFilter('group_id', null)
+          .eq('payer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      results.addAll(personalRows.map((r) => _rowToExpense(r as Map<String, dynamic>)));
+      results.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+      return results.take(limit).toList();
+    }
+
+    // Mobile SQLite path
+    final memberRows = await LocalDatabase.db.query(
+      'group_members', where: 'user_id = ?', whereArgs: [uid]);
+    final groupIds = memberRows.map((r) => r['group_id'] as String).toSet().toList();
+    final createdRows = await LocalDatabase.db.query(
+      'groups', where: 'creator_id = ?', whereArgs: [uid]);
+    for (final r in createdRows) {
+      groupIds.add(r['id'] as String);
+    }
+
+    final List<ExpenseModel> results = [];
+    if (groupIds.isNotEmpty) {
+      final groupExpRows = await LocalDatabase.db.query(
+        'expenses',
+        where: 'group_id IN (${groupIds.map((_) => '?').join(',')})',
+        whereArgs: groupIds,
+        orderBy: 'created_at DESC',
+        limit: limit,
+      );
+      results.addAll(groupExpRows.map(_rowToExpense));
+    }
+    final personalExpRows = await LocalDatabase.db.query(
+      'expenses',
+      where: 'group_id IS NULL AND payer_id = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    results.addAll(personalExpRows.map(_rowToExpense));
+    results.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+    return results.take(limit).toList();
   }
 
   /// Silently adds any split participant who is missing from group_members.

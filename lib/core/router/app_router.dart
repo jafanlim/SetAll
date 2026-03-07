@@ -13,7 +13,7 @@ import '../../features/dashboard/presentation/screens/invite_member_screen.dart'
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
-import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/activity/presentation/screens/activity_screen.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
@@ -25,7 +25,7 @@ final class AppRouter {
   static const String register = '/register';
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
-  static const String friends = '/friends';
+  static const String activity = '/activity';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
   static const String settings = '/settings';
@@ -146,12 +146,12 @@ final class AppRouter {
               ),
             ),
             GoRoute(
-              path: friends,
-              name: 'friends',
+              path: activity,
+              name: 'activity',
               pageBuilder: (context, state) => NoTransitionPage(
                 child: Material(
                   color: Theme.of(context).colorScheme.surface,
-                  child: const FriendsScreen(),
+                  child: const ActivityScreen(),
                 ),
               ),
             ),

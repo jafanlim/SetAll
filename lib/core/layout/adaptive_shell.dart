@@ -50,7 +50,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   }
 
   int _indexForPath(String path) {
-    if (path.startsWith('/friends')) return 1;
+    if (path.startsWith('/activity')) return 1;
     if (path.startsWith('/groups')) return 2;
     if (path.startsWith('/settings')) return 3;
     return 0;
@@ -65,7 +65,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
         context.go(AppRouter.dashboard);
       case 1:
         setState(() => _selectedIndex = 1);
-        context.go(AppRouter.friends);
+        context.go(AppRouter.activity);
       case 2:
         setState(() => _selectedIndex = 2);
         context.go(AppRouter.groups);
@@ -152,7 +152,7 @@ class _PremiumSidebar extends StatelessWidget {
   static const _navItems = [
     (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: 'Dashboard', index: 0),
     (icon: Icons.group_outlined,     selectedIcon: Icons.group,     label: 'Groups',    index: 2),
-    (icon: Icons.people_outline,     selectedIcon: Icons.people,    label: 'Friends',   index: 1),
+    (icon: Icons.history,            selectedIcon: Icons.history,   label: 'Activity',  index: 1),
   ];
 
   @override
@@ -359,9 +359,9 @@ class _MobileLayout extends StatelessWidget {
           label: Text('Dashboard'),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: Text('Friends'),
+          icon: Icon(Icons.history),
+          selectedIcon: Icon(Icons.history),
+          label: Text('Activity'),
         ),
         NavigationRailDestination(
           icon: Icon(Icons.group_outlined),
@@ -388,9 +388,9 @@ class _MobileLayout extends StatelessWidget {
           label: 'Dashboard',
         ),
         NavigationDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: 'Friends',
+          icon: Icon(Icons.history),
+          selectedIcon: Icon(Icons.history),
+          label: 'Activity',
         ),
         NavigationDestination(
           icon: Icon(Icons.group_outlined),
