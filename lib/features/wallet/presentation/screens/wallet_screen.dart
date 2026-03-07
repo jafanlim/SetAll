@@ -196,11 +196,11 @@ class WalletHero extends StatelessWidget {
 
   static final _zero = Decimal.zero;
 
-  WalletHero.loading()
+  WalletHero.loading({super.key})
       : walletBalance = _zero, netPosition = _zero,
         currency = '', _loading = true, _error = false;
 
-  WalletHero.error()
+  WalletHero.error({super.key})
       : walletBalance = _zero, netPosition = _zero,
         currency = '', _loading = false, _error = true;
 
