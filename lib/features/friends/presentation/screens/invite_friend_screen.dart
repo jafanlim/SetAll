@@ -9,11 +9,25 @@ import '../../../../core/utils/haptic_utils.dart';
 const _teal  = Color(0xFF00D9B0);
 const _slate = Color(0xFF94A3B8);
 
-class InviteFriendScreen extends ConsumerWidget {
+class InviteFriendScreen extends ConsumerStatefulWidget {
   const InviteFriendScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<InviteFriendScreen> createState() => _InviteFriendScreenState();
+}
+
+class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
+  final _shareKey = GlobalKey();
+
+  Rect? _shareButtonRect() {
+    final box = _shareKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null) return null;
+    final pos = box.localToGlobal(Offset.zero);
+    return pos & box.size;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme  = Theme.of(context);
     final uid    = ref.watch(currentUserIdProvider) ?? '';
     final link   = 'https://setall.app/join/$uid';
@@ -151,9 +165,15 @@ class InviteFriendScreen extends ConsumerWidget {
 
             // ── Share button ───────────────────────────────────────────────
             FilledButton.icon(
+              key: _shareKey,
               onPressed: () {
                 HapticUtils.primaryTap();
-                Share.share(shareText, subject: 'Join me on SetAll');
+                final rect = _shareButtonRect();
+                Share.share(
+                  shareText,
+                  subject: 'Join me on SetAll',
+                  sharePositionOrigin: rect ?? const Rect.fromLTWH(0, 0, 1, 1),
+                );
               },
               icon: const Icon(Icons.ios_share_rounded, size: 18),
               label: const Text('Share via…'),

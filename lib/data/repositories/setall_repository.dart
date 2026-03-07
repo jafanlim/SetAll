@@ -1555,16 +1555,15 @@ class SetAllRepository {
                       });
                     }
               
-                    if (await _isOnline && _client != null) {
+                    // Fire-and-forget: return immediately after local save.
+                    // SyncService retries on next tick if network is unavailable.
+                    Future(() async {
+                      if (!await _isOnline || _client == null) return;
                       try {
-                        // Timeout guard: never freeze on a remote constraint error.
-                        // The expense is already persisted locally; SyncService will
-                        // retry on the next pull.  8 s covers slow connections.
                         await Future.wait([
                           _client.from('expenses').insert(supabaseExpenseData),
                           ...splitModels.map((s) => _client.from('splits').insert(s.toJson())),
                         ]).timeout(const Duration(seconds: 8));
-
                         await LocalDatabase.db.update(
                           'expenses',
                           {'synced_at': DateTime.now().millisecondsSinceEpoch},
@@ -1574,12 +1573,12 @@ class SetAllRepository {
                       } catch (e) {
                         if (e is PostgrestException) {
                           debugPrint(
-                              'PostgrestException in addExpense (mobile sync): ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
+                              'PostgrestException in addExpense (bg sync): ${e.message}, code: ${e.code}');
                         } else {
-                          debugPrint('Error in addExpense (mobile sync): $e');
+                          debugPrint('Error in addExpense (bg sync): $e');
                         }
                       }
-                    }
+                    });
 
     // Ensure all split participants are in group_members so they appear in
     // the members list even if they were never formally invited.
