@@ -394,10 +394,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await Supabase.instance.client.auth.updateUser(
         UserAttributes(email: newEmail),
       );
-      if (mounted) setState(() {
-        _currentEmail  = newEmail;
-        _emailChanging = false;
-      });
+      if (mounted) {
+        setState(() {
+          _currentEmail  = newEmail;
+          _emailChanging = false;
+        });
+      }
       messenger.showSnackBar(
         SnackBar(
           content: Text('Confirmation sent to $newEmail. Check your inbox.'),

@@ -156,6 +156,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
   Future<void> _deleteGroup(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
+    // ignore: use_build_context_synchronously
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -172,8 +173,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       ),
     );
     if (confirm != true || !mounted) return;
+    // ignore: use_build_context_synchronously
     final doubleConfirm = await showDialog<bool>(
-      context: context,
+      context: context, // ignore: use_build_context_synchronously
       builder: (ctx) => AlertDialog(
         title: const Text('Are you sure?'),
         content: const Text('This action is irreversible. All expenses and balances in this group will be permanently deleted.'),

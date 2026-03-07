@@ -60,12 +60,12 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
-    for (final c in _customCtrl.values) c.dispose();
+    for (final c in _customCtrl.values) { c.dispose(); }
     super.dispose();
   }
 
   void _rebuildControllers() {
-    for (final c in _customCtrl.values) c.dispose();
+    for (final c in _customCtrl.values) { c.dispose(); }
     _customCtrl.clear();
     final n = _members.length;
     if (_splitMode == SplitMode.percentage) {
@@ -142,8 +142,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     final currentUid = await repo.ensureUser();
     final payerId    = _payerId ?? currentUid;
     if (payerId == null) {
-      if (mounted) ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Could not get user. Try again.')));
+      if (mounted) { ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Could not get user. Try again.'))); }
       return;
     }
 
@@ -162,8 +162,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             .toList();
         final sum = percents.fold(Decimal.zero, (a, b) => a + b);
         if (sum <= Decimal.zero) {
-          if (mounted) ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Percentages must sum to 100')));
+          if (mounted) { ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Percentages must sum to 100'))); }
           return;
         }
         results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: percents);
@@ -173,8 +173,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             .map((id) => Decimal.tryParse(_customCtrl[id]?.text.trim() ?? '') ?? Decimal.zero)
             .toList();
         if (shares.every((s) => s <= Decimal.zero)) {
-          if (mounted) ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Enter at least one share')));
+          if (mounted) { ScaffoldMessenger.of(context)
+              .showSnackBar(const SnackBar(content: Text('Enter at least one share'))); }
           return;
         }
         results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: shares);
@@ -187,8 +187,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             .toList();
         final totalManual = amounts.fold(Decimal.zero, (a, b) => a + b);
         if (totalManual != amount) {
-          if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Amounts must sum to $amount (got $totalManual)')));
+          if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Amounts must sum to $amount (got $totalManual)'))); }
           return;
         }
         results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, amountsOwed: amounts);
@@ -308,7 +308,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
             // ── Category ─────────────────────────────────────────────────────
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: InputDecoration(
                 labelText: 'Category',
                 filled: true,
@@ -346,7 +346,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             // ── Paid by ──────────────────────────────────────────────────────
             if (_members.length > 1) ...[
               DropdownButtonFormField<String>(
-                value: _members.any((m) => m.id == _payerId) ? _payerId : null,
+                initialValue: _members.any((m) => m.id == _payerId) ? _payerId : null,
                 decoration: InputDecoration(
                   labelText: 'Paid by',
                   filled: true,

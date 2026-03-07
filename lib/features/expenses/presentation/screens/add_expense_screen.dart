@@ -713,7 +713,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       HapticUtils.selection();
                       setState(() => _isIncome = v);
                     },
-                    activeColor: const Color(0xFF22C55E),
+                    activeThumbColor: const Color(0xFF22C55E),
                   ),
                 ],
               ),

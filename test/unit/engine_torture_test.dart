@@ -36,7 +36,7 @@ class _StubRepository extends SetAllRepository {
     required this.uid,
     required this.rawOwed,
     required this.rawOwe,
-    this.baseCurrency = 'USD',
+    required this.baseCurrency,
   }) : super();
 
   final String uid;
@@ -130,6 +130,7 @@ void main() {
         uid: 'user-a',
         rawOwed: [_usdEntry('50.00')],
         rawOwe: [_usdEntry('20.00')],
+        baseCurrency: 'USD',
       );
       final fx = _StubCurrencyService({});
       final service = BalanceService(repository: repo, currencyService: fx);
@@ -162,6 +163,7 @@ void main() {
         uid: 'user-a',
         rawOwed: [_usdEntry('110.00')], // B owes A $110 (A paid €100)
         rawOwe: [_usdEntry('110.00')],  // A owes B $110 (B paid $110)
+        baseCurrency: 'USD',
       );
       final fx = _StubCurrencyService({
         'EUR_USD': Decimal.parse('1.10'),
