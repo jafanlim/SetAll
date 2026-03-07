@@ -315,19 +315,19 @@ class SyncService {
   Future<void> _pullFromSupabase(String uid) async {
     if (_client == null) return;
 
+    // Load the groups this user has voluntarily left so we never re-pull them.
+    final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
+    final leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+
     final memberRows = await _client
         .from('group_members')
         .select('group_id')
         .eq('user_id', uid);
     final memberIds = (memberRows as List)
         .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
+        .where((id) => !leftGroupIds.contains(id))
         .toSet()
         .toList();
-    final created =
-        await _client.from('groups').select('id').eq('creator_id', uid);
-    for (final r in created as List) {
-      memberIds.add((r as Map<String, dynamic>)['id'] as String);
-    }
 
     // ── Reconciler: remove local orphans ────────────────────────────────────
     // If memberIds is empty the user has no groups — wipe everything local.

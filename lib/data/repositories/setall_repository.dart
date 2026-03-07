@@ -590,19 +590,29 @@ class SetAllRepository {
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
     }
 
+    // Groups this user voluntarily left must never resurface.
+    final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
+    final leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+
     final memberRows = await LocalDatabase.db.query(
       'group_members',
       where: 'user_id = ?',
       whereArgs: [uid],
     );
-    final memberIds =
-        memberRows.map((r) => r['group_id'] as String).toSet().toList();
+    final memberIds = memberRows
+        .map((r) => r['group_id'] as String)
+        .where((id) => !leftGroupIds.contains(id))
+        .toSet()
+        .toList();
     final createdRows = await LocalDatabase.db.query(
       'groups',
       where: 'creator_id = ?',
       whereArgs: [uid],
     );
-    final createdIds = createdRows.map((r) => r['id'] as String).toList();
+    final createdIds = createdRows
+        .map((r) => r['id'] as String)
+        .where((id) => !leftGroupIds.contains(id))
+        .toList();
     final allIds = <String>{...memberIds, ...createdIds}.toList();
     if (allIds.isEmpty) return [];
 
@@ -793,10 +803,22 @@ class SetAllRepository {
           debugPrint('[deleteGroup] Supabase member-exit failed: $e');
         }
       }
-      // Remove locally — group row stays so SyncService can reconcile,
-      // but removing the member row hides it from watchGroups queries.
+      // Persist the left group so _pullFromSupabase never re-pulls it.
+      await LocalDatabase.db.insert(
+        'left_groups',
+        {'group_id': groupId, 'left_at': DateTime.now().toIso8601String()},
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+      // Remove locally — cascade expenses/members/group so nothing lingers.
+      final expenseRows = await LocalDatabase.db.query(
+        'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
+      for (final row in expenseRows) {
+        await LocalDatabase.db.delete('splits',
+            where: 'expense_id = ?', whereArgs: [row['id']]);
+      }
+      await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
       await LocalDatabase.db.delete('group_members',
-          where: 'group_id = ? AND user_id = ?', whereArgs: [groupId, uid]);
+          where: 'group_id = ?', whereArgs: [groupId]);
       await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
     }
 
