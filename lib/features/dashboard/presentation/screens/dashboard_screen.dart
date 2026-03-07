@@ -65,7 +65,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       },
       child: CustomScrollView(
         slivers: [
-          // ── Net Balance Hero ──────────────────────────────────────────────
+          // ── Net Liquidity Hero ───────────────────────────────────────────
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
@@ -73,20 +73,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 skipLoadingOnReload: true,
                 data: (summary) {
                   final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
-                  final owe = Decimal.tryParse(summary.youOwe) ?? Decimal.zero;
-                  final net = owed - owe;
+                  final owe  = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
+                  final net  = owed - owe;
                   final isPositive = net >= Decimal.zero;
                   final display = isPositive ? net : -net;
-                  return _NetBalanceHero(
+                  return _BalanceHero(
                     netDisplay: display.toStringAsFixed(2),
                     currency: summary.currency,
                     isPositive: isPositive,
                     youAreOwed: summary.youAreOwed,
                     youOwe: summary.youOwe,
+                    walletBalanceAsync: ref.watch(walletBalanceProvider),
                   );
                 },
-                loading: () => _NetBalanceHero.loading(),
-                error: (_, _) => _NetBalanceHero.error(),
+                loading: () => _BalanceHero.loading(),
+                error: (_, _) => _BalanceHero.error(),
               ),
             ),
           ),
@@ -267,32 +268,38 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Net Balance Hero Widget
+// Balance Hero — toggles between Net Debt (group) and Wallet Balance views
 // ---------------------------------------------------------------------------
-class _NetBalanceHero extends StatelessWidget {
-  const _NetBalanceHero({
+const _purple = Color(0xFF8B5CF6);
+const _purpleDim = Color(0x268B5CF6);
+
+class _BalanceHero extends StatefulWidget {
+  const _BalanceHero({
     required this.netDisplay,
     required this.currency,
     required this.isPositive,
     required this.youAreOwed,
     required this.youOwe,
+    required this.walletBalanceAsync,
   }) : _loading = false, _error = false;
 
-  const _NetBalanceHero.loading()
+  const _BalanceHero.loading()
       : netDisplay = '—',
         currency = '',
         isPositive = true,
         youAreOwed = '0',
         youOwe = '0',
+        walletBalanceAsync = const AsyncValue.loading(),
         _loading = true,
         _error = false;
 
-  const _NetBalanceHero.error()
+  const _BalanceHero.error()
       : netDisplay = '—',
         currency = '',
         isPositive = true,
         youAreOwed = '0',
         youOwe = '0',
+        walletBalanceAsync = const AsyncValue.data('0'),
         _loading = false,
         _error = true;
 
@@ -301,77 +308,185 @@ class _NetBalanceHero extends StatelessWidget {
   final bool isPositive;
   final String youAreOwed;
   final String youOwe;
+  final AsyncValue<String> walletBalanceAsync;
   final bool _loading;
   final bool _error;
 
   @override
+  State<_BalanceHero> createState() => _BalanceHeroState();
+}
+
+class _BalanceHeroState extends State<_BalanceHero> {
+  // false = Net Debt (group view), true = Wallet Balance (personal view)
+  bool _showWallet = false;
+
+  void _toggle() {
+    HapticUtils.selection();
+    setState(() => _showWallet = !_showWallet);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final accent = isPositive ? _teal : _orange;
+    final theme       = Theme.of(context);
+    final walletValue = widget.walletBalanceAsync.valueOrNull ?? '0';
+    final walletDec   = Decimal.tryParse(walletValue) ?? Decimal.zero;
+    final walletPos   = walletDec >= Decimal.zero;
+
+    final accent        = _showWallet ? _purple    : (widget.isPositive ? _teal : _orange);
+    final accentDim     = _showWallet ? _purpleDim : (widget.isPositive ? _tealDim : _orangeDim);
+    final heroLabel     = _showWallet
+        ? (walletPos ? 'Net liquidity' : 'Net liquidity deficit')
+        : (widget.isPositive ? 'Overall you are owed' : 'Overall you owe');
+    final heroAmount    = _showWallet
+        ? '${widget.currency.isEmpty ? 'USD' : widget.currency} ${walletDec.abs().toStringAsFixed(2)}'
+        : '${widget.currency} ${widget.netDisplay}';
 
     return GlassCard(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
+      padding: EdgeInsets.zero,
+      child: InkWell(
+        onTap: _toggle,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Container(
-                width: 7,
-                height: 7,
-                decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+              // ── Header row ──────────────────────────────────────────────
+              Row(
+                children: [
+                  Container(
+                    width: 7, height: 7,
+                    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    heroLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const Spacer(),
+                  // Mode toggle chip
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: accentDim,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _showWallet ? Icons.account_balance_wallet_outlined : Icons.group_outlined,
+                          size: 11,
+                          color: accent,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _showWallet ? 'Wallet' : 'Group',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
-              Text(
-                isPositive ? 'Overall you are owed' : 'Overall you owe',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 12,
+              const SizedBox(height: 6),
+              // ── Main amount ─────────────────────────────────────────────
+              if (widget._loading)
+                const SizedBox(height: 28, child: LinearProgressIndicator())
+              else
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: Text(
+                    heroAmount,
+                    key: ValueKey(_showWallet),
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 26,
+                      letterSpacing: -0.5,
+                      color: widget._error
+                          ? theme.colorScheme.onSurfaceVariant
+                          : accent,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              const SizedBox(height: 12),
+              // ── Pills ───────────────────────────────────────────────────
+              AnimatedSwitcher(
+                duration: const Duration(milliseconds: 200),
+                child: _showWallet
+                    ? Row(
+                        key: const ValueKey('wallet-pills'),
+                        children: [
+                          Expanded(
+                            child: _BalancePill(
+                              label: 'Income',
+                              amount: walletPos ? walletValue : '0',
+                              currency: widget.currency.isEmpty ? 'USD' : widget.currency,
+                              color: _teal,
+                              bgColor: _tealDim,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _BalancePill(
+                              label: 'Net deficit',
+                              amount: walletPos ? '0' : walletDec.abs().toStringAsFixed(2),
+                              currency: widget.currency.isEmpty ? 'USD' : widget.currency,
+                              color: _orange,
+                              bgColor: _orangeDim,
+                            ),
+                          ),
+                        ],
+                      )
+                    : Row(
+                        key: const ValueKey('group-pills'),
+                        children: [
+                          Expanded(
+                            child: _BalancePill(
+                              label: 'Owed to you',
+                              amount: widget.youAreOwed,
+                              currency: widget.currency,
+                              color: _teal,
+                              bgColor: _tealDim,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _BalancePill(
+                              label: 'You owe',
+                              amount: widget.youOwe,
+                              currency: widget.currency,
+                              color: _orange,
+                              bgColor: _orangeDim,
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              // ── Tap hint ────────────────────────────────────────────────
+              const SizedBox(height: 10),
+              Center(
+                child: Text(
+                  'Tap to toggle ${_showWallet ? 'group' : 'wallet'} view',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    fontSize: 10,
+                    color: theme.colorScheme.onSurfaceVariant.withAlpha(130),
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          if (_loading)
-            const SizedBox(height: 28, child: LinearProgressIndicator())
-          else
-            Text(
-              '$currency $netDisplay',
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 26,
-                letterSpacing: -0.5,
-                color: _error ? theme.colorScheme.onSurfaceVariant : accent,
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _BalancePill(
-                  label: 'Owed to you',
-                  amount: youAreOwed,
-                  currency: currency,
-                  color: _teal,
-                  bgColor: _tealDim,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: _BalancePill(
-                  label: 'You owe',
-                  amount: youOwe,
-                  currency: currency,
-                  color: _orange,
-                  bgColor: _orangeDim,
-                ),
-              ),
-            ],
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -692,7 +807,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 class _ActivityTile extends ConsumerWidget {
   const _ActivityTile({required this.expense, required this.groupId, required this.groupName});
   final ExpenseModel expense;
-  final String groupId;
+  final String? groupId;
   final String groupName;
 
   static const Map<String, IconData> _categoryIcons = {
@@ -775,7 +890,7 @@ class _ActivityTile extends ConsumerWidget {
       ),
     );
     if (!context.mounted) return;
-    if (result == 'edit') {
+    if (result == 'edit' && groupId != null) {
       context.push('/group/$groupId/expense/${expense.id}',
           extra: {'groupName': ''});
     } else if (result == 'delete') {
@@ -809,7 +924,7 @@ class _ActivityTile extends ConsumerWidget {
       ],
     );
     if (!context.mounted) return;
-    if (result == 'edit') {
+    if (result == 'edit' && groupId != null) {
       context.push('/group/$groupId/expense/${expense.id}',
           extra: {'groupName': ''});
     } else if (result == 'delete') {
@@ -829,7 +944,7 @@ class _ActivityTile extends ConsumerWidget {
       child: SwipeActionCard(
         actionsPanelWidth: 140,
         actions: [
-          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: () => context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''})),
+          SwipeAction(icon: Icons.edit_outlined, label: 'Edit', color: _teal, onTap: () { if (groupId != null) context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''}); }),
           SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: () => _delete(context, ref)),
         ],
         child: GestureDetector(
@@ -841,10 +956,10 @@ class _ActivityTile extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: () => context.push(
+              onTap: groupId != null ? () => context.push(
                 '/group/$groupId/expense/${expense.id}',
                 extra: {'groupName': ''},
-              ),
+              ) : null,
               child: Row(
                 children: [
                   Container(

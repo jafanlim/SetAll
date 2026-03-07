@@ -165,6 +165,21 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
+final personalExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getPersonalExpenses();
+});
+
+/// Unified activity feed stream: group + personal expenses, sorted newest-first.
+final activityFeedProvider = StreamProvider<List<ExpenseModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchActivityFeed();
+});
+
+/// Net liquidity: income - personal spend - group share (in USD).
+final walletBalanceProvider = FutureProvider<String>((ref) async {
+  final balance = await ref.watch(setAllRepositoryProvider).getWalletBalance();
+  return balance.toStringAsFixed(2);
+});
+
 /// Expenses for a specific group.
 /// StreamProvider.family — re-emits automatically on any local change.
 final groupExpensesProvider =

@@ -3,13 +3,14 @@ import '../../domain/entities/expense.dart';
 class ExpenseModel extends Expense {
   const ExpenseModel({
     required super.id,
-    required super.groupId,
+    super.groupId,
     required super.payerId,
     required super.amount,
     super.description = '',
     super.currency = 'USD',
     super.splitType = SplitType.even,
     super.category = 'General',
+    super.isIncome = false,
     super.createdAt,
     super.createdBy,
     super.originalAmount,
@@ -32,7 +33,7 @@ class ExpenseModel extends Expense {
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
     return ExpenseModel(
       id: json['id'] as String,
-      groupId: json['group_id'] as String,
+      groupId: json['group_id'] as String?,
       payerId: (json['payer_id'] ?? '').toString(),
       // 'amount' is the raw total
       amount: (json['amount'] ?? '0').toString(),
@@ -40,6 +41,7 @@ class ExpenseModel extends Expense {
       currency: (json['currency'] as String?) ?? 'USD',
       splitType: _splitTypeFromString(json['split_type'] as String?),
       category: (json['category'] as String?) ?? 'General',
+      isIncome: (json['is_income'] as int? ?? 0) != 0,
       createdAt: json['created_at'] as String?,
       createdBy: json['created_by'] as String?,
       originalAmount: json['original_amount']?.toString(),
@@ -52,13 +54,14 @@ class ExpenseModel extends Expense {
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'group_id': groupId,
+        if (groupId != null) 'group_id': groupId,
         'payer_id': payerId,
         'amount': amount,
         'description': description,
         'currency': currency,
         'split_type': splitType.name,
         'category': category,
+        'is_income': isIncome ? 1 : 0,
         'created_at': createdAt,
         if (createdBy != null) 'created_by': createdBy,
         'universal_usd_amount': universalUsdAmount, // Key MUST be universal_usd_amount
