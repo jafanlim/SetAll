@@ -177,44 +177,57 @@ class _PremiumSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── Title bar area (drag + window controls) ─────────────────
-          DragToMoveArea(
-            child: SizedBox(
-              height: isMac ? 52 : 48,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+          // ── macOS: traffic-light spacer (28 px — room for red/amber/green) ─
+          if (isMac)
+            const SizedBox(height: 28)
+          // ── Windows: dedicated drag+controls row at the very top ──────────
+          else
+            DragToMoveArea(
+              child: SizedBox(
+                height: 36,
                 child: Row(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: Image.asset(
-                        'assets/icon.png',
-                        width: 32,
-                        height: 32,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Flexible(
-                      child: Text(
-                        'SetAll',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          fontSize: 16,
-                          color: Colors.white,
-                          letterSpacing: -0.4,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    if (!isMac) const _WindowControls(),
+                  children: const [
+                    Spacer(),
+                    _WindowControls(),
                   ],
                 ),
               ),
             ),
+
+          // ── Brand header (drag zone on macOS) ────────────────────────────
+          DragToMoveArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.asset(
+                      'assets/icon.png',
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Flexible(
+                    child: Text(
+                      'SetAll',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        color: Colors.white,
+                        letterSpacing: -0.4,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 10),
 
           // ── Navigation items ─────────────────────────────────────────
           ..._navItems.map((item) {

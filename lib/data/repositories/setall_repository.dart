@@ -1786,6 +1786,22 @@ class SetAllRepository {
     return income - personalSpend - groupShare;
   }
 
+  /// Wallet-only balance: personal income − personal spend.
+  /// Does NOT subtract the user's share of group expenses.
+  /// Use this for the Wallet screen hero total.
+  Future<Decimal> getWalletOnlyBalance() async {
+    final uid = await ensureUser();
+    if (uid == null) return Decimal.zero;
+    final personalRows = await getPersonalExpenses(limit: 1000);
+    Decimal income = Decimal.zero;
+    Decimal spend  = Decimal.zero;
+    for (final e in personalRows) {
+      final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+      if (e.isIncome) { income += amt; } else { spend += amt; }
+    }
+    return income - spend;
+  }
+
   /// Stream a unified activity feed: group + personal expenses, sorted newest-first.
   Stream<List<ExpenseModel>> watchActivityFeed({int limit = 50}) async* {
     // Yield immediately from current data, then re-yield on every _notify()

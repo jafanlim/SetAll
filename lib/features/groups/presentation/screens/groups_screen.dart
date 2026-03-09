@@ -909,6 +909,7 @@ class _ActivityTile extends ConsumerWidget {
     await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(omniActivityProvider);
     if (context.mounted) {
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
