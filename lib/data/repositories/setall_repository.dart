@@ -586,6 +586,7 @@ class SetAllRepository {
           .select()
           .inFilter('id', memberIds)
           .eq('type', type)
+          .eq('is_deleted', false)
           .order('updated_at', ascending: false) as List;
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
     }
@@ -619,7 +620,7 @@ class SetAllRepository {
     final rows = await LocalDatabase.db.query(
       'groups',
       where:
-          "id IN (${allIds.map((_) => '?').join(',')}) AND (type = ? OR type IS NULL AND ? = 'normal')",
+          "id IN (${allIds.map((_) => '?').join(',')}) AND (type = ? OR type IS NULL AND ? = 'normal') AND (is_deleted IS NULL OR is_deleted = 0)",
       whereArgs: [...allIds, type, type],
       orderBy: 'updated_at DESC',
     );
