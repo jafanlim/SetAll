@@ -2061,7 +2061,37 @@ class SetAllRepository {
       }
     }
 
-    // ── 5. Sort newest-first, cap at limit ───────────────────────────────────
+    // ── 5. Expense-deleted events from persistent snapshot table ─────────────
+    if (!_isWeb) {
+      try {
+        final deletedRows = await LocalDatabase.db.query(
+          'deleted_expenses',
+          orderBy: 'deleted_at DESC',
+          limit: limit,
+        );
+        for (final r in deletedRows) {
+          final deletedByUid = r['deleted_by'] as String? ?? '';
+          events.add(ExpenseDeletedEvent(
+            timestamp:     r['deleted_at'] as String? ?? '',
+            expenseId:     r['expense_id'] as String,
+            description:   r['description'] as String? ?? '',
+            amount:        r['amount'] as String? ?? '0',
+            currency:      r['currency'] as String? ?? 'USD',
+            groupId:       r['group_id'] as String?,
+            groupName:     r['group_name'] as String? ?? '',
+            isIncome:      (r['is_income'] as int? ?? 0) == 1,
+            deletedByYou:  deletedByUid == uid,
+            deletedByName: r['deleted_by_name'] as String? ?? 'Someone',
+            deletedAt:     DateTime.tryParse(r['deleted_at'] as String? ?? '') ?? DateTime.now(),
+            category:      r['category'] as String? ?? 'Other',
+          ));
+        }
+      } catch (e) {
+        debugPrint('[_buildOmniActivity] deleted_expenses query failed: $e');
+      }
+    }
+
+    // ── 6. Sort newest-first, cap at limit ───────────────────────────────────
     events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return events.take(limit).toList();
   }
@@ -2245,6 +2275,9 @@ class SetAllRepository {
   }
 
   Future<bool> deleteExpense(String expenseId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
     if (_isWeb && _client != null) {
       try {
         await _client.from('splits').delete().eq('expense_id', expenseId);
@@ -2255,29 +2288,128 @@ class SetAllRepository {
       }
     }
 
+    // Snapshot the expense into deleted_expenses BEFORE removing it so the
+    // activity feed can show a deletion event with a Restore button.
+    final deletedAt = _now();
+    final expRows = await LocalDatabase.db.query(
+      'expenses', where: 'id = ?', whereArgs: [expenseId]);
+    if (expRows.isNotEmpty) {
+      final row = expRows.first;
+      // Resolve group name if applicable.
+      String groupName = '';
+      final gid = row['group_id'] as String?;
+      if (gid != null) {
+        final gRows = await LocalDatabase.db.query(
+          'groups', columns: ['name'], where: 'id = ?', whereArgs: [gid]);
+        if (gRows.isNotEmpty) groupName = gRows.first['name'] as String? ?? '';
+      }
+      // Resolve deleter's display name from local profile cache.
+      String deletedByName = 'You';
+      final pRows = await LocalDatabase.db.query(
+        'profiles', columns: ['name', 'nickname'], where: 'id = ?', whereArgs: [uid]);
+      if (pRows.isNotEmpty) {
+        deletedByName = (pRows.first['nickname'] as String?)?.trim().isNotEmpty == true
+            ? pRows.first['nickname'] as String
+            : (pRows.first['name'] as String? ?? 'You');
+      }
+      await LocalDatabase.db.insert(
+        'deleted_expenses',
+        {
+          'expense_id':      expenseId,
+          'description':     row['description'],
+          'amount':          row['universal_usd_amount'] ?? row['amount'],
+          'currency':        row['original_currency'] ?? row['currency'] ?? 'USD',
+          'group_id':        gid,
+          'group_name':      groupName,
+          'is_income':       row['is_income'] ?? 0,
+          'category':        row['category'] ?? 'Other',
+          'deleted_by':      uid,
+          'deleted_by_name': deletedByName,
+          'deleted_at':      deletedAt,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
     // Remote-first: delete from Supabase before removing locally.
-    // This ensures the deletion is authoritative — the reconciler in
-    // _pullFromSupabase will not re-insert rows that were deleted on another device.
     if (await _isOnline && _client != null) {
       try {
         await _client.from('splits').delete().eq('expense_id', expenseId);
         await _client.from('expenses').delete().eq('id', expenseId);
       } catch (e) {
         debugPrint('[deleteExpense] Supabase delete failed: $e');
-        // Proceed with local delete anyway so the UI stays responsive.
       }
     }
 
     await LocalDatabase.db.delete(
-      'splits',
-      where: 'expense_id = ?',
-      whereArgs: [expenseId],
-    );
+      'splits', where: 'expense_id = ?', whereArgs: [expenseId]);
     await LocalDatabase.db.delete(
-      'expenses',
-      where: 'id = ?',
-      whereArgs: [expenseId],
-    );
+      'expenses', where: 'id = ?', whereArgs: [expenseId]);
+    _notify();
+    return true;
+  }
+
+  /// Restores a previously-deleted expense from the [deleted_expenses] snapshot.
+  /// Re-inserts it into the local [expenses] table and removes the deletion record.
+  /// Best-effort re-push to Supabase when online.
+  Future<bool> restoreExpense(String expenseId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    final snapRows = await LocalDatabase.db.query(
+      'deleted_expenses', where: 'expense_id = ?', whereArgs: [expenseId]);
+    if (snapRows.isEmpty) return false;
+    final snap = snapRows.first;
+
+    // Only the deleter can restore.
+    if ((snap['deleted_by'] as String?) != uid) return false;
+
+    final now = _now();
+    final restoredExpense = {
+      'id':         expenseId,
+      'group_id':   snap['group_id'],
+      'payer_id':   uid,
+      'amount':     snap['amount'],
+      'is_income':  snap['is_income'],
+      'description': snap['description'] ?? '',
+      'currency':   snap['currency'] ?? 'USD',
+      'category':   snap['category'] ?? 'Other',
+      'universal_usd_amount': snap['amount'],
+      'created_at': now,
+      'updated_at': now,
+      'synced_at':  null,
+    };
+
+    await LocalDatabase.db.insert(
+      'expenses', restoredExpense,
+      conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Remove from deletion log.
+    await LocalDatabase.db.delete(
+      'deleted_expenses', where: 'expense_id = ?', whereArgs: [expenseId]);
+
+    // Best-effort re-push to Supabase.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('expenses').upsert({
+          'id':        expenseId,
+          'group_id':  snap['group_id'],
+          'payer_id':  uid,
+          'amount':    snap['amount'],
+          'is_income': (snap['is_income'] as int?) == 1,
+          'description': snap['description'] ?? '',
+          'currency':  snap['currency'] ?? 'USD',
+          'category':  snap['category'] ?? 'Other',
+          'universal_usd_amount': snap['amount'],
+        });
+        await LocalDatabase.db.update(
+          'expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+          where: 'id = ?', whereArgs: [expenseId]);
+      } catch (e) {
+        debugPrint('[restoreExpense] Supabase upsert failed (will sync later): $e');
+      }
+    }
+
     _notify();
     return true;
   }

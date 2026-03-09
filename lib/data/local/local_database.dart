@@ -38,7 +38,9 @@ class LocalDatabase {
   /// Schema v13 adds:
   ///   • groups.is_deleted – soft-delete flag (INTEGER 0/1)
   ///   • groups.deleted_at – timestamp of deletion
-  static const int _version = 13;
+  /// Schema v14 adds:
+  ///   • deleted_expenses – snapshot table for expense deletion audit log
+  static const int _version = 14;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -167,6 +169,23 @@ class LocalDatabase {
     if (oldVersion < 13) {
       await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
       await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 14) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_expenses (
+          expense_id   TEXT PRIMARY KEY,
+          description  TEXT,
+          amount       TEXT NOT NULL,
+          currency     TEXT,
+          group_id     TEXT,
+          group_name   TEXT,
+          is_income    INTEGER NOT NULL DEFAULT 0,
+          category     TEXT,
+          deleted_by   TEXT NOT NULL,
+          deleted_by_name TEXT,
+          deleted_at   TEXT NOT NULL
+        )
+      ''');
     }
     if (oldVersion < 12) {
       // Phase 1: Safe ALTER TABLE additions — these cannot fail and guarantee
@@ -351,6 +370,21 @@ class LocalDatabase {
       CREATE TABLE left_groups (
         group_id TEXT PRIMARY KEY,
         left_at  TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE deleted_expenses (
+        expense_id   TEXT PRIMARY KEY,
+        description  TEXT,
+        amount       TEXT NOT NULL,
+        currency     TEXT,
+        group_id     TEXT,
+        group_name   TEXT,
+        is_income    INTEGER NOT NULL DEFAULT 0,
+        category     TEXT,
+        deleted_by   TEXT NOT NULL,
+        deleted_by_name TEXT,
+        deleted_at   TEXT NOT NULL
       )
     ''');
   }
