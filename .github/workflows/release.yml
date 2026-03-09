@@ -12,6 +12,7 @@ jobs:
     name: Build & Package
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: macos-latest
@@ -23,7 +24,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
@@ -31,32 +32,45 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # macOS Build & Package
+      # ── macOS Build & Package ──────────────────────────────────────────────
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         run: |
           flutter config --enable-macos-desktop
-          # Build without the failing entitlements
           flutter build macos --release
-          
-          # Force a deep ad-hoc signature on the runner
-          find build/macos/Build/Products/Release/setall.app -type f -name "*" -exec codesign --force --deep --sign - {} +
-          
+
+      - name: Sign & package macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          codesign --force --deep --sign - \
+            "build/macos/Build/Products/Release/setall.app"
           brew install create-dmg
           create-dmg \
             --volname "SetAll Installer" \
+            --no-internet-enable \
             "SetAll-macOS.dmg" \
-            "build/macos/Build/Products/Release/setall.app"
+            "build/macos/Build/Products/Release/setall.app" \
+            || true
+          # create-dmg exits 1 if no background/window set but still produces the DMG
+          test -f SetAll-macOS.dmg
 
-      # Windows Build & Package
+      # ── Windows Build & Package ────────────────────────────────────────────
+      - name: Install Inno Setup
+        if: matrix.os == 'windows-latest'
+        run: choco install innosetup --yes
+
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         run: |
           flutter config --enable-windows-desktop
           flutter build windows --release
-          iscc windows/installer.iss
 
-      # Upload the packaged artifact
+      - name: Package Windows installer
+        if: matrix.os == 'windows-latest'
+        run: iscc windows/installer.iss
+        shell: cmd
+
+      # ── Upload artifact ────────────────────────────────────────────────────
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
@@ -64,23 +78,25 @@ jobs:
           path: ${{ matrix.asset_path }}
 
   release:
-    name: Create GitHub Release
+    name: Publish GitHub Release
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Download macOS Artifact
+      - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: SetAll-macOS.dmg
+          path: dist
 
-      - name: Download Windows Artifact
+      - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: SetAll-Windows.exe
+          path: dist
 
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            SetAll-macOS.dmg
-            SetAll-Windows.exe
+            dist/SetAll-macOS.dmg
+            dist/SetAll-Windows.exe
