@@ -185,11 +185,11 @@ class _PremiumSidebar extends StatelessWidget {
             child: Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                   child: Image.asset(
                     'assets/icon.png',
-                    width: 36,
-                    height: 36,
+                    width: 32,
+                    height: 32,
                     fit: BoxFit.cover,
                   ),
                 ),

@@ -709,14 +709,15 @@ class SetAllRepository {
     return rows.first['creator_id'] as String?;
   }
 
-  /// Delete a group. Any member of the group can perform this action.
+  /// Soft-delete a group. Owner sets is_deleted=true; non-owner leaves.
   Future<bool> deleteGroup(String groupId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
+    final deletedAt = _now();
 
     if (_isWeb && _client != null) {
       try {
-        // Snapshot name + creator before deleting.
+        // Snapshot name + creator before soft-deleting.
         String webGroupName = groupId;
         String? creatorId;
         try {
@@ -729,21 +730,17 @@ class SetAllRepository {
         } catch (_) {}
 
         if (creatorId == uid) {
-          // Full delete — cascade expenses / splits / members / group.
-          final expenseRows = await _client.from('expenses').select('id').eq('group_id', groupId) as List;
-          final expenseIds  = expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
-          if (expenseIds.isNotEmpty) {
-            await _client.from('splits').delete().inFilter('expense_id', expenseIds);
-          }
-          await _client.from('expenses').delete().eq('group_id', groupId);
-          await _client.from('group_members').delete().eq('group_id', groupId);
-          await _client.from('groups').delete().eq('id', groupId);
+          // Owner: soft-delete — flip flag, keep data intact for restore.
+          await _client.from('groups').update({
+            'is_deleted': true,
+            'deleted_at': deletedAt,
+          }).eq('id', groupId);
         } else {
           // Non-owner: leave only — remove this user from group_members.
           await _client.from('group_members').delete()
               .eq('group_id', groupId).eq('user_id', uid);
         }
-        _logGroupDeletedEvents(uid, {groupId: webGroupName});
+        _logGroupDeletedEvents(uid, {groupId: (webGroupName, creatorId ?? uid)});
         _notify();
         return true;
       } catch (_) {
@@ -763,35 +760,24 @@ class SetAllRepository {
     final isOwner   = creatorId == uid;
 
     if (isOwner) {
-      // ── Owner: full cascade delete ──────────────────────────────────────
-      // Remote-first: delete from Supabase before removing locally so other
-      // devices' reconciler will prune the group on their next pull.
+      // ── Owner: soft-delete — mark deleted locally and on Supabase ─────────
       if (await _isOnline && _client != null) {
         try {
-          final remoteExpenseRows = await _client
-              .from('expenses').select('id').eq('group_id', groupId) as List;
-          final remoteExpenseIds = remoteExpenseRows
-              .map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
-          if (remoteExpenseIds.isNotEmpty) {
-            await _client.from('splits').delete().inFilter('expense_id', remoteExpenseIds);
-          }
-          await _client.from('expenses').delete().eq('group_id', groupId);
-          await _client.from('group_members').delete().eq('group_id', groupId);
-          await _client.from('groups').delete().eq('id', groupId);
+          await _client.from('groups').update({
+            'is_deleted': true,
+            'deleted_at': deletedAt,
+          }).eq('id', groupId);
         } catch (e) {
-          debugPrint('[deleteGroup] Supabase owner-delete failed: $e');
+          debugPrint('[deleteGroup] Supabase soft-delete failed: $e');
         }
       }
-      // Local cascade.
-      final expenseRows = await LocalDatabase.db.query(
-        'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
-      for (final row in expenseRows) {
-        await LocalDatabase.db.delete('splits',
-            where: 'expense_id = ?', whereArgs: [row['id']]);
-      }
-      await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
-      await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
-      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
+      // Local: mark soft-deleted so it disappears from lists.
+      await LocalDatabase.db.update(
+        'groups',
+        {'is_deleted': 1, 'deleted_at': deletedAt},
+        where: 'id = ?',
+        whereArgs: [groupId],
+      );
     } else {
       // ── Non-owner: leave only ────────────────────────────────────────────
       // Remove this user from group_members remotely (best-effort).
@@ -822,7 +808,59 @@ class SetAllRepository {
       await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
     }
 
-    _logGroupDeletedEvents(uid, {groupId: groupName});
+    _logGroupDeletedEvents(uid, {groupId: (groupName, creatorId ?? uid)});
+    _notify();
+    return true;
+  }
+
+  /// Restore a soft-deleted group. Only the original owner (creator_id) may call this.
+  /// Returns true on success.
+  Future<bool> restoreGroup(String groupId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'is_deleted': false,
+          'deleted_at': null,
+        }).eq('id', groupId).eq('creator_id', uid);
+        _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
+        _notify();
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'groups',
+      columns: ['creator_id'],
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+    if (rows.isEmpty) return false;
+    if ((rows.first['creator_id'] as String?) != uid) return false;
+
+    await LocalDatabase.db.update(
+      'groups',
+      {'is_deleted': 0, 'deleted_at': null},
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'is_deleted': false,
+          'deleted_at': null,
+        }).eq('id', groupId).eq('creator_id', uid);
+      } catch (e) {
+        debugPrint('[restoreGroup] Supabase restore failed: $e');
+      }
+    }
+
+    _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
     _notify();
     return true;
   }
@@ -840,12 +878,14 @@ class SetAllRepository {
     return allOk;
   }
 
-  void _logGroupDeletedEvents(String uid, Map<String, String> groupNames) {
+  void _logGroupDeletedEvents(String uid, Map<String, (String, String)> groupInfo) {
     // Logged as in-memory events only; picked up by next _buildOmniActivity call.
-    for (final entry in groupNames.entries) {
+    for (final entry in groupInfo.entries) {
+      _pendingDeletedGroups.removeWhere((r) => r.id == entry.key);
       _pendingDeletedGroups.add(_DeletedGroupRecord(
         id: entry.key,
-        name: entry.value,
+        name: entry.value.$1,
+        creatorId: entry.value.$2,
         deletedAt: _now(),
         deletedByUid: uid,
       ));
@@ -1520,6 +1560,10 @@ class SetAllRepository {
                         return expense;
                       } catch (e) {
                         if (e is PostgrestException) {
+                          if (e.code == '42501') {
+                            debugPrint('RLS ERROR: Syncing in background — ${e.message}');
+                            return null;
+                          }
                           debugPrint(
                               'PostgrestException in addExpense: ${e.message}, code: ${e.code}, details: ${e.details}, hint: ${e.hint}');
                         } else {
@@ -1572,8 +1616,12 @@ class SetAllRepository {
                         );
                       } catch (e) {
                         if (e is PostgrestException) {
-                          debugPrint(
-                              'PostgrestException in addExpense (bg sync): ${e.message}, code: ${e.code}');
+                          if (e.code == '42501') {
+                            debugPrint('RLS ERROR: Syncing in background — ${e.message}');
+                          } else {
+                            debugPrint(
+                                'PostgrestException in addExpense (bg sync): ${e.message}, code: ${e.code}');
+                          }
                         } else {
                           debugPrint('Error in addExpense (bg sync): $e');
                         }
@@ -1994,6 +2042,8 @@ class SetAllRepository {
           timestamp: rec.deletedAt,
           groupId:   rec.id,
           groupName: rec.name,
+          creatorId: rec.creatorId,
+          deletedAt: DateTime.tryParse(rec.deletedAt) ?? DateTime.now(),
         ));
       }
     }
@@ -2504,11 +2554,13 @@ class _DeletedGroupRecord {
   const _DeletedGroupRecord({
     required this.id,
     required this.name,
+    required this.creatorId,
     required this.deletedAt,
     required this.deletedByUid,
   });
   final String id;
   final String name;
+  final String creatorId;
   final String deletedAt;
   final String deletedByUid;
 }

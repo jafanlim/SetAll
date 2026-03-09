@@ -171,7 +171,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete group?'),
-        content: Text('Delete "$_groupName" and all its expenses?'),
+        content: Text('Delete "$_groupName"? You can restore it from the Activity screen within 90 days.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
@@ -188,7 +188,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       context: context, // ignore: use_build_context_synchronously
       builder: (ctx) => AlertDialog(
         title: const Text('Are you sure?'),
-        content: const Text('This action is irreversible. All expenses and balances in this group will be permanently deleted.'),
+        content: const Text('The group will be hidden immediately. As the owner, you can restore it from the Activity screen within 90 days.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(

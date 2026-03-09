@@ -21,7 +21,7 @@ const _slate  = Color(0xFF94A3B8);
 // Filter / sort enums
 // ---------------------------------------------------------------------------
 enum _ActivityFilter { all, wallet, groups, income }
-enum _ActivitySort   { newest, largest }
+enum _ActivitySort   { newest, oldest, largest, smallest }
 
 /// Omni Activity Hub — polymorphic audit trail.
 /// Shows group creation, shared expenses, personal wallet entries, and settlements.
@@ -54,14 +54,16 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     }).toList();
 
     // Sort
-    if (_sort == _ActivitySort.largest) {
-      result.sort((a, b) {
-        final amtA = _eventAmount(a);
-        final amtB = _eventAmount(b);
-        return amtB.compareTo(amtA);
-      });
+    switch (_sort) {
+      case _ActivitySort.newest:
+        result.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      case _ActivitySort.oldest:
+        result.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+      case _ActivitySort.largest:
+        result.sort((a, b) => _eventAmount(b).compareTo(_eventAmount(a)));
+      case _ActivitySort.smallest:
+        result.sort((a, b) => _eventAmount(a).compareTo(_eventAmount(b)));
     }
-    // newest is already the default order from the provider
     return result;
   }
 
@@ -96,22 +98,22 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
-            tooltip: _sort == _ActivitySort.newest ? 'Sort: Newest first' : 'Sort: Largest first',
+          PopupMenuButton<_ActivitySort>(
+            tooltip: 'Sort',
             icon: Icon(
-              _sort == _ActivitySort.newest
-                  ? Icons.sort_rounded
-                  : Icons.attach_money_rounded,
-              color: _sort == _ActivitySort.largest ? _teal : null,
+              Icons.sort_rounded,
+              color: _sort != _ActivitySort.newest ? _teal : null,
             ),
-            onPressed: () {
+            onSelected: (val) {
               HapticUtils.selection();
-              setState(() {
-                _sort = _sort == _ActivitySort.newest
-                    ? _ActivitySort.largest
-                    : _ActivitySort.newest;
-              });
+              setState(() => _sort = val);
             },
+            itemBuilder: (_) => [
+              _sortMenuItem(_ActivitySort.newest,  Icons.arrow_downward_rounded, 'Newest First',    _sort),
+              _sortMenuItem(_ActivitySort.oldest,  Icons.arrow_upward_rounded,   'Oldest First',    _sort),
+              _sortMenuItem(_ActivitySort.largest, Icons.attach_money_rounded,   'Largest Amount',  _sort),
+              _sortMenuItem(_ActivitySort.smallest,Icons.money_off_rounded,      'Smallest Amount', _sort),
+            ],
           ),
           const SizedBox(width: 4),
         ],
@@ -183,6 +185,24 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     );
   }
 
+  PopupMenuItem<_ActivitySort> _sortMenuItem(
+    _ActivitySort val,
+    IconData icon,
+    String label,
+    _ActivitySort current,
+  ) {
+    final selected = current == val;
+    return PopupMenuItem(
+      value: val,
+      child: Row(children: [
+        Icon(icon, size: 16, color: selected ? _teal : null),
+        const SizedBox(width: 10),
+        Text(label, style: TextStyle(fontWeight: selected ? FontWeight.w700 : FontWeight.w400)),
+        if (selected) ...[const Spacer(), const Icon(Icons.check, size: 14, color: _teal)],
+      ]),
+    );
+  }
+
   Widget _buildFeed(
     BuildContext context,
     List<ActivityEvent> feed,
@@ -191,8 +211,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     if (feed.isEmpty) return _EmptyActivityState(theme: theme);
 
     final items = <_FeedItem>[];
-    // For largest sort, skip date headers (they'd be misleading).
-    if (_sort == _ActivitySort.newest) {
+    // For date-sorted views, show section headers; for amount sorts, skip them.
+    final showHeaders = _sort == _ActivitySort.newest || _sort == _ActivitySort.oldest;
+    if (showHeaders) {
       String? lastLabel;
       for (final event in feed) {
         final label = _dateSection(event.timestamp);
@@ -207,6 +228,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         items.add(_FeedItem.event(event));
       }
     }
+
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 96),
@@ -563,21 +585,109 @@ class _GroupCreatedTile extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Group deleted event tile
 // ---------------------------------------------------------------------------
-class _GroupDeletedTile extends StatelessWidget {
+class _GroupDeletedTile extends ConsumerStatefulWidget {
   const _GroupDeletedTile({required this.event});
   final GroupDeletedEvent event;
 
   @override
+  ConsumerState<_GroupDeletedTile> createState() => _GroupDeletedTileState();
+}
+
+class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
+  bool _restoring = false;
+
+  Future<void> _restore() async {
+    setState(() => _restoring = true);
+    final ok = await ref.read(setAllRepositoryProvider).restoreGroup(widget.event.groupId);
+    if (!mounted) return;
+    setState(() => _restoring = false);
+    if (ok) {
+      ref.invalidate(omniActivityProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Group "${widget.event.groupName}" restored'),
+          backgroundColor: _teal.withAlpha(220),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore group')),
+      );
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return _buildEventTile(
-      context:   context,
-      theme:     theme,
-      accent:    Colors.redAccent,
-      icon:      Icons.delete_outline,
-      title:     'You deleted the group "${event.groupName}"',
-      badge:     'Deleted',
-      timestamp: event.timestamp,
+    final currentUid = ref.read(setAllRepositoryProvider).currentUserId;
+    final isOwner = currentUid != null && currentUid == widget.event.creatorId;
+    final withinWindow = DateTime.now().difference(widget.event.deletedAt).inDays < 90;
+    final canRestore = isOwner && withinWindow;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withAlpha(28),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(Icons.delete_outline, size: 19, color: Colors.redAccent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You deleted "${widget.event.groupName}"',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withAlpha(22),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: const Text('Deleted',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.redAccent)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(_fmtTime(widget.event.timestamp),
+                        style: const TextStyle(fontSize: 10, color: _slate)),
+                  ]),
+                ],
+              ),
+            ),
+            if (canRestore)
+              _restoring
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+                    )
+                  : TextButton(
+                      onPressed: _restore,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _teal,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('RESTORE',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                    ),
+          ],
+        ),
+      ),
     );
   }
 }
