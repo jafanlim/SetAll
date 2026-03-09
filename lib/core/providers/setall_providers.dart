@@ -181,9 +181,12 @@ final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
   return ref.watch(setAllRepositoryProvider).watchOmniActivity();
 });
 
-/// Net liquidity: income - personal spend - group share (in USD).
+/// Personal wallet balance: income − personal spend ONLY (no group splits).
+/// This is what the Wallet screen hero should display.
 final walletBalanceProvider = FutureProvider<String>((ref) async {
-  final balance = await ref.watch(setAllRepositoryProvider).getWalletBalance();
+  // Watch the groups stream so this refreshes after any sync pull.
+  ref.watch(myGroupsProvider);
+  final balance = await ref.watch(setAllRepositoryProvider).getWalletOnlyBalance();
   return balance.toStringAsFixed(2);
 });
 

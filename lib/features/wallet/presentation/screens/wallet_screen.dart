@@ -96,6 +96,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(personalExpensesProvider);
     ref.invalidate(walletBalanceProvider);
     ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(omniActivityProvider);
     setState(() { _editMode = false; _selected.clear(); });
   }
 
@@ -122,6 +123,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(personalExpensesProvider);
     ref.invalidate(walletBalanceProvider);
     ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(omniActivityProvider);
   }
 
   void _editExpense(ExpenseModel expense) {
@@ -136,7 +138,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final theme         = Theme.of(context);
     final walletAsync   = ref.watch(walletBalanceProvider);
     final personalAsync = ref.watch(personalExpensesProvider);
-    final summaryAsync  = ref.watch(balanceSummaryProvider);
 
     final expenses = personalAsync.valueOrNull ?? [];
     final allIds   = expenses.map((e) => e.id).toList();
@@ -206,13 +207,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   skipLoadingOnReload: true,
                   data: (walletStr) {
                     final walletDec = Decimal.tryParse(walletStr) ?? Decimal.zero;
-                    final summary   = summaryAsync.valueOrNull;
-                    final owed = Decimal.tryParse(summary?.youAreOwed ?? '0') ?? Decimal.zero;
-                    final owe  = Decimal.tryParse(summary?.youOwe     ?? '0') ?? Decimal.zero;
                     return WalletHero(
                       walletBalance: walletDec,
-                      netPosition: walletDec + owed - owe,
-                      currency: summary?.currency ?? 'USD',
                     );
                   },
                   loading: () => WalletHero.loading(),
@@ -319,32 +315,24 @@ class WalletHero extends StatelessWidget {
   const WalletHero({
     super.key,
     required this.walletBalance,
-    required this.netPosition,
-    required this.currency,
   }) : _loading = false, _error = false;
 
   static final _zero = Decimal.zero;
 
   WalletHero.loading({super.key})
-      : walletBalance = _zero, netPosition = _zero,
-        currency = '', _loading = true, _error = false;
+      : walletBalance = _zero, _loading = true, _error = false;
 
   WalletHero.error({super.key})
-      : walletBalance = _zero, netPosition = _zero,
-        currency = '', _loading = false, _error = true;
+      : walletBalance = _zero, _loading = false, _error = true;
 
   final Decimal walletBalance;
-  final Decimal netPosition;
-  final String  currency;
   final bool    _loading;
   final bool    _error;
 
   @override
   Widget build(BuildContext context) {
     final theme       = Theme.of(context);
-    final netIsPos    = netPosition >= Decimal.zero;
     final walletIsPos = walletBalance >= Decimal.zero;
-    final ccy         = currency.isEmpty ? 'USD' : currency;
 
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -370,7 +358,7 @@ class WalletHero extends StatelessWidget {
             const SizedBox(height: 28, child: LinearProgressIndicator(color: _purple))
           else
             Text(
-              '$ccy ${walletBalance.abs().toStringAsFixed(2)}',
+              walletBalance.abs().toStringAsFixed(2),
               style: TextStyle(
                 fontWeight: FontWeight.w800, fontSize: 26, letterSpacing: -0.5,
                 color: _error
@@ -382,19 +370,17 @@ class WalletHero extends StatelessWidget {
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: _BalancePill(
-              label: 'Cash balance',
-              amount: walletBalance.abs().toStringAsFixed(2),
-              currency: ccy,
-              color: walletIsPos ? _purple : _orange,
-              bgColor: walletIsPos ? _purpleDim : _orangeDim,
+              label: 'Income',
+              amount: walletBalance >= Decimal.zero ? walletBalance.toStringAsFixed(2) : '0.00',
+              color: _teal,
+              bgColor: _tealDim,
             )),
             const SizedBox(width: 8),
             Expanded(child: _BalancePill(
-              label: 'True net worth',
-              amount: netPosition.abs().toStringAsFixed(2),
-              currency: ccy,
-              color: netIsPos ? _teal : _orange,
-              bgColor: netIsPos ? _tealDim : _orangeDim,
+              label: 'Expenses',
+              amount: walletBalance < Decimal.zero ? walletBalance.abs().toStringAsFixed(2) : '0.00',
+              color: walletIsPos ? _purple : _orange,
+              bgColor: walletIsPos ? _purpleDim : _orangeDim,
             )),
           ]),
         ],
@@ -410,14 +396,12 @@ class _BalancePill extends StatelessWidget {
   const _BalancePill({
     required this.label,
     required this.amount,
-    required this.currency,
     required this.color,
     required this.bgColor,
   });
 
   final String label;
   final String amount;
-  final String currency;
   final Color  color;
   final Color  bgColor;
 
@@ -440,7 +424,7 @@ class _BalancePill extends StatelessWidget {
               ),
               overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
-          Text('$currency $amount',
+          Text(amount,
               style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
               overflow: TextOverflow.ellipsis),
         ],
