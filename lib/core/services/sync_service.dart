@@ -383,16 +383,25 @@ class SyncService {
 
     if (memberIds.isEmpty) return;
 
+    // Build a set of group IDs the user has locally soft-deleted so we never
+    // overwrite is_deleted=1 with a fresh Supabase pull.
+    final softDeletedRows = await LocalDatabase.db.query(
+      'groups', columns: ['id'], where: 'is_deleted = 1');
+    final softDeletedIds = softDeletedRows.map((r) => r['id'] as String).toSet();
+
     final groups = await _client
         .from('groups')
         .select()
         .inFilter('id', memberIds.toList());
     for (final g in groups as List) {
       final map = g as Map<String, dynamic>;
+      final gid = map['id'] as String;
+      // Never restore a group the user explicitly deleted on this device.
+      if (softDeletedIds.contains(gid)) continue;
       await LocalDatabase.db.insert(
         'groups',
         {
-          'id': map['id'],
+          'id': gid,
           'name': map['name'],
           'creator_id': map['creator_id'],
           'type': map['type'] ?? 'normal',
