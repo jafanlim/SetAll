@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'core/theme/setall_theme.dart';
@@ -71,6 +72,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       // Token refresh / session-restore with same user: do nothing extra —
       // the StreamController and its listeners stay intact.
 
+      // Migrate any entries created under the anonymous device UUID to the
+      // real Supabase user ID, then reset their synced_at so they get pushed.
+      await _migrateDeviceUidToRealUid(newUid);
+
       _lastUserId = newUid;
 
       final sync = ref.read(syncServiceProvider);
@@ -91,6 +96,64 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       _lastUserId = null;
       _invalidateAllProviders();
       ref.read(syncServiceProvider).unsubscribeFromRealtime();
+    }
+  }
+
+  /// Finds any local rows stamped with the anonymous device UUID and
+  /// re-stamps them with the real Supabase [uid]. Also resets synced_at = NULL
+  /// on rows that were permanently skipped (synced_at = -1) so the push
+  /// retries them with the correct payer_id.
+  Future<void> _migrateDeviceUidToRealUid(String uid) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final deviceUid = prefs.getString('device_user_id');
+      if (deviceUid == null || deviceUid.isEmpty || deviceUid == uid) return;
+
+      final db = LocalDatabase.db;
+
+      // Re-stamp expenses.
+      final affected = await db.update(
+        'expenses',
+        {'payer_id': uid, 'synced_at': null},
+        where: 'payer_id = ?',
+        whereArgs: [deviceUid],
+      );
+
+      if (affected > 0) {
+        debugPrint('[app] migrated $affected expense(s) from device UID $deviceUid → $uid');
+        // Re-stamp splits for those expenses too.
+        await db.rawUpdate(
+          '''
+          UPDATE splits SET synced_at = NULL
+          WHERE expense_id IN (
+            SELECT id FROM expenses WHERE payer_id = ?
+          )
+          ''',
+          [uid],
+        );
+      }
+
+      // Also un-blacklist any expenses/splits that were previously rejected
+      // with RLS error (synced_at = -1) but now have the correct payer_id.
+      await db.update(
+        'expenses',
+        {'synced_at': null},
+        where: 'payer_id = ? AND synced_at = -1',
+        whereArgs: [uid],
+      );
+      await db.rawUpdate(
+        '''
+        UPDATE splits SET synced_at = NULL
+        WHERE synced_at = -1
+          AND expense_id IN (SELECT id FROM expenses WHERE payer_id = ?)
+        ''',
+        [uid],
+      );
+
+      // Clear the device UUID so it is never reused after migration.
+      await prefs.remove('device_user_id');
+    } catch (e) {
+      debugPrint('[app] _migrateDeviceUidToRealUid error (non-fatal): $e');
     }
   }
 
