@@ -16,13 +16,14 @@ const List<String> kExpenseCategories = [
 class Expense {
   const Expense({
     required this.id,
-    required this.groupId,
+    this.groupId,
     required this.payerId,
     required this.amount,
     this.description = '',
     this.currency = 'USD',
     this.splitType = SplitType.even,
     this.category = 'General',
+    this.isIncome = false,
     this.createdAt,
     this.createdBy,
     this.originalAmount,
@@ -32,7 +33,7 @@ class Expense {
   });
 
   final String id;
-  final String groupId;
+  final String? groupId;
   final String payerId;
 
   /// The stored amount (string for Decimal compatibility).
@@ -45,6 +46,10 @@ class Expense {
   final String currency;
   final SplitType splitType;
   final String category;
+
+  /// When true, this entry is income (positive cash-flow) in the wallet.
+  final bool isIncome;
+
   final String? createdAt;
 
   /// The user ID who created this expense (maps to Supabase auth.uid()).

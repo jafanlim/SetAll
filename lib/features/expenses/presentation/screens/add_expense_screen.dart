@@ -99,6 +99,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String _category = 'General';
   SplitMode _splitMode = SplitMode.even;
   bool _isSubmitting = false;
+  bool _isIncome = false;
   String? _payerId;
 
   final List<TextEditingController> _customCtrl = [];
@@ -114,11 +115,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Future<void> _loadMembers() async {
     final repo = ref.read(setAllRepositoryProvider);
     final uid = await repo.ensureUser();
-    final members = await repo.getGroupMembers(widget.groupId);
+    // wallet mode — no group, no members to load; skip the Supabase call
+    // entirely to avoid sending '' as a UUID which Postgres rejects.
+    final members = widget.groupId.isEmpty
+        ? await Future.value(<dynamic>[])
+        : await repo.getGroupMembers(widget.groupId);
     if (!mounted) return;
 
-    var ids   = members.map((m) => m.id).toList();
-    var names = members.map((m) => m.name).toList();
+    var ids   = members.map((m) => m.id   as String).toList();
+    var names = members.map((m) => m.name as String).toList();
 
     debugPrint('[AddExpense] _loadMembers: uid=$uid, members=${ids.length}: $ids');
 
@@ -187,7 +192,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   void _nextStep() {
     if (_step == 0 && !_validateAmount()) return;
     HapticUtils.primaryTap();
-    setState(() { if (_step < _totalSteps - 1) _step++; });
+    setState(() { if (_step < _effectiveTotalSteps - 1) _step++; });
   }
 
   void _prevStep() {
@@ -235,12 +240,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       return;
     }
 
-    if (widget.groupId.isEmpty) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Choose a group first')));
-      return;
-    }
-    if (_memberIds.isEmpty) {
+    final isPersonal = widget.groupId.isEmpty;
+
+    if (!isPersonal && _memberIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No members in this group. Add members first.')),
       );
@@ -250,6 +252,42 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     setState(() => _isSubmitting = true);
 
     debugPrint('[AddExpense] _submit: payerId=$payerId currentUid=$currentUid memberIds=${_memberIds.length}: $_memberIds, splitMode=$_splitMode, amount=$amount');
+
+    // -- Personal (wallet) mode — no splits -----------------------------------
+    if (isPersonal) {
+      final expense = await repo.addExpense(
+        groupId: null,
+        payerId: payerId,
+        amount: amount,
+        description: _descriptionCtrl.text.trim(),
+        currency: _currency,
+        splitType: SplitType.even,
+        splits: [],
+        category: _category,
+        isIncome: _isIncome,
+      );
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+        if (expense != null) {
+          HapticUtils.success();
+          ref.invalidate(walletBalanceProvider);
+          ref.invalidate(personalExpensesProvider);
+          ref.invalidate(recentExpensesProvider);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(_isIncome ? 'Income recorded' : 'Personal expense saved'),
+              backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
+            ),
+          );
+          context.pop();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not save entry')),
+          );
+        }
+      }
+      return;
+    }
 
     // -- Build split results --------------------------------------------------
     List<SplitResult> results;
@@ -336,14 +374,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           }).toList();
         debugPrint('[AddExpense] splits generated: ${splitsToStore.map((s) => '${s.userId}=${s.universalUsdOwed}').join(', ')}');
         final expense = await repo.addExpense(
-      groupId: widget.groupId,
+      groupId: widget.groupId.isEmpty ? null : widget.groupId,
       payerId: payerId,
-      amount: amount, // Original input amount
+      amount: amount,
       description: _descriptionCtrl.text.trim(),
-      currency: _currency, // Original input currency
+      currency: _currency,
       splitType: splitType,
       splits: splitsToStore,
       category: _category,
+      isIncome: _isIncome,
     );
 
 
@@ -383,7 +422,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          'Add expense · ${_step + 1}/$_totalSteps',
+          'Add expense · ${_step + 1}/$_effectiveTotalSteps',
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -424,8 +463,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             _stepIndicator(theme),
             const SizedBox(height: 20),
             if (_step == 0) _buildStepAmount(theme),
-            if (_step == 1) _buildStepSplit(theme),
-            if (_step == 2) _buildStepDetails(theme),
+          if (_step == 1 && widget.groupId.isNotEmpty) _buildStepSplit(theme),
+          if ((_step == 1 && widget.groupId.isEmpty) || _step == 2) _buildStepDetails(theme),
             const SizedBox(height: 24),
             Row(
               children: [
@@ -436,7 +475,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     label: const Text('Back'),
                   ),
                 const Spacer(),
-                if (_step < _totalSteps - 1)
+                if (_step < _effectiveTotalSteps - 1)
                   FilledButton.icon(
                     onPressed: _nextStep,
                     style: FilledButton.styleFrom(
@@ -480,7 +519,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
   Widget _stepIndicator(ThemeData theme) {
     return Row(
-      children: List.generate(_totalSteps, (i) {
+      children: List.generate(_effectiveTotalSteps, (i) {
         final active = i == _step;
         final done = i < _step;
         return Expanded(
@@ -503,6 +542,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       }),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Step helpers
+  // ---------------------------------------------------------------------------
+
+  int get _effectiveTotalSteps => widget.groupId.isEmpty ? 2 : _totalSteps;
 
   // ---------------------------------------------------------------------------
   // Step 1 – Amount & Currency
@@ -622,6 +667,60 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 if (mounted) setState(() {});
                 HapticUtils.success();
               },
+            ),
+          ],
+
+          // ── Income toggle (personal wallet mode only) ──────────────────
+          if (widget.groupId.isEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _isIncome
+                    ? const Color(0xFF22C55E).withValues(alpha: 0.10)
+                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                borderRadius: BorderRadius.circular(12),
+                border: _isIncome
+                    ? Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4))
+                    : null,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                    size: 18,
+                    color: _isIncome ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Mark as Income',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: _isIncome ? const Color(0xFF22C55E) : theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        Text(
+                          _isIncome ? 'This entry adds to your wallet balance' : 'This entry subtracts from your wallet balance',
+                          style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Switch(
+                    value: _isIncome,
+                    onChanged: (v) {
+                      HapticUtils.selection();
+                      setState(() => _isIncome = v);
+                    },
+                    activeThumbColor: const Color(0xFF22C55E),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -798,7 +897,69 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   // Step 3 – Details
   // ---------------------------------------------------------------------------
 
+  Future<void> _showCreateCategoryDialog(ThemeData theme) async {
+    final ctrl = TextEditingController();
+    String catType = _isIncome ? 'income' : 'expense';
+    final result = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('New category'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(
+                  labelText: 'Category name',
+                  hintText: 'e.g. Gym, Salary…',
+                ),
+              ),
+              const SizedBox(height: 12),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'expense', label: Text('Expense', style: TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 'income',  label: Text('Income',  style: TextStyle(fontSize: 12))),
+                ],
+                selected: {catType},
+                onSelectionChanged: (s) => setDlg(() => catType = s.first),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+              onPressed: () {
+                final name = ctrl.text.trim();
+                if (name.isNotEmpty) Navigator.of(ctx).pop({'name': name, 'type': catType});
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) => ctrl.dispose());
+    if (result == null || !mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    final ok = await repo.createUserCategory(name: result['name']!, type: result['type']!);
+    if (!mounted) return;
+    if (ok) {
+      HapticUtils.success();
+      ref.invalidate(userCategoriesProvider);
+      setState(() => _category = result['name']!);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not save category')),
+      );
+    }
+  }
+
   Widget _buildStepDetails(ThemeData theme) {
+    final userCatsAsync = ref.watch(userCategoriesProvider);
     return GlassCard(
       padding: const EdgeInsets.all(20),
       child: Column(
@@ -812,15 +973,45 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Category chips
-          Text(
-            'Category',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontSize: 11,
-            ),
+          // Category section header with "+" button
+          Row(
+            children: [
+              Text(
+                'Category',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+              const Spacer(),
+              InkWell(
+                onTap: () => _showCreateCategoryDialog(theme),
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add, size: 14, color: _teal),
+                      const SizedBox(width: 4),
+                      Text('New', style: const TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w600)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
+          // Standard categories
+          Text(
+            'Standard',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 6),
           Wrap(
             spacing: 8,
             runSpacing: 6,
@@ -841,6 +1032,67 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 },
               );
             }).toList(),
+          ),
+          // User categories
+          userCatsAsync.when(
+            data: (cats) {
+              if (cats.isEmpty) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Text(
+                    'Your Categories',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: cats.map((cat) {
+                      final name = cat['name'] ?? '';
+                      final selected = _category == name;
+                      final isIncomeCat = cat['type'] == 'income';
+                      return FilterChip(
+                        avatar: Icon(
+                          isIncomeCat ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
+                          size: 12,
+                          color: selected
+                              ? (isIncomeCat ? const Color(0xFF22C55E) : _teal)
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        label: Text(name, style: const TextStyle(fontSize: 11)),
+                        selected: selected,
+                        selectedColor: (isIncomeCat
+                                ? const Color(0xFF22C55E)
+                                : _teal)
+                            .withValues(alpha: 0.15),
+                        checkmarkColor: isIncomeCat ? const Color(0xFF22C55E) : _teal,
+                        labelStyle: TextStyle(
+                          color: selected
+                              ? (isIncomeCat ? const Color(0xFF22C55E) : _teal)
+                              : null,
+                          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                        ),
+                        onSelected: (_) {
+                          HapticUtils.selection();
+                          setState(() {
+                            _category = name;
+                            if (isIncomeCat) _isIncome = true;
+                          });
+                        },
+                      );
+                    }).toList(),
+                  ),
+                ],
+              );
+            },
+            loading: () => const SizedBox.shrink(),
+            error: (e, s) => const SizedBox.shrink(),
           ),
           const SizedBox(height: 16),
           if (_memberIds.length > 1) ...

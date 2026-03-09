@@ -13,10 +13,12 @@ import '../../features/dashboard/presentation/screens/invite_member_screen.dart'
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
-import '../../features/friends/presentation/screens/friends_screen.dart';
+import '../../features/activity/presentation/screens/activity_screen.dart';
+import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -25,7 +27,8 @@ final class AppRouter {
   static const String register = '/register';
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
-  static const String friends = '/friends';
+  static const String activity = '/activity';
+  static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
   static const String settings = '/settings';
@@ -33,7 +36,8 @@ final class AppRouter {
   static const String editExpense = '/group/:id/expense/:expenseId';
   static const String groupPicker = '/add-expense/choose-group';
   static const String groupDetail = '/group/:id';
-  static const String inviteMember = '/group/:id/invite';
+  static const String inviteMember    = '/group/:id/invite';
+  static const String inviteFriend    = '/invite-friend';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -128,7 +132,7 @@ final class AppRouter {
           ),
         ),
 
-        // ── Shell: AdaptiveShell wraps Dashboard, Friends, Groups, Settings ──
+        // ── Shell: AdaptiveShell wraps Dashboard, Wallet, Groups, Activity, Settings ──
         ShellRoute(
           builder: (context, state, child) => AdaptiveShell(
             currentPath: state.matchedLocation,
@@ -146,12 +150,22 @@ final class AppRouter {
               ),
             ),
             GoRoute(
-              path: friends,
-              name: 'friends',
+              path: wallet,
+              name: 'wallet',
               pageBuilder: (context, state) => NoTransitionPage(
                 child: Material(
                   color: Theme.of(context).colorScheme.surface,
-                  child: const FriendsScreen(),
+                  child: const WalletScreen(),
+                ),
+              ),
+            ),
+            GoRoute(
+              path: activity,
+              name: 'activity',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const ActivityScreen(),
                 ),
               ),
             ),
@@ -176,6 +190,18 @@ final class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // ── Invite friend (modal push, no shell nav bar) ─────────────────
+        GoRoute(
+          path: inviteFriend,
+          name: 'inviteFriend',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const InviteFriendScreen(),
+            ),
+          ),
         ),
 
         // ── Create group (modal push, no shell nav bar) ───────────────────
@@ -239,16 +265,23 @@ final class AppRouter {
               path: 'expense/:expenseId',
               name: 'editExpense',
               pageBuilder: (context, state) {
-                final groupId = state.pathParameters['id']!;
+                final groupId   = state.pathParameters['id']!;
                 final expenseId = state.pathParameters['expenseId']!;
-                final extra = state.extra as Map<String, dynamic>?;
-                final groupName = extra?['groupName'] as String? ?? 'Group';
+                // extra can be an ExpenseModel (from wallet tap-to-edit)
+                // or a Map<String, dynamic> (from group detail screen).
+                final extra = state.extra;
+                final String groupName;
+                if (extra is Map<String, dynamic>) {
+                  groupName = extra['groupName'] as String? ?? 'Group';
+                } else {
+                  groupName = 'Wallet';
+                }
                 return MaterialPage(
                   child: Material(
                     color: Theme.of(context).colorScheme.surface,
                     child: EditExpenseScreen(
                       expenseId: expenseId,
-                      groupId: groupId,
+                      groupId: groupId == 'wallet' ? '' : groupId,
                       groupName: groupName,
                     ),
                   ),

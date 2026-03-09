@@ -5,14 +5,12 @@
             "name": "SetAll (iOS Device)",
             "request": "launch",
             "type": "dart",
-            "preLaunchTask": "checkout develop",
             "args": ["-d", "00008101-00126DC62610001E"]
         },
         {
             "name": "SetAll (macOS)",
             "request": "launch",
             "type": "dart",
-            "preLaunchTask": "checkout develop",
             "args": ["-d", "macos"]
         },
         {
