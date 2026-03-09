@@ -91,8 +91,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     final repo       = ref.read(setAllRepositoryProvider);
     final expense    = await repo.getExpense(widget.expenseId);
     final splits     = await repo.getSplitsForExpense(widget.expenseId);
-    final members    = await repo.getGroupMembers(widget.groupId);
     final currentUid = await repo.ensureUser();
+    var members      = await repo.getGroupMembers(widget.groupId);
+
+    // Wallet entry — no group, so use the current user as sole member.
+    if (members.isEmpty && currentUid != null) {
+      final profile = await repo.getCurrentUserProfile();
+      if (profile != null) members = [profile];
+    }
 
     if (!mounted) return;
     setState(() {
@@ -211,6 +217,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       splitType:   splitType,
       splits:      splits,
       category:    _category,
+      isIncome:    _expense?.isIncome ?? false,
     );
 
     if (mounted) {
