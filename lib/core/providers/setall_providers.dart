@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -184,6 +185,57 @@ final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
 final walletBalanceProvider = FutureProvider<String>((ref) async {
   final balance = await ref.watch(setAllRepositoryProvider).getWalletBalance();
   return balance.toStringAsFixed(2);
+});
+
+// ---------------------------------------------------------------------------
+// Master balance — combines personal wallet cash + shared group position
+// ---------------------------------------------------------------------------
+
+/// Aggregated financial snapshot for the Dashboard Control Center.
+class MasterBalance {
+  const MasterBalance({
+    required this.netWorth,
+    required this.walletCash,
+    required this.sharedOwed,
+    required this.sharedOwe,
+    required this.currency,
+  });
+
+  /// (walletCash) + (sharedOwed - sharedOwe)
+  final Decimal netWorth;
+
+  /// Personal income − personal spend (wallet).
+  final Decimal walletCash;
+
+  /// Total owed to you across all groups.
+  final Decimal sharedOwed;
+
+  /// Total you owe across all groups.
+  final Decimal sharedOwe;
+
+  final String currency;
+
+  Decimal get sharedNet => sharedOwed - sharedOwe;
+  bool get netWorthPositive => netWorth >= Decimal.zero;
+}
+
+/// Combines [walletBalanceProvider] and [balanceSummaryProvider] into a single
+/// [MasterBalance] snapshot used by the Dashboard Control Center hero card.
+final masterBalanceProvider = FutureProvider<MasterBalance>((ref) async {
+  final walletStr = await ref.watch(walletBalanceProvider.future);
+  final summary   = await ref.watch(balanceSummaryProvider.future);
+
+  final wallet  = Decimal.tryParse(walletStr)       ?? Decimal.zero;
+  final owed    = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
+  final owe     = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
+
+  return MasterBalance(
+    netWorth:    wallet + owed - owe,
+    walletCash:  wallet,
+    sharedOwed:  owed,
+    sharedOwe:   owe,
+    currency:    summary.currency.isEmpty ? 'USD' : summary.currency,
+  );
 });
 
 /// Expenses for a specific group.
