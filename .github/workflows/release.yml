@@ -33,11 +33,24 @@ jobs:
         run: flutter pub get
 
       # ── macOS Build & Package ──────────────────────────────────────────────
-      - name: Build macOS
+      - name: Build macOS (no codesign)
         if: matrix.os == 'macos-latest'
         run: |
           flutter config --enable-macos-desktop
-          flutter build macos --release --no-codesign
+          # Generate Flutter-managed Xcode project files
+          flutter build macos --config-only --release
+          # Build directly with xcodebuild, overriding signing settings
+          xcodebuild \
+            -workspace macos/Runner.xcworkspace \
+            -scheme Runner \
+            -configuration Release \
+            -derivedDataPath build/macos/DerivedData \
+            BUILD_DIR=build/macos/Build/Products \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=- \
+            DEVELOPMENT_TEAM= \
+            -quiet
 
       - name: Ad-hoc sign & package macOS DMG
         if: matrix.os == 'macos-latest'
