@@ -47,17 +47,15 @@ jobs:
           brew install create-dmg
           create-dmg \
             --volname "SetAll Installer" \
-            --no-internet-enable \
             "SetAll-macOS.dmg" \
             "build/macos/Build/Products/Release/setall.app" \
             || true
-          # create-dmg exits 1 if no background/window set but still produces the DMG
           test -f SetAll-macOS.dmg
 
       # ── Windows Build & Package ────────────────────────────────────────────
       - name: Install Inno Setup
         if: matrix.os == 'windows-latest'
-        run: choco install innosetup --yes
+        run: choco install innosetup --yes --no-progress
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
@@ -67,8 +65,11 @@ jobs:
 
       - name: Package Windows installer
         if: matrix.os == 'windows-latest'
-        run: iscc windows/installer.iss
-        shell: cmd
+        shell: pwsh
+        run: |
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc windows/installer.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       # ── Upload artifact ────────────────────────────────────────────────────
       - name: Upload Artifact
@@ -97,6 +98,9 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
+          draft: false
+          prerelease: false
+          overwrite: true
           files: |
             dist/SetAll-macOS.dmg
             dist/SetAll-Windows.exe
