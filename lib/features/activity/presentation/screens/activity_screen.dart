@@ -514,15 +514,18 @@ class _ExpenseTile extends StatelessWidget {
       timestamp:      e.createdAt,
       amount:         amountStr,
       amountPositive: e.isIncome || isSettlement,
-      onTap: e.groupId != null
-          ? () {
-              HapticUtils.lightTap();
-              context.push(
-                '/group/${e.groupId}/expense/${e.id}',
-                extra: {'groupName': event.groupName},
-              );
-            }
-          : null,
+      onTap: () {
+        HapticUtils.lightTap();
+        if (e.groupId != null) {
+          context.push(
+            '/group/${e.groupId}/expense/${e.id}',
+            extra: {'groupName': event.groupName},
+          );
+        } else {
+          // Personal (wallet) entry — use sentinel group segment
+          context.push('/group/wallet/expense/${e.id}');
+        }
+      },
     );
   }
 }

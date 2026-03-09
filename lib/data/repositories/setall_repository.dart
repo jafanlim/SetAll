@@ -2049,10 +2049,14 @@ class SetAllRepository {
     required SplitType splitType,
     required List<SplitInsert> splits,
     String category = 'General',
+    bool isIncome = false,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
     final now = _now();
+
+    // Coerce empty string to null so wallet entries stay group_id IS NULL.
+    final effectiveGroupId = groupId.isEmpty ? null : groupId;
 
     // -- Anchor logic: Always re-compute USD value on update --
     Decimal rateToUsd = Decimal.one;
@@ -2063,13 +2067,14 @@ class SetAllRepository {
 
           final expense = ExpenseModel(
             id: expenseId,
-            groupId: groupId,
+            groupId: effectiveGroupId,
             payerId: payerId,
             amount: amount.toString(),
             description: description,
             currency: currency,
             splitType: splitType,
             category: category,
+            isIncome: isIncome,
             universalUsdAmount: universalUsdAmount.toString(),
             exchangeRateApplied: rateToUsd.toString(),
             createdBy: uid,
