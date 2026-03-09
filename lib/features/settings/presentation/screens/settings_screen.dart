@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -47,6 +48,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _localAvatarPath; // path of newly picked image (before upload)
   bool _avatarUploading = false;
 
+  // ── App version ─────────────────────────────────────────────────────────
+  String _appVersion = '';
+
   // ── Email ────────────────────────────────────────────────────────────────
   String? _currentEmail;
   bool _emailChanging = false;
@@ -69,6 +73,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadBiometricSettings();
+    _loadAppVersion();
     _currentEmail = Supabase.instance.client.auth.currentUser?.email;
     // Seed controllers from a cached profile immediately (no wait for first frame).
     // ref.read is safe in initState for ConsumerStatefulWidget.
@@ -84,6 +89,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _nameCtrl.dispose();
     _nicknameCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadAppVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) setState(() => _appVersion = 'v${info.version}');
   }
 
   Future<void> _loadBiometricSettings() async {
@@ -829,6 +839,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
           ),
+
+                        const SizedBox(height: 24),
+
+                        // ── About ──────────────────────────────────────────
+                        _SectionHeader(label: 'About'),
+                        const SizedBox(height: 8),
+                        GlassCard(
+                          padding: EdgeInsets.zero,
+                          child: ListTile(
+                            leading: const Icon(Icons.info_outline),
+                            title: const Text(
+                              'SetAll',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                            ),
+                            subtitle: Text(
+                              _appVersion.isEmpty ? 'Loading…' : _appVersion,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        ),
 
                         const SizedBox(height: 32),
                       ],
