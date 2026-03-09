@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 
@@ -56,6 +57,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            tooltip: 'Add friend',
+            icon: const Icon(Icons.person_add_outlined),
+            onPressed: () {
+              HapticUtils.lightTap();
+              context.push(AppRouter.inviteFriend);
+            },
+          ),
+          const SizedBox(width: 4),
+        ],
       ),
       body: RefreshIndicator(
         color: _teal,
