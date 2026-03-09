@@ -55,6 +55,37 @@ class GroupDeletedEvent extends ActivityEvent {
   final DateTime deletedAt;
 }
 
+/// An expense was deleted by any user (personal or group).
+/// The snapshot of the expense data is preserved for display and potential restore.
+class ExpenseDeletedEvent extends ActivityEvent {
+  const ExpenseDeletedEvent({
+    required super.timestamp,
+    required this.expenseId,
+    required this.description,
+    required this.amount,
+    required this.currency,
+    required this.groupId,
+    required this.groupName,
+    required this.isIncome,
+    required this.deletedByYou,
+    required this.deletedByName,
+    required this.deletedAt,
+    required this.category,
+  });
+
+  final String  expenseId;
+  final String  description;
+  final String  amount;
+  final String  currency;
+  final String? groupId;
+  final String  groupName;
+  final bool    isIncome;
+  final bool    deletedByYou;
+  final String  deletedByName;
+  final DateTime deletedAt;
+  final String  category;
+}
+
 /// A settlement was recorded in a group.
 class SettlementEvent extends ActivityEvent {
   const SettlementEvent({

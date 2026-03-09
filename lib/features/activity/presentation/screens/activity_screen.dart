@@ -47,7 +47,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         case _ActivityFilter.groups:
           return (ev is ExpenseEvent && ev.expense.groupId != null) ||
               ev is GroupCreatedEvent ||
-              ev is GroupDeletedEvent;
+              ev is GroupDeletedEvent ||
+              (ev is ExpenseDeletedEvent && ev.groupId != null);
         case _ActivityFilter.income:
           return ev is ExpenseEvent && ev.expense.isIncome;
       }
@@ -72,6 +73,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       return Decimal.tryParse(ev.expense.universalUsdAmount ?? ev.expense.amount) ?? Decimal.zero;
     }
     if (ev is SettlementEvent) {
+      return Decimal.tryParse(ev.amount) ?? Decimal.zero;
+    }
+    if (ev is ExpenseDeletedEvent) {
       return Decimal.tryParse(ev.amount) ?? Decimal.zero;
     }
     return Decimal.zero;
@@ -239,10 +243,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           return _SectionHeader(label: item.header!, theme: theme);
         }
         final ev = item.event!;
-        if (ev is ExpenseEvent)      return _ExpenseTile(event: ev);
-        if (ev is GroupCreatedEvent) return _GroupCreatedTile(event: ev);
-        if (ev is GroupDeletedEvent) return _GroupDeletedTile(event: ev);
-        if (ev is SettlementEvent)   return _SettlementTile(event: ev);
+        if (ev is ExpenseEvent)        return _ExpenseTile(event: ev);
+        if (ev is GroupCreatedEvent)   return _GroupCreatedTile(event: ev);
+        if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
+        if (ev is SettlementEvent)     return _SettlementTile(event: ev);
+        if (ev is ExpenseDeletedEvent) return _ExpenseDeletedTile(event: ev);
         return const SizedBox.shrink();
       },
     );
@@ -668,6 +673,132 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
                 ],
               ),
             ),
+            if (canRestore)
+              _restoring
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+                    )
+                  : TextButton(
+                      onPressed: _restore,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _teal,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('RESTORE',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                    ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Expense deleted event tile
+// ---------------------------------------------------------------------------
+class _ExpenseDeletedTile extends ConsumerStatefulWidget {
+  const _ExpenseDeletedTile({required this.event});
+  final ExpenseDeletedEvent event;
+
+  @override
+  ConsumerState<_ExpenseDeletedTile> createState() => _ExpenseDeletedTileState();
+}
+
+class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
+  bool _restoring = false;
+
+  Future<void> _restore() async {
+    setState(() => _restoring = true);
+    final ok = await ref.read(setAllRepositoryProvider).restoreExpense(widget.event.expenseId);
+    if (!mounted) return;
+    setState(() => _restoring = false);
+    if (ok) {
+      ref.invalidate(omniActivityProvider);
+      ref.invalidate(personalExpensesProvider);
+      ref.invalidate(walletBalanceProvider);
+      ref.invalidate(balanceSummaryProvider);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${widget.event.description.isEmpty ? widget.event.category : widget.event.description}" restored'),
+          backgroundColor: _teal.withAlpha(220),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore expense')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ev    = widget.event;
+    final label = ev.description.isEmpty ? ev.category : ev.description;
+    final title = ev.deletedByYou
+        ? 'You deleted "$label"'
+        : '${ev.deletedByName} deleted "$label"';
+    final badge = ev.groupId != null
+        ? (ev.groupName.isEmpty ? 'Group' : ev.groupName)
+        : 'Wallet';
+    final amountStr = '${ev.currency} ${formatAmount(ev.amount)}';
+    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 30;
+    final canRestore = ev.deletedByYou && withinWindow;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withAlpha(28),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(Icons.delete_outline, size: 19, color: Colors.redAccent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withAlpha(22),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(badge,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Colors.redAccent)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(_fmtTime(ev.timestamp),
+                        style: const TextStyle(fontSize: 10, color: _slate)),
+                  ]),
+                ],
+              ),
+            ),
+            Text(
+              amountStr,
+              style: const TextStyle(
+                fontWeight: FontWeight.w700, fontSize: 13, color: Colors.redAccent),
+            ),
+            const SizedBox(width: 8),
             if (canRestore)
               _restoring
                   ? const SizedBox(
