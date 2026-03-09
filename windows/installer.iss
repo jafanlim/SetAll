@@ -1,6 +1,6 @@
 [Setup]
 AppName=SetAll
-AppVersion=1.0.4
+AppVersion=1.1.0
 DefaultDirName={autopf}\SetAll
 OutputDir=..\build\windows\installer
 OutputBaseFilename=SetAll-Windows
