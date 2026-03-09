@@ -82,6 +82,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         onRefresh: () async {
           HapticUtils.lightTap();
           await ref.read(syncServiceProvider).performFullSync();
+          if (!mounted) return;
           ref.invalidate(balanceSummaryProvider);
           ref.invalidate(myGroupsProvider);
           ref.invalidate(recentExpensesProvider);

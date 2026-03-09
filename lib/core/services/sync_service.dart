@@ -274,9 +274,17 @@ class SyncService {
             where: 'id = ?',
             whereArgs: [row['id']],
           );
+        } else if (e is PostgrestException && e.code == '42501') {
+          // RLS policy violation — this row will never be accepted by Supabase.
+          // Mark with sentinel -1 so it is never retried, but kept locally.
+          debugPrint('[SyncService] RLS ERROR on expense ${row['id']}: skipping permanently');
+          await LocalDatabase.db.update(
+            'expenses',
+            {'synced_at': -1},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
         } else {
-          // Any other error (RLS, network, bad data): leave synced_at=null
-          // so this row is retried on the next sync cycle.
           debugPrint('[SyncService] expense push failed, will retry: $e');
         }
       }
@@ -306,6 +314,15 @@ class SyncService {
           await LocalDatabase.db.update(
             'splits',
             {'synced_at': DateTime.now().millisecondsSinceEpoch},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
+        } else if (e is PostgrestException && e.code == '42501') {
+          // RLS policy violation — mark with sentinel -1 to skip permanently.
+          debugPrint('[SyncService] RLS ERROR on split ${row['id']}: skipping permanently');
+          await LocalDatabase.db.update(
+            'splits',
+            {'synced_at': -1},
             where: 'id = ?',
             whereArgs: [row['id']],
           );
