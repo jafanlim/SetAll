@@ -734,7 +734,6 @@ class SetAllRepository {
           // Owner: soft-delete — flip flag, keep data intact for restore.
           await _client.from('groups').update({
             'is_deleted': true,
-            'deleted_at': deletedAt,
           }).eq('id', groupId);
         } else {
           // Non-owner: leave only — remove this user from group_members.
@@ -766,7 +765,6 @@ class SetAllRepository {
         try {
           await _client.from('groups').update({
             'is_deleted': true,
-            'deleted_at': deletedAt,
           }).eq('id', groupId);
         } catch (e) {
           debugPrint('[deleteGroup] Supabase soft-delete failed: $e');
@@ -824,7 +822,6 @@ class SetAllRepository {
       try {
         await _client.from('groups').update({
           'is_deleted': false,
-          'deleted_at': null,
         }).eq('id', groupId).eq('creator_id', uid);
         _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
         _notify();
@@ -854,7 +851,6 @@ class SetAllRepository {
       try {
         await _client.from('groups').update({
           'is_deleted': false,
-          'deleted_at': null,
         }).eq('id', groupId).eq('creator_id', uid);
       } catch (e) {
         debugPrint('[restoreGroup] Supabase restore failed: $e');
