@@ -2061,7 +2061,38 @@ class SetAllRepository {
       }
     }
 
-    // ── 5. Expense-deleted events from persistent snapshot table ─────────────
+    // ── 5. Expense-edited events from audit log ──────────────────────────────
+    if (!_isWeb) {
+      try {
+        final editRows = await LocalDatabase.db.query(
+          'expense_edits',
+          orderBy: 'edited_at DESC',
+          limit: limit,
+        );
+        for (final r in editRows) {
+          final editedByUid = r['edited_by'] as String? ?? '';
+          events.add(ExpenseEditedEvent(
+            timestamp:      r['edited_at'] as String? ?? '',
+            expenseId:      r['expense_id'] as String,
+            oldDescription: r['old_description'] as String? ?? '',
+            newDescription: r['new_description'] as String? ?? '',
+            oldCategory:    r['old_category'] as String? ?? '',
+            newCategory:    r['new_category'] as String? ?? '',
+            oldAmount:      r['old_amount'] as String? ?? '0',
+            newAmount:      r['new_amount'] as String? ?? '0',
+            currency:       r['currency'] as String? ?? 'USD',
+            groupId:        r['group_id'] as String?,
+            groupName:      r['group_name'] as String? ?? '',
+            editedByYou:    editedByUid == uid,
+            editedByName:   r['edited_by_name'] as String? ?? 'Someone',
+          ));
+        }
+      } catch (e) {
+        debugPrint('[_buildOmniActivity] expense_edits query failed: $e');
+      }
+    }
+
+    // ── 6. Expense-deleted events from persistent snapshot table ─────────────
     if (!_isWeb) {
       try {
         final deletedRows = await LocalDatabase.db.query(
@@ -2173,8 +2204,10 @@ class SetAllRepository {
             createdBy: uid,
           );
     
-          // Strip created_at so we never overwrite the original timestamp.
-          final expenseData = expense.toJson()..remove('created_at');
+          // Strip created_at and created_by — Supabase schema doesn't have created_by.
+          final expenseData = expense.toJson()
+            ..remove('created_at')
+            ..remove('created_by');
     
           if (_isWeb && _client != null) {
             try {
@@ -2222,9 +2255,59 @@ class SetAllRepository {
             );
           }).toList();
 
+          // ── Log the edit for the activity feed ────────────────────────────
+          final prevRows = await LocalDatabase.db.query(
+            'expenses', where: 'id = ?', whereArgs: [expenseId]);
+          if (prevRows.isNotEmpty) {
+            final prev = prevRows.first;
+            final prevDesc = (prev['description'] as String?) ?? '';
+            final prevCat  = (prev['category']    as String?) ?? '';
+            final prevAmt  = (prev['universal_usd_amount'] ?? prev['amount'])?.toString() ?? '0';
+            final newDesc  = description;
+            final newCat   = category;
+            final newAmt   = universalUsdAmount.toString();
+            final changed  = prevDesc != newDesc || prevCat != newCat || prevAmt != newAmt;
+            if (changed) {
+              // Resolve editor display name.
+              String editorName = 'You';
+              final pRows = await LocalDatabase.db.query(
+                'profiles', columns: ['name', 'nickname'],
+                where: 'id = ?', whereArgs: [uid]);
+              if (pRows.isNotEmpty) {
+                editorName = (pRows.first['nickname'] as String?)?.trim().isNotEmpty == true
+                    ? pRows.first['nickname'] as String
+                    : (pRows.first['name'] as String? ?? 'You');
+              }
+              // Resolve group name.
+              String gName = '';
+              if (effectiveGroupId != null) {
+                final gRows = await LocalDatabase.db.query(
+                  'groups', columns: ['name'],
+                  where: 'id = ?', whereArgs: [effectiveGroupId]);
+                if (gRows.isNotEmpty) gName = gRows.first['name'] as String? ?? '';
+              }
+              await LocalDatabase.db.insert('expense_edits', {
+                'id':              const Uuid().v4(),
+                'expense_id':      expenseId,
+                'old_description': prevDesc,
+                'new_description': newDesc,
+                'old_category':    prevCat,
+                'new_category':    newCat,
+                'old_amount':      prevAmt,
+                'new_amount':      newAmt,
+                'currency':        currency,
+                'group_id':        effectiveGroupId,
+                'group_name':      gName,
+                'edited_by':       uid,
+                'edited_by_name':  editorName,
+                'edited_at':       now,
+              }, conflictAlgorithm: ConflictAlgorithm.replace);
+            }
+          }
+
           await LocalDatabase.db.update(
             'expenses',
-            {...expenseData, 'synced_at': null}, // created_at already removed from expenseData
+            {...expenseData, 'synced_at': null, 'created_by': uid},
             where: 'id = ?',
             whereArgs: [expenseId],
           );

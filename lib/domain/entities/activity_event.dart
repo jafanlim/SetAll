@@ -86,6 +86,38 @@ class ExpenseDeletedEvent extends ActivityEvent {
   final String  category;
 }
 
+/// An expense was edited (description, category, amount, etc.) by any user.
+class ExpenseEditedEvent extends ActivityEvent {
+  const ExpenseEditedEvent({
+    required super.timestamp,
+    required this.expenseId,
+    required this.oldDescription,
+    required this.newDescription,
+    required this.oldCategory,
+    required this.newCategory,
+    required this.oldAmount,
+    required this.newAmount,
+    required this.currency,
+    required this.groupId,
+    required this.groupName,
+    required this.editedByYou,
+    required this.editedByName,
+  });
+
+  final String  expenseId;
+  final String  oldDescription;
+  final String  newDescription;
+  final String  oldCategory;
+  final String  newCategory;
+  final String  oldAmount;
+  final String  newAmount;
+  final String  currency;
+  final String? groupId;
+  final String  groupName;
+  final bool    editedByYou;
+  final String  editedByName;
+}
+
 /// A settlement was recorded in a group.
 class SettlementEvent extends ActivityEvent {
   const SettlementEvent({

@@ -48,7 +48,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           return (ev is ExpenseEvent && ev.expense.groupId != null) ||
               ev is GroupCreatedEvent ||
               ev is GroupDeletedEvent ||
-              (ev is ExpenseDeletedEvent && ev.groupId != null);
+              (ev is ExpenseDeletedEvent && ev.groupId != null) ||
+              (ev is ExpenseEditedEvent && ev.groupId != null);
         case _ActivityFilter.income:
           return ev is ExpenseEvent && ev.expense.isIncome;
       }
@@ -77,6 +78,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     }
     if (ev is ExpenseDeletedEvent) {
       return Decimal.tryParse(ev.amount) ?? Decimal.zero;
+    }
+    if (ev is ExpenseEditedEvent) {
+      return Decimal.tryParse(ev.newAmount) ?? Decimal.zero;
     }
     return Decimal.zero;
   }
@@ -248,6 +252,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
         if (ev is SettlementEvent)     return _SettlementTile(event: ev);
         if (ev is ExpenseDeletedEvent) return _ExpenseDeletedTile(event: ev);
+        if (ev is ExpenseEditedEvent)  return _ExpenseEditedTile(event: ev);
         return const SizedBox.shrink();
       },
     );
@@ -690,6 +695,97 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
                       child: const Text('RESTORE',
                           style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
                     ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Expense edited event tile
+// ---------------------------------------------------------------------------
+class _ExpenseEditedTile extends StatelessWidget {
+  const _ExpenseEditedTile({required this.event});
+  final ExpenseEditedEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ev    = event;
+    final label = ev.newDescription.isEmpty ? ev.newCategory : ev.newDescription;
+    final title = ev.editedByYou
+        ? 'You edited "$label"'
+        : '${ev.editedByName} edited "$label"';
+    final badge = ev.groupId != null
+        ? (ev.groupName.isEmpty ? 'Group' : ev.groupName)
+        : 'Wallet';
+
+    // Build subtitle showing what changed.
+    final changes = <String>[];
+    if (ev.oldDescription != ev.newDescription) {
+      changes.add('name: "${ev.oldDescription.isEmpty ? ev.oldCategory : ev.oldDescription}" → "${ev.newDescription.isEmpty ? ev.newCategory : ev.newDescription}"');
+    }
+    if (ev.oldCategory != ev.newCategory) {
+      changes.add('category: ${ev.oldCategory} → ${ev.newCategory}');
+    }
+    if (ev.oldAmount != ev.newAmount) {
+      changes.add('amount: ${ev.currency} ${formatAmount(ev.oldAmount)} → ${ev.currency} ${formatAmount(ev.newAmount)}');
+    }
+    const accent = Color(0xFF818CF8); // indigo
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42, height: 42,
+              decoration: BoxDecoration(
+                color: accent.withAlpha(28),
+                borderRadius: BorderRadius.circular(13),
+              ),
+              child: const Icon(Icons.edit_outlined, size: 19, color: accent),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: accent.withAlpha(22),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(badge,
+                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: accent)),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(_fmtTime(ev.timestamp),
+                        style: const TextStyle(fontSize: 10, color: _slate)),
+                  ]),
+                  if (changes.isNotEmpty) ...
+                    changes.map((c) => Padding(
+                      padding: const EdgeInsets.only(top: 3),
+                      child: Text(c,
+                        style: const TextStyle(fontSize: 10, color: _slate),
+                        overflow: TextOverflow.ellipsis),
+                    )),
+                ],
+              ),
+            ),
           ],
         ),
       ),
