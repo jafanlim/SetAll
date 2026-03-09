@@ -40,7 +40,9 @@ class LocalDatabase {
   ///   • groups.deleted_at – timestamp of deletion
   /// Schema v14 adds:
   ///   • deleted_expenses – snapshot table for expense deletion audit log
-  static const int _version = 14;
+  /// Schema v15 adds:
+  ///   • expense_edits – audit log of expense description/category/amount changes
+  static const int _version = 15;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -169,6 +171,26 @@ class LocalDatabase {
     if (oldVersion < 13) {
       await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
       await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expense_edits (
+          id             TEXT PRIMARY KEY,
+          expense_id     TEXT NOT NULL,
+          old_description TEXT,
+          new_description TEXT,
+          old_category   TEXT,
+          new_category   TEXT,
+          old_amount     TEXT,
+          new_amount     TEXT,
+          currency       TEXT,
+          group_id       TEXT,
+          group_name     TEXT,
+          edited_by      TEXT NOT NULL,
+          edited_by_name TEXT,
+          edited_at      TEXT NOT NULL
+        )
+      ''');
     }
     if (oldVersion < 14) {
       await db.execute('''
@@ -370,6 +392,24 @@ class LocalDatabase {
       CREATE TABLE left_groups (
         group_id TEXT PRIMARY KEY,
         left_at  TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE expense_edits (
+        id             TEXT PRIMARY KEY,
+        expense_id     TEXT NOT NULL,
+        old_description TEXT,
+        new_description TEXT,
+        old_category   TEXT,
+        new_category   TEXT,
+        old_amount     TEXT,
+        new_amount     TEXT,
+        currency       TEXT,
+        group_id       TEXT,
+        group_name     TEXT,
+        edited_by      TEXT NOT NULL,
+        edited_by_name TEXT,
+        edited_at      TEXT NOT NULL
       )
     ''');
     await db.execute('''
