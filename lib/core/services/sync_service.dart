@@ -360,6 +360,27 @@ class SyncService {
     // Supabase (i.e. were deleted on another device).
     await _reconcileLocalOrphans(uid, memberIds);
 
+    // Always pull personal (wallet) expenses regardless of group membership.
+    final personalExpenses = await _client
+        .from('expenses')
+        .select()
+        .isFilter('group_id', null)
+        .eq('payer_id', uid);
+
+    for (final e in personalExpenses as List) {
+      final map = e as Map<String, dynamic>;
+      final expense = ExpenseModel.fromJson(map);
+      await LocalDatabase.db.insert(
+        'expenses',
+        {
+          ...expense.toJson(),
+          'updated_at': map['updated_at']?.toString(),
+          'synced_at': DateTime.now().millisecondsSinceEpoch,
+        },
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+
     if (memberIds.isEmpty) return;
 
     final groups = await _client
@@ -431,17 +452,8 @@ class SyncService {
         .select()
         .inFilter('group_id', memberIds.toList());
 
-    // Also pull personal (wallet) expenses owned by this user.
-    final personalExpenses = await _client
-        .from('expenses')
-        .select()
-        .isFilter('group_id', null)
-        .eq('payer_id', uid);
-
-    final expenses = [
-      ...(groupExpenses as List),
-      ...(personalExpenses as List),
-    ];
+    // personalExpenses already fetched and upserted above (before memberIds check).
+    final expenses = [...(groupExpenses as List)];
 
     for (final e in expenses) {
       final map = e as Map<String, dynamic>;
