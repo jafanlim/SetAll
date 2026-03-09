@@ -6,15 +6,18 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/navigation_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
+import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/group_model.dart';
 
-const _teal    = Color(0xFF00D9B0);
-const _tealDim = Color(0x2600D9B0);
-const _orange  = Color(0xFFFF8C42);
+const _teal       = Color(0xFF00D9B0);
+const _tealDim    = Color(0x2600D9B0);
+const _orange     = Color(0xFFFF8C42);
+const _orangeDim = Color(0x26FF8C42);
 const _brandOrange = Color(0xFFF97316);
 
 class GroupsScreen extends ConsumerStatefulWidget {
@@ -27,6 +30,19 @@ class GroupsScreen extends ConsumerStatefulWidget {
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   bool _editMode = false;
   final Set<String> _selected = {};
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(syncServiceProvider).performFullSync().then((_) {
+        if (mounted) {
+          ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(recentExpensesProvider);
+        }
+      });
+    });
+  }
 
   void _toggleEditMode() {
     HapticUtils.selection();
@@ -65,7 +81,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete groups?'),
         content: Text(
-          'Are you sure you want to delete $count item${count == 1 ? '' : 's'}?\n\nThis is irreversible — all expenses inside will be permanently removed.',
+          'Delete $count group${count == 1 ? '' : 's'}? As the owner you can restore them from the Activity screen within 90 days.',
         ),
         actions: [
           TextButton(
@@ -106,8 +122,10 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme       = Theme.of(context);
-    final groupsAsync = ref.watch(myGroupsProvider);
+    final theme         = Theme.of(context);
+    final summaryAsync  = ref.watch(balanceSummaryProvider);
+    final groupsAsync   = ref.watch(myGroupsProvider);
+    final expensesAsync = ref.watch(recentExpensesProvider);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -162,13 +180,13 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           : FloatingActionButton.extended(
               onPressed: () {
                 HapticUtils.primaryTap();
-                context.push(AppRouter.createGroup);
+                context.push(AppRouter.groupPicker);
               },
               backgroundColor: _teal,
               foregroundColor: Colors.black,
-              icon: const Icon(Icons.group_add_outlined),
+              icon: const Icon(Icons.add),
               label: const Text(
-                'New group',
+                'Add expense',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
               ),
             ),
@@ -176,37 +194,140 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
         color: _teal,
         onRefresh: () async {
           HapticUtils.lightTap();
+          await ref.read(syncServiceProvider).performFullSync();
+          if (!mounted) return;
+          ref.invalidate(balanceSummaryProvider);
           ref.invalidate(myGroupsProvider);
+          ref.invalidate(recentExpensesProvider);
         },
-        child: groupsAsync.when(
-          data: (groups) {
-            if (groups.isEmpty) return const _EmptyGroupsView();
-            return ListView.builder(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 96),
-              itemCount: groups.length,
-              itemBuilder: (_, i) {
-                final group = groups[i];
-                if (_editMode) {
-                  return _GroupCardSelectable(
-                    group: group,
-                    selected: _selected.contains(group.id),
-                    onToggle: () => _toggleItem(group.id),
-                  );
-                }
-                return _GroupCard(group: group);
-              },
-            );
-          },
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (e, _) => Center(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Text(
-                'Could not load groups',
-                style: TextStyle(color: theme.colorScheme.error, fontSize: 14),
+        child: CustomScrollView(
+          slivers: [
+            // ── Net Balance Hero ──────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                child: summaryAsync.when(
+                  skipLoadingOnReload: true,
+                  data: (summary) {
+                    final owed = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
+                    final owe  = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
+                    final net  = owed - owe;
+                    final isPos = net >= Decimal.zero;
+                    return _NetBalanceHero(
+                      netDisplay:  (isPos ? net : -net).toStringAsFixed(2),
+                      currency:    summary.currency,
+                      isPositive:  isPos,
+                      youAreOwed:  summary.youAreOwed,
+                      youOwe:      summary.youOwe,
+                    );
+                  },
+                  loading: () => const _NetBalanceHero.loading(),
+                  error: (_, _) => const _NetBalanceHero.error(),
+                ),
               ),
             ),
-          ),
+
+            // ── Groups section header ─────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                child: Text(
+                  'Your groups',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700, fontSize: 13,
+                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+
+            // ── Group list ────────────────────────────────────────────────
+            groupsAsync.when(
+              data: (groups) => groups.isEmpty
+                  ? SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                        child: Center(
+                          child: Text(
+                            'No groups yet. Tap Add expense to create one.',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      ))
+                  : SliverList(
+                      delegate: SliverChildBuilderDelegate(
+                        (ctx, i) {
+                          final group = groups[i];
+                          if (_editMode) {
+                            return _GroupCardSelectable(
+                              group: group,
+                              selected: _selected.contains(group.id),
+                              onToggle: () => _toggleItem(group.id),
+                            );
+                          }
+                          return _GroupCard(group: group);
+                        },
+                        childCount: groups.length,
+                      )),
+              loading: () => const SliverToBoxAdapter(
+                  child: Padding(padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()))),
+              error: (_, _) => SliverToBoxAdapter(
+                  child: Padding(padding: const EdgeInsets.all(24),
+                      child: Center(child: Text('Could not load groups',
+                          style: TextStyle(color: Colors.redAccent))))),
+            ),
+
+            // ── Recent Activity header ────────────────────────────────────
+            if (!_editMode)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
+                  child: Text(
+                    'Recent activity',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700, fontSize: 13,
+                      letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ),
+
+            // ── Recent Activity list ──────────────────────────────────────
+            if (!_editMode)
+              groupsAsync.when(
+                data: (groups) {
+                  final groupNameMap = {for (final g in groups) g.id: g.name};
+                  return expensesAsync.when(
+                    data: (expenses) => expenses.isEmpty
+                        ? SliverToBoxAdapter(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              child: Text(
+                                'No expenses yet. Tap Add expense to get started.',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant),
+                              )))
+                        : SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (ctx, i) => _ActivityTile(
+                                expense:   expenses[i],
+                                groupId:   expenses[i].groupId,
+                                groupName: groupNameMap[expenses[i].groupId] ?? ''),
+                              childCount: expenses.length,
+                            )),
+                    loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                    error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              ),
+
+            const SliverToBoxAdapter(child: SizedBox(height: 96)),
+          ],
         ),
       ),
     );
@@ -214,38 +335,111 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Empty state
+// Net balance hero
 // ---------------------------------------------------------------------------
-class _EmptyGroupsView extends StatelessWidget {
-  const _EmptyGroupsView();
+class _NetBalanceHero extends StatelessWidget {
+  const _NetBalanceHero({
+    required this.netDisplay,
+    required this.currency,
+    required this.isPositive,
+    required this.youAreOwed,
+    required this.youOwe,
+  }) : _loading = false, _error = false;
+
+  const _NetBalanceHero.loading()
+      : netDisplay = '—', currency = '', isPositive = true,
+        youAreOwed = '0', youOwe = '0', _loading = true, _error = false;
+
+  const _NetBalanceHero.error()
+      : netDisplay = '—', currency = '', isPositive = true,
+        youAreOwed = '0', youOwe = '0', _loading = false, _error = true;
+
+  final String netDisplay;
+  final String currency;
+  final bool isPositive;
+  final String youAreOwed;
+  final String youOwe;
+  final bool _loading;
+  final bool _error;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final accent = isPositive ? _teal : _orange;
+    return GlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Container(width: 7, height: 7,
+                decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
+            const SizedBox(width: 6),
+            Text(isPositive ? 'Overall you are owed' : 'Overall you owe',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
+          ]),
+          const SizedBox(height: 6),
+          if (_loading)
+            const SizedBox(height: 28, child: LinearProgressIndicator())
+          else
+            Text('$currency $netDisplay',
+                style: TextStyle(
+                    fontWeight: FontWeight.w800, fontSize: 26, letterSpacing: -0.5,
+                    color: _error ? theme.colorScheme.onSurfaceVariant : accent),
+                maxLines: 1, overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 12),
+          Row(children: [
+            Expanded(child: _BalancePill(label: 'Owed to you', amount: youAreOwed,
+                currency: currency, color: _teal, bgColor: _tealDim)),
+            const SizedBox(width: 8),
+            Expanded(child: _BalancePill(label: 'You owe', amount: youOwe,
+                currency: currency, color: _orange, bgColor: _orangeDim)),
+          ]),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalancePill extends StatelessWidget {
+  const _BalancePill({
+    required this.label,
+    required this.amount,
+    required this.currency,
+    required this.color,
+    required this.bgColor,
+  });
+
+  final String label;
+  final String amount;
+  final String currency;
+  final Color color;
+  final Color bgColor;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.group_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(
-              'No groups yet',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: theme.colorScheme.onSurface,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Create a group to split expenses with multiple people.',
-              style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: color, fontWeight: FontWeight.w600, fontSize: 10),
+            overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 2),
+          Text('$currency $amount',
+            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
+            overflow: TextOverflow.ellipsis),
+        ],
       ),
     );
   }
@@ -423,7 +617,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Delete group?'),
-        content: Text('Delete "${widget.group.name}" and all its expenses?'),
+        content: Text('Delete "${widget.group.name}"? You can restore it from the Activity screen within 90 days.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
@@ -439,13 +633,13 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Are you sure?'),
-        content: const Text('This action is irreversible. All expenses and balances in this group will be permanently deleted.'),
+        content: const Text('The group will be hidden immediately. As the owner, you can restore it from the Activity screen within 90 days.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Yes, delete forever'),
+            child: const Text('Yes, delete'),
           ),
         ],
       ),
@@ -530,8 +724,8 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       child: SwipeActionCard(
         actionsPanelWidth: 140,
         actions: [
-          SwipeAction(icon: Icons.edit_outlined,  label: 'Edit',   color: _teal,             onTap: _rename),
-          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent,  onTap: _delete),
+          SwipeAction(icon: Icons.edit_outlined,  label: 'Edit',   color: _teal,            onTap: _rename),
+          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: _delete),
         ],
         child: GestureDetector(
           onLongPress: () => _showContextMenu(context),
@@ -670,5 +864,204 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
         ),
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Activity tile  (tap → Edit, swipe left → Delete, right-click → menu)
+// ---------------------------------------------------------------------------
+class _ActivityTile extends ConsumerWidget {
+  const _ActivityTile({required this.expense, required this.groupId, required this.groupName});
+  final ExpenseModel expense;
+  final String? groupId;
+  final String groupName;
+
+  static const Map<String, IconData> _categoryIcons = {
+    'Food & drink': Icons.restaurant_outlined,
+    'Transport': Icons.directions_car_outlined,
+    'Entertainment': Icons.movie_outlined,
+    'Bills & utilities': Icons.receipt_long_outlined,
+    'Shopping': Icons.shopping_bag_outlined,
+    'Travel': Icons.flight_outlined,
+    'Other': Icons.category_outlined,
+  };
+
+  Future<void> _delete(BuildContext context, WidgetRef ref) async {
+    HapticUtils.primaryTap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete expense?'),
+        content: Text(
+          'Remove "${expense.description.isEmpty ? expense.category : expense.description}"?',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(balanceSummaryProvider);
+    if (context.mounted) {
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Expense deleted')),
+      );
+    }
+  }
+
+  Future<void> _showLongPressMenu(BuildContext context, WidgetRef ref) async {
+    HapticUtils.primaryTap();
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: Icon(Icons.edit_outlined, color: _teal),
+              title: const Text('Edit expense'),
+              onTap: () => Navigator.of(ctx).pop('edit'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
+              title: const Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+              onTap: () => Navigator.of(ctx).pop('delete'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!context.mounted) return;
+    if (result == 'edit' && groupId != null) {
+      context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''});
+    } else if (result == 'delete') {
+      _delete(context, ref);
+    }
+  }
+
+  Future<void> _showRightClickMenu(BuildContext context, WidgetRef ref, Offset position) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(position.dx, position.dy, position.dx + 1, position.dy + 1),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(children: [
+            Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            const Text('Edit expense'),
+          ]),
+        ),
+        const PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            SizedBox(width: 8),
+            Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+          ]),
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    if (result == 'edit' && groupId != null) {
+      context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''});
+    } else if (result == 'delete') {
+      _delete(context, ref);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final icon  = _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
+    final displayAmount   = formatAmount(expense.originalAmount ?? expense.amount);
+    final displayCurrency = expense.originalCurrency ?? expense.currency;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      child: SwipeActionCard(
+        actionsPanelWidth: 140,
+        actions: [
+          SwipeAction(icon: Icons.edit_outlined,  label: 'Edit',   color: _teal,            onTap: () { if (groupId != null) context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''}); }),
+          SwipeAction(icon: Icons.delete_outline, label: 'Delete', color: Colors.redAccent, onTap: () => _delete(context, ref)),
+        ],
+        child: GestureDetector(
+          onLongPress: () => _showLongPressMenu(context, ref),
+          onSecondaryTapUp: defaultTargetPlatform == TargetPlatform.macOS
+              ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
+              : null,
+          child: GlassCard(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: groupId != null
+                  ? () => context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''})
+                  : null,
+              child: Row(
+                children: [
+                  Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          expense.description.isEmpty ? expense.category : expense.description,
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (groupName.isNotEmpty) ...[const SizedBox(height: 2),
+                          Text(groupName,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+                            overflow: TextOverflow.ellipsis)],
+                      ],
+                    ),
+                  ),
+                  IntrinsicWidth(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('$displayCurrency $displayAmount',
+                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _teal)),
+                        if (expense.createdAt != null)
+                          Text(_shortDate(expense.createdAt!),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _shortDate(String iso) {
+    try {
+      final d = DateTime.parse(iso).toLocal();
+      return '${d.day}/${d.month}';
+    } catch (_) {
+      return '';
+    }
   }
 }
