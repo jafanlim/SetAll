@@ -24,11 +24,14 @@ void main() async {
       defaultTargetPlatform == TargetPlatform.windows ||
       defaultTargetPlatform == TargetPlatform.linux) {
     await windowManager.ensureInitialized();
-    const options = WindowOptions(
-      minimumSize: Size(800, 600),
-      size: Size(1100, 720),
+    final options = WindowOptions(
+      minimumSize: const Size(800, 600),
+      size: const Size(1100, 720),
       center: true,
-      titleBarStyle: TitleBarStyle.normal,
+      titleBarStyle: defaultTargetPlatform == TargetPlatform.windows
+          ? TitleBarStyle.hidden
+          : TitleBarStyle.hidden,
+      windowButtonVisibility: defaultTargetPlatform == TargetPlatform.macOS,
     );
     await windowManager.waitUntilReadyToShow(options);
     await windowManager.show();

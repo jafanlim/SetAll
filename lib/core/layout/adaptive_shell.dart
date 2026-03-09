@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:window_manager/window_manager.dart';
 
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
@@ -176,37 +177,40 @@ class _PremiumSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // macOS traffic-light area spacer
-          SizedBox(height: isMac ? 28 : 20),
-
-          // ── Brand header ─────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.asset(
-                    'assets/icon.png',
-                    width: 32,
-                    height: 32,
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Flexible(
-                  child: Text(
-                    'SetAll',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16,
-                      color: Colors.white,
-                      letterSpacing: -0.4,
+          // ── Title bar area (drag + window controls) ─────────────────
+          DragToMoveArea(
+            child: SizedBox(
+              height: isMac ? 52 : 48,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: Image.asset(
+                        'assets/icon.png',
+                        width: 32,
+                        height: 32,
+                        fit: BoxFit.cover,
+                      ),
                     ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
+                    const SizedBox(width: 12),
+                    const Flexible(
+                      child: Text(
+                        'SetAll',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                          color: Colors.white,
+                          letterSpacing: -0.4,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (!isMac) const _WindowControls(),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
 
@@ -318,6 +322,78 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Windows title-bar controls (min / max / close) ───────────────────────
+
+class _WindowControls extends StatelessWidget {
+  const _WindowControls();
+
+  @override
+  Widget build(BuildContext context) {
+    const iconColor = Color(0xFF94A3B8);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _WinBtn(
+          icon: Icons.remove,
+          color: iconColor,
+          onTap: () => windowManager.minimize(),
+        ),
+        _WinBtn(
+          icon: Icons.crop_square,
+          color: iconColor,
+          onTap: () async {
+            if (await windowManager.isMaximized()) {
+              windowManager.unmaximize();
+            } else {
+              windowManager.maximize();
+            }
+          },
+        ),
+        _WinBtn(
+          icon: Icons.close,
+          color: Colors.redAccent,
+          onTap: () => windowManager.close(),
+        ),
+      ],
+    );
+  }
+}
+
+class _WinBtn extends StatefulWidget {
+  const _WinBtn({required this.icon, required this.color, required this.onTap});
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  State<_WinBtn> createState() => _WinBtnState();
+}
+
+class _WinBtnState extends State<_WinBtn> {
+  bool _hovered = false;
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: _hovered
+                ? widget.color.withValues(alpha: 0.15)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(widget.icon, size: 14, color: widget.color),
         ),
       ),
     );
