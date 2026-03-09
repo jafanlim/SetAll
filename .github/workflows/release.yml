@@ -33,6 +33,17 @@ jobs:
         run: flutter pub get
 
       # ── macOS Build & Package ──────────────────────────────────────────────
+      - name: Disable macOS code signing in Xcode project
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Remove team ID and set ad-hoc signing so Xcode never looks for a certificate
+          sed -i '' \
+            -e 's/DEVELOPMENT_TEAM = [^;]*;/DEVELOPMENT_TEAM = "";/g' \
+            -e 's/CODE_SIGN_IDENTITY = [^;]*;/CODE_SIGN_IDENTITY = "-";/g' \
+            -e 's/CODE_SIGNING_REQUIRED = [^;]*;/CODE_SIGNING_REQUIRED = NO;/g' \
+            -e 's/CODE_SIGNING_ALLOWED = [^;]*;/CODE_SIGNING_ALLOWED = NO;/g' \
+            macos/Runner.xcodeproj/project.pbxproj
+
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         run: |
