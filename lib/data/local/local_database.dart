@@ -35,7 +35,10 @@ class LocalDatabase {
   ///     in v11 failed silently on this device).
   ///   • Ensures left_groups table exists.
   ///   • Re-attempts full expenses rebuild using PRAGMA-based column detection.
-  static const int _version = 12;
+  /// Schema v13 adds:
+  ///   • groups.is_deleted – soft-delete flag (INTEGER 0/1)
+  ///   • groups.deleted_at – timestamp of deletion
+  static const int _version = 13;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -161,6 +164,10 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 13) {
+      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
     if (oldVersion < 12) {
       // Phase 1: Safe ALTER TABLE additions — these cannot fail and guarantee
       // the columns exist regardless of what happened in v10/v11.
@@ -261,6 +268,8 @@ class LocalDatabase {
         creator_id TEXT NOT NULL,
         created_by TEXT, -- Schema v7
         type       TEXT NOT NULL DEFAULT 'normal',
+        is_deleted INTEGER NOT NULL DEFAULT 0, -- Schema v13
+        deleted_at TEXT,                       -- Schema v13
         created_at TEXT,
         updated_at TEXT,
         synced_at  INTEGER
