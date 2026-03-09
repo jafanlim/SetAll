@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'core/theme/setall_theme.dart';
 import 'core/router/app_router.dart';
@@ -214,16 +215,113 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
           designSize: designSize,
           minTextAdapt: !isDesktop,
           splitScreenMode: false,
-          builder: (_, _) {
+          builder: (context, _) {
             ScalingUtility.init(context);
             final theme = Theme.of(context);
+            final isMac = defaultTargetPlatform == TargetPlatform.macOS;
+            final isWin = defaultTargetPlatform == TargetPlatform.windows;
+
+            // ── Full-width title-bar fringe (desktop only) ────────────────
+            // Sits above every screen — shell tabs AND push routes — so
+            // nothing ever collides with window controls / traffic lights.
+            Widget content = inner;
+            if (isMac || isWin) {
+              content = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _AppTitleBar(isMac: isMac),
+                  Expanded(child: inner),
+                ],
+              );
+            }
+
             return Container(
               color: theme.colorScheme.surface,
-              child: inner,
+              child: content,
             );
           },
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Full-width title-bar fringe — rendered at top of every screen on desktop
+// ---------------------------------------------------------------------------
+
+class _AppTitleBar extends StatelessWidget {
+  const _AppTitleBar({required this.isMac});
+  final bool isMac;
+
+  static const _kBg = Color(0xFF0F172A);
+
+  @override
+  Widget build(BuildContext context) {
+    if (isMac) {
+      return DragToMoveArea(
+        child: Container(height: 28, color: _kBg),
+      );
+    }
+    return DragToMoveArea(
+      child: Container(
+        height: 36,
+        color: _kBg,
+        child: const Row(
+          children: [Spacer(), _WinTitleControls()],
+        ),
+      ),
+    );
+  }
+}
+
+class _WinTitleControls extends StatelessWidget {
+  const _WinTitleControls();
+
+  @override
+  Widget build(BuildContext context) {
+    const iconColor = Color(0xFF94A3B8);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _WCtrlBtn(icon: Icons.remove,      color: iconColor,         onTap: () => windowManager.minimize()),
+        _WCtrlBtn(icon: Icons.crop_square, color: iconColor,         onTap: () async {
+          if (await windowManager.isMaximized()) { windowManager.unmaximize(); } else { windowManager.maximize(); }
+        }),
+        _WCtrlBtn(icon: Icons.close,       color: Colors.redAccent,  onTap: () => windowManager.close()),
+      ],
+    );
+  }
+}
+
+class _WCtrlBtn extends StatefulWidget {
+  const _WCtrlBtn({required this.icon, required this.color, required this.onTap});
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+  @override
+  State<_WCtrlBtn> createState() => _WCtrlBtnState();
+}
+
+class _WCtrlBtnState extends State<_WCtrlBtn> {
+  bool _hovered = false;
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          width: 32, height: 32,
+          decoration: BoxDecoration(
+            color: _hovered ? widget.color.withValues(alpha: 0.15) : Colors.transparent,
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Icon(widget.icon, size: 14, color: widget.color),
+        ),
+      ),
     );
   }
 }

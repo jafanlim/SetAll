@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -163,7 +162,6 @@ class _PremiumSidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isMac = defaultTargetPlatform == TargetPlatform.macOS;
     const unselectedFg = Color(0xFF94A3B8);
 
     return Container(
@@ -177,23 +175,6 @@ class _PremiumSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // ── macOS: traffic-light spacer (28 px — room for red/amber/green) ─
-          if (isMac)
-            const SizedBox(height: 28)
-          // ── Windows: dedicated drag+controls row at the very top ──────────
-          else
-            DragToMoveArea(
-              child: SizedBox(
-                height: 36,
-                child: Row(
-                  children: const [
-                    Spacer(),
-                    _WindowControls(),
-                  ],
-                ),
-              ),
-            ),
-
           // ── Brand header (drag zone on macOS) ────────────────────────────
           DragToMoveArea(
             child: Padding(
@@ -335,78 +316,6 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Windows title-bar controls (min / max / close) ───────────────────────
-
-class _WindowControls extends StatelessWidget {
-  const _WindowControls();
-
-  @override
-  Widget build(BuildContext context) {
-    const iconColor = Color(0xFF94A3B8);
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _WinBtn(
-          icon: Icons.remove,
-          color: iconColor,
-          onTap: () => windowManager.minimize(),
-        ),
-        _WinBtn(
-          icon: Icons.crop_square,
-          color: iconColor,
-          onTap: () async {
-            if (await windowManager.isMaximized()) {
-              windowManager.unmaximize();
-            } else {
-              windowManager.maximize();
-            }
-          },
-        ),
-        _WinBtn(
-          icon: Icons.close,
-          color: Colors.redAccent,
-          onTap: () => windowManager.close(),
-        ),
-      ],
-    );
-  }
-}
-
-class _WinBtn extends StatefulWidget {
-  const _WinBtn({required this.icon, required this.color, required this.onTap});
-  final IconData icon;
-  final Color color;
-  final VoidCallback onTap;
-  @override
-  State<_WinBtn> createState() => _WinBtnState();
-}
-
-class _WinBtnState extends State<_WinBtn> {
-  bool _hovered = false;
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: GestureDetector(
-        onTap: widget.onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          width: 32,
-          height: 32,
-          decoration: BoxDecoration(
-            color: _hovered
-                ? widget.color.withValues(alpha: 0.15)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Icon(widget.icon, size: 14, color: widget.color),
         ),
       ),
     );

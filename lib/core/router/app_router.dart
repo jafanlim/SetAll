@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../layout/adaptive_shell.dart';
-import '../widgets/desktop_inset.dart';
 import '../services/biometric_service.dart';
 import '../../features/auth/presentation/screens/biometric_gate_screen.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
@@ -198,11 +197,9 @@ final class AppRouter {
           path: inviteFriend,
           name: 'inviteFriend',
           pageBuilder: (context, state) => MaterialPage(
-            child: DesktopInset(
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                child: const InviteFriendScreen(),
-              ),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const InviteFriendScreen(),
             ),
           ),
         ),
@@ -214,11 +211,9 @@ final class AppRouter {
           pageBuilder: (context, state) {
             final cb = state.extra as void Function(String, String)?;
             return MaterialPage(
-              child: DesktopInset(
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: CreateGroupScreen(onGroupCreated: cb),
-                ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: CreateGroupScreen(onGroupCreated: cb),
               ),
             );
           },
@@ -229,11 +224,9 @@ final class AppRouter {
           path: groupPicker,
           name: 'groupPicker',
           pageBuilder: (context, state) => MaterialPage(
-            child: DesktopInset(
-              child: Material(
-                color: Theme.of(context).colorScheme.surface,
-                child: const GroupPickerScreen(),
-              ),
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const GroupPickerScreen(),
             ),
           ),
         ),
@@ -243,13 +236,11 @@ final class AppRouter {
           pageBuilder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
             return MaterialPage(
-              child: DesktopInset(
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: AddExpenseScreen(
-                    groupId: extra?['groupId'] as String? ?? '',
-                    groupName: extra?['groupName'] as String? ?? 'Group',
-                  ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: AddExpenseScreen(
+                  groupId: extra?['groupId'] as String? ?? '',
+                  groupName: extra?['groupName'] as String? ?? 'Group',
                 ),
               ),
             );
@@ -263,11 +254,9 @@ final class AppRouter {
             final extra = state.extra as Map<String, dynamic>?;
             final name = extra?['groupName'] as String? ?? 'Group';
             return MaterialPage(
-              child: DesktopInset(
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: GroupDetailScreen(groupId: id, groupName: name),
-                ),
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: GroupDetailScreen(groupId: id, groupName: name),
               ),
             );
           },
@@ -288,14 +277,12 @@ final class AppRouter {
                   groupName = 'Wallet';
                 }
                 return MaterialPage(
-                  child: DesktopInset(
-                    child: Material(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: EditExpenseScreen(
-                        expenseId: expenseId,
-                        groupId: groupId == 'wallet' ? '' : groupId,
-                        groupName: groupName,
-                      ),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: EditExpenseScreen(
+                      expenseId: expenseId,
+                      groupId: groupId == 'wallet' ? '' : groupId,
+                      groupName: groupName,
                     ),
                   ),
                 );
@@ -309,13 +296,11 @@ final class AppRouter {
                 final extra = state.extra as Map<String, dynamic>?;
                 final groupName = extra?['groupName'] as String? ?? 'Group';
                 return MaterialPage(
-                  child: DesktopInset(
-                    child: Material(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: InviteMemberScreen(
-                        groupId: groupId,
-                        groupName: groupName,
-                      ),
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: InviteMemberScreen(
+                      groupId: groupId,
+                      groupName: groupName,
                     ),
                   ),
                 );

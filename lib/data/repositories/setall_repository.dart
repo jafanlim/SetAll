@@ -631,10 +631,10 @@ class SetAllRepository {
     final uid = await ensureUser();
     if (uid == null) return null;
 
-    // Reject duplicate names (case-insensitive) within the user's groups.
+    // Reject duplicate names (case-insensitive) within the user's active groups.
     final existing = await LocalDatabase.db.query(
       'groups',
-      where: 'LOWER(name) = LOWER(?)',
+      where: 'LOWER(name) = LOWER(?) AND (is_deleted IS NULL OR is_deleted = 0)',
       whereArgs: [name],
     );
     if (existing.isNotEmpty) {
