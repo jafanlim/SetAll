@@ -50,9 +50,10 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   }
 
   int _indexForPath(String path) {
-    if (path.startsWith('/friends')) return 1;
-    if (path.startsWith('/groups')) return 2;
-    if (path.startsWith('/settings')) return 3;
+    if (path.startsWith('/wallet'))   return 1;
+    if (path.startsWith('/groups'))   return 2;
+    if (path.startsWith('/activity')) return 3;
+    if (path.startsWith('/settings')) return 4;
     return 0;
   }
 
@@ -65,12 +66,15 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
         context.go(AppRouter.dashboard);
       case 1:
         setState(() => _selectedIndex = 1);
-        context.go(AppRouter.friends);
+        context.go(AppRouter.wallet);
       case 2:
         setState(() => _selectedIndex = 2);
         context.go(AppRouter.groups);
       case 3:
         setState(() => _selectedIndex = 3);
+        context.go(AppRouter.activity);
+      case 4:
+        setState(() => _selectedIndex = 4);
         context.go(AppRouter.settings);
     }
   }
@@ -150,9 +154,10 @@ class _PremiumSidebar extends StatelessWidget {
   final void Function(int) onTap;
 
   static const _navItems = [
-    (icon: Icons.dashboard_outlined, selectedIcon: Icons.dashboard, label: 'Dashboard', index: 0),
-    (icon: Icons.group_outlined,     selectedIcon: Icons.group,     label: 'Groups',    index: 2),
-    (icon: Icons.people_outline,     selectedIcon: Icons.people,    label: 'Friends',   index: 1),
+    (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'Dashboard', index: 0),
+    (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'Wallet',    index: 1),
+    (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'Groups',    index: 2),
+    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'Activity',  index: 3),
   ];
 
   @override
@@ -179,14 +184,14 @@ class _PremiumSidebar extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             child: Row(
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: _kTeal,
-                    borderRadius: BorderRadius.circular(10),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/icon.png',
+                    width: 32,
+                    height: 32,
+                    fit: BoxFit.cover,
                   ),
-                  child: const Icon(Icons.account_balance_wallet_outlined, size: 20, color: Colors.white),
                 ),
                 const SizedBox(width: 12),
                 const Flexible(
@@ -226,8 +231,8 @@ class _PremiumSidebar extends StatelessWidget {
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
             label: 'Settings',
-            isSelected: selectedIndex == 3,
-            onTap: () => onTap(3),
+            isSelected: selectedIndex == 4,
+            onTap: () => onTap(4),
             unselectedColor: unselectedFg,
           ),
 
@@ -359,14 +364,19 @@ class _MobileLayout extends StatelessWidget {
           label: Text('Dashboard'),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: Text('Friends'),
+          icon: Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: Icon(Icons.account_balance_wallet),
+          label: Text('Wallet'),
         ),
         NavigationRailDestination(
           icon: Icon(Icons.group_outlined),
           selectedIcon: Icon(Icons.group),
           label: Text('Groups'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.history),
+          selectedIcon: Icon(Icons.history),
+          label: Text('Activity'),
         ),
         NavigationRailDestination(
           icon: Icon(Icons.settings_outlined),
@@ -388,14 +398,24 @@ class _MobileLayout extends StatelessWidget {
           label: 'Dashboard',
         ),
         NavigationDestination(
-          icon: Icon(Icons.people_outline),
-          selectedIcon: Icon(Icons.people),
-          label: 'Friends',
+          icon: Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: Icon(Icons.account_balance_wallet),
+          label: 'Wallet',
         ),
         NavigationDestination(
           icon: Icon(Icons.group_outlined),
           selectedIcon: Icon(Icons.group),
           label: 'Groups',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.history),
+          selectedIcon: Icon(Icons.history),
+          label: 'Activity',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.settings_outlined),
+          selectedIcon: Icon(Icons.settings),
+          label: 'Settings',
         ),
       ],
     );

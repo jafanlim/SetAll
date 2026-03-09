@@ -82,7 +82,7 @@ SplitModel _split({
   String? universalUsdOwed,
 }) =>
     SplitModel(
-      id: '${expenseId}_${userId}',
+      id: '${expenseId}_$userId',
       expenseId: expenseId,
       userId: userId,
       // Engine uses universalUsdOwed; fall back to amountOwed for legacy tests.

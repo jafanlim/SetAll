@@ -1,3 +1,4 @@
+import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -10,6 +11,7 @@ import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
+import '../../domain/entities/activity_event.dart';
 
 // Supported currencies with display names and emoji flags.
 // "Most used" group shown first in pickers.
@@ -165,6 +167,77 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
+final personalExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getPersonalExpenses();
+});
+
+/// Unified activity feed stream: group + personal expenses, sorted newest-first.
+final activityFeedProvider = StreamProvider<List<ExpenseModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchActivityFeed();
+});
+
+/// Omni activity feed: polymorphic [ActivityEvent] stream (expenses, group creation, settlements).
+final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchOmniActivity();
+});
+
+/// Net liquidity: income - personal spend - group share (in USD).
+final walletBalanceProvider = FutureProvider<String>((ref) async {
+  final balance = await ref.watch(setAllRepositoryProvider).getWalletBalance();
+  return balance.toStringAsFixed(2);
+});
+
+// ---------------------------------------------------------------------------
+// Master balance — combines personal wallet cash + shared group position
+// ---------------------------------------------------------------------------
+
+/// Aggregated financial snapshot for the Dashboard Control Center.
+class MasterBalance {
+  const MasterBalance({
+    required this.netWorth,
+    required this.walletCash,
+    required this.sharedOwed,
+    required this.sharedOwe,
+    required this.currency,
+  });
+
+  /// (walletCash) + (sharedOwed - sharedOwe)
+  final Decimal netWorth;
+
+  /// Personal income − personal spend (wallet).
+  final Decimal walletCash;
+
+  /// Total owed to you across all groups.
+  final Decimal sharedOwed;
+
+  /// Total you owe across all groups.
+  final Decimal sharedOwe;
+
+  final String currency;
+
+  Decimal get sharedNet => sharedOwed - sharedOwe;
+  bool get netWorthPositive => netWorth >= Decimal.zero;
+}
+
+/// Combines [walletBalanceProvider] and [balanceSummaryProvider] into a single
+/// [MasterBalance] snapshot used by the Dashboard Control Center hero card.
+final masterBalanceProvider = FutureProvider<MasterBalance>((ref) async {
+  final walletStr = await ref.watch(walletBalanceProvider.future);
+  final summary   = await ref.watch(balanceSummaryProvider.future);
+
+  final wallet  = Decimal.tryParse(walletStr)       ?? Decimal.zero;
+  final owed    = Decimal.tryParse(summary.youAreOwed) ?? Decimal.zero;
+  final owe     = Decimal.tryParse(summary.youOwe)     ?? Decimal.zero;
+
+  return MasterBalance(
+    netWorth:    wallet + owed - owe,
+    walletCash:  wallet,
+    sharedOwed:  owed,
+    sharedOwe:   owe,
+    currency:    summary.currency.isEmpty ? 'USD' : summary.currency,
+  );
+});
+
 /// Expenses for a specific group.
 /// StreamProvider.family — re-emits automatically on any local change.
 final groupExpensesProvider =
@@ -222,6 +295,11 @@ final rateToBaseProvider =
   final svc = ref.watch(currencyServiceProvider);
   final rate = await svc.getRate(params.from, params.base);
   return rate.toStringAsFixed(6);
+});
+
+/// Smart custom categories for the current user.
+final userCategoriesProvider = FutureProvider<List<Map<String, String>>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getUserCategories();
 });
 
 // ---------------------------------------------------------------------------

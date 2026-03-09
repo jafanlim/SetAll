@@ -246,9 +246,17 @@ class SyncService {
       try {
         final expense = ExpenseModel.fromJson(row);
         // Strip local-only / schema-mismatched fields before sending to Supabase.
-        final payload = expense.toJson()
+        final raw = expense.toJson()
           ..remove('created_by')
           ..remove('base_amount_at_entry');
+        // Remap is_income int→bool and coerce empty group_id to null
+        final payload = <String, dynamic>{
+          ...raw,
+          'is_income': expense.isIncome,
+          'group_id': (raw['group_id'] as String?)?.isEmpty == true
+              ? null
+              : raw['group_id'],
+        };
         await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
           'expenses',
@@ -266,9 +274,17 @@ class SyncService {
             where: 'id = ?',
             whereArgs: [row['id']],
           );
+        } else if (e is PostgrestException && e.code == '42501') {
+          // RLS policy violation — this row will never be accepted by Supabase.
+          // Mark with sentinel -1 so it is never retried, but kept locally.
+          debugPrint('[SyncService] RLS ERROR on expense ${row['id']}: skipping permanently');
+          await LocalDatabase.db.update(
+            'expenses',
+            {'synced_at': -1},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
         } else {
-          // Any other error (RLS, network, bad data): leave synced_at=null
-          // so this row is retried on the next sync cycle.
           debugPrint('[SyncService] expense push failed, will retry: $e');
         }
       }
@@ -301,6 +317,15 @@ class SyncService {
             where: 'id = ?',
             whereArgs: [row['id']],
           );
+        } else if (e is PostgrestException && e.code == '42501') {
+          // RLS policy violation — mark with sentinel -1 to skip permanently.
+          debugPrint('[SyncService] RLS ERROR on split ${row['id']}: skipping permanently');
+          await LocalDatabase.db.update(
+            'splits',
+            {'synced_at': -1},
+            where: 'id = ?',
+            whereArgs: [row['id']],
+          );
         } else {
           debugPrint('[SyncService] split push failed, will retry: $e');
         }
@@ -315,19 +340,19 @@ class SyncService {
   Future<void> _pullFromSupabase(String uid) async {
     if (_client == null) return;
 
+    // Load the groups this user has voluntarily left so we never re-pull them.
+    final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
+    final leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+
     final memberRows = await _client
         .from('group_members')
         .select('group_id')
         .eq('user_id', uid);
     final memberIds = (memberRows as List)
         .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
+        .where((id) => !leftGroupIds.contains(id))
         .toSet()
         .toList();
-    final created =
-        await _client.from('groups').select('id').eq('creator_id', uid);
-    for (final r in created as List) {
-      memberIds.add((r as Map<String, dynamic>)['id'] as String);
-    }
 
     // ── Reconciler: remove local orphans ────────────────────────────────────
     // If memberIds is empty the user has no groups — wipe everything local.
@@ -401,11 +426,24 @@ class SyncService {
       }
     } catch (_) {}
 
-    final expenses = await _client
+    final groupExpenses = await _client
         .from('expenses')
         .select()
         .inFilter('group_id', memberIds.toList());
-    for (final e in expenses as List) {
+
+    // Also pull personal (wallet) expenses owned by this user.
+    final personalExpenses = await _client
+        .from('expenses')
+        .select()
+        .isFilter('group_id', null)
+        .eq('payer_id', uid);
+
+    final expenses = [
+      ...(groupExpenses as List),
+      ...(personalExpenses as List),
+    ];
+
+    for (final e in expenses) {
       final map = e as Map<String, dynamic>;
       final expense = ExpenseModel.fromJson(map);
       await LocalDatabase.db.insert(
@@ -419,7 +457,7 @@ class SyncService {
       );
     }
 
-    final expenseIds = (expenses as List)
+    final expenseIds = expenses
         .map((e) => (e as Map<String, dynamic>)['id'] as String)
         .toList();
     if (expenseIds.isNotEmpty) {
@@ -501,8 +539,13 @@ class SyncService {
 
       // Only reconcile expenses that have been synced — unsynced rows
       // (synced_at IS NULL) are pending push and must not be pruned.
+      // Exclude personal (wallet) expenses: group_id IS NULL means they are
+      // never in cloudGroupIds, so they must never be treated as orphans.
       final localExpenses = await LocalDatabase.db.query(
-        'expenses', columns: ['id'], where: 'synced_at IS NOT NULL');
+        'expenses',
+        columns: ['id'],
+        where: 'synced_at IS NOT NULL AND group_id IS NOT NULL',
+      );
       for (final row in localExpenses) {
         final eid = row['id'] as String;
         if (!cloudExpenseIds.contains(eid)) {
