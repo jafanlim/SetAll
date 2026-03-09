@@ -43,10 +43,16 @@ class GroupDeletedEvent extends ActivityEvent {
     required super.timestamp,
     required this.groupId,
     required this.groupName,
+    required this.creatorId,
+    required this.deletedAt,
   });
 
   final String groupId;
   final String groupName;
+  /// The original creator/owner of the group.
+  final String creatorId;
+  /// UTC timestamp of when the group was soft-deleted (used for 90-day window).
+  final DateTime deletedAt;
 }
 
 /// A settlement was recorded in a group.
