@@ -275,15 +275,9 @@ class SyncService {
             whereArgs: [row['id']],
           );
         } else if (e is PostgrestException && e.code == '42501') {
-          // RLS policy violation — this row will never be accepted by Supabase.
-          // Mark with sentinel -1 so it is never retried, but kept locally.
-          debugPrint('[SyncService] RLS ERROR on expense ${row['id']}: skipping permanently');
-          await LocalDatabase.db.update(
-            'expenses',
-            {'synced_at': -1},
-            where: 'id = ?',
-            whereArgs: [row['id']],
-          );
+          // RLS policy violation — likely a transient auth issue (e.g. token
+          // not yet refreshed). Leave synced_at IS NULL so the next tick retries.
+          debugPrint('[SyncService] RLS ERROR on expense ${row['id']}, will retry: ${e.message}');
         } else {
           debugPrint('[SyncService] expense push failed, will retry: $e');
         }
@@ -318,14 +312,8 @@ class SyncService {
             whereArgs: [row['id']],
           );
         } else if (e is PostgrestException && e.code == '42501') {
-          // RLS policy violation — mark with sentinel -1 to skip permanently.
-          debugPrint('[SyncService] RLS ERROR on split ${row['id']}: skipping permanently');
-          await LocalDatabase.db.update(
-            'splits',
-            {'synced_at': -1},
-            where: 'id = ?',
-            whereArgs: [row['id']],
-          );
+          // RLS policy violation — likely transient. Leave synced_at NULL to retry.
+          debugPrint('[SyncService] RLS ERROR on split ${row['id']}, will retry: ${e.message}');
         } else {
           debugPrint('[SyncService] split push failed, will retry: $e');
         }
@@ -389,10 +377,13 @@ class SyncService {
     // exist in Supabase (i.e. deleted on another device). Only touch rows that
     // have been confirmed synced — unsynced rows (synced_at IS NULL) are
     // pending push and must not be deleted.
+    // Only reconcile rows confirmed in Supabase (synced_at > 0).
+    // synced_at IS NULL  → pending push, never delete.
+    // synced_at = -1     → (legacy sentinel) treat as pending, never delete.
     final localPersonalRows = await LocalDatabase.db.query(
       'expenses',
       columns: ['id', 'payer_id', 'synced_at'],
-      where: 'group_id IS NULL AND synced_at IS NOT NULL',
+      where: 'group_id IS NULL AND synced_at > 0',
     );
     debugPrint('[SyncService] reconciler: ${localPersonalRows.length} local synced personal expenses, ${cloudPersonalIds.length} in cloud');
     for (final row in localPersonalRows) {
