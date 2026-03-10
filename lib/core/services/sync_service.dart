@@ -368,10 +368,12 @@ class SyncService {
         .eq('payer_id', uid);
 
     final cloudPersonalIds = <String>{};
+    debugPrint('[SyncService] pull: found ${(personalExpenses as List).length} personal expenses in Supabase for uid=$uid');
     for (final e in personalExpenses as List) {
       final map = e as Map<String, dynamic>;
       final expense = ExpenseModel.fromJson(map);
       cloudPersonalIds.add(expense.id);
+      debugPrint('[SyncService] pull: upsert personal expense ${expense.id} payer=${expense.payerId}');
       await LocalDatabase.db.insert(
         'expenses',
         {
@@ -389,14 +391,15 @@ class SyncService {
     // pending push and must not be deleted.
     final localPersonalRows = await LocalDatabase.db.query(
       'expenses',
-      columns: ['id'],
-      where: 'group_id IS NULL AND payer_id = ? AND synced_at IS NOT NULL',
-      whereArgs: [uid],
+      columns: ['id', 'payer_id', 'synced_at'],
+      where: 'group_id IS NULL AND synced_at IS NOT NULL',
     );
+    debugPrint('[SyncService] reconciler: ${localPersonalRows.length} local synced personal expenses, ${cloudPersonalIds.length} in cloud');
     for (final row in localPersonalRows) {
       final eid = row['id'] as String;
+      final payerId = row['payer_id'] as String?;
       if (!cloudPersonalIds.contains(eid)) {
-        debugPrint('[SyncService] reconciler: pruning orphan personal expense $eid');
+        debugPrint('[SyncService] reconciler: pruning orphan personal expense $eid payer=$payerId (not in cloud set)');
         await LocalDatabase.db.delete('expenses', where: 'id = ?', whereArgs: [eid]);
       }
     }
