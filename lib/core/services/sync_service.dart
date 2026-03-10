@@ -333,8 +333,14 @@ class SyncService {
     if (_client == null) return;
 
     // Load the groups this user has voluntarily left so we never re-pull them.
-    final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
-    final leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+    // Guard: table may not exist on older schema installs.
+    Set<String> leftGroupIds;
+    try {
+      final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
+      leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+    } catch (_) {
+      leftGroupIds = {};
+    }
 
     final memberRows = await _client
         .from('group_members')

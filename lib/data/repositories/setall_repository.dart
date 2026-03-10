@@ -606,8 +606,14 @@ class SetAllRepository {
     }
 
     // Groups this user voluntarily left must never resurface.
-    final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
-    final leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+    // Guard: left_groups table may not exist on older installs before schema v12.
+    late final Set<String> leftGroupIds;
+    try {
+      final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
+      leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+    } catch (_) {
+      leftGroupIds = {};
+    }
 
     final memberRows = await LocalDatabase.db.query(
       'group_members',

@@ -241,36 +241,40 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
             final isMac = defaultTargetPlatform == TargetPlatform.macOS;
             final isWin = defaultTargetPlatform == TargetPlatform.windows;
 
-            // ── Full-width title-bar fringe (desktop only) ────────────────
-            // Sits above every screen — shell tabs AND push routes — so
-            // nothing ever collides with window controls / traffic lights.
-            Widget content = inner;
-            if (isMac || isWin) {
-              content = Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  _AppTitleBar(isMac: isMac),
-                  Expanded(child: inner),
-                ],
-              );
-            }
-
-            // ── Update banner (non-intrusive, desktop + mobile) ─────────
+            // ── Update banner ─────────────────────────────────────────
             final updateResult = ref.watch(updateResultProvider);
             final showBanner   = updateResult != null &&
                 updateResult.hasUpdate &&
                 !_updateBannerDismissed;
 
-            Widget root = content;
-            if (showBanner) {
+            final banner = showBanner
+                ? _UpdateBanner(
+                    result: updateResult,
+                    onDismiss: () => setState(() => _updateBannerDismissed = true),
+                  )
+                : null;
+
+            // ── Full-width title-bar fringe (desktop only) ────────────────
+            // Sits above every screen — shell tabs AND push routes — so
+            // nothing ever collides with window controls / traffic lights.
+            // The update banner is placed BELOW the title bar so it never
+            // overlaps the traffic lights / window controls.
+            Widget root = inner;
+            if (isMac || isWin) {
               root = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _UpdateBanner(
-                    result: updateResult,
-                    onDismiss: () => setState(() => _updateBannerDismissed = true),
-                  ),
-                  Expanded(child: content),
+                  _AppTitleBar(isMac: isMac),
+                  ?banner,
+                  Expanded(child: inner),
+                ],
+              );
+            } else if (banner != null) {
+              root = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  banner,
+                  Expanded(child: inner),
                 ],
               );
             }
@@ -327,7 +331,15 @@ class _UpdateBannerState extends State<_UpdateBanner> {
   }
 
   void _onProgress(UpdateDownloadProgress p) {
-    if (mounted) setState(() => _prog = p);
+    if (!mounted) return;
+    setState(() => _prog = p);
+    // On macOS, auto-open the DMG as soon as it finishes downloading —
+    // no extra click needed. The DMG will mount and Finder will show it.
+    if (p.state == UpdateDownloadState.readyToInstall &&
+        p.localPath != null &&
+        defaultTargetPlatform == TargetPlatform.macOS) {
+      UpdateService.instance.launchInstaller(p.localPath!);
+    }
   }
 
   void _startDownload() =>
@@ -411,7 +423,7 @@ class _UpdateBannerState extends State<_UpdateBanner> {
         );
       case UpdateDownloadState.readyToInstall:
         return const Text(
-          'Ready to install — app will restart',
+          'Opening installer…',
           style: TextStyle(color: _kGreen, fontSize: 12,
               fontWeight: FontWeight.w600),
           overflow: TextOverflow.ellipsis,
