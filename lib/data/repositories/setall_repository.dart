@@ -534,6 +534,20 @@ class SetAllRepository {
     }
   }
 
+  /// Emits personal (wallet) expenses immediately, then re-emits on every
+  /// local write or sync completion — same mechanism as [watchGroupExpenses].
+  Stream<List<ExpenseModel>> watchPersonalExpenses({int limit = 50}) async* {
+    var last = await getPersonalExpenses(limit: limit);
+    yield last;
+    await for (final _ in _changeController.stream) {
+      final next = await getPersonalExpenses(limit: limit);
+      if (_expenseListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
   static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
     if (a.length != b.length) return true;
     for (var i = 0; i < a.length; i++) {
