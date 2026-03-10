@@ -257,11 +257,15 @@ class UpdateService {
         await Process.start('open', [localPath],
             mode: ProcessStartMode.detached);
       } else if (Platform.isWindows) {
-        // Start the installer via cmd /c start so the process is detached.
+        // /VERYSILENT  — no UI, no prompts.
+        // /NORESTART   — installer won't reboot the machine.
+        // /CLOSEAPPLICATIONS — kills the running SetAll process so the
+        //                      installer can overwrite the EXE.
         await Process.start(
-          'cmd', ['/c', 'start', '', localPath],
+          localPath,
+          ['/VERYSILENT', '/NORESTART', '/CLOSEAPPLICATIONS'],
           mode: ProcessStartMode.detached,
-          runInShell: true,
+          runInShell: false,
         );
       }
     } catch (e) {

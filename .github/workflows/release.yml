@@ -48,6 +48,13 @@ jobs:
           brew install create-dmg
           create-dmg \
             --volname "SetAll Installer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "setall.app" 150 185 \
+            --hide-extension "setall.app" \
+            --app-drop-link 450 185 \
+            --background "/System/Library/Desktop Pictures/Solid Colors/Stone.png" \
             "SetAll-macOS.dmg" \
             "build/macos/Build/Products/Release/setall.app" \
             || true
