@@ -12,8 +12,16 @@ import 'core/theme/setall_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/setall_providers.dart';
 import 'core/providers/theme_mode_provider.dart';
+import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
+
+// ---------------------------------------------------------------------------
+// Update state — shared across app.dart and settings_screen.dart
+// ---------------------------------------------------------------------------
+
+final updateResultProvider =
+    StateProvider<UpdateCheckResult?>((ref) => null);
 
 class SetAllApp extends ConsumerStatefulWidget {
   const SetAllApp({super.key});
@@ -25,6 +33,7 @@ class SetAllApp extends ConsumerStatefulWidget {
 class _SetAllAppState extends ConsumerState<SetAllApp> {
   StreamSubscription<AuthState>? _authSub;
   String? _lastUserId;
+  bool _updateBannerDismissed = false;
 
   @override
   void initState() {
@@ -90,6 +99,8 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
           ref.invalidate(recentExpensesProvider);
         }),
       );
+      // Check for updates once per session (first login / initial session).
+      if (isFirstLogin) unawaited(_checkForUpdates());
     }
 
     // On sign-out always invalidate so the login screen starts clean.
@@ -171,6 +182,15 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    final result = await UpdateService.instance.checkForUpdate();
+    if (!mounted) return;
+    if (result.hasUpdate) {
+      ref.read(updateResultProvider.notifier).state = result;
+      setState(() => _updateBannerDismissed = false);
+    }
+  }
+
   void _invalidateAllProviders() {
     // Do NOT invalidate setAllRepositoryProvider — it owns the StreamController
     // that backs watchGroups()/watchGroupExpenses(). Destroying it kills all
@@ -235,13 +255,96 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
               );
             }
 
+            // ── Update banner (non-intrusive, desktop + mobile) ─────────
+            final updateResult = ref.watch(updateResultProvider);
+            final showBanner   = updateResult != null &&
+                updateResult.hasUpdate &&
+                !_updateBannerDismissed;
+
+            Widget root = content;
+            if (showBanner) {
+              root = Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _UpdateBanner(
+                    result: updateResult,
+                    onDismiss: () => setState(() => _updateBannerDismissed = true),
+                  ),
+                  Expanded(child: content),
+                ],
+              );
+            }
+
             return Container(
               color: theme.colorScheme.surface,
-              child: content,
+              child: root,
             );
           },
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Update available banner — shown at the very top of the app when a newer
+// GitHub release is detected. Non-intrusive: dismissible with an ✕ button.
+// ---------------------------------------------------------------------------
+
+class _UpdateBanner extends StatelessWidget {
+  const _UpdateBanner({required this.result, required this.onDismiss});
+
+  final UpdateCheckResult result;
+  final VoidCallback onDismiss;
+
+  static const _kBg      = Color(0xFF1E3A5F);
+  static const _kAccent  = Color(0xFF38BDF8); // sky-400
+  static const _kText    = Color(0xFFE0F2FE);
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: _kBg,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        child: Row(
+          children: [
+            const Icon(Icons.system_update_alt_rounded, size: 16, color: _kAccent),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'Update available: ${result.latestTag}  (current: ${result.currentTag})',
+                style: const TextStyle(
+                  color: _kText,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            TextButton(
+              onPressed: () => UpdateService.instance.openReleasePage(result.releaseUrl),
+              style: TextButton.styleFrom(
+                foregroundColor: _kAccent,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Download',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+            ),
+            GestureDetector(
+              onTap: onDismiss,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 4),
+                child: Icon(Icons.close, size: 16, color: _kText),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
