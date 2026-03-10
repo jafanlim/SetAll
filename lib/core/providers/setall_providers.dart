@@ -181,12 +181,18 @@ final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
   return ref.watch(setAllRepositoryProvider).watchOmniActivity();
 });
 
-/// Personal wallet balance: income − personal spend ONLY (no group splits).
-/// This is what the Wallet screen hero should display.
+/// Personal wallet balance: income − personal spend ONLY (no group splits),
+/// converted to the user's base currency.
+/// Watches [baseCurrencyProvider] so changing default currency triggers a
+/// recompute and the Wallet hero updates immediately.
 final walletBalanceProvider = FutureProvider<String>((ref) async {
+  // Watch base currency — invalidates this provider when the user changes it.
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
   // Watch the groups stream so this refreshes after any sync pull.
   ref.watch(myGroupsProvider);
-  final balance = await ref.watch(setAllRepositoryProvider).getWalletOnlyBalance();
+  final balance = await ref
+      .watch(setAllRepositoryProvider)
+      .getWalletOnlyBalance(baseCurrency: baseCurrency);
   return balance.toStringAsFixed(2);
 });
 
