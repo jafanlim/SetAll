@@ -212,6 +212,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     final walletDec = Decimal.tryParse(walletStr) ?? Decimal.zero;
                     return WalletHero(
                       walletBalance: walletDec,
+                      currency: baseCurrency,
                     );
                   },
                   loading: () => WalletHero.loading(),
@@ -332,17 +333,19 @@ class WalletHero extends StatelessWidget {
   const WalletHero({
     super.key,
     required this.walletBalance,
+    this.currency = 'USD',
   }) : _loading = false, _error = false;
 
   static final _zero = Decimal.zero;
 
   WalletHero.loading({super.key})
-      : walletBalance = _zero, _loading = true, _error = false;
+      : walletBalance = _zero, currency = 'USD', _loading = true, _error = false;
 
   WalletHero.error({super.key})
-      : walletBalance = _zero, _loading = false, _error = true;
+      : walletBalance = _zero, currency = 'USD', _loading = false, _error = true;
 
   final Decimal walletBalance;
+  final String  currency;
   final bool    _loading;
   final bool    _error;
 
@@ -375,7 +378,7 @@ class WalletHero extends StatelessWidget {
             const SizedBox(height: 28, child: LinearProgressIndicator(color: _purple))
           else
             Text(
-              walletBalance.abs().toStringAsFixed(2),
+              '$currency ${walletBalance.abs().toStringAsFixed(2)}',
               style: TextStyle(
                 fontWeight: FontWeight.w800, fontSize: 26, letterSpacing: -0.5,
                 color: _error

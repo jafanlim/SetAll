@@ -522,14 +522,15 @@ class _ExpenseTile extends StatelessWidget {
             ? Icons.arrow_downward_rounded
             : (_categoryIcons[e.category] ?? Icons.attach_money_outlined);
 
-    final desc  = e.description.isEmpty ? e.category : e.description;
+    final desc       = e.description.isEmpty ? e.category : e.description;
+    final byWhom     = event.payerName.isEmpty ? 'You' : event.payerName;
     final title = isSettlement
         ? 'Settlement: $desc'
         : e.isIncome
-            ? 'Income: $desc'
+            ? '$desc · Income by $byWhom'
             : isPersonal
-                ? 'Personal expense: $desc'
-                : desc;
+                ? '$desc · Added by $byWhom'
+                : '$desc · Added by $byWhom';
 
     final badge       = isPersonal ? 'Wallet' : (event.groupName.isEmpty ? 'Group' : event.groupName);
     final displayAmt  = formatAmount(e.originalAmount ?? e.amount);

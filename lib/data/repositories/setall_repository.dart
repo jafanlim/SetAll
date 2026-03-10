@@ -1996,6 +1996,44 @@ class SetAllRepository {
         (g['id'] as String): (g['name'] as String? ?? ''),
     };
 
+    // Build profile name cache: uid → display name (nickname ?? name)
+    // Used to annotate each expense event with the payer's name.
+    final profileNameCache = <String, String>{};
+    Future<String> payerName(String payerId) async {
+      if (payerId == uid) return 'You';
+      if (profileNameCache.containsKey(payerId)) return profileNameCache[payerId]!;
+      String name = 'Someone';
+      try {
+        if (_isWeb && _client != null) {
+          final rows = await _client
+              .from('profiles')
+              .select('name, nickname')
+              .eq('id', payerId)
+              .limit(1) as List;
+          if (rows.isNotEmpty) {
+            final r = rows.first as Map<String, dynamic>;
+            name = (r['nickname'] as String?)?.trim().isNotEmpty == true
+                ? r['nickname'] as String
+                : (r['name'] as String? ?? 'Someone');
+          }
+        } else {
+          final rows = await LocalDatabase.db.query(
+            'profiles',
+            columns: ['name', 'nickname'],
+            where: 'id = ?',
+            whereArgs: [payerId],
+          );
+          if (rows.isNotEmpty) {
+            final r = rows.first;
+            final nick = (r['nickname'] as String?)?.trim() ?? '';
+            name = nick.isNotEmpty ? nick : (r['name'] as String? ?? 'Someone');
+          }
+        }
+      } catch (_) {}
+      profileNameCache[payerId] = name;
+      return name;
+    }
+
     // ── 2. Group-created events ──────────────────────────────────────────────
     for (final g in groupRows) {
       final ts = (g['created_at'] as String?) ?? '';
@@ -2025,6 +2063,7 @@ class SetAllRepository {
             timestamp: e.createdAt ?? '',
             expense: e,
             groupName: groupNameMap[e.groupId] ?? '',
+            payerName: await payerName(e.payerId),
           ));
         }
       }
@@ -2042,6 +2081,7 @@ class SetAllRepository {
           timestamp: e.createdAt ?? '',
           expense: e,
           groupName: '',
+          payerName: await payerName(e.payerId),
         ));
       }
     } else {
@@ -2059,6 +2099,7 @@ class SetAllRepository {
             timestamp: e.createdAt ?? '',
             expense: e,
             groupName: groupNameMap[e.groupId] ?? '',
+            payerName: await payerName(e.payerId),
           ));
         }
       }
@@ -2076,6 +2117,7 @@ class SetAllRepository {
           timestamp: e.createdAt ?? '',
           expense: e,
           groupName: '',
+          payerName: await payerName(e.payerId),
         ));
       }
     }
