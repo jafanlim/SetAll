@@ -1613,7 +1613,11 @@ class SetAllRepository {
                     // Fire-and-forget: return immediately after local save.
                     // SyncService retries on next tick if network is unavailable.
                     Future(() async {
-                      if (!await _isOnline || _client == null) return;
+                      if (!await _isOnline || _client == null) {
+                        debugPrint('[addExpense] offline, skipping bg push for $expenseId');
+                        return;
+                      }
+                      debugPrint('[addExpense] bg push start for $expenseId');
                       try {
                         await Future.wait([
                           _client.from('expenses').insert(supabaseExpenseData),
@@ -1625,16 +1629,24 @@ class SetAllRepository {
                           where: 'id = ?',
                           whereArgs: [expenseId],
                         );
+                        debugPrint('[addExpense] bg push succeeded for $expenseId');
                       } catch (e) {
                         if (e is PostgrestException) {
                           if (e.code == '42501') {
-                            debugPrint('RLS ERROR: Syncing in background — ${e.message}');
+                            debugPrint('[addExpense] RLS ERROR bg push $expenseId: ${e.message}');
+                          } else if (e.code == '23505') {
+                            debugPrint('[addExpense] duplicate, marking synced for $expenseId');
+                            await LocalDatabase.db.update(
+                              'expenses',
+                              {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                              where: 'id = ?',
+                              whereArgs: [expenseId],
+                            );
                           } else {
-                            debugPrint(
-                                'PostgrestException in addExpense (bg sync): ${e.message}, code: ${e.code}');
+                            debugPrint('[addExpense] PostgrestException bg push $expenseId: ${e.message}, code: ${e.code}');
                           }
                         } else {
-                          debugPrint('Error in addExpense (bg sync): $e');
+                          debugPrint('[addExpense] error bg push $expenseId: $e');
                         }
                       }
                     });
