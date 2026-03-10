@@ -167,8 +167,11 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
-final personalExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
-  return ref.watch(setAllRepositoryProvider).getPersonalExpenses();
+/// Personal (wallet) expenses — StreamProvider so the Wallet screen
+/// auto-refreshes whenever a sync pull or local write calls _notify(),
+/// exactly like [groupExpensesProvider] for group expenses.
+final personalExpensesProvider = StreamProvider<List<ExpenseModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchPersonalExpenses();
 });
 
 /// Unified activity feed stream: group + personal expenses, sorted newest-first.
@@ -181,15 +184,14 @@ final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
   return ref.watch(setAllRepositoryProvider).watchOmniActivity();
 });
 
-/// Personal wallet balance: income − personal spend ONLY (no group splits),
-/// converted to the user's base currency.
-/// Watches [baseCurrencyProvider] so changing default currency triggers a
-/// recompute and the Wallet hero updates immediately.
+/// Personal wallet balance, converted to the user's base currency.
+/// Watches [personalExpensesProvider] stream so it recomputes automatically
+/// on every sync pull or local write — no manual invalidation needed.
 final walletBalanceProvider = FutureProvider<String>((ref) async {
   // Watch base currency — invalidates this provider when the user changes it.
   final baseCurrency = await ref.watch(baseCurrencyProvider.future);
-  // Watch the groups stream so this refreshes after any sync pull.
-  ref.watch(myGroupsProvider);
+  // Watch the personal expenses stream — recomputes on every sync/write.
+  ref.watch(personalExpensesProvider);
   final balance = await ref
       .watch(setAllRepositoryProvider)
       .getWalletOnlyBalance(baseCurrency: baseCurrency);
