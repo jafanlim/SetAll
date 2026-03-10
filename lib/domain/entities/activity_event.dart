@@ -15,12 +15,16 @@ class ExpenseEvent extends ActivityEvent {
     required super.timestamp,
     required this.expense,
     required this.groupName,
+    this.payerName = '',
   });
 
   final ExpenseModel expense;
 
   /// Empty string when [expense.groupId] is null (personal wallet entry).
   final String groupName;
+
+  /// Display name of the payer (empty string falls back to "You" in the tile).
+  final String payerName;
 }
 
 /// A group was created by the current user or someone else in the group.

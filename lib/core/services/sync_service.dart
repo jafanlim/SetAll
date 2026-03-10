@@ -214,30 +214,34 @@ class SyncService {
     final pendingGroups =
         await LocalDatabase.db.query('groups', where: 'synced_at IS NULL');
     for (final row in pendingGroups) {
+      final localId   = row['id'] as String;
+      final groupName = row['name'] as String? ?? '';
       try {
-        await _client.from('groups').insert({
-          'id': row['id'],
-          'name': row['name'],
-          'creator_id': row['creator_id'],
-          'type': row['type'] ?? 'normal',
-        });
-        await LocalDatabase.db.update(
-          'groups',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
-        await _client.from('group_members').insert({
-          'group_id': row['id'],
-          'user_id': row['creator_id'],
-        });
-        await LocalDatabase.db.update(
-          'group_members',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'group_id = ?',
-          whereArgs: [row['id']],
-        );
-      } catch (_) {}
+        // Use SECURITY DEFINER RPC to bypass RLS — direct insert on 'groups'
+        // is blocked by policy on all platforms (macOS, Windows, Android, iOS).
+        final remoteId = await _client.rpc(
+          'create_group',
+          params: {'p_name': groupName},
+        ) as String;
+        if (remoteId != localId) {
+          // RPC generated a new UUID — update local rows to match.
+          await LocalDatabase.db.update('groups',
+              {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'id = ?', whereArgs: [localId]);
+          await LocalDatabase.db.update('group_members',
+              {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'group_id = ?', whereArgs: [localId]);
+        } else {
+          await LocalDatabase.db.update('groups',
+              {'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'id = ?', whereArgs: [localId]);
+          await LocalDatabase.db.update('group_members',
+              {'synced_at': DateTime.now().millisecondsSinceEpoch},
+              where: 'group_id = ?', whereArgs: [localId]);
+        }
+      } catch (e) {
+        debugPrint('[SyncService] group push failed for $localId: $e');
+      }
     }
 
     final pendingExpenses =
