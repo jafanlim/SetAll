@@ -919,9 +919,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                         .state = result;
                                     setState(() {
                                       _checkingUpdate = false;
-                                      _updateMessage  =
-                                          '${result.latestTag} available!';
+                                      _updateMessage  = result.hasDirectDownload
+                                          ? 'Downloading ${result.latestTag}…'
+                                          : '${result.latestTag} available — see banner at top';
                                     });
+                                    // Kick off background download immediately.
+                                    if (result.hasDirectDownload) {
+                                      unawaited(
+                                        UpdateService.instance
+                                            .downloadUpdate(result)
+                                            .then((_) {
+                                          if (!mounted) return;
+                                          setState(() => _updateMessage =
+                                              'Ready — tap "Install Now & Quit" in banner');
+                                        }),
+                                      );
+                                    }
                                   } else {
                                     setState(() {
                                       _checkingUpdate = false;
