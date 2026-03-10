@@ -1783,17 +1783,23 @@ class SetAllRepository {
     return income - personalSpend - groupShare;
   }
 
-  /// Wallet-only balance: personal income − personal spend.
-  /// Does NOT subtract the user's share of group expenses.
-  /// Use this for the Wallet screen hero total.
-  Future<Decimal> getWalletOnlyBalance() async {
+  /// Wallet-only balance: personal income − personal spend, expressed in
+  /// [baseCurrency]. Pass the user's default currency so the total is shown
+  /// in the correct denomination. Amounts are stored in USD
+  /// (universalUsdAmount) and converted here via [_currencyService].
+  Future<Decimal> getWalletOnlyBalance({String baseCurrency = 'USD'}) async {
     final uid = await ensureUser();
     if (uid == null) return Decimal.zero;
     final personalRows = await getPersonalExpenses(limit: 1000);
     Decimal income = Decimal.zero;
     Decimal spend  = Decimal.zero;
     for (final e in personalRows) {
-      final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+      final usdAmt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+      Decimal amt = usdAmt;
+      if (baseCurrency != 'USD' && _currencyService != null && usdAmt != Decimal.zero) {
+        final rate = await _currencyService.getRate('USD', baseCurrency);
+        amt = (usdAmt * rate).round(scale: 2);
+      }
       if (e.isIncome) { income += amt; } else { spend += amt; }
     }
     return income - spend;

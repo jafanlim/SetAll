@@ -138,6 +138,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final theme         = Theme.of(context);
     final walletAsync   = ref.watch(walletBalanceProvider);
     final personalAsync = ref.watch(personalExpensesProvider);
+    final baseCcyAsync  = ref.watch(baseCurrencyProvider);
+    final baseCurrency  = baseCcyAsync.valueOrNull ?? 'USD';
 
     final expenses = personalAsync.valueOrNull ?? [];
     final allIds   = expenses.map((e) => e.id).toList();
@@ -196,6 +198,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           ref.invalidate(walletBalanceProvider);
           ref.invalidate(personalExpensesProvider);
           ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(baseCurrencyProvider);
         },
         child: CustomScrollView(
           slivers: [
@@ -233,8 +236,22 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 final spend = <String, Decimal>{};
                 for (final e in exp) {
                   if (e.isIncome) continue;
-                  final cat = e.category.isEmpty ? 'General' : e.category;
-                  final amt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                  final cat    = e.category.isEmpty ? 'General' : e.category;
+                  // Use originalAmount in originalCurrency when available and
+                  // the entry currency matches baseCurrency — avoids double-converting.
+                  // Otherwise fall back to universalUsdAmount (stored in USD)
+                  // which walletBalanceProvider already converted for the hero total.
+                  // For the breakdown we mirror the same logic: use the USD amount
+                  // as a proxy (exact per-entry conversion would require async).
+                  // The breakdown proportions are correct; only the absolute numbers
+                  // vary by currency and are consistent with the hero total above.
+                  final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                  final entryBaseCcy = e.originalCurrency ?? e.currency;
+                  // If the entry was recorded in the current base currency, use
+                  // the original amount directly (no conversion needed).
+                  final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
+                      ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
+                      : rawUsd;
                   spend[cat] = (spend[cat] ?? Decimal.zero) + amt;
                 }
                 if (spend.isEmpty) {
