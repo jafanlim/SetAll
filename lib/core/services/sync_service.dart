@@ -367,9 +367,11 @@ class SyncService {
         .isFilter('group_id', null)
         .eq('payer_id', uid);
 
+    final cloudPersonalIds = <String>{};
     for (final e in personalExpenses as List) {
       final map = e as Map<String, dynamic>;
       final expense = ExpenseModel.fromJson(map);
+      cloudPersonalIds.add(expense.id);
       await LocalDatabase.db.insert(
         'expenses',
         {
@@ -379,6 +381,24 @@ class SyncService {
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
+    }
+
+    // Reconcile personal expenses: prune any local synced rows that no longer
+    // exist in Supabase (i.e. deleted on another device). Only touch rows that
+    // have been confirmed synced — unsynced rows (synced_at IS NULL) are
+    // pending push and must not be deleted.
+    final localPersonalRows = await LocalDatabase.db.query(
+      'expenses',
+      columns: ['id'],
+      where: 'group_id IS NULL AND payer_id = ? AND synced_at IS NOT NULL',
+      whereArgs: [uid],
+    );
+    for (final row in localPersonalRows) {
+      final eid = row['id'] as String;
+      if (!cloudPersonalIds.contains(eid)) {
+        debugPrint('[SyncService] reconciler: pruning orphan personal expense $eid');
+        await LocalDatabase.db.delete('expenses', where: 'id = ?', whereArgs: [eid]);
+      }
     }
 
     if (memberIds.isEmpty) return;
