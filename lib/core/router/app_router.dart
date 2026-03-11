@@ -47,9 +47,10 @@ final class AppRouter {
       redirect: (context, state) async {
         try {
           final user = Supabase.instance.client.auth.currentUser;
-          final isLogin = state.matchedLocation == login;
+          final isLogin    = state.matchedLocation == login;
+          final isRegister = state.matchedLocation == register;
           final isBiometricGate = state.matchedLocation == biometricGate;
-          if (user == null && !isLogin) return login;
+          if (user == null && !isLogin && !isRegister) return login;
           if (user != null && isLogin) {
             final useBio = await bio.getUseBiometric();
             if (useBio) return biometricGate;

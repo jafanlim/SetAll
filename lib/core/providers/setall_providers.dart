@@ -163,7 +163,11 @@ final friendGroupsProvider = FutureProvider<List<GroupModel>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getDirectGroups();
 });
 
+/// Recent expenses across all groups.
+/// Watches [myGroupsProvider] so it auto-refreshes whenever a group is
+/// created, deleted, or updated — no manual invalidation needed.
 final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
+  ref.watch(myGroupsProvider);
   return ref.watch(setAllRepositoryProvider).getRecentExpenses();
 });
 
