@@ -302,9 +302,18 @@ class SetAllRepository {
     }
     // Mobile: try local first; fall back to Supabase when local is empty
     // so freshly-signed-in users see correct balances before sync completes.
+    // Exception: if the user has ever deleted/left a group (left_groups is
+    // non-empty) trust the local result — it's empty because they deleted
+    // their data, not because sync hasn't run yet. Falling back to Supabase
+    // in that case resurfaces stale expenses and shows phantom balances.
     final local = await _getBalanceRawDataLocal(uid);
     if (local.youOwe.isNotEmpty || local.youAreOwed.isNotEmpty) return local;
     if (_client != null && await _isOnline) {
+      try {
+        final leftRows = await LocalDatabase.db.query(
+            'left_groups', columns: ['group_id'], limit: 1);
+        if (leftRows.isNotEmpty) return local; // trust the intentional empty
+      } catch (_) {}
       return _getBalanceRawDataWeb(uid);
     }
     return local;
@@ -314,12 +323,21 @@ class SetAllRepository {
       _getBalanceRawDataWeb(String uid) async {
     // Only include expenses from 'normal' groups — exclude 'direct' (friend)
     // groups so the global counter matches the sum of the dashboard group cards.
+    // Also exclude any group the user has locally left/deleted so that stale
+    // Supabase rows (not yet purged) never contribute to the balance total.
+    Set<String> leftGroupIds = {};
+    try {
+      final leftRows = await LocalDatabase.db.query(
+          'left_groups', columns: ['group_id']);
+      leftGroupIds = leftRows.map((r) => r['group_id'] as String).toSet();
+    } catch (_) {}
     final normalGroupRows = await _client!
         .from('groups')
         .select('id')
         .eq('type', 'normal') as List;
     final normalGroupIds = normalGroupRows
         .map((r) => (r as Map<String, dynamic>)['id'] as String)
+        .where((id) => !leftGroupIds.contains(id))
         .toSet();
 
     final youOwe = <BalanceEntry>[];
@@ -867,13 +885,32 @@ class SetAllRepository {
     final isOwner   = creatorId == uid;
 
     // Both owner and non-owner: remove self from group_members in Supabase so
-    // sync never re-pulls this group. Owner also soft-deletes locally.
+    // sync never re-pulls this group. Owner also purges expenses+splits from
+    // Supabase so the web balance fallback never returns stale data.
     if (await _isOnline && _client != null) {
       try {
         await _client.from('group_members').delete()
             .eq('group_id', groupId).eq('user_id', uid);
       } catch (e) {
         debugPrint('[deleteGroup] Supabase member-exit failed: $e');
+      }
+      if (isOwner) {
+        try {
+          // Delete all splits for expenses in this group, then the expenses.
+          final expRows = await _client
+              .from('expenses')
+              .select('id')
+              .eq('group_id', groupId) as List;
+          final expIds = expRows
+              .map((r) => (r as Map<String, dynamic>)['id'] as String)
+              .toList();
+          if (expIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', expIds);
+            await _client.from('expenses').delete().eq('group_id', groupId);
+          }
+        } catch (e) {
+          debugPrint('[deleteGroup] Supabase expense purge failed: $e');
+        }
       }
     }
     // Always write to left_groups so _pullFromSupabase filter catches it even
