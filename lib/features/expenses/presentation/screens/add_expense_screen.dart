@@ -11,43 +11,12 @@ import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
-// ---------------------------------------------------------------------------
-// Currency catalogue — "Most Used" first, then alphabetical remainder
-// ---------------------------------------------------------------------------
-const List<Map<String, String>> kCurrencyList = [
-  // ── Most used (shown first in picker) ──
-  {'code': 'USD', 'name': 'US Dollar',           'flag': '🇺🇸'},
-  {'code': 'EUR', 'name': 'Euro',                'flag': '🇪🇺'},
-  {'code': 'GBP', 'name': 'British Pound',       'flag': '🇬🇧'},
-  {'code': 'GEL', 'name': 'Georgian Lari',       'flag': '🇬🇪'},
-  {'code': 'AED', 'name': 'UAE Dirham',          'flag': '🇦🇪'},
-  {'code': 'TRY', 'name': 'Turkish Lira',        'flag': '🇹🇷'},
-  {'code': 'PLN', 'name': 'Polish Złoty',        'flag': '🇵🇱'},
-  // ── Extended list ──
-  {'code': 'AUD', 'name': 'Australian Dollar',   'flag': '🇦🇺'},
-  {'code': 'BRL', 'name': 'Brazilian Real',      'flag': '🇧🇷'},
-  {'code': 'CAD', 'name': 'Canadian Dollar',     'flag': '🇨🇦'},
-  {'code': 'CHF', 'name': 'Swiss Franc',         'flag': '🇨🇭'},
-  {'code': 'CNY', 'name': 'Chinese Yuan',        'flag': '🇨🇳'},
-  {'code': 'CZK', 'name': 'Czech Koruna',        'flag': '🇨🇿'},
-  {'code': 'DKK', 'name': 'Danish Krone',        'flag': '🇩🇰'},
-  {'code': 'HKD', 'name': 'Hong Kong Dollar',    'flag': '🇭🇰'},
-  {'code': 'HUF', 'name': 'Hungarian Forint',    'flag': '🇭🇺'},
-  {'code': 'ILS', 'name': 'Israeli Shekel',      'flag': '🇮🇱'},
-  {'code': 'INR', 'name': 'Indian Rupee',        'flag': '🇮🇳'},
-  {'code': 'JPY', 'name': 'Japanese Yen',        'flag': '🇯🇵'},
-  {'code': 'KRW', 'name': 'South Korean Won',    'flag': '🇰🇷'},
-  {'code': 'MXN', 'name': 'Mexican Peso',        'flag': '🇲🇽'},
-  {'code': 'MYR', 'name': 'Malaysian Ringgit',   'flag': '🇲🇾'},
-  {'code': 'NOK', 'name': 'Norwegian Krone',     'flag': '🇳🇴'},
-  {'code': 'NZD', 'name': 'New Zealand Dollar',  'flag': '🇳🇿'},
-  {'code': 'PHP', 'name': 'Philippine Peso',     'flag': '🇵🇭'},
-  {'code': 'SEK', 'name': 'Swedish Krona',       'flag': '🇸🇪'},
-  {'code': 'SGD', 'name': 'Singapore Dollar',    'flag': '🇸🇬'},
-  {'code': 'THB', 'name': 'Thai Baht',           'flag': '🇹🇭'},
-  {'code': 'TWD', 'name': 'Taiwan Dollar',       'flag': '🇹🇼'},
-  {'code': 'ZAR', 'name': 'South African Rand',  'flag': '🇿🇦'},
-];
+// Currency catalogue re-exported via setall_providers.dart → currencies.dart.
+// kAllSupportedCurrencies / kMostUsedCurrencies / kMostUsedCurrencyCodes are
+// all available through the setall_providers import above.
+//
+// Alias kept for backward compat within this file:
+const kCurrencyList = kAllSupportedCurrencies;
 
 List<String> get kCurrencyCodes =>
     kCurrencyList.map((c) => c['code']!).toList();
@@ -1238,19 +1207,37 @@ class CurrencySearchSheet extends StatefulWidget {
 class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
   String _query = '';
 
-  List<Map<String, String>> get _filtered {
-    if (_query.isEmpty) return kCurrencyList;
-    final q = _query.toUpperCase();
-    return kCurrencyList
-        .where((c) =>
-            c['code']!.contains(q) ||
-            c['name']!.toUpperCase().contains(_query.toUpperCase()))
+  static const _kHeader = '__HEADER__';
+
+  // Returns a mixed list: header sentinel maps + currency maps.
+  // When searching, returns a flat filtered list with no headers.
+  List<Map<String, String>> get _items {
+    if (_query.isNotEmpty) {
+      final q = _query.toUpperCase();
+      return kCurrencyList
+          .where((c) =>
+              c['code']!.contains(q) ||
+              c['name']!.toUpperCase().contains(q))
+          .toList();
+    }
+    final mostUsed = kCurrencyList
+        .where((c) => kMostUsedCurrencyCodes.contains(c['code']))
         .toList();
+    final others = kCurrencyList
+        .where((c) => !kMostUsedCurrencyCodes.contains(c['code']))
+        .toList();
+    return [
+      {'code': _kHeader, 'name': 'Most Used',      'flag': ''},
+      ...mostUsed,
+      {'code': _kHeader, 'name': 'All Currencies', 'flag': ''},
+      ...others,
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final items = _items;
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       maxChildSize: 0.95,
@@ -1292,9 +1279,22 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
             Expanded(
               child: ListView.builder(
                 controller: ctrl,
-                itemCount: _filtered.length,
+                itemCount: items.length,
                 itemBuilder: (_, i) {
-                  final c = _filtered[i];
+                  final c = items[i];
+                  if (c['code'] == _kHeader) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: Text(
+                        c['name']!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    );
+                  }
                   final isSelected = c['code'] == widget.selected;
                   return ListTile(
                     dense: true,

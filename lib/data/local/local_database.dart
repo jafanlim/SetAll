@@ -9,6 +9,7 @@ class LocalDatabase {
   static LocalDatabase? _instance;
   static Database? _db;
   static bool _webMode = false;
+  static Future<LocalDatabase>? _initFuture;
 
   static const String _dbName = 'setall_local.db';
 
@@ -42,7 +43,20 @@ class LocalDatabase {
   ///   • deleted_expenses – snapshot table for expense deletion audit log
   /// Schema v15 adds:
   ///   • expense_edits – audit log of expense description/category/amount changes
-  static const int _version = 15;
+  /// Schema v16 fixes:
+  ///   • Re-applies groups.is_deleted and groups.deleted_at safely via
+  ///     _addColumnIfNotExists, guaranteeing the columns exist on any device
+  ///     that skipped the original v13 migration due to the ordering bug.
+  /// Schema v17 adds:
+  ///   • deleted_groups_log – persists group-deletion audit events across
+  ///     restarts (replaces the in-memory _pendingDeletedGroups list).
+  /// Schema v18 adds:
+  ///   • deleted_expenses.deleted_with_group_id – non-null when an expense was
+  ///     cascade-deleted as part of a group soft-delete. Used to restore those
+  ///     expenses when the group itself is restored.
+  ///   • deleted_splits – snapshot of splits removed during a group soft-delete
+  ///     so they can be re-inserted when the group is restored.
+  static const int _version = 18;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -53,16 +67,22 @@ class LocalDatabase {
     _instance ??= LocalDatabase._();
   }
 
-  static Future<LocalDatabase> get instance async {
+  static Future<LocalDatabase> get instance {
     _instance ??= LocalDatabase._();
+    if (_webMode) return Future.value(_instance!);
+    _initFuture ??= _instance!._init();
+    return _initFuture!;
+  }
+
+  Future<LocalDatabase> _init() async {
     if (_db == null && !_webMode) {
       try {
-        _db = await _instance!._open();
+        _db = await _open();
       } catch (_) {
         _webMode = true;
       }
     }
-    return _instance!;
+    return this;
   }
 
   static Database get db {
@@ -168,47 +188,6 @@ class LocalDatabase {
         )
       ''');
     }
-    if (oldVersion < 13) {
-      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
-      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
-    }
-    if (oldVersion < 15) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS expense_edits (
-          id             TEXT PRIMARY KEY,
-          expense_id     TEXT NOT NULL,
-          old_description TEXT,
-          new_description TEXT,
-          old_category   TEXT,
-          new_category   TEXT,
-          old_amount     TEXT,
-          new_amount     TEXT,
-          currency       TEXT,
-          group_id       TEXT,
-          group_name     TEXT,
-          edited_by      TEXT NOT NULL,
-          edited_by_name TEXT,
-          edited_at      TEXT NOT NULL
-        )
-      ''');
-    }
-    if (oldVersion < 14) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS deleted_expenses (
-          expense_id   TEXT PRIMARY KEY,
-          description  TEXT,
-          amount       TEXT NOT NULL,
-          currency     TEXT,
-          group_id     TEXT,
-          group_name   TEXT,
-          is_income    INTEGER NOT NULL DEFAULT 0,
-          category     TEXT,
-          deleted_by   TEXT NOT NULL,
-          deleted_by_name TEXT,
-          deleted_at   TEXT NOT NULL
-        )
-      ''');
-    }
     if (oldVersion < 12) {
       // Phase 1: Safe ALTER TABLE additions — these cannot fail and guarantee
       // the columns exist regardless of what happened in v10/v11.
@@ -282,6 +261,78 @@ class LocalDatabase {
       await db.execute(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
       );
+    }
+    if (oldVersion < 13) {
+      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 14) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_expenses (
+          expense_id   TEXT PRIMARY KEY,
+          description  TEXT,
+          amount       TEXT NOT NULL,
+          currency     TEXT,
+          group_id     TEXT,
+          group_name   TEXT,
+          is_income    INTEGER NOT NULL DEFAULT 0,
+          category     TEXT,
+          deleted_by   TEXT NOT NULL,
+          deleted_by_name TEXT,
+          deleted_at   TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expense_edits (
+          id             TEXT PRIMARY KEY,
+          expense_id     TEXT NOT NULL,
+          old_description TEXT,
+          new_description TEXT,
+          old_category   TEXT,
+          new_category   TEXT,
+          old_amount     TEXT,
+          new_amount     TEXT,
+          currency       TEXT,
+          group_id       TEXT,
+          group_name     TEXT,
+          edited_by      TEXT NOT NULL,
+          edited_by_name TEXT,
+          edited_at      TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 16) {
+      // Re-apply groups.is_deleted + deleted_at defensively — devices that had
+      // the migration ordering bug (v13 ran after v15) never got these columns.
+      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 17) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_groups_log (
+          group_id       TEXT PRIMARY KEY,
+          group_name     TEXT NOT NULL,
+          creator_id     TEXT NOT NULL,
+          deleted_by_uid TEXT NOT NULL,
+          deleted_at     TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 18) {
+      await _addColumnIfNotExists(
+        db, 'deleted_expenses', 'deleted_with_group_id', 'TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_splits (
+          id                   TEXT PRIMARY KEY,
+          expense_id           TEXT NOT NULL,
+          user_id              TEXT NOT NULL,
+          amount_owed          TEXT,
+          universal_usd_owed   TEXT,
+          deleted_with_group_id TEXT NOT NULL
+        )
+      ''');
     }
   }
 
@@ -414,17 +465,28 @@ class LocalDatabase {
     ''');
     await db.execute('''
       CREATE TABLE deleted_expenses (
-        expense_id   TEXT PRIMARY KEY,
-        description  TEXT,
-        amount       TEXT NOT NULL,
-        currency     TEXT,
-        group_id     TEXT,
-        group_name   TEXT,
-        is_income    INTEGER NOT NULL DEFAULT 0,
-        category     TEXT,
-        deleted_by   TEXT NOT NULL,
-        deleted_by_name TEXT,
-        deleted_at   TEXT NOT NULL
+        expense_id            TEXT PRIMARY KEY,
+        description           TEXT,
+        amount                TEXT NOT NULL,
+        currency              TEXT,
+        group_id              TEXT,
+        group_name            TEXT,
+        is_income             INTEGER NOT NULL DEFAULT 0,
+        category              TEXT,
+        deleted_by            TEXT NOT NULL,
+        deleted_by_name       TEXT,
+        deleted_at            TEXT NOT NULL,
+        deleted_with_group_id TEXT        -- Schema v18: set when cascade-deleted with a group
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE deleted_splits (
+        id                    TEXT PRIMARY KEY,
+        expense_id            TEXT NOT NULL,
+        user_id               TEXT NOT NULL,
+        amount_owed           TEXT,
+        universal_usd_owed    TEXT,
+        deleted_with_group_id TEXT NOT NULL  -- Schema v18
       )
     ''');
   }

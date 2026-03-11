@@ -169,6 +169,19 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ),
               ]
             : [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'Refresh',
+                  onPressed: () async {
+                    HapticUtils.lightTap();
+                    await ref.read(syncServiceProvider).performFullSync();
+                    if (!mounted) return;
+                    ref.invalidate(myGroupsProvider);
+                    ref.invalidate(balanceSummaryProvider);
+                    ref.invalidate(recentExpensesProvider);
+                    ref.invalidate(omniActivityProvider);
+                  },
+                ),
                 TextButton(
                   onPressed: _toggleEditMode,
                   child: const Text('Edit'),
@@ -177,18 +190,40 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       ),
       floatingActionButton: _editMode
           ? null
-          : FloatingActionButton.extended(
-              onPressed: () {
-                HapticUtils.primaryTap();
-                context.push(AppRouter.groupPicker);
-              },
-              backgroundColor: _teal,
-              foregroundColor: Colors.black,
-              icon: const Icon(Icons.add),
-              label: const Text(
-                'Add expense',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-              ),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'fab_new_group',
+                  onPressed: () async {
+                    HapticUtils.primaryTap();
+                    await context.push(AppRouter.createGroup);
+                    if (!mounted) return;
+                    ref.invalidate(myGroupsProvider);
+                  },
+                  backgroundColor: _teal.withValues(alpha: 0.15),
+                  foregroundColor: _teal,
+                  elevation: 2,
+                  tooltip: 'New group',
+                  child: const Icon(Icons.group_add_outlined),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'fab_add_expense',
+                  onPressed: () {
+                    HapticUtils.primaryTap();
+                    context.push(AppRouter.groupPicker);
+                  },
+                  backgroundColor: _teal,
+                  foregroundColor: Colors.black,
+                  icon: const Icon(Icons.add),
+                  label: const Text(
+                    'Add expense',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
       body: RefreshIndicator(
         color: _teal,
@@ -227,7 +262,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               ),
             ),
 
-            // ── Groups section header ─────────────────────────────────────
+            // ── Groups section header ──────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
@@ -249,7 +284,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                         child: Center(
                           child: Text(
-                            'No groups yet. Tap Add expense to create one.',
+                            'No groups yet. Tap New group to create one.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
