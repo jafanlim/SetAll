@@ -9,6 +9,7 @@ class LocalDatabase {
   static LocalDatabase? _instance;
   static Database? _db;
   static bool _webMode = false;
+  static Future<LocalDatabase>? _initFuture;
 
   static const String _dbName = 'setall_local.db';
 
@@ -60,16 +61,22 @@ class LocalDatabase {
     _instance ??= LocalDatabase._();
   }
 
-  static Future<LocalDatabase> get instance async {
+  static Future<LocalDatabase> get instance {
     _instance ??= LocalDatabase._();
+    if (_webMode) return Future.value(_instance!);
+    _initFuture ??= _instance!._init();
+    return _initFuture!;
+  }
+
+  Future<LocalDatabase> _init() async {
     if (_db == null && !_webMode) {
       try {
-        _db = await _instance!._open();
+        _db = await _open();
       } catch (_) {
         _webMode = true;
       }
     }
-    return _instance!;
+    return this;
   }
 
   static Database get db {

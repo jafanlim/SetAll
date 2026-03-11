@@ -98,6 +98,14 @@ class SetAllRepository {
 
   bool get _isWeb => LocalDatabase.isWeb;
 
+  /// Safe async accessor — waits for DB init to complete before returning.
+  /// Use this instead of [LocalDatabase.db] for any call that might happen
+  /// before the DB singleton is fully opened (e.g. first user action).
+  Future<Database> get _db async {
+    await LocalDatabase.instance;
+    return LocalDatabase.db;
+  }
+
   String? get currentUserId {
     if (_client != null) {
       return _client.auth.currentUser?.id;
@@ -631,6 +639,9 @@ class SetAllRepository {
 
     // Groups this user voluntarily left must never resurface.
     // Guard: left_groups table may not exist on older installs before schema v12.
+    // Ensure SQLite is initialised before any access (guards against race on first launch).
+    await _db;
+
     late final Set<String> leftGroupIds;
     try {
       final leftRows = await LocalDatabase.db.query('left_groups', columns: ['group_id']);
@@ -715,19 +726,19 @@ class SetAllRepository {
     final uid = await ensureUser();
     if (uid == null) return null;
 
-    // Reject duplicate names (case-insensitive) within the user's active groups.
-    final existing = await LocalDatabase.db.query(
-      'groups',
-      where: 'LOWER(name) = LOWER(?) AND (is_deleted IS NULL OR is_deleted = 0)',
-      whereArgs: [name],
-    );
-    if (existing.isNotEmpty) {
-      throw Exception('You already have a group named "$name".');
-    }
-
     final id = const Uuid().v4();
 
     if (_isWeb && _client != null) {
+      // Reject duplicate names on web via Supabase.
+      final dupeCheck = await _client
+          .from('groups')
+          .select('id')
+          .eq('creator_id', uid)
+          .ilike('name', name)
+          .eq('is_deleted', false) as List;
+      if (dupeCheck.isNotEmpty) {
+        throw Exception('You already have a group named "$name".');
+      }
       await _client.from('groups').insert(
           {'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'});
       await _client
@@ -736,8 +747,21 @@ class SetAllRepository {
       return GroupModel(id: id, name: name, creatorId: uid);
     }
 
+    // Non-web: ensure DB is ready before any SQLite access.
+    final db = await _db;
+
+    // Reject duplicate names (case-insensitive) within the user's active groups.
+    final existing = await db.query(
+      'groups',
+      where: 'LOWER(name) = LOWER(?) AND (is_deleted IS NULL OR is_deleted = 0)',
+      whereArgs: [name],
+    );
+    if (existing.isNotEmpty) {
+      throw Exception('You already have a group named "$name".');
+    }
+
     final now = _now();
-    await LocalDatabase.db.insert('groups', {
+    await db.insert('groups', {
       'id': id,
       'name': name,
       'creator_id': uid,
@@ -746,7 +770,7 @@ class SetAllRepository {
       'updated_at': now,
       'synced_at': null,
     });
-    await LocalDatabase.db.insert('group_members', {
+    await db.insert('group_members', {
       'group_id': id,
       'user_id': uid,
       'joined_at': now,
@@ -759,12 +783,12 @@ class SetAllRepository {
       try {
         final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
         if (remoteId != id) {
-          await LocalDatabase.db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
-          await LocalDatabase.db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+          await db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+          await db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
           return GroupModel(id: remoteId, name: name, creatorId: uid);
         }
-        await LocalDatabase.db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
-        await LocalDatabase.db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+        await db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
+        await db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
       } catch (e) {
         debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
       }
