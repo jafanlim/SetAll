@@ -168,47 +168,6 @@ class LocalDatabase {
         )
       ''');
     }
-    if (oldVersion < 13) {
-      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
-      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
-    }
-    if (oldVersion < 15) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS expense_edits (
-          id             TEXT PRIMARY KEY,
-          expense_id     TEXT NOT NULL,
-          old_description TEXT,
-          new_description TEXT,
-          old_category   TEXT,
-          new_category   TEXT,
-          old_amount     TEXT,
-          new_amount     TEXT,
-          currency       TEXT,
-          group_id       TEXT,
-          group_name     TEXT,
-          edited_by      TEXT NOT NULL,
-          edited_by_name TEXT,
-          edited_at      TEXT NOT NULL
-        )
-      ''');
-    }
-    if (oldVersion < 14) {
-      await db.execute('''
-        CREATE TABLE IF NOT EXISTS deleted_expenses (
-          expense_id   TEXT PRIMARY KEY,
-          description  TEXT,
-          amount       TEXT NOT NULL,
-          currency     TEXT,
-          group_id     TEXT,
-          group_name   TEXT,
-          is_income    INTEGER NOT NULL DEFAULT 0,
-          category     TEXT,
-          deleted_by   TEXT NOT NULL,
-          deleted_by_name TEXT,
-          deleted_at   TEXT NOT NULL
-        )
-      ''');
-    }
     if (oldVersion < 12) {
       // Phase 1: Safe ALTER TABLE additions — these cannot fail and guarantee
       // the columns exist regardless of what happened in v10/v11.
@@ -282,6 +241,47 @@ class LocalDatabase {
       await db.execute(
         'CREATE UNIQUE INDEX IF NOT EXISTS idx_splits_unique_pair ON splits(expense_id, user_id)',
       );
+    }
+    if (oldVersion < 13) {
+      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 14) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_expenses (
+          expense_id   TEXT PRIMARY KEY,
+          description  TEXT,
+          amount       TEXT NOT NULL,
+          currency     TEXT,
+          group_id     TEXT,
+          group_name   TEXT,
+          is_income    INTEGER NOT NULL DEFAULT 0,
+          category     TEXT,
+          deleted_by   TEXT NOT NULL,
+          deleted_by_name TEXT,
+          deleted_at   TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 15) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS expense_edits (
+          id             TEXT PRIMARY KEY,
+          expense_id     TEXT NOT NULL,
+          old_description TEXT,
+          new_description TEXT,
+          old_category   TEXT,
+          new_category   TEXT,
+          old_amount     TEXT,
+          new_amount     TEXT,
+          currency       TEXT,
+          group_id       TEXT,
+          group_name     TEXT,
+          edited_by      TEXT NOT NULL,
+          edited_by_name TEXT,
+          edited_at      TEXT NOT NULL
+        )
+      ''');
     }
   }
 

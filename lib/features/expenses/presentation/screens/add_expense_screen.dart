@@ -12,41 +12,170 @@ import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
 // ---------------------------------------------------------------------------
-// Currency catalogue — "Most Used" first, then alphabetical remainder
+// Currency catalogue — "Most Used" first, then full ISO 4217 list
 // ---------------------------------------------------------------------------
+const List<String> kMostUsedCurrencyCodes = [
+  'USD', 'EUR', 'GBP', 'GEL', 'AED', 'TRY', 'PLN',
+];
+
 const List<Map<String, String>> kCurrencyList = [
-  // ── Most used (shown first in picker) ──
-  {'code': 'USD', 'name': 'US Dollar',           'flag': '🇺🇸'},
-  {'code': 'EUR', 'name': 'Euro',                'flag': '🇪🇺'},
-  {'code': 'GBP', 'name': 'British Pound',       'flag': '🇬🇧'},
-  {'code': 'GEL', 'name': 'Georgian Lari',       'flag': '🇬🇪'},
-  {'code': 'AED', 'name': 'UAE Dirham',          'flag': '🇦🇪'},
-  {'code': 'TRY', 'name': 'Turkish Lira',        'flag': '🇹🇷'},
-  {'code': 'PLN', 'name': 'Polish Złoty',        'flag': '🇵🇱'},
-  // ── Extended list ──
-  {'code': 'AUD', 'name': 'Australian Dollar',   'flag': '🇦🇺'},
-  {'code': 'BRL', 'name': 'Brazilian Real',      'flag': '🇧🇷'},
-  {'code': 'CAD', 'name': 'Canadian Dollar',     'flag': '🇨🇦'},
-  {'code': 'CHF', 'name': 'Swiss Franc',         'flag': '🇨🇭'},
-  {'code': 'CNY', 'name': 'Chinese Yuan',        'flag': '🇨🇳'},
-  {'code': 'CZK', 'name': 'Czech Koruna',        'flag': '🇨🇿'},
-  {'code': 'DKK', 'name': 'Danish Krone',        'flag': '🇩🇰'},
-  {'code': 'HKD', 'name': 'Hong Kong Dollar',    'flag': '🇭🇰'},
-  {'code': 'HUF', 'name': 'Hungarian Forint',    'flag': '🇭🇺'},
-  {'code': 'ILS', 'name': 'Israeli Shekel',      'flag': '🇮🇱'},
-  {'code': 'INR', 'name': 'Indian Rupee',        'flag': '🇮🇳'},
-  {'code': 'JPY', 'name': 'Japanese Yen',        'flag': '🇯🇵'},
-  {'code': 'KRW', 'name': 'South Korean Won',    'flag': '🇰🇷'},
-  {'code': 'MXN', 'name': 'Mexican Peso',        'flag': '🇲🇽'},
-  {'code': 'MYR', 'name': 'Malaysian Ringgit',   'flag': '🇲🇾'},
-  {'code': 'NOK', 'name': 'Norwegian Krone',     'flag': '🇳🇴'},
-  {'code': 'NZD', 'name': 'New Zealand Dollar',  'flag': '🇳🇿'},
-  {'code': 'PHP', 'name': 'Philippine Peso',     'flag': '🇵🇭'},
-  {'code': 'SEK', 'name': 'Swedish Krona',       'flag': '🇸🇪'},
-  {'code': 'SGD', 'name': 'Singapore Dollar',    'flag': '🇸🇬'},
-  {'code': 'THB', 'name': 'Thai Baht',           'flag': '🇹🇭'},
-  {'code': 'TWD', 'name': 'Taiwan Dollar',       'flag': '🇹🇼'},
-  {'code': 'ZAR', 'name': 'South African Rand',  'flag': '🇿🇦'},
+  // ── Most used ──────────────────────────────────────────────────────────────
+  {'code': 'USD', 'name': 'US Dollar',              'flag': '🇺🇸'},
+  {'code': 'EUR', 'name': 'Euro',                   'flag': '🇪🇺'},
+  {'code': 'GBP', 'name': 'British Pound',          'flag': '🇬🇧'},
+  {'code': 'GEL', 'name': 'Georgian Lari',          'flag': '🇬🇪'},
+  {'code': 'AED', 'name': 'UAE Dirham',             'flag': '🇦🇪'},
+  {'code': 'TRY', 'name': 'Turkish Lira',           'flag': '🇹🇷'},
+  {'code': 'PLN', 'name': 'Polish Złoty',           'flag': '🇵🇱'},
+  // ── All currencies (A–Z) ───────────────────────────────────────────────────
+  {'code': 'AFN', 'name': 'Afghan Afghani',         'flag': '🇦🇫'},
+  {'code': 'ALL', 'name': 'Albanian Lek',           'flag': '🇦🇱'},
+  {'code': 'AMD', 'name': 'Armenian Dram',          'flag': '🇦🇲'},
+  {'code': 'ANG', 'name': 'NL Antillean Guilder',   'flag': '🇨🇼'},
+  {'code': 'AOA', 'name': 'Angolan Kwanza',         'flag': '🇦🇴'},
+  {'code': 'ARS', 'name': 'Argentine Peso',         'flag': '🇦🇷'},
+  {'code': 'AUD', 'name': 'Australian Dollar',      'flag': '🇦🇺'},
+  {'code': 'AWG', 'name': 'Aruban Florin',          'flag': '🇦🇼'},
+  {'code': 'AZN', 'name': 'Azerbaijani Manat',      'flag': '🇦🇿'},
+  {'code': 'BAM', 'name': 'Bosnia Mark',            'flag': '🇧🇦'},
+  {'code': 'BBD', 'name': 'Barbadian Dollar',       'flag': '🇧🇧'},
+  {'code': 'BDT', 'name': 'Bangladeshi Taka',       'flag': '🇧🇩'},
+  {'code': 'BGN', 'name': 'Bulgarian Lev',          'flag': '🇧🇬'},
+  {'code': 'BHD', 'name': 'Bahraini Dinar',         'flag': '🇧🇭'},
+  {'code': 'BIF', 'name': 'Burundian Franc',        'flag': '🇧🇮'},
+  {'code': 'BMD', 'name': 'Bermudian Dollar',       'flag': '🇧🇲'},
+  {'code': 'BND', 'name': 'Brunei Dollar',          'flag': '🇧🇳'},
+  {'code': 'BOB', 'name': 'Bolivian Boliviano',     'flag': '🇧🇴'},
+  {'code': 'BRL', 'name': 'Brazilian Real',         'flag': '🇧🇷'},
+  {'code': 'BSD', 'name': 'Bahamian Dollar',        'flag': '🇧🇸'},
+  {'code': 'BTN', 'name': 'Bhutanese Ngultrum',     'flag': '🇧🇹'},
+  {'code': 'BWP', 'name': 'Botswanan Pula',         'flag': '🇧🇼'},
+  {'code': 'BYN', 'name': 'Belarusian Ruble',       'flag': '🇧🇾'},
+  {'code': 'BZD', 'name': 'Belize Dollar',          'flag': '🇧🇿'},
+  {'code': 'CAD', 'name': 'Canadian Dollar',        'flag': '🇨🇦'},
+  {'code': 'CDF', 'name': 'Congolese Franc',        'flag': '🇨🇩'},
+  {'code': 'CHF', 'name': 'Swiss Franc',            'flag': '🇨🇭'},
+  {'code': 'CLP', 'name': 'Chilean Peso',           'flag': '🇨🇱'},
+  {'code': 'CNY', 'name': 'Chinese Yuan',           'flag': '🇨🇳'},
+  {'code': 'COP', 'name': 'Colombian Peso',         'flag': '🇨🇴'},
+  {'code': 'CRC', 'name': 'Costa Rican Colón',      'flag': '🇨🇷'},
+  {'code': 'CUP', 'name': 'Cuban Peso',             'flag': '🇨🇺'},
+  {'code': 'CVE', 'name': 'Cape Verdean Escudo',    'flag': '🇨🇻'},
+  {'code': 'CZK', 'name': 'Czech Koruna',           'flag': '🇨🇿'},
+  {'code': 'DJF', 'name': 'Djiboutian Franc',       'flag': '🇩🇯'},
+  {'code': 'DKK', 'name': 'Danish Krone',           'flag': '🇩🇰'},
+  {'code': 'DOP', 'name': 'Dominican Peso',         'flag': '🇩🇴'},
+  {'code': 'DZD', 'name': 'Algerian Dinar',         'flag': '🇩🇿'},
+  {'code': 'EGP', 'name': 'Egyptian Pound',         'flag': '🇪🇬'},
+  {'code': 'ERN', 'name': 'Eritrean Nakfa',         'flag': '�🇷'},
+  {'code': 'ETB', 'name': 'Ethiopian Birr',         'flag': '🇪🇹'},
+  {'code': 'FJD', 'name': 'Fijian Dollar',          'flag': '🇫🇯'},
+  {'code': 'FKP', 'name': 'Falkland Islands Pound', 'flag': '🇫�'},
+  {'code': 'FOK', 'name': 'Faroese Króna',          'flag': '🇫🇴'},
+  {'code': 'GHS', 'name': 'Ghanaian Cedi',          'flag': '🇬🇭'},
+  {'code': 'GIP', 'name': 'Gibraltar Pound',        'flag': '🇬🇮'},
+  {'code': 'GMD', 'name': 'Gambian Dalasi',         'flag': '🇬🇲'},
+  {'code': 'GNF', 'name': 'Guinean Franc',          'flag': '🇬🇳'},
+  {'code': 'GTQ', 'name': 'Guatemalan Quetzal',     'flag': '🇬🇹'},
+  {'code': 'GYD', 'name': 'Guyanese Dollar',        'flag': '🇬🇾'},
+  {'code': 'HKD', 'name': 'Hong Kong Dollar',       'flag': '🇭🇰'},
+  {'code': 'HNL', 'name': 'Honduran Lempira',       'flag': '🇭🇳'},
+  {'code': 'HRK', 'name': 'Croatian Kuna',          'flag': '🇭🇷'},
+  {'code': 'HTG', 'name': 'Haitian Gourde',         'flag': '🇭🇹'},
+  {'code': 'HUF', 'name': 'Hungarian Forint',       'flag': '🇭🇺'},
+  {'code': 'IDR', 'name': 'Indonesian Rupiah',      'flag': '🇮🇩'},
+  {'code': 'ILS', 'name': 'Israeli Shekel',         'flag': '🇮🇱'},
+  {'code': 'INR', 'name': 'Indian Rupee',           'flag': '🇮🇳'},
+  {'code': 'IQD', 'name': 'Iraqi Dinar',            'flag': '🇮🇶'},
+  {'code': 'IRR', 'name': 'Iranian Rial',           'flag': '🇮🇷'},
+  {'code': 'ISK', 'name': 'Icelandic Króna',        'flag': '🇮🇸'},
+  {'code': 'JMD', 'name': 'Jamaican Dollar',        'flag': '🇯🇲'},
+  {'code': 'JOD', 'name': 'Jordanian Dinar',        'flag': '🇯🇴'},
+  {'code': 'JPY', 'name': 'Japanese Yen',           'flag': '🇯🇵'},
+  {'code': 'KES', 'name': 'Kenyan Shilling',        'flag': '🇰🇪'},
+  {'code': 'KGS', 'name': 'Kyrgyzstani Som',        'flag': '🇰🇬'},
+  {'code': 'KHR', 'name': 'Cambodian Riel',         'flag': '🇰🇭'},
+  {'code': 'KMF', 'name': 'Comorian Franc',         'flag': '🇰🇲'},
+  {'code': 'KPW', 'name': 'North Korean Won',       'flag': '��'},
+  {'code': 'KRW', 'name': 'South Korean Won',       'flag': '🇰🇷'},
+  {'code': 'KWD', 'name': 'Kuwaiti Dinar',          'flag': '🇰🇼'},
+  {'code': 'KYD', 'name': 'Cayman Islands Dollar',  'flag': '🇰🇾'},
+  {'code': 'KZT', 'name': 'Kazakhstani Tenge',      'flag': '🇰🇿'},
+  {'code': 'LAK', 'name': 'Lao Kip',               'flag': '🇱🇦'},
+  {'code': 'LBP', 'name': 'Lebanese Pound',         'flag': '🇱🇧'},
+  {'code': 'LKR', 'name': 'Sri Lankan Rupee',       'flag': '🇱🇰'},
+  {'code': 'LRD', 'name': 'Liberian Dollar',        'flag': '🇱🇷'},
+  {'code': 'LSL', 'name': 'Lesotho Loti',           'flag': '🇱🇸'},
+  {'code': 'LYD', 'name': 'Libyan Dinar',           'flag': '🇱🇾'},
+  {'code': 'MAD', 'name': 'Moroccan Dirham',        'flag': '🇲🇦'},
+  {'code': 'MDL', 'name': 'Moldovan Leu',           'flag': '🇲🇩'},
+  {'code': 'MGA', 'name': 'Malagasy Ariary',        'flag': '�🇬'},
+  {'code': 'MKD', 'name': 'Macedonian Denar',       'flag': '🇲��'},
+  {'code': 'MMK', 'name': 'Myanmar Kyat',           'flag': '🇲🇲'},
+  {'code': 'MNT', 'name': 'Mongolian Tögrög',       'flag': '🇲🇳'},
+  {'code': 'MOP', 'name': 'Macanese Pataca',        'flag': '�🇴'},
+  {'code': 'MRU', 'name': 'Mauritanian Ouguiya',    'flag': '🇲��'},
+  {'code': 'MUR', 'name': 'Mauritian Rupee',        'flag': '🇲🇺'},
+  {'code': 'MVR', 'name': 'Maldivian Rufiyaa',      'flag': '🇲🇻'},
+  {'code': 'MWK', 'name': 'Malawian Kwacha',        'flag': '🇲🇼'},
+  {'code': 'MXN', 'name': 'Mexican Peso',           'flag': '🇲🇽'},
+  {'code': 'MYR', 'name': 'Malaysian Ringgit',      'flag': '🇲🇾'},
+  {'code': 'MZN', 'name': 'Mozambican Metical',     'flag': '🇲🇿'},
+  {'code': 'NAD', 'name': 'Namibian Dollar',        'flag': '🇳🇦'},
+  {'code': 'NGN', 'name': 'Nigerian Naira',         'flag': '🇳🇬'},
+  {'code': 'NIO', 'name': 'Nicaraguan Córdoba',     'flag': '🇳🇮'},
+  {'code': 'NOK', 'name': 'Norwegian Krone',        'flag': '🇳🇴'},
+  {'code': 'NPR', 'name': 'Nepalese Rupee',         'flag': '🇳🇵'},
+  {'code': 'NZD', 'name': 'New Zealand Dollar',     'flag': '🇳🇿'},
+  {'code': 'OMR', 'name': 'Omani Rial',             'flag': '🇴🇲'},
+  {'code': 'PAB', 'name': 'Panamanian Balboa',      'flag': '🇵🇦'},
+  {'code': 'PEN', 'name': 'Peruvian Sol',           'flag': '🇵🇪'},
+  {'code': 'PGK', 'name': 'Papua New Guinean Kina', 'flag': '🇵🇬'},
+  {'code': 'PHP', 'name': 'Philippine Peso',        'flag': '🇵🇭'},
+  {'code': 'PKR', 'name': 'Pakistani Rupee',        'flag': '🇵🇰'},
+  {'code': 'PYG', 'name': 'Paraguayan Guaraní',     'flag': '🇵🇾'},
+  {'code': 'QAR', 'name': 'Qatari Riyal',           'flag': '🇶🇦'},
+  {'code': 'RON', 'name': 'Romanian Leu',           'flag': '🇷🇴'},
+  {'code': 'RSD', 'name': 'Serbian Dinar',          'flag': '🇷🇸'},
+  {'code': 'RUB', 'name': 'Russian Ruble',          'flag': '🇷🇺'},
+  {'code': 'RWF', 'name': 'Rwandan Franc',          'flag': '🇷🇼'},
+  {'code': 'SAR', 'name': 'Saudi Riyal',            'flag': '🇸🇦'},
+  {'code': 'SBD', 'name': 'Solomon Islands Dollar', 'flag': '🇸🇧'},
+  {'code': 'SCR', 'name': 'Seychellois Rupee',      'flag': '🇸🇨'},
+  {'code': 'SDG', 'name': 'Sudanese Pound',         'flag': '🇸🇩'},
+  {'code': 'SEK', 'name': 'Swedish Krona',          'flag': '🇸🇪'},
+  {'code': 'SGD', 'name': 'Singapore Dollar',       'flag': '🇸🇬'},
+  {'code': 'SHP', 'name': 'Saint Helena Pound',     'flag': '🇸🇭'},
+  {'code': 'SLL', 'name': 'Sierra Leonean Leone',   'flag': '🇸🇱'},
+  {'code': 'SOS', 'name': 'Somali Shilling',        'flag': '🇸🇴'},
+  {'code': 'SRD', 'name': 'Surinamese Dollar',      'flag': '🇸🇷'},
+  {'code': 'STN', 'name': 'São Tomé Dobra',         'flag': '🇸🇹'},
+  {'code': 'SYP', 'name': 'Syrian Pound',           'flag': '🇸🇾'},
+  {'code': 'SZL', 'name': 'Swazi Lilangeni',        'flag': '🇸🇿'},
+  {'code': 'THB', 'name': 'Thai Baht',              'flag': '🇹🇭'},
+  {'code': 'TJS', 'name': 'Tajikistani Somoni',     'flag': '🇹🇯'},
+  {'code': 'TMT', 'name': 'Turkmenistani Manat',    'flag': '🇹🇲'},
+  {'code': 'TND', 'name': 'Tunisian Dinar',         'flag': '🇹🇳'},
+  {'code': 'TOP', 'name': 'Tongan Paʻanga',         'flag': '🇹🇴'},
+  {'code': 'TTD', 'name': 'Trinidad & Tobago Dollar','flag': '🇹🇹'},
+  {'code': 'TWD', 'name': 'Taiwan Dollar',          'flag': '🇹🇼'},
+  {'code': 'TZS', 'name': 'Tanzanian Shilling',     'flag': '🇹🇿'},
+  {'code': 'UAH', 'name': 'Ukrainian Hryvnia',      'flag': '🇺🇦'},
+  {'code': 'UGX', 'name': 'Ugandan Shilling',       'flag': '🇺🇬'},
+  {'code': 'UYU', 'name': 'Uruguayan Peso',         'flag': '🇺🇾'},
+  {'code': 'UZS', 'name': 'Uzbekistani Som',        'flag': '🇺🇿'},
+  {'code': 'VES', 'name': 'Venezuelan Bolívar',     'flag': '🇻🇪'},
+  {'code': 'VND', 'name': 'Vietnamese Dong',        'flag': '🇻🇳'},
+  {'code': 'VUV', 'name': 'Vanuatu Vatu',           'flag': '�🇺'},
+  {'code': 'WST', 'name': 'Samoan Tālā',            'flag': '��🇸'},
+  {'code': 'XAF', 'name': 'Central African CFA',    'flag': '🌍'},
+  {'code': 'XCD', 'name': 'East Caribbean Dollar',  'flag': '🌎'},
+  {'code': 'XOF', 'name': 'West African CFA',       'flag': '🌍'},
+  {'code': 'XPF', 'name': 'CFP Franc',              'flag': '🇵🇫'},
+  {'code': 'YER', 'name': 'Yemeni Rial',            'flag': '🇾🇪'},
+  {'code': 'ZAR', 'name': 'South African Rand',     'flag': '🇿🇦'},
+  {'code': 'ZMW', 'name': 'Zambian Kwacha',         'flag': '🇿🇲'},
+  {'code': 'ZWL', 'name': 'Zimbabwean Dollar',      'flag': '🇿🇼'},
 ];
 
 List<String> get kCurrencyCodes =>
@@ -1238,19 +1367,37 @@ class CurrencySearchSheet extends StatefulWidget {
 class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
   String _query = '';
 
-  List<Map<String, String>> get _filtered {
-    if (_query.isEmpty) return kCurrencyList;
-    final q = _query.toUpperCase();
-    return kCurrencyList
-        .where((c) =>
-            c['code']!.contains(q) ||
-            c['name']!.toUpperCase().contains(_query.toUpperCase()))
+  static const _kHeader = '__HEADER__';
+
+  // Returns a mixed list: header sentinel maps + currency maps.
+  // When searching, returns a flat filtered list with no headers.
+  List<Map<String, String>> get _items {
+    if (_query.isNotEmpty) {
+      final q = _query.toUpperCase();
+      return kCurrencyList
+          .where((c) =>
+              c['code']!.contains(q) ||
+              c['name']!.toUpperCase().contains(q))
+          .toList();
+    }
+    final mostUsed = kCurrencyList
+        .where((c) => kMostUsedCurrencyCodes.contains(c['code']))
         .toList();
+    final others = kCurrencyList
+        .where((c) => !kMostUsedCurrencyCodes.contains(c['code']))
+        .toList();
+    return [
+      {'code': _kHeader, 'name': 'Most Used',      'flag': ''},
+      ...mostUsed,
+      {'code': _kHeader, 'name': 'All Currencies', 'flag': ''},
+      ...others,
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final items = _items;
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       maxChildSize: 0.95,
@@ -1292,9 +1439,22 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
             Expanded(
               child: ListView.builder(
                 controller: ctrl,
-                itemCount: _filtered.length,
+                itemCount: items.length,
                 itemBuilder: (_, i) {
-                  final c = _filtered[i];
+                  final c = items[i];
+                  if (c['code'] == _kHeader) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                      child: Text(
+                        c['name']!,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    );
+                  }
                   final isSelected = c['code'] == widget.selected;
                   return ListTile(
                     dense: true,
