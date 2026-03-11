@@ -1092,6 +1092,15 @@ class SetAllRepository {
 
     // Supabase groups table has no is_deleted column — restore is local-only.
 
+    // Remove from left_groups so sync and _getGroupsByType no longer filter
+    // this group out. Without this the group stays invisible after restore.
+    await LocalDatabase.db.delete(
+      'left_groups', where: 'group_id = ?', whereArgs: [groupId]);
+    // Also remove from the persistent deleted_groups_log so the activity feed
+    // no longer shows a deletion entry for this group.
+    await LocalDatabase.db.delete(
+      'deleted_groups_log', where: 'group_id = ?', whereArgs: [groupId]);
+
     _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
     _notify();
     return true;
