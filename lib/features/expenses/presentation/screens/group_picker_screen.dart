@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../../domain/entities/group.dart';
 
 /// Choose an existing group or create a new one, then go to add expense.
 class GroupPickerScreen extends ConsumerWidget {
@@ -43,36 +44,13 @@ class GroupPickerScreen extends ConsumerWidget {
       ),
       body: groupsAsync.when(
         data: (groups) {
-          final personal =
-              groups.where((g) => g.name == 'Personal').toList();
-          final others =
-              groups.where((g) => g.name != 'Personal').toList();
+          final others = groups
+              .where((g) => g.name != 'Personal' && g.type != GroupType.direct)
+              .toList();
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
-              // ── Personal ──────────────────────────────────────────────
-              Text(
-                'Personal expense',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 8),
-              if (personal.isNotEmpty)
-                Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.person),
-                    title: const Text('Personal'),
-                    subtitle: const Text('Just for you — no splitting'),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () => _openAddExpense(context, personal.first),
-                  ),
-                ),
-
-              const SizedBox(height: 20),
-
-              // ── Existing groups ───────────────────────────────────────
+              // ── Existing groups ───────────────────────────────────────────────
               Text(
                 'Choose a group',
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -81,6 +59,15 @@ class GroupPickerScreen extends ConsumerWidget {
                 ),
               ),
               const SizedBox(height: 12),
+              if (others.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Text(
+                    'No groups yet. Create one below.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
               ...others.map((g) => Card(
                     child: ListTile(
                       leading: const Icon(Icons.group_outlined),
@@ -92,7 +79,7 @@ class GroupPickerScreen extends ConsumerWidget {
 
               const SizedBox(height: 24),
 
-              // ── Create new ────────────────────────────────────────────
+              // ── Create new ──────────────────────────────────────────────────
               OutlinedButton.icon(
                 onPressed: () => _openCreateGroup(context),
                 icon: const Icon(Icons.group_add_outlined),

@@ -95,6 +95,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     HapticUtils.success();
     ref.invalidate(personalExpensesProvider);
     ref.invalidate(walletBalanceProvider);
+    ref.invalidate(walletTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
     setState(() { _editMode = false; _selected.clear(); });
@@ -122,6 +123,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     HapticUtils.success();
     ref.invalidate(personalExpensesProvider);
     ref.invalidate(walletBalanceProvider);
+    ref.invalidate(walletTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
   }
@@ -137,6 +139,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   Widget build(BuildContext context) {
     final theme         = Theme.of(context);
     final walletAsync   = ref.watch(walletBalanceProvider);
+    final totalsAsync   = ref.watch(walletTotalsProvider);
     final personalAsync = ref.watch(personalExpensesProvider);
     final baseCcyAsync  = ref.watch(baseCurrencyProvider);
     final baseCurrency  = baseCcyAsync.valueOrNull ?? 'USD';
@@ -175,6 +178,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
               ]
             : [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'Refresh',
+                  onPressed: () async {
+                    HapticUtils.lightTap();
+                    await ref.read(syncServiceProvider).performFullSync();
+                    if (!mounted) return;
+                    ref.invalidate(personalExpensesProvider);
+                    ref.invalidate(walletBalanceProvider);
+                    ref.invalidate(walletTotalsProvider);
+                    ref.invalidate(balanceSummaryProvider);
+                  },
+                ),
                 TextButton(onPressed: _toggleEditMode, child: const Text('Edit')),
               ],
       ),
@@ -210,8 +226,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   skipLoadingOnReload: true,
                   data: (walletStr) {
                     final walletDec = Decimal.tryParse(walletStr) ?? Decimal.zero;
+                    final totals = totalsAsync.valueOrNull;
                     return WalletHero(
                       walletBalance: walletDec,
+                      income: totals?.income,
+                      spend: totals?.spend,
                       currency: baseCurrency,
                     );
                   },
@@ -333,21 +352,25 @@ class WalletHero extends StatelessWidget {
   const WalletHero({
     super.key,
     required this.walletBalance,
+    this.income,
+    this.spend,
     this.currency = 'USD',
   }) : _loading = false, _error = false;
 
   static final _zero = Decimal.zero;
 
   WalletHero.loading({super.key})
-      : walletBalance = _zero, currency = 'USD', _loading = true, _error = false;
+      : walletBalance = _zero, income = null, spend = null, currency = 'USD', _loading = true, _error = false;
 
   WalletHero.error({super.key})
-      : walletBalance = _zero, currency = 'USD', _loading = false, _error = true;
+      : walletBalance = _zero, income = null, spend = null, currency = 'USD', _loading = false, _error = true;
 
-  final Decimal walletBalance;
-  final String  currency;
-  final bool    _loading;
-  final bool    _error;
+  final Decimal  walletBalance;
+  final Decimal? income;
+  final Decimal? spend;
+  final String   currency;
+  final bool     _loading;
+  final bool     _error;
 
   @override
   Widget build(BuildContext context) {
@@ -391,14 +414,14 @@ class WalletHero extends StatelessWidget {
           Row(children: [
             Expanded(child: _BalancePill(
               label: 'Income',
-              amount: walletBalance >= Decimal.zero ? walletBalance.toStringAsFixed(2) : '0.00',
+              amount: (income ?? Decimal.zero).toStringAsFixed(2),
               color: _teal,
               bgColor: _tealDim,
             )),
             const SizedBox(width: 8),
             Expanded(child: _BalancePill(
               label: 'Expenses',
-              amount: walletBalance < Decimal.zero ? walletBalance.abs().toStringAsFixed(2) : '0.00',
+              amount: (spend ?? Decimal.zero).toStringAsFixed(2),
               color: walletIsPos ? _purple : _orange,
               bgColor: walletIsPos ? _purpleDim : _orangeDim,
             )),
