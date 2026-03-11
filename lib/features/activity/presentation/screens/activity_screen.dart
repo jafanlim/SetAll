@@ -239,6 +239,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 96),
       itemCount: items.length,
       itemBuilder: (_, i) {

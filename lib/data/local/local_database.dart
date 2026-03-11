@@ -42,7 +42,11 @@ class LocalDatabase {
   ///   • deleted_expenses – snapshot table for expense deletion audit log
   /// Schema v15 adds:
   ///   • expense_edits – audit log of expense description/category/amount changes
-  static const int _version = 15;
+  /// Schema v16 fixes:
+  ///   • Re-applies groups.is_deleted and groups.deleted_at safely via
+  ///     _addColumnIfNotExists, guaranteeing the columns exist on any device
+  ///     that skipped the original v13 migration due to the ordering bug.
+  static const int _version = 16;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -282,6 +286,12 @@ class LocalDatabase {
           edited_at      TEXT NOT NULL
         )
       ''');
+    }
+    if (oldVersion < 16) {
+      // Re-apply groups.is_deleted + deleted_at defensively — devices that had
+      // the migration ordering bug (v13 ran after v15) never got these columns.
+      await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
+      await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
     }
   }
 

@@ -432,6 +432,7 @@ class SyncService {
           'created_at': map['created_at']?.toString(),
           'updated_at': map['updated_at']?.toString(),
           'synced_at': DateTime.now().millisecondsSinceEpoch,
+          'is_deleted': 0,
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
