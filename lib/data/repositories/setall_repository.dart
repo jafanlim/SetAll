@@ -510,10 +510,18 @@ class SetAllRepository {
   /// Emits the current group list immediately, then re-emits after every
   /// local write or sync completion. The UI never needs to be invalidated.
   Stream<List<GroupModel>> watchGroups() async* {
-    var last = await getMyGroups();
+    List<GroupModel> last;
+    try { last = await getMyGroups(); } catch (e) {
+      debugPrint('[watchGroups] initial load error (yielding []): $e');
+      last = [];
+    }
     yield last;
     await for (final _ in _changeController.stream) {
-      final next = await getMyGroups();
+      List<GroupModel> next;
+      try { next = await getMyGroups(); } catch (e) {
+        debugPrint('[watchGroups] reload error (keeping last): $e');
+        continue;
+      }
       if (_groupListChanged(last, next)) {
         last = next;
         yield next;
@@ -523,10 +531,18 @@ class SetAllRepository {
 
   /// Emits expenses for [groupId] immediately, then re-emits on every change.
   Stream<List<ExpenseModel>> watchGroupExpenses(String groupId) async* {
-    var last = await getExpensesForGroup(groupId);
+    List<ExpenseModel> last;
+    try { last = await getExpensesForGroup(groupId); } catch (e) {
+      debugPrint('[watchGroupExpenses] initial load error (yielding []): $e');
+      last = [];
+    }
     yield last;
     await for (final _ in _changeController.stream) {
-      final next = await getExpensesForGroup(groupId);
+      List<ExpenseModel> next;
+      try { next = await getExpensesForGroup(groupId); } catch (e) {
+        debugPrint('[watchGroupExpenses] reload error (keeping last): $e');
+        continue;
+      }
       if (_expenseListChanged(last, next)) {
         last = next;
         yield next;
@@ -537,10 +553,18 @@ class SetAllRepository {
   /// Emits personal (wallet) expenses immediately, then re-emits on every
   /// local write or sync completion — same mechanism as [watchGroupExpenses].
   Stream<List<ExpenseModel>> watchPersonalExpenses({int limit = 50}) async* {
-    var last = await getPersonalExpenses(limit: limit);
+    List<ExpenseModel> last;
+    try { last = await getPersonalExpenses(limit: limit); } catch (e) {
+      debugPrint('[watchPersonalExpenses] initial load error (yielding []): $e');
+      last = [];
+    }
     yield last;
     await for (final _ in _changeController.stream) {
-      final next = await getPersonalExpenses(limit: limit);
+      List<ExpenseModel> next;
+      try { next = await getPersonalExpenses(limit: limit); } catch (e) {
+        debugPrint('[watchPersonalExpenses] reload error (keeping last): $e');
+        continue;
+      }
       if (_expenseListChanged(last, next)) {
         last = next;
         yield next;
@@ -635,6 +659,43 @@ class SetAllRepository {
         .where((id) => !leftGroupIds.contains(id))
         .toList();
     final allIds = <String>{...memberIds, ...createdIds}.toList();
+
+    // SQLite is empty — expected on a fresh native install before the first
+    // full sync. Fall back to Supabase so the UI isn't stuck waiting.
+    if (allIds.isEmpty && _client != null) {
+      try {
+        final memberRowsCloud = await _client
+            .from('group_members')
+            .select('group_id')
+            .eq('user_id', uid) as List;
+        final cloudIds = memberRowsCloud
+            .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
+            .where((id) => !leftGroupIds.contains(id))
+            .toSet()
+            .toList();
+        final createdCloud = await _client
+            .from('groups')
+            .select('id')
+            .eq('creator_id', uid) as List;
+        for (final r in createdCloud) {
+          final id = (r as Map<String, dynamic>)['id'] as String;
+          if (!leftGroupIds.contains(id)) cloudIds.add(id);
+        }
+        if (cloudIds.isEmpty) return [];
+        final cloudRows = await _client
+            .from('groups')
+            .select()
+            .inFilter('id', cloudIds)
+            .eq('type', type)
+            .eq('is_deleted', false)
+            .order('updated_at', ascending: false) as List;
+        return cloudRows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
+      } catch (e) {
+        debugPrint('[_getGroupsByType] Supabase fallback failed: $e');
+        return [];
+      }
+    }
+
     if (allIds.isEmpty) return [];
 
     final rows = await LocalDatabase.db.query(
@@ -1816,25 +1877,33 @@ class SetAllRepository {
   }
 
   /// Wallet-only balance: personal income − personal spend, expressed in
-  /// [baseCurrency]. Pass the user's default currency so the total is shown
-  /// in the correct denomination. Amounts are stored in USD
-  /// (universalUsdAmount) and converted here via [_currencyService].
+  /// [baseCurrency]. Delegates to [getWalletTotals] to avoid duplicate logic.
   Future<Decimal> getWalletOnlyBalance({String baseCurrency = 'USD'}) async {
+    final totals = await getWalletTotals(baseCurrency: baseCurrency);
+    return totals.net;
+  }
+
+  /// Returns wallet income, spend, and net separately in [baseCurrency].
+  /// The UI uses this to display Income and Expenses pills independently.
+  Future<({Decimal income, Decimal spend, Decimal net})> getWalletTotals({
+    String baseCurrency = 'USD',
+  }) async {
     final uid = await ensureUser();
-    if (uid == null) return Decimal.zero;
+    if (uid == null) return (income: Decimal.zero, spend: Decimal.zero, net: Decimal.zero);
     final personalRows = await getPersonalExpenses(limit: 1000);
     Decimal income = Decimal.zero;
     Decimal spend  = Decimal.zero;
+    Decimal? cachedRate;
     for (final e in personalRows) {
       final usdAmt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
       Decimal amt = usdAmt;
       if (baseCurrency != 'USD' && _currencyService != null && usdAmt != Decimal.zero) {
-        final rate = await _currencyService.getRate('USD', baseCurrency);
-        amt = (usdAmt * rate).round(scale: 2);
+        cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
+        amt = (usdAmt * cachedRate).round(scale: 2);
       }
       if (e.isIncome) { income += amt; } else { spend += amt; }
     }
-    return income - spend;
+    return (income: income, spend: spend, net: income - spend);
   }
 
   /// Stream a unified activity feed: group + personal expenses, sorted newest-first.

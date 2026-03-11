@@ -198,6 +198,17 @@ final walletBalanceProvider = FutureProvider<String>((ref) async {
   return balance.toStringAsFixed(2);
 });
 
+/// Wallet income, expenses, and net — all separately, in the user's base
+/// currency. Drives the Income / Expenses pills in WalletHero.
+final walletTotalsProvider =
+    FutureProvider<({Decimal income, Decimal spend, Decimal net})>((ref) async {
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  ref.watch(personalExpensesProvider);
+  return ref
+      .watch(setAllRepositoryProvider)
+      .getWalletTotals(baseCurrency: baseCurrency);
+});
+
 // ---------------------------------------------------------------------------
 // Master balance — combines personal wallet cash + shared group position
 // ---------------------------------------------------------------------------
