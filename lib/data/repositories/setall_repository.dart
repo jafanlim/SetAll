@@ -866,10 +866,26 @@ class SetAllRepository {
     final creatorId = rows.first['creator_id'] as String?;
     final isOwner   = creatorId == uid;
 
+    // Both owner and non-owner: remove self from group_members in Supabase so
+    // sync never re-pulls this group. Owner also soft-deletes locally.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('group_members').delete()
+            .eq('group_id', groupId).eq('user_id', uid);
+      } catch (e) {
+        debugPrint('[deleteGroup] Supabase member-exit failed: $e');
+      }
+    }
+    // Always write to left_groups so _pullFromSupabase filter catches it even
+    // if the Supabase delete above failed or happens offline.
+    await LocalDatabase.db.insert(
+      'left_groups',
+      {'group_id': groupId, 'left_at': DateTime.now().toIso8601String()},
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
     if (isOwner) {
-      // ── Owner: soft-delete — mark deleted locally and on Supabase ─────────
-      // Supabase groups table has no is_deleted column — soft-delete is local-only.
-      // Local: mark soft-deleted so it disappears from lists.
+      // ── Owner: soft-delete locally so it's hidden but restorable ──────────
       await LocalDatabase.db.update(
         'groups',
         {'is_deleted': 1, 'deleted_at': deletedAt},
@@ -877,23 +893,7 @@ class SetAllRepository {
         whereArgs: [groupId],
       );
     } else {
-      // ── Non-owner: leave only ────────────────────────────────────────────
-      // Remove this user from group_members remotely (best-effort).
-      if (await _isOnline && _client != null) {
-        try {
-          await _client.from('group_members').delete()
-              .eq('group_id', groupId).eq('user_id', uid);
-        } catch (e) {
-          debugPrint('[deleteGroup] Supabase member-exit failed: $e');
-        }
-      }
-      // Persist the left group so _pullFromSupabase never re-pulls it.
-      await LocalDatabase.db.insert(
-        'left_groups',
-        {'group_id': groupId, 'left_at': DateTime.now().toIso8601String()},
-        conflictAlgorithm: ConflictAlgorithm.replace,
-      );
-      // Remove locally — cascade expenses/members/group so nothing lingers.
+      // ── Non-owner: fully remove local data ────────────────────────────────
       final expenseRows = await LocalDatabase.db.query(
         'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
       for (final row in expenseRows) {
