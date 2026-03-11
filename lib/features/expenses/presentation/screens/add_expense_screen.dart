@@ -60,7 +60,6 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _amountCtrl = TextEditingController();
   final _descriptionCtrl = TextEditingController();
   final _rateOverrideCtrl = TextEditingController();
-
   int _step = 0;
   static const int _totalSteps = 3;
 
@@ -148,6 +147,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     _amountCtrl.dispose();
     _descriptionCtrl.dispose();
     _rateOverrideCtrl.dispose();
+
     for (final c in _customCtrl) {
       c.dispose();
     }
@@ -387,8 +387,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
+      // Prevent Scaffold from resizing on keyboard appear — avoids the
+      // viewport-change cascade that spams showSoftInput and causes
+      // onCancelled at PHASE_CLIENT_APPLY_ANIMATION on Android.
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
           'Add expense · ${_step + 1}/$_effectiveTotalSteps',
@@ -408,7 +414,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       body: Form(
         key: _formKey,
         child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 8 + bottomInset),
           children: [
             if (widget.groupName.isNotEmpty)
               Padding(
@@ -557,6 +563,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           // Amount field
           TextFormField(
             controller: _amountCtrl,
+            autofocus: true,
             keyboardType:
                 const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(

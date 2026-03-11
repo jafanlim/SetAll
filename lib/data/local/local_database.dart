@@ -56,7 +56,12 @@ class LocalDatabase {
   ///     expenses when the group itself is restored.
   ///   • deleted_splits – snapshot of splits removed during a group soft-delete
   ///     so they can be re-inserted when the group is restored.
-  static const int _version = 18;
+  /// Schema v19 adds:
+  ///   • deleted_expenses.original_amount – preserves the raw entered amount
+  ///     (e.g. 15000 VND) separate from the USD anchor so restore shows the
+  ///     correct original value instead of the converted USD amount.
+  ///   • deleted_groups_log – backfill for fresh installs that missed v17.
+  static const int _version = 19;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -334,6 +339,19 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 19) {
+      await _addColumnIfNotExists(
+        db, 'deleted_expenses', 'original_amount', 'TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_groups_log (
+          group_id       TEXT PRIMARY KEY,
+          group_name     TEXT NOT NULL,
+          creator_id     TEXT NOT NULL,
+          deleted_by_uid TEXT NOT NULL,
+          deleted_at     TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -464,10 +482,20 @@ class LocalDatabase {
       )
     ''');
     await db.execute('''
+      CREATE TABLE deleted_groups_log (
+        group_id       TEXT PRIMARY KEY,
+        group_name     TEXT NOT NULL,
+        creator_id     TEXT NOT NULL,
+        deleted_by_uid TEXT NOT NULL,
+        deleted_at     TEXT NOT NULL
+      )
+    ''');
+    await db.execute('''
       CREATE TABLE deleted_expenses (
         expense_id            TEXT PRIMARY KEY,
         description           TEXT,
         amount                TEXT NOT NULL,
+        original_amount       TEXT,
         currency              TEXT,
         group_id              TEXT,
         group_name            TEXT,

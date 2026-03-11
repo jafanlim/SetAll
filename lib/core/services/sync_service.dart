@@ -288,9 +288,6 @@ class SyncService {
       }
     }
 
-    // Only push splits whose parent expense is already confirmed in Supabase.
-    // If the expense push failed, the split will also fail with a 42501 RLS
-    // error because Supabase can't find a matching expense row.
     final pendingSplits = await LocalDatabase.db.rawQuery('''
       SELECT s.* FROM splits s
       INNER JOIN expenses e ON s.expense_id = e.id
@@ -346,17 +343,33 @@ class SyncService {
         .from('group_members')
         .select('group_id')
         .eq('user_id', uid);
-    final memberIds = (memberRows as List)
+    final allCloudMemberIds = (memberRows as List)
         .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
+        .toSet();
+
+    // If a group is in left_groups but Supabase still shows us as a member,
+    // the left_groups entry is stale (e.g. from a bug or old schema). Remove it
+    // so the group is re-pulled and never falsely treated as an orphan.
+    if (leftGroupIds.isNotEmpty) {
+      final staleLeftIds = leftGroupIds.intersection(allCloudMemberIds);
+      for (final gid in staleLeftIds) {
+        debugPrint('[SyncService] removing stale left_groups entry for $gid (still a member in Supabase)');
+        try {
+          await LocalDatabase.db.delete('left_groups', where: 'group_id = ?', whereArgs: [gid]);
+          leftGroupIds.remove(gid);
+        } catch (_) {}
+      }
+    }
+
+    final memberIds = allCloudMemberIds
         .where((id) => !leftGroupIds.contains(id))
-        .toSet()
         .toList();
 
     // ── Reconciler: remove local orphans ────────────────────────────────────
     // If memberIds is empty the user has no groups — wipe everything local.
     // Otherwise diff cloud vs local and delete rows that no longer exist in
     // Supabase (i.e. were deleted on another device).
-    await _reconcileLocalOrphans(uid, memberIds);
+    await _reconcileLocalOrphans(uid, memberIds, leftGroupIds);
 
     // Always pull personal (wallet) expenses regardless of group membership.
     final personalExpenses = await _client
@@ -390,10 +403,15 @@ class SyncService {
     // Only reconcile rows confirmed in Supabase (synced_at > 0).
     // synced_at IS NULL  → pending push, never delete.
     // synced_at = -1     → (legacy sentinel) treat as pending, never delete.
+    // Only reconcile personal expenses paid by the current user. Expenses paid
+    // by a teammate (other payer, same group) have group_id set and are handled
+    // by the group expense reconciler. Wallet expenses paid by another user
+    // (synced_at IS NULL) are never touched — reconciler skips IS NULL rows.
     final localPersonalRows = await LocalDatabase.db.query(
       'expenses',
       columns: ['id', 'payer_id', 'synced_at'],
-      where: 'group_id IS NULL AND synced_at > 0',
+      where: 'group_id IS NULL AND synced_at > 0 AND payer_id = ?',
+      whereArgs: [uid],
     );
     debugPrint('[SyncService] reconciler: ${localPersonalRows.length} local synced personal expenses, ${cloudPersonalIds.length} in cloud');
     for (final row in localPersonalRows) {
@@ -543,6 +561,7 @@ class SyncService {
   Future<void> _reconcileLocalOrphans(
     String uid,
     List<String> cloudGroupIds,
+    Set<String> leftGroupIds,
   ) async {
     // ── Groups ───────────────────────────────────────────────────────────────
     final cloudGroupIdSet = cloudGroupIds.toSet();
@@ -551,13 +570,17 @@ class SyncService {
     // Groups with synced_at IS NULL are pending push — don't delete them.
     // Groups with is_deleted = 1 are intentionally soft-deleted locally and
     // must not be treated as cloud orphans — they may be restored later.
+    // Groups in leftGroupIds were voluntarily left — never treat as orphans;
+    // their local data is kept so the user can see history.
     final syncedLocalGroups = await LocalDatabase.db.query(
       'groups',
       columns: ['id'],
       where: 'synced_at IS NOT NULL AND (is_deleted IS NULL OR is_deleted = 0)');
     final syncedLocalGroupIds =
         syncedLocalGroups.map((r) => r['id'] as String).toSet();
-    final orphanGroupIds = syncedLocalGroupIds.difference(cloudGroupIdSet);
+    final orphanGroupIds = syncedLocalGroupIds
+        .difference(cloudGroupIdSet)
+        .difference(leftGroupIds);
     for (final gid in orphanGroupIds) {
       debugPrint('[SyncService] reconciler: pruning orphan group $gid');
       // Cascade: delete expenses and splits for this group first.
