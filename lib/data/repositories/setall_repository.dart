@@ -637,7 +637,6 @@ class SetAllRepository {
           .select()
           .inFilter('id', memberIds)
           .eq('type', type)
-          .eq('is_deleted', false)
           .order('updated_at', ascending: false) as List;
       return rows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
     }
@@ -706,7 +705,6 @@ class SetAllRepository {
             .select()
             .inFilter('id', cloudIds)
             .eq('type', type)
-            .eq('is_deleted', false)
             .order('updated_at', ascending: false) as List;
         return cloudRows.map((r) => _rowToGroup(r as Map<String, dynamic>)).toList();
       } catch (e) {
@@ -739,8 +737,7 @@ class SetAllRepository {
           .from('groups')
           .select('id')
           .eq('creator_id', uid)
-          .ilike('name', name)
-          .eq('is_deleted', false) as List;
+          .ilike('name', name) as List;
       if (dupeCheck.isNotEmpty) {
         throw Exception('You already have a group named "$name".');
       }
@@ -843,16 +840,13 @@ class SetAllRepository {
           }
         } catch (_) {}
 
-        if (creatorId == uid) {
-          // Owner: soft-delete — flip flag, keep data intact for restore.
-          await _client.from('groups').update({
-            'is_deleted': true,
-          }).eq('id', groupId);
-        } else {
-          // Non-owner: leave only — remove this user from group_members.
+        if (creatorId != uid) {
+          // Non-owner: leave — remove this user from group_members.
           await _client.from('group_members').delete()
               .eq('group_id', groupId).eq('user_id', uid);
         }
+        // Owner soft-delete: Supabase groups has no is_deleted column.
+        // The group is hidden locally; sync reconciler will prune it.
         _logGroupDeletedEvents(uid, {groupId: (webGroupName, creatorId ?? uid)});
         _notify();
         return true;
@@ -874,15 +868,7 @@ class SetAllRepository {
 
     if (isOwner) {
       // ── Owner: soft-delete — mark deleted locally and on Supabase ─────────
-      if (await _isOnline && _client != null) {
-        try {
-          await _client.from('groups').update({
-            'is_deleted': true,
-          }).eq('id', groupId);
-        } catch (e) {
-          debugPrint('[deleteGroup] Supabase soft-delete failed: $e');
-        }
-      }
+      // Supabase groups table has no is_deleted column — soft-delete is local-only.
       // Local: mark soft-deleted so it disappears from lists.
       await LocalDatabase.db.update(
         'groups',
@@ -933,9 +919,7 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').update({
-          'is_deleted': false,
-        }).eq('id', groupId).eq('creator_id', uid);
+        // No is_deleted column in Supabase — restore is local-only for native platforms.
         _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
         _notify();
         return true;
@@ -960,15 +944,7 @@ class SetAllRepository {
       whereArgs: [groupId],
     );
 
-    if (await _isOnline && _client != null) {
-      try {
-        await _client.from('groups').update({
-          'is_deleted': false,
-        }).eq('id', groupId).eq('creator_id', uid);
-      } catch (e) {
-        debugPrint('[restoreGroup] Supabase restore failed: $e');
-      }
-    }
+    // Supabase groups table has no is_deleted column — restore is local-only.
 
     _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
     _notify();
