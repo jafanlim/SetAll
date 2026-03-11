@@ -549,8 +549,12 @@ class SyncService {
 
     // Only prune groups that have been confirmed in Supabase (synced_at NOT NULL).
     // Groups with synced_at IS NULL are pending push — don't delete them.
+    // Groups with is_deleted = 1 are intentionally soft-deleted locally and
+    // must not be treated as cloud orphans — they may be restored later.
     final syncedLocalGroups = await LocalDatabase.db.query(
-      'groups', columns: ['id'], where: 'synced_at IS NOT NULL');
+      'groups',
+      columns: ['id'],
+      where: 'synced_at IS NOT NULL AND (is_deleted IS NULL OR is_deleted = 0)');
     final syncedLocalGroupIds =
         syncedLocalGroups.map((r) => r['id'] as String).toSet();
     final orphanGroupIds = syncedLocalGroupIds.difference(cloudGroupIdSet);
@@ -587,13 +591,23 @@ class SyncService {
       // (synced_at IS NULL) are pending push and must not be pruned.
       // Exclude personal (wallet) expenses: group_id IS NULL means they are
       // never in cloudGroupIds, so they must never be treated as orphans.
+      // Exclude expenses belonging to soft-deleted groups (is_deleted = 1) —
+      // those were intentionally moved to deleted_expenses and should not be
+      // purged from live tables by the reconciler.
+      final softDeletedGroupRows = await LocalDatabase.db.query(
+        'groups', columns: ['id'],
+        where: 'is_deleted = 1');
+      final softDeletedGroupIds =
+          softDeletedGroupRows.map((r) => r['id'] as String).toSet();
       final localExpenses = await LocalDatabase.db.query(
         'expenses',
-        columns: ['id'],
+        columns: ['id', 'group_id'],
         where: 'synced_at IS NOT NULL AND group_id IS NOT NULL',
       );
       for (final row in localExpenses) {
         final eid = row['id'] as String;
+        final gid = row['group_id'] as String?;
+        if (gid != null && softDeletedGroupIds.contains(gid)) continue;
         if (!cloudExpenseIds.contains(eid)) {
           debugPrint('[SyncService] reconciler: pruning orphan expense $eid');
           await LocalDatabase.db.delete('splits', where: 'expense_id = ?', whereArgs: [eid]);

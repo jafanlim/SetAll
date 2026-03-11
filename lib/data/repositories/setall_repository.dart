@@ -2446,6 +2446,9 @@ class SetAllRepository {
       try {
         final deletedRows = await LocalDatabase.db.query(
           'deleted_expenses',
+          // Exclude cascade-deleted expenses (deleted together with their group).
+          // Those are restorable only via the GroupDeletedEvent tile, not individually.
+          where: 'deleted_with_group_id IS NULL',
           orderBy: 'deleted_at DESC',
           limit: limit,
         );
