@@ -106,6 +106,16 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            tooltip: 'Refresh',
+            onPressed: () async {
+              HapticUtils.lightTap();
+              await ref.read(syncServiceProvider).performFullSync();
+              if (!mounted) return;
+              ref.invalidate(omniActivityProvider);
+            },
+          ),
           PopupMenuButton<_ActivitySort>(
             tooltip: 'Sort',
             icon: Icon(
@@ -167,6 +177,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               color: _teal,
               onRefresh: () async {
                 HapticUtils.lightTap();
+                await ref.read(syncServiceProvider).performFullSync();
+                if (!mounted) return;
                 ref.invalidate(omniActivityProvider);
               },
               child: feedAsync.when(

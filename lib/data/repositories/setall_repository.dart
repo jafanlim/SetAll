@@ -659,6 +659,9 @@ class SetAllRepository {
         .where((id) => !leftGroupIds.contains(id))
         .toList();
     final allIds = <String>{...memberIds, ...createdIds}.toList();
+    debugPrint('[_getGroupsByType] uid=$uid type=$type '
+        'memberIds=${memberIds.length} createdIds=${createdIds.length} '
+        'allIds=${allIds.length} leftGroupIds=${leftGroupIds.length}');
 
     // SQLite is empty — expected on a fresh native install before the first
     // full sync. Fall back to Supabase so the UI isn't stuck waiting.
@@ -957,16 +960,34 @@ class SetAllRepository {
   }
 
   void _logGroupDeletedEvents(String uid, Map<String, (String, String)> groupInfo) {
-    // Logged as in-memory events only; picked up by next _buildOmniActivity call.
+    final deletedAt = _now();
     for (final entry in groupInfo.entries) {
+      // Keep in-memory list for immediate UI update.
       _pendingDeletedGroups.removeWhere((r) => r.id == entry.key);
       _pendingDeletedGroups.add(_DeletedGroupRecord(
         id: entry.key,
         name: entry.value.$1,
         creatorId: entry.value.$2,
-        deletedAt: _now(),
+        deletedAt: deletedAt,
         deletedByUid: uid,
       ));
+      // Also persist to SQLite so the event survives app restarts.
+      if (!_isWeb) {
+        LocalDatabase.db.insert(
+          'deleted_groups_log',
+          {
+            'group_id':       entry.key,
+            'group_name':     entry.value.$1,
+            'creator_id':     entry.value.$2,
+            'deleted_by_uid': uid,
+            'deleted_at':     deletedAt,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        ).catchError((e) {
+          debugPrint('[_logGroupDeletedEvents] SQLite write failed: $e');
+          return 0;
+        });
+      }
     }
   }
 
@@ -2197,9 +2218,12 @@ class SetAllRepository {
       }
     }
 
-    // ── 4. In-memory group-deleted events (logged on deleteGroup/deleteGroups) ─
+    // ── 4. Group-deleted events: in-memory (current session) + SQLite log ──────
+    final seenDeletedGroupIds = <String>{};
+    // In-memory first (current session, already have the data).
     for (final rec in _pendingDeletedGroups) {
       if (rec.deletedByUid == uid) {
+        seenDeletedGroupIds.add(rec.id);
         events.add(GroupDeletedEvent(
           timestamp: rec.deletedAt,
           groupId:   rec.id,
@@ -2207,6 +2231,31 @@ class SetAllRepository {
           creatorId: rec.creatorId,
           deletedAt: DateTime.tryParse(rec.deletedAt) ?? DateTime.now(),
         ));
+      }
+    }
+    // Persistent log — fills in deletions from previous sessions / restarts.
+    if (!_isWeb) {
+      try {
+        final logRows = await LocalDatabase.db.query(
+          'deleted_groups_log',
+          orderBy: 'deleted_at DESC',
+          limit: limit,
+        );
+        for (final r in logRows) {
+          final gid = r['group_id'] as String;
+          if (seenDeletedGroupIds.contains(gid)) continue; // already added
+          if ((r['deleted_by_uid'] as String?) != uid) continue;
+          final ts = r['deleted_at'] as String? ?? '';
+          events.add(GroupDeletedEvent(
+            timestamp: ts,
+            groupId:   gid,
+            groupName: r['group_name'] as String? ?? '',
+            creatorId: r['creator_id'] as String? ?? '',
+            deletedAt: DateTime.tryParse(ts) ?? DateTime.now(),
+          ));
+        }
+      } catch (e) {
+        debugPrint('[_buildOmniActivity] deleted_groups_log query failed: $e');
       }
     }
 

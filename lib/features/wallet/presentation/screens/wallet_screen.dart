@@ -178,6 +178,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
               ]
             : [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'Refresh',
+                  onPressed: () async {
+                    HapticUtils.lightTap();
+                    await ref.read(syncServiceProvider).performFullSync();
+                    if (!mounted) return;
+                    ref.invalidate(personalExpensesProvider);
+                    ref.invalidate(walletBalanceProvider);
+                    ref.invalidate(walletTotalsProvider);
+                    ref.invalidate(balanceSummaryProvider);
+                  },
+                ),
                 TextButton(onPressed: _toggleEditMode, child: const Text('Edit')),
               ],
       ),
