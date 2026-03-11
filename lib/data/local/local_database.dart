@@ -46,7 +46,10 @@ class LocalDatabase {
   ///   • Re-applies groups.is_deleted and groups.deleted_at safely via
   ///     _addColumnIfNotExists, guaranteeing the columns exist on any device
   ///     that skipped the original v13 migration due to the ordering bug.
-  static const int _version = 16;
+  /// Schema v17 adds:
+  ///   • deleted_groups_log – persists group-deletion audit events across
+  ///     restarts (replaces the in-memory _pendingDeletedGroups list).
+  static const int _version = 17;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -292,6 +295,17 @@ class LocalDatabase {
       // the migration ordering bug (v13 ran after v15) never got these columns.
       await _addColumnIfNotExists(db, 'groups', 'is_deleted', 'INTEGER NOT NULL DEFAULT 0');
       await _addColumnIfNotExists(db, 'groups', 'deleted_at', 'TEXT');
+    }
+    if (oldVersion < 17) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_groups_log (
+          group_id       TEXT PRIMARY KEY,
+          group_name     TEXT NOT NULL,
+          creator_id     TEXT NOT NULL,
+          deleted_by_uid TEXT NOT NULL,
+          deleted_at     TEXT NOT NULL
+        )
+      ''');
     }
   }
 

@@ -169,6 +169,19 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ),
               ]
             : [
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded),
+                  tooltip: 'Refresh',
+                  onPressed: () async {
+                    HapticUtils.lightTap();
+                    await ref.read(syncServiceProvider).performFullSync();
+                    if (!mounted) return;
+                    ref.invalidate(myGroupsProvider);
+                    ref.invalidate(balanceSummaryProvider);
+                    ref.invalidate(recentExpensesProvider);
+                    ref.invalidate(omniActivityProvider);
+                  },
+                ),
                 TextButton(
                   onPressed: _toggleEditMode,
                   child: const Text('Edit'),
