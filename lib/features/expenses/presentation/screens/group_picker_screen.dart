@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../../domain/entities/group.dart';
 
 /// Choose an existing group or create a new one, then go to add expense.
 class GroupPickerScreen extends ConsumerWidget {
@@ -44,7 +45,7 @@ class GroupPickerScreen extends ConsumerWidget {
       body: groupsAsync.when(
         data: (groups) {
           final others = groups
-              .where((g) => g.name != 'Personal' && g.type != 'direct')
+              .where((g) => g.name != 'Personal' && g.type != GroupType.direct)
               .toList();
           return ListView(
             padding: const EdgeInsets.all(16),

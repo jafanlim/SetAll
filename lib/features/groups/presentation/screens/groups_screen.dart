@@ -190,18 +190,40 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       ),
       floatingActionButton: _editMode
           ? null
-          : FloatingActionButton.extended(
-              onPressed: () {
-                HapticUtils.primaryTap();
-                context.push(AppRouter.groupPicker);
-              },
-              backgroundColor: _teal,
-              foregroundColor: Colors.black,
-              icon: const Icon(Icons.add),
-              label: const Text(
-                'Add expense',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-              ),
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                FloatingActionButton(
+                  heroTag: 'fab_new_group',
+                  onPressed: () async {
+                    HapticUtils.primaryTap();
+                    await context.push(AppRouter.createGroup);
+                    if (!mounted) return;
+                    ref.invalidate(myGroupsProvider);
+                  },
+                  backgroundColor: _teal.withValues(alpha: 0.15),
+                  foregroundColor: _teal,
+                  elevation: 2,
+                  tooltip: 'New group',
+                  child: const Icon(Icons.group_add_outlined),
+                ),
+                const SizedBox(height: 12),
+                FloatingActionButton.extended(
+                  heroTag: 'fab_add_expense',
+                  onPressed: () {
+                    HapticUtils.primaryTap();
+                    context.push(AppRouter.groupPicker);
+                  },
+                  backgroundColor: _teal,
+                  foregroundColor: Colors.black,
+                  icon: const Icon(Icons.add),
+                  label: const Text(
+                    'Add expense',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
+                ),
+              ],
             ),
       body: RefreshIndicator(
         color: _teal,
@@ -240,37 +262,16 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               ),
             ),
 
-            // ── Groups section header + Create button ──────────────────────
+            // ── Groups section header ──────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Your groups',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w700, fontSize: 13,
-                          letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ),
-                    if (!_editMode)
-                      TextButton.icon(
-                        onPressed: () async {
-                          HapticUtils.primaryTap();
-                          await context.push(AppRouter.createGroup);
-                          if (!mounted) return;
-                          ref.invalidate(myGroupsProvider);
-                        },
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('New group'),
-                        style: TextButton.styleFrom(
-                          foregroundColor: _teal,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                  ],
+                child: Text(
+                  'Your groups',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w700, fontSize: 13,
+                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ),
