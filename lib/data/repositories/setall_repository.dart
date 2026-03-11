@@ -114,6 +114,9 @@ class SetAllRepository {
   }
 
   Future<String?> ensureUser() async {
+    // Ensure SQLite is open before any caller uses LocalDatabase.db.
+    // This is a no-op once the DB is initialised; awaiting is very cheap.
+    if (!_isWeb) await _db;
     if (_client != null) {
       return _client.auth.currentUser?.id;
     }
@@ -356,6 +359,7 @@ class SetAllRepository {
 
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})>
       _getBalanceRawDataLocal(String uid) async {
+    await _db;
     // Only include expenses from 'normal' groups — exclude 'direct' (friend)
     // groups so the global counter matches the sum of the dashboard group cards.
     final normalGroupRows = await LocalDatabase.db.query(
@@ -457,6 +461,7 @@ class SetAllRepository {
 
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})?>
       _getGroupBalanceRawDataLocal(String uid, String groupId) async {
+    await _db;
     final expenseRows = await LocalDatabase.db.query(
       'expenses',
       where: 'group_id = ?',
