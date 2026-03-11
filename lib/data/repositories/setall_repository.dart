@@ -360,12 +360,12 @@ class SetAllRepository {
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})>
       _getBalanceRawDataLocal(String uid) async {
     await _db;
-    // Only include expenses from 'normal' groups — exclude 'direct' (friend)
-    // groups so the global counter matches the sum of the dashboard group cards.
+    // Only include expenses from non-deleted 'normal' groups — excludes
+    // soft-deleted groups so their balances disappear immediately after deletion.
     final normalGroupRows = await LocalDatabase.db.query(
       'groups',
       columns: ['id'],
-      where: 'type = ?',
+      where: 'type = ? AND (is_deleted IS NULL OR is_deleted = 0)',
       whereArgs: ['normal'],
     );
     final normalGroupIds =
@@ -892,6 +892,55 @@ class SetAllRepository {
         where: 'id = ?',
         whereArgs: [groupId],
       );
+
+      // Cascade-delete all expenses for this group into deleted_expenses,
+      // tagging them with deleted_with_group_id so they can be bulk-restored.
+      final expenseRows = await LocalDatabase.db.query(
+        'expenses',
+        where: 'group_id = ?',
+        whereArgs: [groupId],
+      );
+      for (final ex in expenseRows) {
+        await LocalDatabase.db.insert(
+          'deleted_expenses',
+          {
+            'expense_id':            ex['id'],
+            'description':           ex['description'],
+            'amount':                ex['amount'] ?? ex['total_amount'] ?? '0',
+            'currency':              ex['original_currency'] ?? 'USD',
+            'group_id':              groupId,
+            'group_name':            groupName,
+            'is_income':             ex['is_income'] ?? 0,
+            'category':              ex['category'],
+            'deleted_by':            uid,
+            'deleted_at':            deletedAt,
+            'deleted_with_group_id': groupId,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        // Snapshot splits, then remove them (and the expense) from live tables
+        // so balance queries no longer see them while the group is soft-deleted.
+        final splitRows = await LocalDatabase.db.query(
+          'splits', where: 'expense_id = ?', whereArgs: [ex['id']]);
+        for (final s in splitRows) {
+          await LocalDatabase.db.insert(
+            'deleted_splits',
+            {
+              'id':                    s['id'] ?? '${ex['id']}_${s['user_id']}',
+              'expense_id':            ex['id'],
+              'user_id':               s['user_id'],
+              'amount_owed':           s['amount_owed'],
+              'universal_usd_owed':    s['universal_usd_owed'],
+              'deleted_with_group_id': groupId,
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+        await LocalDatabase.db.delete(
+          'splits', where: 'expense_id = ?', whereArgs: [ex['id']]);
+        await LocalDatabase.db.delete(
+          'expenses', where: 'id = ?', whereArgs: [ex['id']]);
+      }
     } else {
       // ── Non-owner: fully remove local data ────────────────────────────────
       final expenseRows = await LocalDatabase.db.query(
@@ -943,6 +992,66 @@ class SetAllRepository {
       where: 'id = ?',
       whereArgs: [groupId],
     );
+
+    // Restore only the expenses that were cascade-deleted with this group.
+    final cascadeRows = await LocalDatabase.db.query(
+      'deleted_expenses',
+      where: 'deleted_with_group_id = ?',
+      whereArgs: [groupId],
+    );
+    for (final row in cascadeRows) {
+      final expenseId = row['expense_id'] as String;
+      // Only restore if the expense no longer exists in the live table.
+      final existing = await LocalDatabase.db.query(
+        'expenses', columns: ['id'],
+        where: 'id = ?', whereArgs: [expenseId],
+      );
+      if (existing.isEmpty) {
+        await LocalDatabase.db.insert(
+          'expenses',
+          {
+            'id':                expenseId,
+            'group_id':          row['group_id'],
+            'payer_id':          uid,
+            'description':       row['description'],
+            'amount':            row['amount'],
+            'original_currency': row['currency'],
+            'is_income':         row['is_income'] ?? 0,
+            'category':          row['category'],
+            'created_at':        row['deleted_at'],
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        // Restore the snapshotted splits for this expense.
+        final savedSplits = await LocalDatabase.db.query(
+          'deleted_splits',
+          where: 'expense_id = ?',
+          whereArgs: [expenseId],
+        );
+        for (final s in savedSplits) {
+          await LocalDatabase.db.insert(
+            'splits',
+            {
+              'id':                 s['id'],
+              'expense_id':         expenseId,
+              'user_id':            s['user_id'],
+              'amount_owed':        s['amount_owed'],
+              'universal_usd_owed': s['universal_usd_owed'],
+            },
+            conflictAlgorithm: ConflictAlgorithm.ignore,
+          );
+        }
+      }
+      // Clean up snapshot rows.
+      await LocalDatabase.db.delete(
+        'deleted_expenses',
+        where: 'expense_id = ?', whereArgs: [expenseId],
+      );
+      await LocalDatabase.db.delete(
+        'deleted_splits',
+        where: 'expense_id = ?', whereArgs: [expenseId],
+      );
+    }
 
     // Supabase groups table has no is_deleted column — restore is local-only.
 

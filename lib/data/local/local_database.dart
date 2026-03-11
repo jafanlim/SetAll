@@ -50,7 +50,13 @@ class LocalDatabase {
   /// Schema v17 adds:
   ///   • deleted_groups_log – persists group-deletion audit events across
   ///     restarts (replaces the in-memory _pendingDeletedGroups list).
-  static const int _version = 17;
+  /// Schema v18 adds:
+  ///   • deleted_expenses.deleted_with_group_id – non-null when an expense was
+  ///     cascade-deleted as part of a group soft-delete. Used to restore those
+  ///     expenses when the group itself is restored.
+  ///   • deleted_splits – snapshot of splits removed during a group soft-delete
+  ///     so they can be re-inserted when the group is restored.
+  static const int _version = 18;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -314,6 +320,20 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 18) {
+      await _addColumnIfNotExists(
+        db, 'deleted_expenses', 'deleted_with_group_id', 'TEXT');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_splits (
+          id                   TEXT PRIMARY KEY,
+          expense_id           TEXT NOT NULL,
+          user_id              TEXT NOT NULL,
+          amount_owed          TEXT,
+          universal_usd_owed   TEXT,
+          deleted_with_group_id TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -445,17 +465,28 @@ class LocalDatabase {
     ''');
     await db.execute('''
       CREATE TABLE deleted_expenses (
-        expense_id   TEXT PRIMARY KEY,
-        description  TEXT,
-        amount       TEXT NOT NULL,
-        currency     TEXT,
-        group_id     TEXT,
-        group_name   TEXT,
-        is_income    INTEGER NOT NULL DEFAULT 0,
-        category     TEXT,
-        deleted_by   TEXT NOT NULL,
-        deleted_by_name TEXT,
-        deleted_at   TEXT NOT NULL
+        expense_id            TEXT PRIMARY KEY,
+        description           TEXT,
+        amount                TEXT NOT NULL,
+        currency              TEXT,
+        group_id              TEXT,
+        group_name            TEXT,
+        is_income             INTEGER NOT NULL DEFAULT 0,
+        category              TEXT,
+        deleted_by            TEXT NOT NULL,
+        deleted_by_name       TEXT,
+        deleted_at            TEXT NOT NULL,
+        deleted_with_group_id TEXT        -- Schema v18: set when cascade-deleted with a group
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE deleted_splits (
+        id                    TEXT PRIMARY KEY,
+        expense_id            TEXT NOT NULL,
+        user_id               TEXT NOT NULL,
+        amount_owed           TEXT,
+        universal_usd_owed    TEXT,
+        deleted_with_group_id TEXT NOT NULL  -- Schema v18
       )
     ''');
   }
