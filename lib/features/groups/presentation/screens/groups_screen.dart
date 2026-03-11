@@ -240,16 +240,37 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               ),
             ),
 
-            // ── Groups section header ─────────────────────────────────────
+            // ── Groups section header + Create button ──────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-                child: Text(
-                  'Your groups',
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700, fontSize: 13,
-                    letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Your groups',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w700, fontSize: 13,
+                          letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    if (!_editMode)
+                      TextButton.icon(
+                        onPressed: () async {
+                          HapticUtils.primaryTap();
+                          await context.push(AppRouter.createGroup);
+                          if (!mounted) return;
+                          ref.invalidate(myGroupsProvider);
+                        },
+                        icon: const Icon(Icons.add, size: 16),
+                        label: const Text('New group'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: _teal,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ),
@@ -262,7 +283,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                         child: Center(
                           child: Text(
-                            'No groups yet. Tap Add expense to create one.',
+                            'No groups yet. Tap New group to create one.',
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
