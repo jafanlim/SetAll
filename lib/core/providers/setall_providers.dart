@@ -12,39 +12,7 @@ import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
 import '../../domain/entities/activity_event.dart';
-
-// Supported currencies with display names and emoji flags.
-// "Most used" group shown first in pickers.
-const List<Map<String, String>> kMostUsedCurrencies = [
-  {'code': 'USD', 'name': 'US Dollar',        'flag': '🇺🇸'},
-  {'code': 'EUR', 'name': 'Euro',              'flag': '🇪🇺'},
-  {'code': 'GBP', 'name': 'British Pound',     'flag': '🇬🇧'},
-  {'code': 'GEL', 'name': 'Georgian Lari',     'flag': '🇬🇪'},
-  {'code': 'AED', 'name': 'UAE Dirham',        'flag': '🇦🇪'},
-];
-
-const List<Map<String, String>> kAllSupportedCurrencies = [
-  {'code': 'USD', 'name': 'US Dollar',        'flag': '🇺🇸'},
-  {'code': 'EUR', 'name': 'Euro',              'flag': '🇪🇺'},
-  {'code': 'GBP', 'name': 'British Pound',     'flag': '🇬🇧'},
-  {'code': 'GEL', 'name': 'Georgian Lari',     'flag': '🇬🇪'},
-  {'code': 'AED', 'name': 'UAE Dirham',        'flag': '🇦🇪'},
-  {'code': 'TRY', 'name': 'Turkish Lira',      'flag': '🇹🇷'},
-  {'code': 'PLN', 'name': 'Polish Złoty',      'flag': '🇵🇱'},
-  {'code': 'CAD', 'name': 'Canadian Dollar',   'flag': '🇨🇦'},
-  {'code': 'AUD', 'name': 'Australian Dollar', 'flag': '🇦🇺'},
-  {'code': 'CHF', 'name': 'Swiss Franc',       'flag': '🇨🇭'},
-  {'code': 'JPY', 'name': 'Japanese Yen',      'flag': '🇯🇵'},
-  {'code': 'CNY', 'name': 'Chinese Yuan',      'flag': '🇨🇳'},
-  {'code': 'INR', 'name': 'Indian Rupee',      'flag': '🇮🇳'},
-  {'code': 'BRL', 'name': 'Brazilian Real',    'flag': '🇧🇷'},
-  {'code': 'MXN', 'name': 'Mexican Peso',      'flag': '🇲🇽'},
-  {'code': 'SEK', 'name': 'Swedish Krona',     'flag': '🇸🇪'},
-  {'code': 'NOK', 'name': 'Norwegian Krone',   'flag': '🇳🇴'},
-  {'code': 'DKK', 'name': 'Danish Krone',      'flag': '🇩🇰'},
-  {'code': 'SGD', 'name': 'Singapore Dollar',  'flag': '🇸🇬'},
-  {'code': 'HKD', 'name': 'Hong Kong Dollar',  'flag': '🇭🇰'},
-];
+export '../constants/currencies.dart';
 
 // ---------------------------------------------------------------------------
 // Infrastructure providers
