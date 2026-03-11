@@ -236,7 +236,7 @@ final class AppRouter {
           name: 'addExpense',
           pageBuilder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
-            return MaterialPage(
+            return NoTransitionPage(
               child: Material(
                 color: Theme.of(context).colorScheme.surface,
                 child: AddExpenseScreen(

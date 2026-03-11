@@ -2684,13 +2684,29 @@ class SetAllRepository {
     
           if (await _isOnline && _client != null) {
             try {
+              // Coerce is_income to bool for Supabase (local DB stores int 0/1).
+              final supabaseExpenseData = {
+                ...expenseData,
+                'is_income': expense.isIncome,
+                'group_id': (expenseData['group_id'] as String?)?.isEmpty == true
+                    ? null
+                    : expenseData['group_id'],
+              };
               await _client
                   .from('expenses')
-                  .update(expenseData) // created_at already stripped
+                  .update(supabaseExpenseData)
                   .eq('id', expenseId);
-              await _client.from('splits').delete().eq('expense_id', expenseId);
+              // Delete old splits then upsert new ones. Delete may fail if RLS
+              // restricts it — fall through to upsert which will overwrite via
+              // the UNIQUE(expense_id, user_id) conflict resolution.
+              try {
+                await _client.from('splits').delete().eq('expense_id', expenseId);
+              } catch (_) {}
               for (final split in updatedSplitModels) {
-                await _client.from('splits').insert(split.toJson());
+                await _client.from('splits').upsert(
+                  split.toJson(),
+                  onConflict: 'expense_id,user_id',
+                );
               }
               await LocalDatabase.db.update(
                 'expenses',
@@ -2698,6 +2714,15 @@ class SetAllRepository {
                 where: 'id = ?',
                 whereArgs: [expenseId],
               );
+              // Mark new splits as synced so SyncService doesn't re-push them.
+              for (final split in updatedSplitModels) {
+                await LocalDatabase.db.update(
+                  'splits',
+                  {'synced_at': DateTime.now().millisecondsSinceEpoch},
+                  where: 'id = ?',
+                  whereArgs: [split.id],
+                );
+              }
             } catch (e) {
               if (e is PostgrestException) {
                 debugPrint(
@@ -2761,6 +2786,9 @@ class SetAllRepository {
         {
           'expense_id':      expenseId,
           'description':     row['description'],
+          // original_amount: the raw entered amount (e.g. 15000 VND)
+          'original_amount': row['amount'],
+          // amount: the USD anchor — used for balance calculations on restore
           'amount':          row['universal_usd_amount'] ?? row['amount'],
           'currency':        row['original_currency'] ?? row['currency'] ?? 'USD',
           'group_id':        gid,
@@ -2809,19 +2837,25 @@ class SetAllRepository {
     if ((snap['deleted_by'] as String?) != uid) return false;
 
     final now = _now();
+    // original_amount is the raw entered amount (e.g. 15000 VND).
+    // amount (USD anchor) is stored in snap['amount'].
+    // Prefer original_amount for the live expenses.amount column so the UI
+    // shows the correct value; keep USD anchor in universal_usd_amount.
+    final originalAmount = snap['original_amount'] ?? snap['amount'];
+    final usdAnchor = snap['amount'];
     final restoredExpense = {
-      'id':         expenseId,
-      'group_id':   snap['group_id'],
-      'payer_id':   uid,
-      'amount':     snap['amount'],
-      'is_income':  snap['is_income'],
-      'description': snap['description'] ?? '',
-      'currency':   snap['currency'] ?? 'USD',
-      'category':   snap['category'] ?? 'Other',
-      'universal_usd_amount': snap['amount'],
-      'created_at': now,
-      'updated_at': now,
-      'synced_at':  null,
+      'id':                   expenseId,
+      'group_id':             snap['group_id'],
+      'payer_id':             uid,
+      'amount':               originalAmount,
+      'is_income':            snap['is_income'],
+      'description':          snap['description'] ?? '',
+      'currency':             snap['currency'] ?? 'USD',
+      'category':             snap['category'] ?? 'Other',
+      'universal_usd_amount': usdAnchor,
+      'created_at':           now,
+      'updated_at':           now,
+      'synced_at':            null,
     };
 
     await LocalDatabase.db.insert(
@@ -2836,15 +2870,15 @@ class SetAllRepository {
     if (await _isOnline && _client != null) {
       try {
         await _client.from('expenses').upsert({
-          'id':        expenseId,
-          'group_id':  snap['group_id'],
-          'payer_id':  uid,
-          'amount':    snap['amount'],
-          'is_income': (snap['is_income'] as int?) == 1,
-          'description': snap['description'] ?? '',
-          'currency':  snap['currency'] ?? 'USD',
-          'category':  snap['category'] ?? 'Other',
-          'universal_usd_amount': snap['amount'],
+          'id':                   expenseId,
+          'group_id':             snap['group_id'],
+          'payer_id':             uid,
+          'amount':               originalAmount,
+          'is_income':            (snap['is_income'] as int?) == 1,
+          'description':          snap['description'] ?? '',
+          'currency':             snap['currency'] ?? 'USD',
+          'category':             snap['category'] ?? 'Other',
+          'universal_usd_amount': usdAnchor,
         });
         await LocalDatabase.db.update(
           'expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
