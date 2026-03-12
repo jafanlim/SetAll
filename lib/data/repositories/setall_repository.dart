@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:decimal/decimal.dart';
+import 'package:path/path.dart' as p;
+import '../../core/utils/attachment_processor.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -1742,6 +1744,60 @@ class SetAllRepository {
     return rows.map<SplitModel>((row) => _rowToSplit(row)).toList();
   }
 
+  /// Upload local file paths to Supabase Storage under {uid}/{expenseId}/.
+  /// • Images/PDFs are processed (→ WebP, ≤1200 px, EXIF stripped) via AttachmentProcessor.
+  /// • .txt/.md files are text-only: their content is NOT uploaded; callers handle notes.
+  /// • Paths that don't look like local paths (no leading / or \) are already storage
+  ///   paths and are passed through unchanged.
+  /// Returns the list of final storage paths.
+  Future<List<String>> _uploadAttachments({
+    required String uid,
+    required String expenseId,
+    required List<String> paths,
+  }) async {
+    if (_client == null || paths.isEmpty) return [];
+    final result = <String>[];
+    for (final path in paths) {
+      final isLocalPath = path.startsWith('/') || path.contains('\\');
+      if (!isLocalPath) {
+        result.add(path);
+        continue;
+      }
+      try {
+        final processed = await AttachmentProcessor.process(path);
+        if (processed == null) {
+          debugPrint('[uploadAttachments] unsupported or failed: $path');
+          continue;
+        }
+        if (processed.isTextOnly) continue; // text content handled separately
+        final bytes    = processed.bytes!;
+        final filename = processed.storedFilename ?? '${p.basenameWithoutExtension(path)}.webp';
+        final storagePath = '$uid/$expenseId/$filename';
+        await _client!.storage
+            .from('expense-attachments')
+            .uploadBinary(storagePath, bytes, fileOptions: const FileOptions(upsert: true));
+        result.add(storagePath);
+        debugPrint('[uploadAttachments] uploaded $filename → $storagePath');
+      } catch (e) {
+        debugPrint('[uploadAttachments] failed for $path: $e');
+      }
+    }
+    return result;
+  }
+
+  /// Returns a signed URL (valid 1 hour) for a storage path from expense attachments.
+  Future<String?> generateAttachmentSignedUrl(String storagePath) async {
+    if (_client == null) return null;
+    try {
+      return await _client!.storage
+          .from('expense-attachments')
+          .createSignedUrl(storagePath, 3600);
+    } catch (e) {
+      debugPrint('[generateAttachmentSignedUrl] $e');
+      return null;
+    }
+  }
+
   /// Add an expense. Offline-first on mobile; Supabase-only on web.
   ///
   /// The [universal_usd_amount] (USD anchor) is calculated internally via
@@ -1759,11 +1815,20 @@ class SetAllRepository {
     Decimal? originalAmount,
     String? originalCurrency,
     String? exchangeRateApplied,
+    int? iconCodepoint,
+    int? iconColor,
+    List<String> attachmentPaths = const [],
+    String? notes,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
     final expenseId = const Uuid().v4();
     final now = _now();
+
+    // Upload any local file paths to Supabase Storage.
+    final attachmentUrls = !kIsWeb
+        ? await _uploadAttachments(uid: uid, expenseId: expenseId, paths: attachmentPaths)
+        : <String>[];
 
     // -- Anchor logic: Always compute USD value --
     Decimal rateToUsd = Decimal.one;
@@ -1788,12 +1853,14 @@ class SetAllRepository {
             originalCurrency: originalCurrency,
             exchangeRateApplied: exchangeRateApplied ?? rateToUsd.toString(),
             universalUsdAmount: universalUsdAmount.toString(),
+            iconCodepoint: iconCodepoint,
+            iconColor: iconColor,
+            attachmentUrls: attachmentUrls.isEmpty ? null : attachmentUrls,
+            notes: notes,
           );
     
           final expenseData = expense.toJson();
-          // Strip local-only / schema-mismatched fields before sending to Supabase.
-          // Remap is_income: SQLite stores 0/1 int, Postgres expects boolean.
-          // Also coerce empty-string groupId to null (wallet entries).
+          // Remap is_income (SQLite 0/1 → Postgres bool) and coerce empty groupId → null.
           final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
             ..remove('created_by')
             ..remove('base_amount_at_entry')
@@ -2535,10 +2602,19 @@ class SetAllRepository {
     required List<SplitInsert> splits,
     String category = 'General',
     bool isIncome = false,
+    int? iconCodepoint,
+    int? iconColor,
+    List<String> attachmentPaths = const [],
+    String? notes,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
     final now = _now();
+
+    // Upload any new local paths; existing storage paths are passed through as-is.
+    final finalAttachmentUrls = !kIsWeb
+        ? await _uploadAttachments(uid: uid, expenseId: expenseId, paths: attachmentPaths)
+        : <String>[];
 
     // Coerce empty string to null so wallet entries stay group_id IS NULL.
     final effectiveGroupId = groupId.isEmpty ? null : groupId;
@@ -2563,18 +2639,28 @@ class SetAllRepository {
             universalUsdAmount: universalUsdAmount.toString(),
             exchangeRateApplied: rateToUsd.toString(),
             createdBy: uid,
+            iconCodepoint: iconCodepoint,
+            iconColor: iconColor,
+            attachmentUrls: finalAttachmentUrls.isEmpty ? null : finalAttachmentUrls,
+            notes: notes,
           );
     
-          // Strip created_at and created_by — Supabase schema doesn't have created_by.
+          // Full data for local SQLite.
           final expenseData = expense.toJson()
             ..remove('created_at')
             ..remove('created_by');
+          // Supabase payload: remap types only.
+          final supabaseExpenseData = Map<String, dynamic>.from(expenseData);
     
           if (_isWeb && _client != null) {
             try {
               await _client
                   .from('expenses')
-                  .update(expenseData)
+                  .update({
+                    ...supabaseExpenseData,
+                    'is_income': expense.isIncome,
+                    'group_id': (supabaseExpenseData['group_id'] as String?)?.isEmpty == true ? null : supabaseExpenseData['group_id'],
+                  })
                   .eq('id', expenseId);
               await _client.from('splits').delete().eq('expense_id', expenseId);
               for (final s in splits) {
@@ -2685,16 +2771,16 @@ class SetAllRepository {
           if (await _isOnline && _client != null) {
             try {
               // Coerce is_income to bool for Supabase (local DB stores int 0/1).
-              final supabaseExpenseData = {
-                ...expenseData,
+              final onlineSyncData = {
+                ...supabaseExpenseData,
                 'is_income': expense.isIncome,
-                'group_id': (expenseData['group_id'] as String?)?.isEmpty == true
+                'group_id': (supabaseExpenseData['group_id'] as String?)?.isEmpty == true
                     ? null
-                    : expenseData['group_id'],
+                    : supabaseExpenseData['group_id'],
               };
               await _client
                   .from('expenses')
-                  .update(supabaseExpenseData)
+                  .update(onlineSyncData)
                   .eq('id', expenseId);
               // Delete old splits then upsert new ones. Delete may fail if RLS
               // restricts it — fall through to upsert which will overwrite via

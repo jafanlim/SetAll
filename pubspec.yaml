@@ -70,6 +70,12 @@ dependencies:
   # File picker (wallet entry attachments)
   file_picker: ^8.1.2
 
+  # On-device image compression → WebP (strips EXIF, resizes)
+  flutter_image_compress: ^2.3.0
+
+  # PDF rendering: extract page 1 → image → WebP
+  pdfx: ^2.8.0
+
   # Deep linking — catches setall:// OAuth/email redirects on Windows (and mobile)
   app_links: ^6.4.0
 

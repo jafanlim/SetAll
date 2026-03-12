@@ -20,6 +20,9 @@ const _orange    = Color(0xFFFF8C42);
 const _orangeDim = Color(0x26FF8C42);
 const _brandOrange = Color(0xFFF97316);
 
+enum _WalletFilter { all, income, expense }
+enum _WalletSort   { newest, oldest, largest, smallest }
+
 /// Standalone Wallet screen — personal cash balance, true net worth,
 /// spending breakdown, and a selectable recent entries list.
 class WalletScreen extends ConsumerStatefulWidget {
@@ -32,6 +35,10 @@ class WalletScreen extends ConsumerStatefulWidget {
 class _WalletScreenState extends ConsumerState<WalletScreen> {
   bool _editMode = false;
   final Set<String> _selected = {};
+  _WalletFilter _filter      = _WalletFilter.all;
+  _WalletSort   _sort        = _WalletSort.newest;
+  String?       _catFilter;   // non-null → show only this category
+  Color?        _colorFilter; // non-null → show only entries with this accent color
 
   void _toggleEditMode() {
     HapticUtils.selection();
@@ -132,6 +139,44 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     context.push(AppRouter.walletEntryDetail, extra: expense);
   }
 
+  List<ExpenseModel> _applyFilterSort(List<ExpenseModel> all) {
+    var list = all.where((e) {
+      if (_colorFilter != null) {
+        final c = e.iconColor != null ? Color(e.iconColor!) : null;
+        if (c?.toARGB32() != _colorFilter!.toARGB32()) return false;
+      }
+      if (_catFilter != null) {
+        final cat = e.category.isEmpty ? 'General' : e.category;
+        return cat == _catFilter;
+      }
+      switch (_filter) {
+        case _WalletFilter.all:     return true;
+        case _WalletFilter.income:  return e.isIncome;
+        case _WalletFilter.expense: return !e.isIncome;
+      }
+    }).toList();
+
+    switch (_sort) {
+      case _WalletSort.newest:
+        list.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+      case _WalletSort.oldest:
+        list.sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
+      case _WalletSort.largest:
+        list.sort((a, b) {
+          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          return bv.compareTo(av);
+        });
+      case _WalletSort.smallest:
+        list.sort((a, b) {
+          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          return av.compareTo(bv);
+        });
+    }
+    return list;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme         = Theme.of(context);
@@ -141,9 +186,10 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final baseCcyAsync  = ref.watch(baseCurrencyProvider);
     final baseCurrency  = baseCcyAsync.valueOrNull ?? 'USD';
 
-    final expenses = personalAsync.valueOrNull ?? [];
-    final allIds   = expenses.map((e) => e.id).toList();
-    final allSelected = allIds.isNotEmpty && allIds.every(_selected.contains);
+    final allExpenses  = personalAsync.valueOrNull ?? [];
+    final expenses     = _applyFilterSort(allExpenses);
+    final allIds       = expenses.map((e) => e.id).toList();
+    final allSelected  = allIds.isNotEmpty && allIds.every(_selected.contains);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -175,6 +221,19 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
               ]
             : [
+                // Sort menu
+                PopupMenuButton<_WalletSort>(
+                  icon: const Icon(Icons.sort_rounded),
+                  tooltip: 'Sort',
+                  initialValue: _sort,
+                  onSelected: (s) { HapticUtils.selection(); setState(() => _sort = s); },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: _WalletSort.newest,   child: Text('Newest first')),
+                    PopupMenuItem(value: _WalletSort.oldest,   child: Text('Oldest first')),
+                    PopupMenuItem(value: _WalletSort.largest,  child: Text('Largest first')),
+                    PopupMenuItem(value: _WalletSort.smallest, child: Text('Smallest first')),
+                  ],
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'Refresh',
@@ -237,88 +296,247 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ),
             ),
 
-            // ── Spending Breakdown ───────────────────────────────────────
+            // ── Filter chips ─────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 6),
-                child: Text('Spending breakdown',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700, fontSize: 13,
-                      letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
-                    )),
-              ),
-            ),
-            personalAsync.when(
-              data: (exp) {
-                final spend = <String, Decimal>{};
-                for (final e in exp) {
-                  if (e.isIncome) continue;
-                  final cat    = e.category.isEmpty ? 'General' : e.category;
-                  // Use originalAmount in originalCurrency when available and
-                  // the entry currency matches baseCurrency — avoids double-converting.
-                  // Otherwise fall back to universalUsdAmount (stored in USD)
-                  // which walletBalanceProvider already converted for the hero total.
-                  // For the breakdown we mirror the same logic: use the USD amount
-                  // as a proxy (exact per-entry conversion would require async).
-                  // The breakdown proportions are correct; only the absolute numbers
-                  // vary by currency and are consistent with the hero total above.
-                  final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
-                  final entryBaseCcy = e.originalCurrency ?? e.currency;
-                  // If the entry was recorded in the current base currency, use
-                  // the original amount directly (no conversion needed).
-                  final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
-                      ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
-                      : rawUsd;
-                  spend[cat] = (spend[cat] ?? Decimal.zero) + amt;
-                }
-                if (spend.isEmpty) {
-                  return SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-                      child: Center(
-                        child: Column(children: [
-                          Icon(Icons.account_balance_wallet_outlined,
-                              size: 48, color: theme.colorScheme.onSurfaceVariant),
-                          const SizedBox(height: 16),
-                          Text('No personal expenses yet',
-                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
-                                  color: theme.colorScheme.onSurface)),
-                          const SizedBox(height: 8),
-                          Text('Tap + to add your first wallet entry.',
-                              style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
-                              textAlign: TextAlign.center),
-                        ]),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _FilterChip(
+                        label: 'All',
+                        selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.all,
+                        onTap: () => setState(() { _filter = _WalletFilter.all; _catFilter = null; _colorFilter = null; }),
                       ),
-                    ),
-                  );
-                }
-                final sorted = spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-                final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
-                return SliverList(
-                  delegate: SliverChildBuilderDelegate(
-                    (ctx, i) => _CategoryRow(category: sorted[i].key, amount: sorted[i].value, total: total),
-                    childCount: sorted.length,
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Income',
+                        selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.income,
+                        color: _teal,
+                        onTap: () => setState(() { _filter = _WalletFilter.income; _catFilter = null; _colorFilter = null; }),
+                      ),
+                      const SizedBox(width: 8),
+                      _FilterChip(
+                        label: 'Expense',
+                        selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.expense,
+                        color: _purple,
+                        onTap: () => setState(() { _filter = _WalletFilter.expense; _catFilter = null; _colorFilter = null; }),
+                      ),
+                      // Color filter dots — one per unique accent color used in entries
+                      ...() {
+                        final entries = personalAsync.valueOrNull ?? [];
+                        final seen = <int>{};
+                        final colors = <Color>[];
+                        for (final e in entries) {
+                          if (e.iconColor != null && seen.add(e.iconColor!)) {
+                            colors.add(Color(e.iconColor!));
+                          }
+                        }
+                        if (colors.isEmpty) return <Widget>[];
+                        return [
+                          const SizedBox(width: 4),
+                          Container(width: 1, height: 20,
+                            color: Theme.of(context).colorScheme.outlineVariant),
+                          const SizedBox(width: 4),
+                          ...colors.map((c) {
+                            final isSelected = _colorFilter?.toARGB32() == c.toARGB32();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: GestureDetector(
+                                onTap: () => setState(() {
+                                  _colorFilter = isSelected ? null : c;
+                                  if (!isSelected) { _catFilter = null; }
+                                }),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 160),
+                                  width: 28, height: 28,
+                                  decoration: BoxDecoration(
+                                    color: c,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: isSelected ? Colors.white : Colors.transparent,
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: isSelected
+                                        ? [BoxShadow(color: c.withAlpha(160), blurRadius: 6, spreadRadius: 1)]
+                                        : null,
+                                  ),
+                                  child: isSelected
+                                      ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                      : null,
+                                ),
+                              ),
+                            );
+                          }),
+                        ];
+                      }(),
+                      if (_catFilter != null) ...[
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: _catFilter!,
+                          selected: true,
+                          color: _orange,
+                          onTap: () => setState(() => _catFilter = null),
+                          trailing: const Icon(Icons.close, size: 12, color: Colors.white),
+                        ),
+                      ],
+                    ],
                   ),
-                );
-              },
-              loading: () => const SliverToBoxAdapter(
-                child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
+                ),
               ),
-              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
             ),
 
-            // ── Recent Entries ───────────────────────────────────────────
-            if (expenses.isNotEmpty) ...[
+            // ── Spending Breakdown ───────────────────────────────────────
+            if (_catFilter == null && _filter != _WalletFilter.income) ...[
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
-                  child: Text('Recent entries',
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                  child: Text('Spending breakdown',
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 13,
                         letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
                       )),
                 ),
               ),
+              personalAsync.when(
+                data: (exp) {
+                  final spend = <String, Decimal>{};
+                  for (final e in exp) {
+                    if (e.isIncome) continue;
+                    final cat    = e.category.isEmpty ? 'General' : e.category;
+                    final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                    final entryBaseCcy = e.originalCurrency ?? e.currency;
+                    final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
+                        ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
+                        : rawUsd;
+                    spend[cat] = (spend[cat] ?? Decimal.zero) + amt;
+                  }
+                  if (spend.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  final sorted = spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+                  final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) => _CategoryRow(
+                        category: sorted[i].key,
+                        amount: sorted[i].value,
+                        total: total,
+                        accentColor: _purple,
+                        onTap: () {
+                          HapticUtils.selection();
+                          setState(() => _catFilter = sorted[i].key);
+                        },
+                      ),
+                      childCount: sorted.length,
+                    ),
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(
+                  child: Padding(padding: EdgeInsets.all(24), child: Center(child: CircularProgressIndicator())),
+                ),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              ),
+            ],
+
+            // ── Income Breakdown ─────────────────────────────────────────
+            if (_catFilter == null && _filter != _WalletFilter.expense) ...[
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
+                  child: Text('Income breakdown',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700, fontSize: 13,
+                        letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                      )),
+                ),
+              ),
+              personalAsync.when(
+                data: (exp) {
+                  final income = <String, Decimal>{};
+                  for (final e in exp) {
+                    if (!e.isIncome) continue;
+                    final cat    = e.category.isEmpty ? 'General' : e.category;
+                    final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                    final entryBaseCcy = e.originalCurrency ?? e.currency;
+                    final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
+                        ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
+                        : rawUsd;
+                    income[cat] = (income[cat] ?? Decimal.zero) + amt;
+                  }
+                  if (income.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  final sorted = income.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+                  final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (ctx, i) => _CategoryRow(
+                        category: sorted[i].key,
+                        amount: sorted[i].value,
+                        total: total,
+                        accentColor: _teal,
+                        onTap: () {
+                          HapticUtils.selection();
+                          setState(() { _catFilter = sorted[i].key; _filter = _WalletFilter.income; });
+                        },
+                      ),
+                      childCount: sorted.length,
+                    ),
+                  );
+                },
+                loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+                error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              ),
+            ],
+
+            // ── Entries list ─────────────────────────────────────────────
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 6),
+                child: Row(
+                  children: [
+                    Text(
+                      _catFilter != null
+                          ? _catFilter!
+                          : (_filter == _WalletFilter.income ? 'Income entries'
+                              : _filter == _WalletFilter.expense ? 'Expense entries'
+                              : 'All entries'),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700, fontSize: 13,
+                        letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      '${expenses.length} entr${expenses.length == 1 ? 'y' : 'ies'}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant, fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            if (expenses.isEmpty)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 32),
+                  child: Center(
+                    child: Column(children: [
+                      Icon(Icons.account_balance_wallet_outlined,
+                          size: 48, color: theme.colorScheme.onSurfaceVariant),
+                      const SizedBox(height: 16),
+                      Text('No entries found',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
+                              color: theme.colorScheme.onSurface)),
+                      const SizedBox(height: 8),
+                      Text('Try a different filter or add a new entry.',
+                          style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
+                          textAlign: TextAlign.center),
+                    ]),
+                  ),
+                ),
+              )
+            else
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) => _WalletEntryRow(
@@ -332,7 +550,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   childCount: expenses.length,
                 ),
               ),
-            ],
 
             const SliverToBoxAdapter(child: SizedBox(height: 112)),
           ],
@@ -476,6 +693,14 @@ class _BalancePill extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Wallet entry row — tap to edit, right-click context menu, checkbox in edit mode
 // ---------------------------------------------------------------------------
+/// Smart amount formatter: 4 decimal places for values < 0.01, else 2.
+String _fmtAmt(Decimal d) {
+  if (d == Decimal.zero) return '0.00';
+  final abs = d.abs();
+  if (abs < Decimal.parse('0.01')) return d.toStringAsFixed(4);
+  return d.toStringAsFixed(2);
+}
+
 class _WalletEntryRow extends ConsumerWidget {
   const _WalletEntryRow({
     required this.expense,
@@ -502,7 +727,17 @@ class _WalletEntryRow extends ConsumerWidget {
     final desc       = expense.description.isEmpty ? 'Wallet entry' : expense.description;
     final baseCcy    = ref.watch(baseCurrencyProvider).valueOrNull ?? 'USD';
     final usdAmt     = Decimal.tryParse(expense.universalUsdAmount ?? '') ?? Decimal.zero;
-    final showEquiv  = ccy != baseCcy && usdAmt > Decimal.zero;
+
+    // Prefer original currency/amount for the main display (e.g. "100 VND").
+    // Fall back to the stored base-currency amount when no conversion occurred.
+    final hasOrig   = expense.originalCurrency != null &&
+        expense.originalAmount != null &&
+        expense.originalCurrency != ccy;
+    final dispAmt   = hasOrig
+        ? (Decimal.tryParse(expense.originalAmount!) ?? amt)
+        : amt;
+    final dispCcy   = hasOrig ? expense.originalCurrency! : ccy;
+    final showEquiv = dispCcy != baseCcy && usdAmt > Decimal.zero;
 
     final tile = GestureDetector(
       onTap: editMode ? onToggle : onEdit,
@@ -535,18 +770,38 @@ class _WalletEntryRow extends ConsumerWidget {
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                   ),
                 ),
-              Container(
-                width: 36, height: 36,
-                decoration: BoxDecoration(
-                  color: isIncome ? _teal.withAlpha(28) : _purple.withAlpha(28),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                  size: 16,
-                  color: isIncome ? _teal : _purple,
-                ),
-              ),
+              Builder(builder: (ctx) {
+                final entryColor = expense.iconColor != null
+                    ? Color(expense.iconColor!)
+                    : (isIncome ? _teal : _purple);
+                final entryIcon = expense.iconCodepoint != null
+                    ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
+                    : (isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Accent stripe
+                    Container(
+                      width: 4, height: 44,
+                      decoration: BoxDecoration(
+                        color: entryColor,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Icon on neutral bg
+                    Container(
+                      width: 34, height: 34,
+                      decoration: BoxDecoration(
+                        color: Theme.of(ctx).colorScheme.surfaceContainerHighest.withAlpha(80),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(entryIcon, size: 16,
+                          color: Theme.of(ctx).colorScheme.onSurface.withAlpha(180)),
+                    ),
+                  ],
+                );
+              }),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
@@ -568,7 +823,7 @@ class _WalletEntryRow extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    '${isIncome ? '+' : '-'}$ccy ${amt.toStringAsFixed(2)}',
+                    '${isIncome ? '+' : '-'}$dispCcy ${_fmtAmt(dispAmt)}',
                     style: TextStyle(
                       fontWeight: FontWeight.w700,
                       fontSize: 13,
@@ -577,7 +832,7 @@ class _WalletEntryRow extends ConsumerWidget {
                   ),
                   if (showEquiv)
                     Text(
-                      '≈ $baseCcy ${usdAmt.toStringAsFixed(2)}',
+                      '≈ $baseCcy ${_fmtAmt(usdAmt)}',
                       style: TextStyle(
                         fontSize: 10,
                         color: theme.colorScheme.onSurfaceVariant,
@@ -626,11 +881,15 @@ class _CategoryRow extends StatelessWidget {
     required this.category,
     required this.amount,
     required this.total,
+    this.onTap,
+    this.accentColor = _purple,
   });
 
-  final String  category;
-  final Decimal amount;
-  final Decimal total;
+  final String       category;
+  final Decimal      amount;
+  final Decimal      total;
+  final VoidCallback? onTap;
+  final Color        accentColor;
 
   static const Map<String, IconData> _icons = {
     'Food & drink':      Icons.restaurant_outlined,
@@ -651,7 +910,9 @@ class _CategoryRow extends StatelessWidget {
         : 0.0;
     final icon  = _icons[category] ?? Icons.category_outlined;
 
-    return Padding(
+    return GestureDetector(
+      onTap: onTap,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       child: GlassCard(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
@@ -660,10 +921,10 @@ class _CategoryRow extends StatelessWidget {
             Container(
               width: 36, height: 36,
               decoration: BoxDecoration(
-                color: _purple.withAlpha(28),
+                color: accentColor.withAlpha(28),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: Icon(icon, size: 16, color: _purple),
+              child: Icon(icon, size: 16, color: accentColor),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -678,8 +939,8 @@ class _CategoryRow extends StatelessWidget {
                     borderRadius: BorderRadius.circular(3),
                     child: LinearProgressIndicator(
                       value: pct / 100,
-                      backgroundColor: _purple.withAlpha(22),
-                      color: _purple,
+                      backgroundColor: accentColor.withAlpha(22),
+                      color: accentColor,
                       minHeight: 4,
                     ),
                   ),
@@ -691,12 +952,65 @@ class _CategoryRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
                 Text('USD ${amount.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w700, fontSize: 13, color: _purple)),
+                    style: TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 13, color: accentColor)),
                 Text('${pct.toStringAsFixed(1)}%',
                     style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
               ],
             ),
+          ],
+        ),
+      ),
+    ));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filter chip
+// ---------------------------------------------------------------------------
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+    this.trailing,
+  });
+
+  final String        label;
+  final bool          selected;
+  final VoidCallback  onTap;
+  final Color?        color;
+  final Widget?       trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = color ?? _purple;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? accent : accent.withAlpha(22),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? accent : accent.withAlpha(60),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : accent,
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 4), trailing!],
           ],
         ),
       ),

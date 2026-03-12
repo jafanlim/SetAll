@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -12,11 +13,9 @@ import '../../../../data/models/expense_model.dart';
 // ---------------------------------------------------------------------------
 // Palette
 // ---------------------------------------------------------------------------
-const _purple     = Color(0xFF8B5CF6);
-const _purpleDim  = Color(0x268B5CF6);
-const _teal       = Color(0xFF00D9B0);
-const _green      = Color(0xFF22C55E);
-const _greenDim   = Color(0x1A22C55E);
+const _purple      = Color(0xFF8B5CF6);
+const _teal        = Color(0xFF00D9B0);
+const _green       = Color(0xFF22C55E);
 const _brandOrange = Color(0xFFF97316);
 
 // Category icons
@@ -93,8 +92,7 @@ class _WalletEntryDetailScreenState
     ref.invalidate(walletTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
-    context.pop();
-    context.pop(); // also pop the detail screen
+    if (context.canPop()) context.pop();
   }
 
   void _edit() {
@@ -111,7 +109,6 @@ class _WalletEntryDetailScreenState
     final expense     = widget.expense;
     final isIncome    = expense.isIncome;
     final accentColor = isIncome ? _green : _purple;
-    final accentDim   = isIncome ? _greenDim : _purpleDim;
 
     final amt    = Decimal.tryParse(expense.amount) ?? Decimal.zero;
     final usdAmt = Decimal.tryParse(expense.universalUsdAmount ?? '') ??
@@ -123,6 +120,12 @@ class _WalletEntryDetailScreenState
 
     final categoryColor = _kCategoryColors[expense.category] ?? _purple;
     final categoryIcon  = _kCategoryIcons[expense.category] ?? Icons.category_outlined;
+
+    // Use saved icon/color if available; otherwise fall back to default
+    final entryColor = expense.iconColor != null ? Color(expense.iconColor!) : accentColor;
+    final entryIcon  = expense.iconCodepoint != null
+        ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
+        : (isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
 
     // Mini analytics: personal expenses for category gauge
     final personalAsync = ref.watch(personalExpensesProvider);
@@ -202,13 +205,10 @@ class _WalletEntryDetailScreenState
                     Container(
                       width: 44, height: 44,
                       decoration: BoxDecoration(
-                        color: accentDim,
+                        color: entryColor.withAlpha(36),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(
-                        isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                        color: accentColor, size: 22,
-                      ),
+                      child: Icon(entryIcon, color: entryColor, size: 22),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -437,6 +437,12 @@ class _WalletEntryDetailScreenState
             const SizedBox(height: 12),
           ],
 
+          // ── Attachments ──────────────────────────────────────────────────
+          if (expense.attachmentUrls != null && expense.attachmentUrls!.isNotEmpty) ...[
+            _AttachmentsCard(expense: expense),
+            const SizedBox(height: 12),
+          ],
+
           // ── Meta info ────────────────────────────────────────────────────
           GlassCard(
             padding: const EdgeInsets.all(16),
@@ -466,6 +472,136 @@ class _WalletEntryDetailScreenState
 // ---------------------------------------------------------------------------
 // Helper widgets
 // ---------------------------------------------------------------------------
+
+class _AttachmentsCard extends ConsumerStatefulWidget {
+  const _AttachmentsCard({required this.expense});
+  final ExpenseModel expense;
+
+  @override
+  ConsumerState<_AttachmentsCard> createState() => _AttachmentsCardState();
+}
+
+class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
+  final Map<String, String> _signedUrls = {};
+  bool _loading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _generateUrls();
+  }
+
+  Future<void> _generateUrls() async {
+    final paths = widget.expense.attachmentUrls ?? [];
+    if (paths.isEmpty) return;
+    setState(() => _loading = true);
+    final repo = ref.read(setAllRepositoryProvider);
+    for (final path in paths) {
+      final url = await repo.generateAttachmentSignedUrl(path);
+      if (url != null && mounted) {
+        setState(() => _signedUrls[path] = url);
+      }
+    }
+    if (mounted) setState(() => _loading = false);
+  }
+
+  Future<void> _openUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not open attachment')),
+        );
+      }
+    }
+  }
+
+  IconData _iconFor(String path) {
+    final ext = path.split('.').last.toLowerCase();
+    switch (ext) {
+      case 'jpg': case 'jpeg': case 'png': case 'webp': case 'gif':
+        return Icons.image_outlined;
+      case 'pdf':
+        return Icons.picture_as_pdf_outlined;
+      default:
+        return Icons.insert_drive_file_outlined;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme  = Theme.of(context);
+    final paths  = widget.expense.attachmentUrls ?? [];
+
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.attach_file_outlined, size: 16, color: _teal),
+              const SizedBox(width: 6),
+              Text(
+                'Attachments (${paths.length})',
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700, fontSize: 12,
+                ),
+              ),
+              if (_loading) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  width: 12, height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 1.5),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...paths.map((path) {
+            final filename = path.split('/').last;
+            final signedUrl = _signedUrls[path];
+            return InkWell(
+              onTap: signedUrl != null ? () => _openUrl(signedUrl) : null,
+              borderRadius: BorderRadius.circular(8),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36, height: 36,
+                      decoration: BoxDecoration(
+                        color: _teal.withAlpha(24),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Icon(_iconFor(path), size: 18, color: _teal),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        filename,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: signedUrl != null
+                              ? theme.colorScheme.onSurface
+                              : theme.colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (signedUrl != null)
+                      const Icon(Icons.open_in_new, size: 14, color: _teal),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
 
 class _AnalyticPill extends StatelessWidget {
   const _AnalyticPill({
