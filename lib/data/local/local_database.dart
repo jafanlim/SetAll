@@ -61,7 +61,14 @@ class LocalDatabase {
   ///     (e.g. 15000 VND) separate from the USD anchor so restore shows the
   ///     correct original value instead of the converted USD amount.
   ///   • deleted_groups_log – backfill for fresh installs that missed v17.
-  static const int _version = 19;
+  /// Schema v20 adds:
+  ///   • expenses.icon_codepoint – integer codepoint of the entry icon (IconData)
+  ///   • expenses.icon_color    – integer ARGB value of the entry accent colour
+  /// Schema v21 adds:
+  ///   • expenses.attachment_urls – JSON array of Supabase Storage paths
+  /// Schema v22 adds:
+  ///   • expenses.notes – long-form notes; also receives .txt/.md file content
+  static const int _version = 22;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -352,6 +359,16 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 20) {
+      await _addColumnIfNotExists(db, 'expenses', 'icon_codepoint', 'INTEGER');
+      await _addColumnIfNotExists(db, 'expenses', 'icon_color',     'INTEGER');
+    }
+    if (oldVersion < 21) {
+      await _addColumnIfNotExists(db, 'expenses', 'attachment_urls', 'TEXT');
+    }
+    if (oldVersion < 22) {
+      await _addColumnIfNotExists(db, 'expenses', 'notes', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -414,7 +431,11 @@ class LocalDatabase {
         universal_usd_amount  TEXT,
         created_at            TEXT,
         updated_at            TEXT,
-        synced_at             INTEGER
+        synced_at             INTEGER,
+        icon_codepoint        INTEGER,
+        icon_color            INTEGER,
+        attachment_urls       TEXT,
+        notes                 TEXT
       )
     ''');
     await db.execute('''

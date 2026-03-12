@@ -385,13 +385,42 @@ class SyncService {
       final expense = ExpenseModel.fromJson(map);
       cloudPersonalIds.add(expense.id);
       debugPrint('[SyncService] pull: upsert personal expense ${expense.id} payer=${expense.payerId}');
+      final insertData = <String, dynamic>{
+        ...expense.toJson(),
+        'updated_at': map['updated_at']?.toString(),
+        'synced_at': DateTime.now().millisecondsSinceEpoch,
+      };
+      // Preserve local fields that Supabase may return as null (e.g. icon or
+      // attachment data not yet present on older remote rows).
+      // ConflictAlgorithm.replace does DELETE+INSERT, so any column absent from
+      // insertData gets wiped unless we explicitly copy it from the local row.
+      if (expense.iconCodepoint == null || expense.iconColor == null ||
+          expense.attachmentUrls == null || expense.notes == null) {
+        final existing = await LocalDatabase.db.query(
+          'expenses',
+          columns: ['icon_codepoint', 'icon_color', 'attachment_urls', 'notes'],
+          where: 'id = ?',
+          whereArgs: [expense.id],
+        );
+        if (existing.isNotEmpty) {
+          final loc = existing.first;
+          if (expense.iconCodepoint == null && loc['icon_codepoint'] != null) {
+            insertData['icon_codepoint'] = loc['icon_codepoint'];
+          }
+          if (expense.iconColor == null && loc['icon_color'] != null) {
+            insertData['icon_color'] = loc['icon_color'];
+          }
+          if (expense.attachmentUrls == null && loc['attachment_urls'] != null) {
+            insertData['attachment_urls'] = loc['attachment_urls'];
+          }
+          if (expense.notes == null && loc['notes'] != null) {
+            insertData['notes'] = loc['notes'];
+          }
+        }
+      }
       await LocalDatabase.db.insert(
         'expenses',
-        {
-          ...expense.toJson(),
-          'updated_at': map['updated_at']?.toString(),
-          'synced_at': DateTime.now().millisecondsSinceEpoch,
-        },
+        insertData,
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }

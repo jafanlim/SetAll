@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,7 +10,9 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/attachment_processor.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
@@ -35,8 +38,7 @@ class EditExpenseScreen extends ConsumerStatefulWidget {
   ConsumerState<EditExpenseScreen> createState() => _EditExpenseScreenState();
 }
 
-const _teal   = Color(0xFF00D9B0);
-const _orange = Color(0xFFFF8C42);
+const _teal = Color(0xFF00D9B0);
 
 // ---------------------------------------------------------------------------
 // Entry icon + color catalogue
@@ -58,8 +60,9 @@ const List<Color> _kEntryColors = [
 
 class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   final _formKey             = GlobalKey<FormState>();
-  final _amountController    = TextEditingController();
+  final _amountController      = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _notesController       = TextEditingController();
 
   String    _currency    = 'USD';
   String    _category    = 'General';
@@ -93,6 +96,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
+    _notesController.dispose();
     for (final c in _customCtrl.values) { c.dispose(); }
     super.dispose();
   }
@@ -108,15 +112,27 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       allowMultiple: false,
-      type: FileType.custom,
-      allowedExtensions: ['pdf', 'doc', 'docx', 'xlsx', 'csv', 'txt'],
+      type: FileType.any,
     );
     if (result == null || result.files.isEmpty || !mounted) return;
     final path = result.files.first.path;
-    if (path != null) {
-      setState(() => _attachmentPaths.add(path));
-      HapticUtils.success();
+    if (path == null) return;
+    if (!AttachmentProcessor.isAllowed(path)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Unsupported file type. Allowed: images, PDF, TXT, MD.'),
+      ));
+      return;
     }
+    if (AttachmentProcessor.isTextFile(path)) {
+      try {
+        final content = await File(path).readAsString();
+        setState(() => _notesController.text = content);
+        HapticUtils.success();
+      } catch (_) {}
+      return;
+    }
+    setState(() => _attachmentPaths.add(path));
+    HapticUtils.success();
   }
 
   Future<void> _pickDateTime() async {
@@ -125,7 +141,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       context: context,
       initialDate: _entryDate,
       firstDate: DateTime(2000),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
+      lastDate: DateTime(2100),
       builder: (ctx, child) => Theme(
         data: Theme.of(ctx).copyWith(
           colorScheme: Theme.of(ctx).colorScheme.copyWith(
@@ -171,28 +187,6 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     );
   }
 
-  void _rebuildControllers() {
-    for (final c in _customCtrl.values) { c.dispose(); }
-    _customCtrl.clear();
-    final n = _members.length;
-    if (_splitMode == SplitMode.percentage) {
-      // 1 dp percentages; payer absorbs the rounding remainder.
-      final baseVal = (1000 ~/ n) / 10.0;
-      final baseFormatted = baseVal.toStringAsFixed(1);
-      final payerVal = 100.0 - baseVal * (n - 1);
-      final payerFormatted = payerVal.toStringAsFixed(1);
-      for (var i = 0; i < n; i++) {
-        final isPayer = _members[i].id == _payerId;
-        _customCtrl[_members[i].id] = TextEditingController(
-          text: isPayer ? payerFormatted : baseFormatted,
-        );
-      }
-    } else {
-      for (var i = 0; i < n; i++) {
-        _customCtrl[_members[i].id] = TextEditingController(text: '1');
-      }
-    }
-  }
 
   Future<void> _load() async {
     final repo       = ref.read(setAllRepositoryProvider);
@@ -224,6 +218,18 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       _payerId   = expense.payerId.isNotEmpty ? expense.payerId : currentUid;
       if (expense.createdAt != null) {
         _entryDate = DateTime.tryParse(expense.createdAt!)?.toLocal() ?? DateTime.now();
+      }
+      if (expense.iconCodepoint != null) {
+        _entryIcon = IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons');
+      }
+      if (expense.iconColor != null) {
+        _entryColor = Color(expense.iconColor!);
+      }
+      if (expense.attachmentUrls != null && expense.attachmentUrls!.isNotEmpty) {
+        _attachmentPaths.addAll(expense.attachmentUrls!);
+      }
+      if (expense.notes != null && expense.notes!.isNotEmpty) {
+        _notesController.text = expense.notes!;
       }
 
       // Pre-fill custom controllers with original-currency amounts (reverse USD).
@@ -318,16 +324,20 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     setState(() => _isSubmitting = true);
 
     final updated = await repo.updateExpense(
-      expenseId:   widget.expenseId,
-      groupId:     widget.groupId,
-      payerId:     payerId,
-      amount:      amount,
-      description: _descriptionController.text.trim(),
-      currency:    _currency,
-      splitType:   splitType,
-      splits:      splits,
-      category:    _category,
-      isIncome:    _expense?.isIncome ?? false,
+      expenseId:      widget.expenseId,
+      groupId:        widget.groupId,
+      payerId:        payerId,
+      amount:         amount,
+      description:    InputSanitizer.sanitize(_descriptionController.text.trim()),
+      currency:       _currency,
+      splitType:      splitType,
+      splits:         splits,
+      category:       _category,
+      isIncome:       _expense?.isIncome ?? false,
+      iconCodepoint:  _entryIcon.codePoint,
+      iconColor:      _entryColor.toARGB32(),
+      attachmentPaths: List.unmodifiable(_attachmentPaths),
+      notes: _notesController.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesController.text.trim()),
     );
 
     if (mounted) {
@@ -363,10 +373,6 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         body: const Center(child: Text('Expense not found')),
       );
     }
-
-    final amountForTotal = Decimal.tryParse(
-          _amountController.text.trim().replaceAll(',', '.')) ??
-        Decimal.zero;
 
     final userCatsAsync = ref.watch(userCategoriesProvider);
     final dateLabel = DateFormat('EEE, d MMM yyyy  HH:mm').format(_entryDate);
@@ -628,12 +634,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                 const Spacer(),
-                AttachButton(
-                  icon: Icons.photo_camera_outlined,
-                  label: 'Camera',
-                  onTap: () => _pickImage(ImageSource.camera),
-                ),
-                const SizedBox(width: 8),
+                if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) ...[
+                  AttachButton(
+                    icon: Icons.photo_camera_outlined,
+                    label: 'Camera',
+                    onTap: () => _pickImage(ImageSource.camera),
+                  ),
+                  const SizedBox(width: 8),
+                ],
                 AttachButton(
                   icon: Icons.photo_library_outlined,
                   label: 'Gallery',
@@ -657,10 +665,11 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   separatorBuilder: (_, _) => const SizedBox(width: 8),
                   itemBuilder: (_, i) {
                     final path = _attachmentPaths[i];
-                    final isImg = path.endsWith('.jpg') ||
+                    final isLocalPath = path.startsWith('/') || path.contains('\\');
+                    final isImg = isLocalPath && (path.endsWith('.jpg') ||
                         path.endsWith('.jpeg') ||
                         path.endsWith('.png') ||
-                        path.endsWith('.webp');
+                        path.endsWith('.webp'));
                     return Stack(
                       children: [
                         ClipRRect(
@@ -704,183 +713,25 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                 ),
               ),
             ],
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
-            // ── Paid by ───────────────────────────────────────────────
-            if (_members.length > 1) ...[
-              DropdownButtonFormField<String>(
-                initialValue: _members.any((m) => m.id == _payerId) ? _payerId : null,
-                decoration: InputDecoration(
-                  labelText: 'Paid by',
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  isDense: true,
+            // ── Notes ───────────────────────────────────────────────────
+            TextFormField(
+              controller: _notesController,
+              decoration: InputDecoration(
+                labelText: 'Notes (optional)',
+                hintText: 'Additional details, or import a .txt / .md file above',
+                prefixIcon: const Icon(Icons.notes_outlined),
+                filled: true,
+                fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
                 ),
-                items: _members
-                    .map((m) => DropdownMenuItem(value: m.id, child: Text(m.name)))
-                    .toList(),
-                onChanged: (v) => setState(() => _payerId = v),
               ),
-              const SizedBox(height: 16),
-            ],
-
-            // ── Split mode ───────────────────────────────────────────────────
-            Text(
-              'How to split',
-              style: theme.textTheme.titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700),
+              maxLines: 3,
+              minLines: 1,
             ),
-            const SizedBox(height: 8),
-            SegmentedButton<SplitMode>(
-              segments: [
-                ButtonSegment(
-                  value: SplitMode.even,
-                  label: Text('Even', style: const TextStyle(fontSize: 11)),
-                  icon: const Icon(Icons.equalizer, size: 14),
-                ),
-                ButtonSegment(
-                  value: SplitMode.percentage,
-                  label: Text('%', style: const TextStyle(fontSize: 11)),
-                  icon: const Icon(Icons.percent, size: 14),
-                ),
-                ButtonSegment(
-                  value: SplitMode.shares,
-                  label: Text('Shares', style: const TextStyle(fontSize: 11)),
-                  icon: const Icon(Icons.pie_chart_outline, size: 14),
-                ),
-                ButtonSegment(
-                  value: SplitMode.manual,
-                  label: Text('Manual', style: const TextStyle(fontSize: 11)),
-                  icon: const Icon(Icons.edit, size: 14),
-                ),
-              ],
-              selected: {_splitMode},
-              onSelectionChanged: (s) {
-                HapticUtils.selection();
-                setState(() {
-                  _splitMode = s.isNotEmpty ? s.first : _splitMode;
-                  _rebuildControllers();
-                });
-              },
-              style: ButtonStyle(
-                backgroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) {
-                    return _teal.withValues(alpha: 0.15);
-                  }
-                  return theme.colorScheme.surfaceContainerHighest;
-                }),
-                foregroundColor: WidgetStateProperty.resolveWith((states) {
-                  if (states.contains(WidgetState.selected)) return _teal;
-                  return theme.colorScheme.onSurfaceVariant;
-                }),
-              ),
-            ),
-
-            if (_splitMode != SplitMode.even) ...[
-              const SizedBox(height: 16),
-              Text(
-                _splitMode == SplitMode.percentage
-                    ? 'Percentage per person (total = 100)'
-                    : _splitMode == SplitMode.shares
-                        ? 'Relative shares per person'
-                        : 'Exact amount per person',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontSize: 11,
-                ),
-              ),
-              const SizedBox(height: 8),
-              ..._members.map((m) {
-                final c = _customCtrl[m.id];
-                if (c == null) return const SizedBox.shrink();
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: Text(
-                          m.name,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      SizedBox(
-                        width: 90,
-                        child: TextFormField(
-                          controller: c,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(fontSize: 13),
-                          onChanged: (_) => setState(() {}),
-                          decoration: InputDecoration(
-                            hintText: _splitMode == SplitMode.percentage
-                                ? '%'
-                                : _splitMode == SplitMode.shares
-                                    ? 'x'
-                                    : _currency,
-                            isDense: true,
-                            filled: true,
-                            fillColor: theme.colorScheme.surfaceContainerHighest
-                                .withValues(alpha: 0.4),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              borderSide: BorderSide.none,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }),
-              if (_splitMode == SplitMode.manual) ...[
-                const SizedBox(height: 8),
-                Builder(builder: (ctx) {
-                  final entered = _members.fold<Decimal>(
-                    Decimal.zero,
-                    (sum, m) => sum +
-                        (Decimal.tryParse(
-                              _customCtrl[m.id]?.text.trim().replaceAll(',', '.') ?? '',
-                            ) ??
-                            Decimal.zero),
-                  );
-                  final ok = entered == amountForTotal && amountForTotal > Decimal.zero;
-                  return Text(
-                    'Total entered: $entered / $amountForTotal',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: ok ? _teal : _orange,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  );
-                }),
-              ],
-            ] else ...[
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: _teal.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.equalizer, color: _teal, size: 16),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Split evenly among ${_members.length} members',
-                      style: const TextStyle(color: _teal, fontSize: 12),
-                    ),
-                  ],
-                ),
-              ),
-            ],
 
             const SizedBox(height: 40),
             FilledButton(
@@ -945,7 +796,8 @@ class _IconColorPickerState extends State<_IconColorPicker> {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
-      child: Column(
+      child: SingleChildScrollView(
+        child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1052,6 +904,7 @@ class _IconColorPickerState extends State<_IconColorPicker> {
             ),
           ),
         ],
+        ),
       ),
     );
   }

@@ -1,4 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Camera permission for image_picker (bill/receipt photos) -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Photo library access: Android 13+ -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <!-- Photo library access: Android ≤ 12 -->
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Needed by image_picker to save captured camera images on Android ≤ 9 -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <application
         android:label="setall"
         android:name="${applicationName}"

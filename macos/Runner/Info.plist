@@ -39,5 +39,7 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SetAll needs access to your photo library to attach images to wallet entries.</string>
 </dict>
 </plist>
