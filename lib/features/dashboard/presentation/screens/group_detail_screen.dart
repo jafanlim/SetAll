@@ -14,6 +14,7 @@ import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
+import '../../../../domain/entities/expense.dart' show SplitType;
 
 const _teal = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
@@ -927,23 +928,32 @@ class _ExpenseTile extends ConsumerWidget {
                         style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (convertedAmount != null)
-                        Text(
-                          '≈ $baseCurrency $convertedAmount',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        )
-                      else if (expense.originalCurrency != null &&
-                          expense.originalCurrency != expense.currency)
-                        Text(
-                          '${expense.currency} ${formatAmount(expense.amount)} base',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          _SplitMethodBadge(expense.splitType),
+                          if (convertedAmount != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '≈ $baseCurrency $convertedAmount',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ] else if (expense.originalCurrency != null &&
+                              expense.originalCurrency != expense.currency) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              '${expense.currency} ${formatAmount(expense.amount)} base',
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -1298,6 +1308,43 @@ class _SettlementPlanSection extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Split method badge
+// ---------------------------------------------------------------------------
+class _SplitMethodBadge extends StatelessWidget {
+  const _SplitMethodBadge(this.splitType);
+  final SplitType splitType;
+
+  static const _kEven       = Color(0xFF00D9B0);
+  static const _kPercentage = Color(0xFF6366F1);
+  static const _kExact      = Color(0xFFF59E0B);
+
+  @override
+  Widget build(BuildContext context) {
+    final (label, icon, color) = switch (splitType) {
+      SplitType.even   => ('Evenly',     Icons.balance_outlined,     _kEven),
+      SplitType.manual => ('Exact',      Icons.attach_money_outlined, _kExact),
+      SplitType.parts  => ('By Parts',   Icons.pie_chart_outline,     _kPercentage),
+    };
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 10, color: color.withValues(alpha: 0.8)),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: color.withValues(alpha: 0.8),
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
     );
   }
 }

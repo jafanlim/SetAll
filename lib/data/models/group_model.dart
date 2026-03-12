@@ -6,6 +6,9 @@ class GroupModel extends Group {
     required super.name,
     required super.creatorId,
     super.type = GroupType.normal,
+    super.iconName,
+    super.colorValue,
+    super.avatarUrl,
   });
 
   static GroupType _typeFromString(String? v) {
@@ -19,6 +22,9 @@ class GroupModel extends Group {
       name: (json['name'] as String?) ?? '',
       creatorId: json['creator_id'] as String,
       type: _typeFromString(json['type'] as String?),
+      iconName: json['icon_name'] as String?,
+      colorValue: json['color_value'] as int?,
+      avatarUrl: json['avatar_url'] as String?,
     );
   }
 
@@ -27,5 +33,8 @@ class GroupModel extends Group {
         'name': name,
         'creator_id': creatorId,
         'type': type.name,
+        if (iconName != null) 'icon_name': iconName,
+        if (colorValue != null) 'color_value': colorValue,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
       };
 }

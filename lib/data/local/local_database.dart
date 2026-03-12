@@ -68,7 +68,11 @@ class LocalDatabase {
   ///   • expenses.attachment_urls – JSON array of Supabase Storage paths
   /// Schema v22 adds:
   ///   • expenses.notes – long-form notes; also receives .txt/.md file content
-  static const int _version = 22;
+  /// Schema v23 adds:
+  ///   • groups.icon_name  – Material icon name for group identity
+  ///   • groups.color_value – ARGB integer accent colour
+  ///   • groups.avatar_url  – Supabase Storage path for group avatar photo
+  static const int _version = 23;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -369,6 +373,11 @@ class LocalDatabase {
     if (oldVersion < 22) {
       await _addColumnIfNotExists(db, 'expenses', 'notes', 'TEXT');
     }
+    if (oldVersion < 23) {
+      await _addColumnIfNotExists(db, 'groups', 'icon_name',   'TEXT');
+      await _addColumnIfNotExists(db, 'groups', 'color_value', 'INTEGER');
+      await _addColumnIfNotExists(db, 'groups', 'avatar_url',  'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -390,16 +399,19 @@ class LocalDatabase {
   Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE groups (
-        id         TEXT PRIMARY KEY,
-        name       TEXT NOT NULL,
-        creator_id TEXT NOT NULL,
-        created_by TEXT, -- Schema v7
-        type       TEXT NOT NULL DEFAULT 'normal',
-        is_deleted INTEGER NOT NULL DEFAULT 0, -- Schema v13
-        deleted_at TEXT,                       -- Schema v13
-        created_at TEXT,
-        updated_at TEXT,
-        synced_at  INTEGER
+        id          TEXT PRIMARY KEY,
+        name        TEXT NOT NULL,
+        creator_id  TEXT NOT NULL,
+        created_by  TEXT,           -- Schema v7
+        type        TEXT NOT NULL DEFAULT 'normal',
+        is_deleted  INTEGER NOT NULL DEFAULT 0, -- Schema v13
+        deleted_at  TEXT,                       -- Schema v13
+        icon_name   TEXT,           -- Schema v23
+        color_value INTEGER,        -- Schema v23
+        avatar_url  TEXT,           -- Schema v23
+        created_at  TEXT,
+        updated_at  TEXT,
+        synced_at   INTEGER
       )
     ''');
     await db.execute('''

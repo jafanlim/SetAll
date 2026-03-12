@@ -651,7 +651,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
     final theme = Theme.of(context);
     final currentUid = ref.read(setAllRepositoryProvider).currentUserId;
     final isOwner = currentUid != null && currentUid == widget.event.creatorId;
-    final withinWindow = DateTime.now().difference(widget.event.deletedAt).inDays < 90;
+    final withinWindow = DateTime.now().difference(widget.event.deletedAt).inDays < 365;
     final canRestore = isOwner && withinWindow;
 
     return Padding(

@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io' as _io;
 
 import 'package:decimal/decimal.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/attachment_processor.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
@@ -608,7 +610,11 @@ class SetAllRepository {
   static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
     if (a.length != b.length) return true;
     for (var i = 0; i < a.length; i++) {
-      if (a[i].id != b[i].id || a[i].name != b[i].name) return true;
+      if (a[i].id != b[i].id ||
+          a[i].name != b[i].name ||
+          a[i].iconName != b[i].iconName ||
+          a[i].colorValue != b[i].colorValue ||
+          a[i].avatarUrl != b[i].avatarUrl) return true;
     }
     return false;
   }
@@ -745,7 +751,12 @@ class SetAllRepository {
     return rows.map<GroupModel>((row) => _rowToGroup(row)).toList();
   }
 
-  Future<GroupModel?> createGroup(String name) async {
+  Future<GroupModel?> createGroup(
+    String name, {
+    String? iconName,
+    int? colorValue,
+    String? avatarUrl,
+  }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
 
@@ -761,12 +772,17 @@ class SetAllRepository {
       if (dupeCheck.isNotEmpty) {
         throw Exception('You already have a group named "$name".');
       }
-      await _client.from('groups').insert(
-          {'id': id, 'name': name, 'creator_id': uid, 'type': 'normal'});
+      await _client.from('groups').insert({
+        'id': id, 'name': name, 'creator_id': uid, 'type': 'normal',
+        if (iconName != null) 'icon_name': iconName,
+        if (colorValue != null) 'color_value': colorValue,
+        if (avatarUrl != null) 'avatar_url': avatarUrl,
+      });
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
-      return GroupModel(id: id, name: name, creatorId: uid);
+      return GroupModel(id: id, name: name, creatorId: uid,
+          iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
     }
 
     // Non-web: ensure DB is ready before any SQLite access.
@@ -791,6 +807,9 @@ class SetAllRepository {
       'created_at': now,
       'updated_at': now,
       'synced_at': null,
+      if (iconName != null) 'icon_name': iconName,
+      if (colorValue != null) 'color_value': colorValue,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
     });
     await db.insert('group_members', {
       'group_id': id,
@@ -804,10 +823,22 @@ class SetAllRepository {
       // The RPC also inserts the creator's group_members row atomically.
       try {
         final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
+        final finalId = remoteId != id ? remoteId : id;
+        // Patch identity columns on Supabase if provided.
+        if (iconName != null || colorValue != null || avatarUrl != null) {
+          try {
+            await _client.from('groups').update({
+              if (iconName != null) 'icon_name': iconName,
+              if (colorValue != null) 'color_value': colorValue,
+              if (avatarUrl != null) 'avatar_url': avatarUrl,
+            }).eq('id', finalId);
+          } catch (_) {}
+        }
         if (remoteId != id) {
           await db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
           await db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
-          return GroupModel(id: remoteId, name: name, creatorId: uid);
+          return GroupModel(id: remoteId, name: name, creatorId: uid,
+              iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
         }
         await db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
         await db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
@@ -816,7 +847,123 @@ class SetAllRepository {
       }
     }
     _notify();
-    return GroupModel(id: id, name: name, creatorId: uid);
+    return GroupModel(id: id, name: name, creatorId: uid,
+        iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+  }
+
+  /// Update a group's visual identity (icon, colour, avatar). Only the creator
+  /// may call this. Returns true on success.
+  Future<bool> updateGroupCustomization(
+    String groupId, {
+    String? iconName,
+    int? colorValue,
+    String? avatarUrl,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+    final updates = <String, dynamic>{};
+    if (iconName != null)   updates['icon_name']   = iconName;
+    if (colorValue != null) updates['color_value'] = colorValue;
+    if (avatarUrl != null)  updates['avatar_url']  = avatarUrl;
+    if (updates.isEmpty) return true;
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('groups').update(updates)
+            .eq('id', groupId).eq('creator_id', uid);
+        return true;
+      } catch (_) { return false; }
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'groups', columns: ['creator_id'],
+      where: 'id = ?', whereArgs: [groupId],
+    );
+    if (rows.isEmpty || rows.first['creator_id'] != uid) return false;
+    await LocalDatabase.db.update(
+      'groups', updates, where: 'id = ?', whereArgs: [groupId]);
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('groups').update(updates)
+            .eq('id', groupId).eq('creator_id', uid);
+      } catch (_) {}
+    }
+    _notify();
+    return true;
+  }
+
+  /// Upload a group avatar photo. Applies the "Clean Storage" pipeline:
+  /// resize to 512×512, convert to WebP, strip EXIF.
+  /// Returns the storage path on success, null on failure.
+  Future<String?> uploadGroupAvatar(String groupId, String localPath) async {
+    if (_client == null) return null;
+    final uid = await ensureUser();
+    if (uid == null) return null;
+    try {
+      final bytes = await FlutterImageCompress.compressWithFile(
+        localPath,
+        minWidth: 512,
+        minHeight: 512,
+        quality: 85,
+        format: CompressFormat.webp,
+        keepExif: false,
+      );
+      final uploadBytes = bytes ?? await _io.File(localPath).readAsBytes();
+      final storagePath = '$uid/$groupId/avatar.webp';
+      await _client.storage
+          .from('group-avatars')
+          .uploadBinary(storagePath, uploadBytes,
+              fileOptions: const FileOptions(upsert: true));
+      return storagePath;
+    } catch (e) {
+      debugPrint('[uploadGroupAvatar] failed: $e');
+      return null;
+    }
+  }
+
+  /// Force-delete a group by first scrubbing all orphaned splits/expenses
+  /// in Supabase and SQLite, then delegating to [deleteGroup].
+  /// Designed for Windows where stale FK dependencies can block normal deletion.
+  Future<bool> forceDeleteGroup(String groupId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    // Purge splits → expenses in Supabase first (ignore errors — keep going).
+    if (_client != null && await _isOnline) {
+      try {
+        final expRows = await _client
+            .from('expenses').select('id').eq('group_id', groupId) as List;
+        final expIds =
+            expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+        if (expIds.isNotEmpty) {
+          await _client.from('splits').delete().inFilter('expense_id', expIds);
+          await _client.from('expenses').delete().eq('group_id', groupId);
+        }
+        await _client.from('group_members').delete().eq('group_id', groupId);
+        await _client.from('groups').delete().eq('id', groupId);
+      } catch (e) {
+        debugPrint('[forceDeleteGroup] Supabase purge error (continuing): $e');
+      }
+    }
+
+    // Purge orphaned splits → expenses in SQLite.
+    if (!_isWeb) {
+      try {
+        final db = await _db;
+        final expRows = await db.query(
+          'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
+        for (final r in expRows) {
+          await db.delete('splits', where: 'expense_id = ?', whereArgs: [r['id']]);
+        }
+        await db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
+        await db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
+      } catch (e) {
+        debugPrint('[forceDeleteGroup] SQLite purge error (continuing): $e');
+      }
+    }
+
+    // Now delegate to the normal soft-delete path.
+    return deleteGroup(groupId);
   }
 
   /// Returns the creator_id for [groupId], or null if not found.

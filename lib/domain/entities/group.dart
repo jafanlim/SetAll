@@ -8,6 +8,9 @@ class Group {
     required this.name,
     required this.creatorId,
     this.type = GroupType.normal,
+    this.iconName,
+    this.colorValue,
+    this.avatarUrl,
   });
 
   final String id;
@@ -16,6 +19,15 @@ class Group {
 
   /// 'normal' = shared group; 'direct' = 1-on-1 friend expense group.
   final GroupType type;
+
+  /// Material icon name (e.g. 'home_outlined', 'flight_outlined'). NULL = default.
+  final String? iconName;
+
+  /// Accent colour as ARGB integer. NULL = use default teal.
+  final int? colorValue;
+
+  /// Supabase Storage path for the group avatar photo. NULL = use icon/initials.
+  final String? avatarUrl;
 
   bool get isDirect => type == GroupType.direct;
 }
