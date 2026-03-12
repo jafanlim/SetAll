@@ -352,11 +352,24 @@ class SyncService {
     // If a group is in left_groups but Supabase still shows us as a member,
     // the left_groups entry is stale (e.g. from a bug or old schema). Remove it
     // so the group is re-pulled and never falsely treated as an orphan.
+    // EXCEPTION: if the group is locally soft-deleted (is_deleted = 1), the
+    // left_groups row is intentional — never remove it or the group resurrects.
     if (leftGroupIds.isNotEmpty) {
       final staleLeftIds = leftGroupIds.intersection(allCloudMemberIds);
       for (final gid in staleLeftIds) {
-        debugPrint('[SyncService] removing stale left_groups entry for $gid (still a member in Supabase)');
         try {
+          final rows = await LocalDatabase.db.query(
+            'groups',
+            columns: ['is_deleted'],
+            where: 'id = ?',
+            whereArgs: [gid],
+          );
+          final isSoftDeleted = rows.isNotEmpty && (rows.first['is_deleted'] as int? ?? 0) == 1;
+          if (isSoftDeleted) {
+            debugPrint('[SyncService] keeping left_groups entry for $gid (soft-deleted locally)');
+            continue;
+          }
+          debugPrint('[SyncService] removing stale left_groups entry for $gid (still a member in Supabase)');
           await LocalDatabase.db.delete('left_groups', where: 'group_id = ?', whereArgs: [gid]);
           leftGroupIds.remove(gid);
         } catch (_) {}
