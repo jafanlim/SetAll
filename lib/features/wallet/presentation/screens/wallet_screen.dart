@@ -135,8 +135,15 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(omniActivityProvider);
   }
 
-  void _editExpense(ExpenseModel expense) {
+  void _viewExpense(ExpenseModel expense) {
     context.push(AppRouter.walletEntryDetail, extra: expense);
+  }
+
+  void _editExpense(ExpenseModel expense) {
+    context.push(
+      '/group/${expense.groupId?.isNotEmpty == true ? expense.groupId : 'wallet'}/expense/${expense.id}',
+      extra: expense,
+    );
   }
 
   List<ExpenseModel> _applyFilterSort(List<ExpenseModel> all) {
@@ -544,6 +551,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     editMode: _editMode,
                     selected: _selected.contains(expenses[i].id),
                     onToggle: () => _toggleItem(expenses[i].id),
+                    onView: () => _viewExpense(expenses[i]),
                     onEdit: () => _editExpense(expenses[i]),
                     onDelete: () => _deleteOne(expenses[i].id),
                   ),
@@ -707,6 +715,7 @@ class _WalletEntryRow extends ConsumerWidget {
     required this.editMode,
     required this.selected,
     required this.onToggle,
+    required this.onView,
     required this.onEdit,
     required this.onDelete,
   });
@@ -715,6 +724,7 @@ class _WalletEntryRow extends ConsumerWidget {
   final bool         editMode;
   final bool         selected;
   final VoidCallback onToggle;
+  final VoidCallback onView;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
@@ -740,7 +750,7 @@ class _WalletEntryRow extends ConsumerWidget {
     final showEquiv = dispCcy != baseCcy && usdAmt > Decimal.zero;
 
     final tile = GestureDetector(
-      onTap: editMode ? onToggle : onEdit,
+      onTap: editMode ? onToggle : onView,
       onSecondaryTapUp: (details) async {
         final pos = details.globalPosition;
         final result = await showMenu<_EntryAction>(
