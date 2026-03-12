@@ -1,6 +1,7 @@
 import 'dart:io' as io;
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:path/path.dart' as p;
 import 'package:pdfx/pdfx.dart';
@@ -72,6 +73,7 @@ class AttachmentProcessor {
 
   // ── Image ─────────────────────────────────────────────────────────────────
   static Future<ProcessedAttachment?> _processImage(String localPath) async {
+    // Try WebP conversion first.
     try {
       final result = await FlutterImageCompress.compressWithFile(
         localPath,
@@ -81,10 +83,40 @@ class AttachmentProcessor {
         format: CompressFormat.webp,
         keepExif: false,
       );
-      if (result == null) return null;
-      final filename = '${p.basenameWithoutExtension(localPath)}.webp';
-      return ProcessedAttachment(bytes: result, storedFilename: filename);
-    } catch (_) {
+      if (result != null) {
+        final filename = '${p.basenameWithoutExtension(localPath)}.webp';
+        return ProcessedAttachment(bytes: result, storedFilename: filename);
+      }
+      debugPrint('[AttachmentProcessor] WebP returned null, trying JPEG fallback');
+    } catch (e) {
+      debugPrint('[AttachmentProcessor] WebP compression failed: $e — trying JPEG fallback');
+    }
+
+    // JPEG fallback (e.g. macOS platform limits).
+    try {
+      final result = await FlutterImageCompress.compressWithFile(
+        localPath,
+        minWidth: 1200,
+        minHeight: 1200,
+        quality: 80,
+        format: CompressFormat.jpeg,
+        keepExif: false,
+      );
+      if (result != null) {
+        final filename = '${p.basenameWithoutExtension(localPath)}.jpg';
+        return ProcessedAttachment(bytes: result, storedFilename: filename);
+      }
+      debugPrint('[AttachmentProcessor] JPEG fallback also returned null, using raw bytes');
+    } catch (e) {
+      debugPrint('[AttachmentProcessor] JPEG fallback failed: $e — using raw bytes');
+    }
+
+    // Last resort: upload original bytes unchanged.
+    try {
+      final bytes = await io.File(localPath).readAsBytes();
+      return ProcessedAttachment(bytes: bytes, storedFilename: p.basename(localPath));
+    } catch (e) {
+      debugPrint('[AttachmentProcessor] raw read failed: $e');
       return null;
     }
   }

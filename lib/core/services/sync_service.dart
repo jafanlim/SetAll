@@ -253,13 +253,15 @@ class SyncService {
         final raw = expense.toJson()
           ..remove('created_by')
           ..remove('base_amount_at_entry');
-        // Remap is_income int→bool and coerce empty group_id to null
+        // Remap is_income int→bool, coerce empty group_id to null,
+        // and clamp icon_color to signed INT4 (ARGB uint32 overflows Postgres INTEGER).
         final payload = <String, dynamic>{
           ...raw,
           'is_income': expense.isIncome,
           'group_id': (raw['group_id'] as String?)?.isEmpty == true
               ? null
               : raw['group_id'],
+          'icon_color': (raw['icon_color'] as int?)?.toSigned(32),
         };
         await _client.from('expenses').insert(payload);
         await LocalDatabase.db.update(
