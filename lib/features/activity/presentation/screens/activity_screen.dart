@@ -528,12 +528,18 @@ class _ExpenseTile extends StatelessWidget {
     final isPersonal   = e.groupId == null;
     final isSettlement = e.category == 'Settlement';
 
-    final accent = isSettlement ? _green : isPersonal ? _purple : _teal;
-    final icon   = isSettlement
+    final defaultAccent = isSettlement ? _green : isPersonal ? _purple : _teal;
+    final accent = (e.iconColor != null && !isSettlement)
+        ? Color(e.iconColor!)
+        : defaultAccent;
+    final defaultIcon = isSettlement
         ? Icons.check_circle_outline
         : e.isIncome
             ? Icons.arrow_downward_rounded
             : (_categoryIcons[e.category] ?? Icons.attach_money_outlined);
+    final icon = (e.iconCodepoint != null && !isSettlement)
+        ? IconData(e.iconCodepoint!, fontFamily: 'MaterialIcons')
+        : defaultIcon;
 
     final desc       = e.description.isEmpty ? e.category : e.description;
     final byWhom     = event.payerName.isEmpty ? 'You' : event.payerName;

@@ -15,6 +15,9 @@ import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/activity/presentation/screens/activity_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_screen.dart';
+import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart';
+import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
+import '../../data/models/expense_model.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
@@ -32,12 +35,14 @@ final class AppRouter {
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
   static const String settings = '/settings';
-  static const String addExpense = '/add-expense';
-  static const String editExpense = '/group/:id/expense/:expenseId';
-  static const String groupPicker = '/add-expense/choose-group';
-  static const String groupDetail = '/group/:id';
-  static const String inviteMember    = '/group/:id/invite';
-  static const String inviteFriend    = '/invite-friend';
+  static const String addExpense       = '/add-expense';
+  static const String editExpense      = '/group/:id/expense/:expenseId';
+  static const String groupPicker      = '/add-expense/choose-group';
+  static const String groupDetail      = '/group/:id';
+  static const String inviteMember     = '/group/:id/invite';
+  static const String inviteFriend     = '/invite-friend';
+  static const String walletEntryType  = '/wallet/add';
+  static const String walletEntryDetail = '/wallet/entry';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -231,6 +236,36 @@ final class AppRouter {
             ),
           ),
         ),
+        // ── Wallet: Step 0 — entry type chooser ──────────────────────────
+        GoRoute(
+          path: walletEntryType,
+          name: 'walletEntryType',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const WalletEntryTypeScreen(),
+            ),
+          ),
+        ),
+
+        // ── Wallet: entry detail (info) screen ────────────────────────────
+        GoRoute(
+          path: walletEntryDetail,
+          name: 'walletEntryDetail',
+          pageBuilder: (context, state) {
+            final extra = state.extra;
+            if (extra is! ExpenseModel) {
+              return const NoTransitionPage(child: SizedBox.shrink());
+            }
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: WalletEntryDetailScreen(expense: extra),
+              ),
+            );
+          },
+        ),
+
         GoRoute(
           path: addExpense,
           name: 'addExpense',
@@ -242,6 +277,7 @@ final class AppRouter {
                 child: AddExpenseScreen(
                   groupId: extra?['groupId'] as String? ?? '',
                   groupName: extra?['groupName'] as String? ?? 'Group',
+                  initialIsIncome: extra?['isIncome'] as bool? ?? false,
                 ),
               ),
             );
