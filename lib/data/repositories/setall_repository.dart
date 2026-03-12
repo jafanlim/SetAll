@@ -1773,7 +1773,7 @@ class SetAllRepository {
         final bytes    = processed.bytes!;
         final filename = processed.storedFilename ?? '${p.basenameWithoutExtension(path)}.webp';
         final storagePath = '$uid/$expenseId/$filename';
-        await _client!.storage
+        await _client.storage
             .from('expense-attachments')
             .uploadBinary(storagePath, bytes, fileOptions: const FileOptions(upsert: true));
         result.add(storagePath);
@@ -1789,7 +1789,7 @@ class SetAllRepository {
   Future<String?> generateAttachmentSignedUrl(String storagePath) async {
     if (_client == null) return null;
     try {
-      return await _client!.storage
+      return await _client.storage
           .from('expense-attachments')
           .createSignedUrl(storagePath, 3600);
     } catch (e) {
