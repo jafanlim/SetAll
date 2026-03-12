@@ -1,8 +1,12 @@
+import 'dart:io' as io;
+import 'dart:typed_data';
+
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -443,6 +447,40 @@ class _WalletEntryDetailScreenState
             const SizedBox(height: 12),
           ],
 
+          // ── Notes ────────────────────────────────────────────────────────
+          if (expense.notes != null && expense.notes!.trim().isNotEmpty) ...[
+            GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.notes_outlined, size: 16, color: _teal),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Notes',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w700, fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    expense.notes!.trim(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontSize: 13,
+                      height: 1.5,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
+
           // ── Meta info ────────────────────────────────────────────────────
           GlassCard(
             padding: const EdgeInsets.all(16),
@@ -505,7 +543,111 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
     if (mounted) setState(() => _loading = false);
   }
 
-  Future<void> _openUrl(String url) async {
+  static const _imageExts = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'};
+
+  String _ext(String path) => path.split('.').last.toLowerCase();
+  bool _isImage(String path) => _imageExts.contains(_ext(path));
+  bool _isPdf(String path)   => _ext(path) == 'pdf';
+
+  IconData _iconFor(String path) {
+    if (_isImage(path)) return Icons.image_outlined;
+    if (_isPdf(path))   return Icons.picture_as_pdf_outlined;
+    return Icons.insert_drive_file_outlined;
+  }
+
+  void _previewFile(String path, String signedUrl) {
+    final filename = path.split('/').last;
+    if (_isImage(path)) {
+      _showImagePreview(filename, signedUrl);
+    } else if (_isPdf(path)) {
+      _showPdfPreview(filename, signedUrl);
+    } else {
+      _launchExternal(signedUrl);
+    }
+  }
+
+  void _showImagePreview(String filename, String url) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog.fullscreen(
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.black,
+            foregroundColor: Colors.white,
+            title: Text(filename,
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () => Navigator.of(ctx).pop(),
+            ),
+          ),
+          body: InteractiveViewer(
+            minScale: 0.5,
+            maxScale: 6.0,
+            child: Center(
+              child: Image.network(
+                url,
+                fit: BoxFit.contain,
+                loadingBuilder: (_, child, progress) => progress == null
+                    ? child
+                    : const Center(
+                        child: CircularProgressIndicator(color: _teal)),
+                errorBuilder: (context, error, stack) => const Center(
+                  child: Icon(Icons.broken_image_outlined,
+                      color: Colors.white54, size: 64)),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Fetches remote bytes using dart:io (no extra package needed).
+  Future<Uint8List> _fetchBytes(String url) async {
+    final request = await io.HttpClient().getUrl(Uri.parse(url));
+    final response = await request.close();
+    final chunks = <List<int>>[];
+    await for (final chunk in response) {
+      chunks.add(chunk);
+    }
+    return Uint8List.fromList(chunks.expand((c) => c).toList());
+  }
+
+  void _showPdfPreview(String filename, String url) {
+    final ctrl = PdfControllerPinch(
+      document: _fetchBytes(url).then(PdfDocument.openData),
+    );
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog.fullscreen(
+        child: Scaffold(
+          backgroundColor: const Color(0xFF1E293B),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF1E293B),
+            foregroundColor: Colors.white,
+            title: Text(filename,
+                style: const TextStyle(fontSize: 14),
+                overflow: TextOverflow.ellipsis),
+            leading: IconButton(
+              icon: const Icon(Icons.close),
+              onPressed: () {
+                ctrl.dispose();
+                Navigator.of(ctx).pop();
+              },
+            ),
+          ),
+          body: PdfViewPinch(controller: ctrl),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _launchExternal(String url) async {
     final uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (mounted) {
@@ -513,18 +655,6 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
           const SnackBar(content: Text('Could not open attachment')),
         );
       }
-    }
-  }
-
-  IconData _iconFor(String path) {
-    final ext = path.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'jpg': case 'jpeg': case 'png': case 'webp': case 'gif':
-        return Icons.image_outlined;
-      case 'pdf':
-        return Icons.picture_as_pdf_outlined;
-      default:
-        return Icons.insert_drive_file_outlined;
     }
   }
 
@@ -562,36 +692,60 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
             final filename = path.split('/').last;
             final signedUrl = _signedUrls[path];
             return InkWell(
-              onTap: signedUrl != null ? () => _openUrl(signedUrl) : null,
+              onTap: signedUrl != null ? () => _previewFile(path, signedUrl) : null,
               borderRadius: BorderRadius.circular(8),
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 6),
                 child: Row(
                   children: [
-                    Container(
-                      width: 36, height: 36,
-                      decoration: BoxDecoration(
-                        color: _teal.withAlpha(24),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Icon(_iconFor(path), size: 18, color: _teal),
+                    // Thumbnail for images, icon for PDFs/files
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: signedUrl != null && _isImage(path)
+                          ? Image.network(
+                              signedUrl,
+                              width: 52, height: 52,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stack) => Container(
+                                width: 52, height: 52,
+                                color: _teal.withAlpha(24),
+                                child: const Icon(Icons.broken_image_outlined,
+                                    size: 22, color: _teal),
+                              ),
+                            )
+                          : Container(
+                              width: 52, height: 52,
+                              color: _teal.withAlpha(24),
+                              child: Icon(_iconFor(path), size: 22, color: _teal),
+                            ),
                     ),
                     const SizedBox(width: 10),
                     Expanded(
-                      child: Text(
-                        filename,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          fontWeight: FontWeight.w600,
-                          color: signedUrl != null
-                              ? theme.colorScheme.onSurface
-                              : theme.colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            filename,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: signedUrl != null
+                                  ? theme.colorScheme.onSurface
+                                  : theme.colorScheme.onSurfaceVariant,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (signedUrl == null)
+                            Text('Loading…',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                )),
+                        ],
                       ),
                     ),
                     if (signedUrl != null)
-                      const Icon(Icons.open_in_new, size: 14, color: _teal),
+                      const Icon(Icons.fullscreen, size: 16, color: _teal),
                   ],
                 ),
               ),
