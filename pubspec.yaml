@@ -64,8 +64,11 @@ dependencies:
   local_auth: ^2.2.0
   flutter_secure_storage: ^9.2.2
 
-  # Image picker (profile avatar)
+  # Image picker (profile avatar + wallet attachments)
   image_picker: ^1.1.2
+
+  # File picker (wallet entry attachments)
+  file_picker: ^8.1.2
 
   # Deep linking — catches setall:// OAuth/email redirects on Windows (and mobile)
   app_links: ^6.4.0
