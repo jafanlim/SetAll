@@ -30,6 +30,10 @@ class Expense {
     this.originalCurrency,
     this.exchangeRateApplied,
     this.universalUsdAmount,
+    this.iconCodepoint,
+    this.iconColor,
+    this.attachmentUrls,
+    this.notes,
   });
 
   final String id;
@@ -70,4 +74,17 @@ class Expense {
   /// It is immune to future rate changes.
   /// NULL for expenses created before schema v8.
   final String? universalUsdAmount;
+
+  /// Icon codepoint (e.g. IconData.codePoint). NULL means use default.
+  final int? iconCodepoint;
+
+  /// Accent colour as ARGB integer. NULL means use default.
+  final int? iconColor;
+
+  /// Storage paths of attached files (e.g. ["uid/expId/receipt.jpg"]).
+  /// NULL or empty means no attachments.
+  final List<String>? attachmentUrls;
+
+  /// Long-form notes. Also populated with content of .txt / .md attachments.
+  final String? notes;
 }
