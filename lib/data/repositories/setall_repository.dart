@@ -1867,7 +1867,10 @@ class SetAllRepository {
             ..['is_income'] = (expenseData['is_income'] as int? ?? 0) != 0
             ..['group_id'] = (expenseData['group_id'] as String?)?.isEmpty == true
                 ? null
-                : expenseData['group_id'];
+                : expenseData['group_id']
+            // Postgres INTEGER (INT4) max is 2147483647; ARGB uint32 overflows it.
+            // toSigned(32) reinterprets the bits as signed — Color() reads them back correctly.
+            ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
     
           if (_isWeb && _client != null) {
             try {
@@ -2649,8 +2652,9 @@ class SetAllRepository {
           final expenseData = expense.toJson()
             ..remove('created_at')
             ..remove('created_by');
-          // Supabase payload: remap types only.
-          final supabaseExpenseData = Map<String, dynamic>.from(expenseData);
+          // Supabase payload: remap types + clamp icon_color to signed INT4.
+          final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
+            ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
     
           if (_isWeb && _client != null) {
             try {
