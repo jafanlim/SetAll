@@ -73,6 +73,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     setState(() => _selected.clear());
   }
 
+  bool _batchDeleting = false;
+
   Future<void> _deleteBatch() async {
     if (_selected.isEmpty) return;
     final count = _selected.length;
@@ -81,7 +83,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete groups?'),
         content: Text(
-          'Delete $count group${count == 1 ? '' : 's'}? As the owner you can restore them from the Activity screen within 90 days.',
+          'Delete $count group${count == 1 ? '' : 's'}? As the owner you can restore them from the Activity screen within 12 months.',
         ),
         actions: [
           TextButton(
@@ -101,9 +103,11 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
+    setState(() => _batchDeleting = true);
     final repo = ref.read(setAllRepositoryProvider);
     final ok = await repo.deleteGroups(_selected.toList());
     if (!mounted) return;
+    setState(() => _batchDeleting = false);
     if (ok) {
       HapticUtils.success();
       ref.invalidate(myGroupsProvider);
@@ -127,7 +131,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     final groupsAsync   = ref.watch(myGroupsProvider);
     final expensesAsync = ref.watch(recentExpensesProvider);
 
-    return Scaffold(
+    return Stack(
+      children: [
+      Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text(
@@ -219,7 +225,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   foregroundColor: Colors.black,
                   icon: const Icon(Icons.add),
                   label: const Text(
-                    'Add expense',
+                    'Add Group Expense',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
@@ -365,7 +371,16 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           ],
         ),
       ),
-    );
+    ),
+    if (_batchDeleting)
+      const Positioned.fill(
+        child: ColoredBox(
+          color: Color(0x66000000),
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ),
+  ],
+);
   }
 }
 
@@ -608,6 +623,8 @@ class _GroupCard extends ConsumerStatefulWidget {
 }
 
 class _GroupCardState extends ConsumerState<_GroupCard> {
+  bool _deleting = false;
+
   Future<void> _rename() async {
     HapticUtils.primaryTap();
     final ctrl = TextEditingController(text: widget.group.name);
@@ -646,42 +663,38 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     }
   }
 
-  Future<void> _delete() async {
+  Future<void> _delete({bool force = false}) async {
     HapticUtils.primaryTap();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete group?'),
-        content: Text('Delete "${widget.group.name}"? You can restore it from the Activity screen within 90 days.'),
+        title: Text(force ? 'Force delete group?' : 'Delete group?'),
+        content: Text(
+          force
+              ? 'Force-delete "${widget.group.name}"? This will also purge all its expenses and splits from the server.'
+              : 'Delete "${widget.group.name}"? You can restore it from the Activity screen within 12 months.',
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            style: FilledButton.styleFrom(
+              backgroundColor: force ? _brandOrange : Colors.redAccent,
+              foregroundColor: Colors.white,
+            ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(force ? 'Force Delete' : 'Delete'),
           ),
         ],
       ),
     );
     if (confirmed != true || !mounted) return;
-    final doubleConfirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Are you sure?'),
-        content: const Text('The group will be hidden immediately. As the owner, you can restore it from the Activity screen within 90 days.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Yes, delete'),
-          ),
-        ],
-      ),
-    );
-    if (doubleConfirmed != true || !mounted) return;
-    final ok = await ref.read(setAllRepositoryProvider).deleteGroup(widget.group.id);
+    setState(() => _deleting = true);
+    final repo = ref.read(setAllRepositoryProvider);
+    final ok = force
+        ? await repo.forceDeleteGroup(widget.group.id)
+        : await repo.deleteGroup(widget.group.id);
     if (!mounted) return;
+    setState(() => _deleting = false);
     if (ok) {
       ref.invalidate(myGroupsProvider);
       ref.invalidate(balanceSummaryProvider);
@@ -689,7 +702,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete group.')),
+        const SnackBar(content: Text('Could not delete group. Try Force Delete from the long-press menu.')),
       );
     }
   }
@@ -712,12 +725,19 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
               title: const Text('Delete group', style: TextStyle(color: Colors.redAccent)),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
+            ListTile(
+              leading: const Icon(Icons.delete_forever_outlined, color: _brandOrange),
+              title: const Text('Force Delete', style: TextStyle(color: _brandOrange)),
+              subtitle: const Text('Purges all expenses from server', style: TextStyle(fontSize: 11)),
+              onTap: () => Navigator.of(ctx).pop('force_delete'),
+            ),
           ],
         ),
       ),
     );
     if (result == 'rename') _rename();
     if (result == 'delete') _delete();
+    if (result == 'force_delete') _delete(force: true);
   }
 
   Future<void> _showRightClickMenu(BuildContext context, Offset position) async {
@@ -742,10 +762,41 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             Text('Delete group', style: TextStyle(color: Colors.redAccent)),
           ]),
         ),
+        const PopupMenuItem(
+          value: 'force_delete',
+          child: Row(children: [
+            Icon(Icons.delete_forever_outlined, size: 16, color: _brandOrange),
+            SizedBox(width: 8),
+            Text('Force Delete', style: TextStyle(color: _brandOrange)),
+          ]),
+        ),
       ],
     );
     if (result == 'rename') _rename();
     if (result == 'delete') _delete();
+    if (result == 'force_delete') _delete(force: true);
+  }
+
+  // Map icon name -> IconData for the group card avatar.
+  static IconData _iconForName(String? name) {
+    const _map = {
+      'groups':     Icons.groups_outlined,
+      'home':       Icons.home_outlined,
+      'flight':     Icons.flight_outlined,
+      'hotel':      Icons.hotel_outlined,
+      'restaurant': Icons.restaurant_outlined,
+      'shopping':   Icons.shopping_bag_outlined,
+      'sports':     Icons.sports_soccer_outlined,
+      'music':      Icons.music_note_outlined,
+      'school':     Icons.school_outlined,
+      'work':       Icons.work_outline,
+      'car':        Icons.directions_car_outlined,
+      'beach':      Icons.beach_access_outlined,
+      'party':      Icons.celebration_outlined,
+      'health':     Icons.favorite_outline,
+      'coffee':     Icons.local_cafe_outlined,
+    };
+    return _map[name] ?? Icons.groups_outlined;
   }
 
   @override
@@ -754,7 +805,13 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final membersAsync = ref.watch(groupMembersProvider(widget.group.id));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(widget.group.id));
 
-    return Padding(
+    final group       = widget.group;
+    final accentColor = group.colorValue != null ? Color(group.colorValue!) : _teal;
+    final bgColor     = accentColor.withValues(alpha: 0.15);
+
+    return Stack(
+      children: [
+      Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: SwipeActionCard(
         actionsPanelWidth: 140,
@@ -788,18 +845,20 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: _tealDim,
+                        color: bgColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Center(
-                        child: Text(
-                          widget.group.name.isNotEmpty ? widget.group.name[0].toUpperCase() : 'G',
-                          style: const TextStyle(
-                            color: _teal,
-                            fontWeight: FontWeight.w800,
-                            fontSize: 16,
-                          ),
-                        ),
+                        child: group.iconName != null
+                            ? Icon(_iconForName(group.iconName), size: 20, color: accentColor)
+                            : Text(
+                                group.name.isNotEmpty ? group.name[0].toUpperCase() : 'G',
+                                style: TextStyle(
+                                  color: accentColor,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 16,
+                                ),
+                              ),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -898,7 +957,18 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
           ),
         ),
       ),
-    );
+    ),
+    if (_deleting)
+      const Positioned.fill(
+        child: ColoredBox(
+          color: Color(0x66000000),
+          child: Center(
+            child: CircularProgressIndicator(),
+          ),
+        ),
+      ),
+  ],
+);
   }
 }
 
