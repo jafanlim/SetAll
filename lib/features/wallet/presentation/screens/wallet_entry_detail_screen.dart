@@ -134,7 +134,7 @@ class _WalletEntryDetailScreenState
     Decimal catMonthSpend  = Decimal.zero;
     Decimal totalMonthSpend = Decimal.zero;
     for (final e in expenses) {
-      if (e.isIncome) continue;
+      if (e.isIncome != isIncome) continue;  // match same type
       final createdAt = DateTime.tryParse(e.createdAt ?? '') ?? DateTime(2000);
       if (createdAt.isBefore(monthStart)) continue;
       final eAmt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
@@ -359,7 +359,7 @@ class _WalletEntryDetailScreenState
           const SizedBox(height: 12),
 
           // ── Mini Analytics ───────────────────────────────────────────────
-          if (!isIncome) ...[
+          if (true) ...[
             GlassCard(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -367,10 +367,10 @@ class _WalletEntryDetailScreenState
                 children: [
                   Row(
                     children: [
-                      const Icon(Icons.bar_chart_rounded, size: 16, color: _purple),
+                      Icon(Icons.bar_chart_rounded, size: 16, color: accentColor),
                       const SizedBox(width: 6),
                       Text(
-                        'Monthly Spending — ${expense.category.isEmpty ? 'General' : expense.category}',
+                        'Monthly ${isIncome ? 'Income' : 'Spending'} — ${expense.category.isEmpty ? 'General' : expense.category}',
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.w700, fontSize: 12,
                         ),
@@ -385,7 +385,7 @@ class _WalletEntryDetailScreenState
                       Container(
                         height: 10,
                         decoration: BoxDecoration(
-                          color: _purple.withValues(alpha: 0.12),
+                          color: accentColor.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(5),
                         ),
                       ),
@@ -414,7 +414,7 @@ class _WalletEntryDetailScreenState
                       _AnalyticPill(
                         label: 'All categories',
                         value: '≈ $baseCcy ${totalMonthSpend.toStringAsFixed(0)}',
-                        color: _purple,
+                        color: accentColor,
                       ),
                       _AnalyticPill(
                         label: 'Share',
@@ -456,44 +456,7 @@ class _WalletEntryDetailScreenState
             ),
           ),
 
-          const SizedBox(height: 24),
-
-          // ── Action buttons ───────────────────────────────────────────────
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _edit,
-                  icon: const Icon(Icons.edit_outlined, size: 18),
-                  label: const Text('Edit Entry'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: _teal,
-                    side: const BorderSide(color: _teal),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: _delete,
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  label: const Text('Delete'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: _brandOrange,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );

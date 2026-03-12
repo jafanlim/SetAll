@@ -280,7 +280,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
             ),
           );
-          context.pop();
+          // For wallet (personal) entries, go directly to /wallet to clear
+          // the WalletEntryTypeScreen from the navigation stack.
+          context.go('/wallet');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not save entry')),
@@ -1121,19 +1123,19 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 ),
               ),
               const Spacer(),
-              _AttachButton(
+              AttachButton(
                 icon: Icons.photo_camera_outlined,
                 label: 'Camera',
                 onTap: () => _pickImage(ImageSource.camera),
               ),
               const SizedBox(width: 8),
-              _AttachButton(
+              AttachButton(
                 icon: Icons.photo_library_outlined,
                 label: 'Gallery',
                 onTap: () => _pickImage(ImageSource.gallery),
               ),
               const SizedBox(width: 8),
-              _AttachButton(
+              AttachButton(
                 icon: Icons.attach_file_outlined,
                 label: 'File',
                 onTap: _pickFile,
@@ -1532,35 +1534,44 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
 
                   // ── A-Z alphabet strip (hidden when searching) ───────────
                   if (!isSearching)
-                    SizedBox(
-                      width: 22,
-                      child: ListView.builder(
-                        itemCount: _alphabet.length,
-                        itemBuilder: (_, i) {
-                          final letter = _alphabet[i];
-                          final hasEntries = _letterIndex.containsKey(letter);
-                          return GestureDetector(
-                            onTap: hasEntries
-                                ? () => _scrollToLetter(letter)
-                                : null,
-                            child: SizedBox(
-                              height: 20,
-                              child: Center(
-                                child: Text(
-                                  letter,
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: hasEntries
-                                        ? _teal
-                                        : theme.colorScheme.onSurfaceVariant
-                                            .withValues(alpha: 0.3),
+                    ScrollConfiguration(
+                      // Disable native scrollbars + prevent the strip from
+                      // swallowing macOS trackpad / mouse-wheel events.
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        scrollbars: false,
+                        physics: const NeverScrollableScrollPhysics(),
+                      ),
+                      child: SizedBox(
+                        width: 24,
+                        child: ListView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _alphabet.length,
+                          itemBuilder: (_, i) {
+                            final letter = _alphabet[i];
+                            final hasEntries = _letterIndex.containsKey(letter);
+                            return GestureDetector(
+                              onTap: hasEntries
+                                  ? () => _scrollToLetter(letter)
+                                  : null,
+                              child: SizedBox(
+                                height: 20,
+                                child: Center(
+                                  child: Text(
+                                    letter,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: hasEntries
+                                          ? _teal
+                                          : theme.colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.3),
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
                     ),
                 ],
@@ -1931,8 +1942,9 @@ class _CurrencySymbolIcon extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Attachment button
 // ---------------------------------------------------------------------------
-class _AttachButton extends StatelessWidget {
-  const _AttachButton({
+class AttachButton extends StatelessWidget {
+  const AttachButton({
+    super.key,
     required this.icon,
     required this.label,
     required this.onTap,
