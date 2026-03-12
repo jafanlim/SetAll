@@ -129,10 +129,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
   }
 
   void _editExpense(ExpenseModel expense) {
-    context.push(
-      '/group/${expense.groupId ?? 'wallet'}/expense/${expense.id}',
-      extra: expense,
-    );
+    context.push(AppRouter.walletEntryDetail, extra: expense);
   }
 
   @override
@@ -199,7 +196,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
           : FloatingActionButton.extended(
               onPressed: () {
                 HapticUtils.primaryTap();
-                context.push(AppRouter.addExpense, extra: {'groupId': '', 'groupName': ''});
+                context.push(AppRouter.walletEntryType);
               },
               backgroundColor: _purple,
               foregroundColor: Colors.white,
@@ -479,7 +476,7 @@ class _BalancePill extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Wallet entry row — tap to edit, right-click context menu, checkbox in edit mode
 // ---------------------------------------------------------------------------
-class _WalletEntryRow extends StatelessWidget {
+class _WalletEntryRow extends ConsumerWidget {
   const _WalletEntryRow({
     required this.expense,
     required this.editMode,
@@ -497,12 +494,15 @@ class _WalletEntryRow extends StatelessWidget {
   final VoidCallback onDelete;
 
   @override
-  Widget build(BuildContext context) {
-    final theme    = Theme.of(context);
-    final isIncome = expense.isIncome;
-    final amt      = Decimal.tryParse(expense.amount) ?? Decimal.zero;
-    final ccy      = expense.currency.isEmpty ? 'USD' : expense.currency;
-    final desc     = expense.description.isEmpty ? 'Wallet entry' : expense.description;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme      = Theme.of(context);
+    final isIncome   = expense.isIncome;
+    final amt        = Decimal.tryParse(expense.amount) ?? Decimal.zero;
+    final ccy        = expense.currency.isEmpty ? 'USD' : expense.currency;
+    final desc       = expense.description.isEmpty ? 'Wallet entry' : expense.description;
+    final baseCcy    = ref.watch(baseCurrencyProvider).valueOrNull ?? 'USD';
+    final usdAmt     = Decimal.tryParse(expense.universalUsdAmount ?? '') ?? Decimal.zero;
+    final showEquiv  = ccy != baseCcy && usdAmt > Decimal.zero;
 
     final tile = GestureDetector(
       onTap: editMode ? onToggle : onEdit,
@@ -564,13 +564,27 @@ class _WalletEntryRow extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                '${isIncome ? '+' : '-'}$ccy ${amt.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: isIncome ? _teal : _purple,
-                ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    '${isIncome ? '+' : '-'}$ccy ${amt.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: isIncome ? _teal : _purple,
+                    ),
+                  ),
+                  if (showEquiv)
+                    Text(
+                      '≈ $baseCcy ${usdAmt.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: theme.colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                ],
               ),
               if (!editMode)
                 const Padding(
