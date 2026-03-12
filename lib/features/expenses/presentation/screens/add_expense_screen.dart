@@ -1,11 +1,18 @@
+import 'dart:io';
+
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/attachment_processor.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/repositories/setall_repository.dart';
@@ -46,10 +53,12 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     super.key,
     required this.groupId,
     required this.groupName,
+    this.initialIsIncome = false,
   });
 
   final String groupId;
   final String groupName;
+  final bool   initialIsIncome;
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -57,8 +66,9 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
 
 class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _amountCtrl = TextEditingController();
-  final _descriptionCtrl = TextEditingController();
+  final _amountCtrl       = TextEditingController();
+  final _descriptionCtrl  = TextEditingController();
+  final _notesCtrl        = TextEditingController();
   final _rateOverrideCtrl = TextEditingController();
   int _step = 0;
   static const int _totalSteps = 3;
@@ -67,8 +77,15 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   String _category = 'General';
   SplitMode _splitMode = SplitMode.even;
   bool _isSubmitting = false;
-  bool _isIncome = false;
+  late bool _isIncome;
+  DateTime _selectedDate = DateTime.now();
   String? _payerId;
+
+  // Icon + color
+  IconData _entryIcon  = Icons.category_outlined;
+  Color    _entryColor = const Color(0xFF8B5CF6);
+
+  final List<String> _attachmentPaths = [];
 
   final List<TextEditingController> _customCtrl = [];
   List<String> _memberIds = [];
@@ -77,7 +94,23 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
+    _isIncome = widget.initialIsIncome;
+    _entryColor = _isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6);
+    _entryIcon  = _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
     _loadMembers();
+  }
+
+  Future<void> _showIconPicker() async {
+    await showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _EntryIconColorPicker(
+        selectedIcon:    _entryIcon,
+        selectedColor:   _entryColor,
+        onIconSelected:  (ic) => setState(() => _entryIcon  = ic),
+        onColorSelected: (c)  => setState(() => _entryColor = c),
+      ),
+    );
   }
 
   Future<void> _loadMembers() async {
@@ -142,10 +175,45 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     }
   }
 
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final xFile = await picker.pickImage(source: source, imageQuality: 85);
+    if (xFile == null || !mounted) return;
+    setState(() => _attachmentPaths.add(xFile.path));
+    HapticUtils.success();
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: false,
+      type: FileType.any,
+    );
+    if (result == null || result.files.isEmpty || !mounted) return;
+    final path = result.files.first.path;
+    if (path == null) return;
+    if (!AttachmentProcessor.isAllowed(path)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Unsupported file type. Allowed: images, PDF, TXT, MD.'),
+      ));
+      return;
+    }
+    if (AttachmentProcessor.isTextFile(path)) {
+      try {
+        final content = await File(path).readAsString();
+        setState(() => _notesCtrl.text = content);
+        HapticUtils.success();
+      } catch (_) {}
+      return;
+    }
+    setState(() => _attachmentPaths.add(path));
+    HapticUtils.success();
+  }
+
   @override
   void dispose() {
     _amountCtrl.dispose();
     _descriptionCtrl.dispose();
+    _notesCtrl.dispose();
     _rateOverrideCtrl.dispose();
 
     for (final c in _customCtrl) {
@@ -228,12 +296,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         groupId: null,
         payerId: payerId,
         amount: amount,
-        description: _descriptionCtrl.text.trim(),
+        description: InputSanitizer.sanitize(_descriptionCtrl.text.trim()),
         currency: _currency,
         splitType: SplitType.even,
         splits: [],
         category: _category,
         isIncome: _isIncome,
+        iconCodepoint: _entryIcon.codePoint,
+        iconColor: _entryColor.toARGB32(),
+        attachmentPaths: List.unmodifiable(_attachmentPaths),
+        notes: _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
       );
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -248,7 +320,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
             ),
           );
-          context.pop();
+          // For wallet (personal) entries, go directly to /wallet to clear
+          // the WalletEntryTypeScreen from the navigation stack.
+          context.go('/wallet');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Could not save entry')),
@@ -346,12 +420,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       groupId: widget.groupId.isEmpty ? null : widget.groupId,
       payerId: payerId,
       amount: amount,
-      description: _descriptionCtrl.text.trim(),
+      description: InputSanitizer.sanitize(_descriptionCtrl.text.trim()),
       currency: _currency,
       splitType: splitType,
       splits: splitsToStore,
       category: _category,
       isIncome: _isIncome,
+      iconCodepoint: _entryIcon.codePoint,
+      iconColor: _entryColor.toARGB32(),
+      attachmentPaths: List.unmodifiable(_attachmentPaths),
+      notes: _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
     );
 
 
@@ -397,7 +475,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
-          'Add expense · ${_step + 1}/$_effectiveTotalSteps',
+          '${_isIncome ? 'Add income' : 'Add expense'} · ${_step + 1}/$_effectiveTotalSteps',
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -477,7 +555,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             ),
                           )
                         : const Icon(Icons.check),
-                    label: Text(_isSubmitting ? 'Saving…' : 'Save expense'),
+                    label: Text(_isSubmitting ? 'Saving…' : (_isIncome ? 'Save income' : 'Save expense')),
                   ),
               ],
             ),
@@ -628,6 +706,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               rateCtrl: _rateOverrideCtrl,
               fromCurrency: _currency,
               toCurrency: base,
+              labelOverride: 'Manual Rate (Optional)',
               onApply: () async {
                 final v = _rateOverrideCtrl.text.trim();
                 final svc = ref.read(currencyServiceProvider);
@@ -646,59 +725,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ],
 
-          // ── Income toggle (personal wallet mode only) ──────────────────
-          if (widget.groupId.isEmpty) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: _isIncome
-                    ? const Color(0xFF22C55E).withValues(alpha: 0.10)
-                    : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                borderRadius: BorderRadius.circular(12),
-                border: _isIncome
-                    ? Border.all(color: const Color(0xFF22C55E).withValues(alpha: 0.4))
-                    : null,
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded,
-                    size: 18,
-                    color: _isIncome ? const Color(0xFF22C55E) : const Color(0xFF94A3B8),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Mark as Income',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 13,
-                            color: _isIncome ? const Color(0xFF22C55E) : theme.colorScheme.onSurface,
-                          ),
-                        ),
-                        Text(
-                          _isIncome ? 'This entry adds to your wallet balance' : 'This entry subtracts from your wallet balance',
-                          style: TextStyle(fontSize: 10, color: theme.colorScheme.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Switch(
-                    value: _isIncome,
-                    onChanged: (v) {
-                      HapticUtils.selection();
-                      setState(() => _isIncome = v);
-                    },
-                    activeThumbColor: const Color(0xFF22C55E),
-                  ),
-                ],
-              ),
-            ),
-          ],
+          // ── Date picker ───────────────────────────────────────────────
+          const SizedBox(height: 12),
+          _DatePickerField(
+            selectedDate: _selectedDate,
+            onDateChanged: (d) => setState(() => _selectedDate = d),
+          ),
+
         ],
       ),
     );
@@ -949,6 +982,54 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
           ),
           const SizedBox(height: 16),
+
+          // ── Icon & Colour ─────────────────────────────────────────────
+          Row(
+            children: [
+              GestureDetector(
+                onTap: _showIconPicker,
+                child: Container(
+                  width: 52, height: 52,
+                  decoration: BoxDecoration(
+                    color: _entryColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                        color: _entryColor.withValues(alpha: 0.4)),
+                  ),
+                  child: Icon(_entryIcon, color: _entryColor, size: 24),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Icon & Colour',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                        )),
+                    const SizedBox(height: 2),
+                    TextButton.icon(
+                      onPressed: _showIconPicker,
+                      icon: const Icon(Icons.palette_outlined, size: 14),
+                      label: const Text('Change icon & colour',
+                          style: TextStyle(fontSize: 12)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _teal,
+                        padding: EdgeInsets.zero,
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
           // Category section header with "+" button
           Row(
             children: [
@@ -1121,6 +1202,121 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ),
             maxLines: 2,
           ),
+          const SizedBox(height: 16),
+
+          // ── Attachments ─────────────────────────────────────────────────
+          Row(
+            children: [
+              Text(
+                'Attachments',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+              const Spacer(),
+              if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) ...[
+                AttachButton(
+                  icon: Icons.photo_camera_outlined,
+                  label: 'Camera',
+                  onTap: () => _pickImage(ImageSource.camera),
+                ),
+                const SizedBox(width: 8),
+              ],
+              AttachButton(
+                icon: Icons.photo_library_outlined,
+                label: 'Gallery',
+                onTap: () => _pickImage(ImageSource.gallery),
+              ),
+              const SizedBox(width: 8),
+              AttachButton(
+                icon: Icons.attach_file_outlined,
+                label: 'File',
+                onTap: _pickFile,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // ── Notes ───────────────────────────────────────────────────────
+          TextFormField(
+            controller: _notesCtrl,
+            decoration: InputDecoration(
+              labelText: 'Notes (optional)',
+              hintText: 'Additional details, or import a .txt / .md file above',
+              prefixIcon: const Icon(Icons.notes_outlined),
+              filled: true,
+              fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            maxLines: 3,
+            minLines: 1,
+          ),
+
+          if (_attachmentPaths.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            SizedBox(
+              height: 80,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: _attachmentPaths.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 8),
+                itemBuilder: (_, i) {
+                  final path = _attachmentPaths[i];
+                  final isLocalPath = path.startsWith('/') || path.contains('\\');
+                  final isImage = isLocalPath && (path.endsWith('.jpg') ||
+                      path.endsWith('.jpeg') ||
+                      path.endsWith('.png') ||
+                      path.endsWith('.webp'));
+                  return Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(10),
+                        child: isImage
+                            ? Image.file(
+                                File(path),
+                                width: 80, height: 80,
+                                fit: BoxFit.cover,
+                              )
+                            : Container(
+                                width: 80, height: 80,
+                                color: theme.colorScheme.surfaceContainerHighest,
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(Icons.insert_drive_file_outlined, size: 28),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      path.split('.').last.toUpperCase(),
+                                      style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                      Positioned(
+                        top: 2, right: 2,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _attachmentPaths.removeAt(i)),
+                          child: Container(
+                            width: 20, height: 20,
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -1203,9 +1399,23 @@ class CurrencyPickerField extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Advanced Currency Search Sheet
+// Ordering: Default → Recently Used → Majors → A–Z
+// Features: search bar + vertical A–Z alphabet strip for fast scrolling
+// ---------------------------------------------------------------------------
+
+/// Persistent store for recently used currency codes (in-memory for session).
+final _recentlyUsed = <String>[];
+
 class CurrencySearchSheet extends StatefulWidget {
-  const CurrencySearchSheet({super.key, required this.selected});
+  const CurrencySearchSheet({
+    super.key,
+    required this.selected,
+    this.defaultCurrency,
+  });
   final String selected;
+  final String? defaultCurrency;
 
   @override
   State<CurrencySearchSheet> createState() => _CurrencySearchSheetState();
@@ -1213,58 +1423,155 @@ class CurrencySearchSheet extends StatefulWidget {
 
 class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
   String _query = '';
+  final _listCtrl = ScrollController();
 
-  static const _kHeader = '__HEADER__';
+  @override
+  void initState() {
+    super.initState();
+    // Ensure the currently selected currency always appears in "Recently Used"
+    // so it is visible at the top even before the user picks anything new.
+    final sel = widget.selected;
+    if (sel.isNotEmpty && !_recentlyUsed.contains(sel)) {
+      _recentlyUsed.insert(0, sel);
+      if (_recentlyUsed.length > 5) _recentlyUsed.removeLast();
+    }
+  }
 
-  // Returns a mixed list: header sentinel maps + currency maps.
-  // When searching, returns a flat filtered list with no headers.
+  static const _kHeader   = '__HEADER__';
+  static const _alphabet  = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+
+  // Build ordered list: Default → Recently Used → Majors → A-Z
+  // Each section preceded by a header sentinel.
+  List<Map<String, String>> get _orderedItems {
+    final defaultCode = widget.defaultCurrency ?? widget.selected;
+
+    // 1. Default currency (single entry)
+    final defaultEntry = kCurrencyList.where((c) => c['code'] == defaultCode).toList();
+
+    // 2. Recently used (exclude only if it is the explicit default entry shown above)
+    final explicitDefault = widget.defaultCurrency;
+    final recentEntries = _recentlyUsed
+        .where((code) => code != (explicitDefault ?? ''))
+        .map((code) => kCurrencyList.firstWhere(
+              (c) => c['code'] == code,
+              orElse: () => <String, String>{},
+            ))
+        .where((c) => c.isNotEmpty)
+        .toList();
+
+    // 3. Majors (excluding default + recent)
+    final majorEntries = kCurrencyList
+        .where((c) =>
+            kMostUsedCurrencyCodes.contains(c['code']) &&
+            c['code'] != defaultCode &&
+            !_recentlyUsed.contains(c['code']))
+        .toList();
+
+    // 4. A–Z (excluding already listed)
+    final listed = {defaultCode, ..._recentlyUsed, ...kMostUsedCurrencyCodes};
+    final azEntries = kCurrencyList
+        .where((c) => !listed.contains(c['code']))
+        .toList()
+      ..sort((a, b) => (a['name'] ?? '').compareTo(b['name'] ?? ''));
+
+    return [
+      if (defaultEntry.isNotEmpty) ...[
+        {'code': _kHeader, 'name': 'Default Currency', 'flag': ''},
+        ...defaultEntry,
+      ],
+      if (recentEntries.isNotEmpty) ...[
+        {'code': _kHeader, 'name': 'Recently Used', 'flag': ''},
+        ...recentEntries,
+      ],
+      if (majorEntries.isNotEmpty) ...[
+        {'code': _kHeader, 'name': 'Major Currencies', 'flag': ''},
+        ...majorEntries,
+      ],
+      {'code': _kHeader, 'name': 'All Currencies A–Z', 'flag': ''},
+      ...azEntries,
+    ];
+  }
+
   List<Map<String, String>> get _items {
     if (_query.isNotEmpty) {
       final q = _query.toUpperCase();
       return kCurrencyList
           .where((c) =>
-              c['code']!.contains(q) ||
+              c['code']!.toUpperCase().contains(q) ||
               c['name']!.toUpperCase().contains(q))
-          .toList();
+          .toList()
+        ..sort((a, b) {
+          // Exact code match first
+          final aExact = a['code']!.toUpperCase() == q;
+          final bExact = b['code']!.toUpperCase() == q;
+          if (aExact && !bExact) return -1;
+          if (!aExact && bExact) return 1;
+          return (a['name'] ?? '').compareTo(b['name'] ?? '');
+        });
     }
-    final mostUsed = kCurrencyList
-        .where((c) => kMostUsedCurrencyCodes.contains(c['code']))
-        .toList();
-    final others = kCurrencyList
-        .where((c) => !kMostUsedCurrencyCodes.contains(c['code']))
-        .toList();
-    return [
-      {'code': _kHeader, 'name': 'Most Used',      'flag': ''},
-      ...mostUsed,
-      {'code': _kHeader, 'name': 'All Currencies', 'flag': ''},
-      ...others,
-    ];
+    return _orderedItems;
+  }
+
+  /// Map from first letter → index in the full _orderedItems list (A-Z section only).
+  Map<String, int> get _letterIndex {
+    final items = _orderedItems;
+    final map = <String, int>{};
+    for (var i = 0; i < items.length; i++) {
+      final c = items[i];
+      if (c['code'] == _kHeader) continue;
+      final first = (c['name'] ?? c['code'] ?? '').toUpperCase();
+      if (first.isEmpty) continue;
+      final letter = first[0];
+      if (!map.containsKey(letter)) map[letter] = i;
+    }
+    return map;
+  }
+
+  void _scrollToLetter(String letter) {
+    final index = _letterIndex[letter];
+    if (index == null) return;
+    HapticUtils.selection();
+    _listCtrl.animateTo(
+      // each ListTile ≈ 60px, each header ≈ 36px — approximate
+      index * 58.0,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  void dispose() {
+    _listCtrl.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final items = _items;
+    final isSearching = _query.isNotEmpty;
+
     return DraggableScrollableSheet(
-      initialChildSize: 0.75,
+      initialChildSize: 0.80,
       maxChildSize: 0.95,
       minChildSize: 0.4,
-      builder: (_, ctrl) => Container(
+      builder: (_, sheetCtrl) => Container(
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         child: Column(
           children: [
+            // Handle
             const SizedBox(height: 8),
             Container(
-              width: 36,
-              height: 4,
+              width: 36, height: 4,
               decoration: BoxDecoration(
                 color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
+            // Search bar
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
               child: TextField(
@@ -1272,6 +1579,12 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
                 decoration: InputDecoration(
                   hintText: 'Search currency…',
                   prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 18),
+                          onPressed: () => setState(() => _query = ''),
+                        )
+                      : null,
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest,
                   border: OutlineInputBorder(
@@ -1283,51 +1596,113 @@ class _CurrencySearchSheetState extends State<CurrencySearchSheet> {
                 onChanged: (v) => setState(() => _query = v),
               ),
             ),
+
+            // List + A-Z strip
             Expanded(
-              child: ListView.builder(
-                controller: ctrl,
-                itemCount: items.length,
-                itemBuilder: (_, i) {
-                  final c = items[i];
-                  if (c['code'] == _kHeader) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
-                      child: Text(
-                        c['name']!,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 0.8,
+              child: Row(
+                children: [
+                  // ── Currency list ────────────────────────────────────────
+                  Expanded(
+                    child: ListView.builder(
+                      controller: isSearching ? sheetCtrl : _listCtrl,
+                      itemCount: items.length,
+                      itemBuilder: (_, i) {
+                        final c = items[i];
+                        if (c['code'] == _kHeader) {
+                          return Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                            child: Text(
+                              c['name']!,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.8,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        }
+                        final isSelected = c['code'] == widget.selected;
+                        return ListTile(
+                          dense: true,
+                          leading: Text(
+                            c['flag'] ?? '',
+                            style: const TextStyle(fontSize: 22),
+                          ),
+                          title: Text(
+                            c['code']!,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13,
+                              color: isSelected ? _teal : null,
+                            ),
+                          ),
+                          subtitle: Text(
+                            c['name']!,
+                            style: const TextStyle(fontSize: 11),
+                          ),
+                          trailing: isSelected
+                              ? const Icon(Icons.check_circle, color: _teal, size: 18)
+                              : null,
+                          onTap: () {
+                            HapticUtils.selection();
+                            // Track recently used
+                            _recentlyUsed
+                              ..remove(c['code'])
+                              ..insert(0, c['code']!);
+                            if (_recentlyUsed.length > 5) {
+                              _recentlyUsed.removeLast();
+                            }
+                            Navigator.pop(context, c['code']);
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // ── A-Z alphabet strip (hidden when searching) ───────────
+                  if (!isSearching)
+                    ScrollConfiguration(
+                      // Disable native scrollbars + prevent the strip from
+                      // swallowing macOS trackpad / mouse-wheel events.
+                      behavior: ScrollConfiguration.of(context).copyWith(
+                        scrollbars: false,
+                        physics: const NeverScrollableScrollPhysics(),
+                      ),
+                      child: SizedBox(
+                        width: 24,
+                        child: ListView.builder(
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: _alphabet.length,
+                          itemBuilder: (_, i) {
+                            final letter = _alphabet[i];
+                            final hasEntries = _letterIndex.containsKey(letter);
+                            return GestureDetector(
+                              onTap: hasEntries
+                                  ? () => _scrollToLetter(letter)
+                                  : null,
+                              child: SizedBox(
+                                height: 20,
+                                child: Center(
+                                  child: Text(
+                                    letter,
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                      color: hasEntries
+                                          ? _teal
+                                          : theme.colorScheme.onSurfaceVariant
+                                              .withValues(alpha: 0.3),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
-                    );
-                  }
-                  final isSelected = c['code'] == widget.selected;
-                  return ListTile(
-                    dense: true,
-                    leading: Text(c['flag'] ?? '',
-                        style: const TextStyle(fontSize: 22)),
-                    title: Text(
-                      c['code']!,
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 13,
-                        color: isSelected ? _teal : null,
-                      ),
                     ),
-                    subtitle: Text(
-                      c['name']!,
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    trailing: isSelected
-                        ? const Icon(Icons.check_circle, color: _teal)
-                        : null,
-                    onTap: () {
-                      HapticUtils.selection();
-                      Navigator.pop(context, c['code']);
-                    },
-                  );
-                },
+                ],
               ),
             ),
           ],
@@ -1530,12 +1905,14 @@ class _ManualRateRow extends StatelessWidget {
     required this.fromCurrency,
     required this.toCurrency,
     required this.onApply,
+    this.labelOverride,
   });
 
   final TextEditingController rateCtrl;
   final String fromCurrency;
   final String toCurrency;
   final VoidCallback onApply;
+  final String? labelOverride;
 
   @override
   Widget build(BuildContext context) {
@@ -1548,7 +1925,7 @@ class _ManualRateRow extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontSize: 12),
             decoration: InputDecoration(
-              labelText: 'Manual rate (bank / cash)',
+              labelText: labelOverride ?? 'Manual rate (bank / cash)',
               hintText: '1 $fromCurrency = ? $toCurrency',
               labelStyle: const TextStyle(fontSize: 11),
               isDense: true,
@@ -1580,6 +1957,89 @@ class _ManualRateRow extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Dynamic currency symbol prefix icon
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Date Picker Field
+// ---------------------------------------------------------------------------
+class _DatePickerField extends StatelessWidget {
+  const _DatePickerField({
+    required this.selectedDate,
+    required this.onDateChanged,
+  });
+
+  final DateTime selectedDate;
+  final ValueChanged<DateTime> onDateChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = _fmt(selectedDate);
+    final isToday = _isToday(selectedDate);
+    return InkWell(
+      onTap: () async {
+        HapticUtils.lightTap();
+        final picked = await showDatePicker(
+          context: context,
+          initialDate: selectedDate,
+          firstDate: DateTime(2000),
+          lastDate: DateTime.now().add(const Duration(days: 1)),
+          builder: (ctx, child) => Theme(
+            data: Theme.of(ctx).copyWith(
+              colorScheme: Theme.of(ctx).colorScheme.copyWith(
+                primary: _teal,
+                onPrimary: Colors.black,
+              ),
+            ),
+            child: child!,
+          ),
+        );
+        if (picked != null) onDateChanged(picked);
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.calendar_today_outlined,
+              size: 16,
+              color: isToday ? _teal : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                isToday ? 'Today · $label' : label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isToday ? _teal : theme.colorScheme.onSurface,
+                ),
+              ),
+            ),
+            Icon(Icons.expand_more, size: 18, color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _fmt(DateTime dt) {
+    const months = [
+      'Jan','Feb','Mar','Apr','May','Jun',
+      'Jul','Aug','Sep','Oct','Nov','Dec'
+    ];
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year}';
+  }
+
+  static bool _isToday(DateTime dt) {
+    final now = DateTime.now();
+    return dt.year == now.year && dt.month == now.month && dt.day == now.day;
+  }
+}
+
 class _CurrencySymbolIcon extends StatelessWidget {
   const _CurrencySymbolIcon({required this.currency});
   final String currency;
@@ -1601,6 +2061,222 @@ class _CurrencySymbolIcon extends StatelessWidget {
             fontWeight: FontWeight.w800,
             fontSize: fontSize,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Entry icon + color catalogue (shared with AddExpenseScreen picker)
+// ---------------------------------------------------------------------------
+const List<IconData> _kAddEntryIcons = [
+  Icons.category_outlined, Icons.restaurant_outlined, Icons.directions_car_outlined,
+  Icons.movie_outlined, Icons.receipt_long_outlined, Icons.shopping_bag_outlined,
+  Icons.flight_outlined, Icons.local_cafe_outlined, Icons.fitness_center_outlined,
+  Icons.medical_services_outlined, Icons.school_outlined, Icons.home_outlined,
+  Icons.pets_outlined, Icons.sports_esports_outlined, Icons.music_note_outlined,
+  Icons.attach_money, Icons.savings_outlined, Icons.card_giftcard_outlined,
+  Icons.arrow_downward_rounded, Icons.arrow_upward_rounded,
+];
+
+const List<Color> _kAddEntryColors = [
+  Color(0xFF8B5CF6), Color(0xFF22C55E), Color(0xFF00D9B0), Color(0xFFEF4444),
+  Color(0xFF3B82F6), Color(0xFFF59E0B), Color(0xFFEC4899), Color(0xFF06B6D4),
+  Color(0xFFA855F7), Color(0xFFF97316), Color(0xFF10B981), Color(0xFF6366F1),
+];
+
+// ---------------------------------------------------------------------------
+// Icon + Color picker bottom sheet (used by AddExpenseScreen)
+// ---------------------------------------------------------------------------
+class _EntryIconColorPicker extends StatefulWidget {
+  const _EntryIconColorPicker({
+    required this.selectedIcon,
+    required this.selectedColor,
+    required this.onIconSelected,
+    required this.onColorSelected,
+  });
+
+  final IconData  selectedIcon;
+  final Color     selectedColor;
+  final ValueChanged<IconData> onIconSelected;
+  final ValueChanged<Color>    onColorSelected;
+
+  @override
+  State<_EntryIconColorPicker> createState() => _EntryIconColorPickerState();
+}
+
+class _EntryIconColorPickerState extends State<_EntryIconColorPicker> {
+  late IconData _icon;
+  late Color    _color;
+
+  @override
+  void initState() {
+    super.initState();
+    _icon  = widget.selectedIcon;
+    _color = widget.selectedColor;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 32),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36, height: 4,
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Center(
+              child: Container(
+                width: 64, height: 64,
+                decoration: BoxDecoration(
+                  color: _color.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: _color.withValues(alpha: 0.5), width: 2),
+                ),
+                child: Icon(_icon, color: _color, size: 30),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text('Colour', style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700, fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant,
+            )),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10, runSpacing: 10,
+              children: _kAddEntryColors.map((c) {
+                final sel = _color.toARGB32() == c.toARGB32();
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _color = c);
+                    widget.onColorSelected(c);
+                  },
+                  child: Container(
+                    width: 32, height: 32,
+                    decoration: BoxDecoration(
+                      color: c,
+                      shape: BoxShape.circle,
+                      border: sel ? Border.all(color: Colors.white, width: 3) : null,
+                      boxShadow: sel
+                          ? [BoxShadow(color: c.withValues(alpha: 0.5), blurRadius: 6)]
+                          : null,
+                    ),
+                    child: sel ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 20),
+            Text('Icon', style: theme.textTheme.labelMedium?.copyWith(
+              fontWeight: FontWeight.w700, fontSize: 11,
+              color: theme.colorScheme.onSurfaceVariant,
+            )),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10, runSpacing: 10,
+              children: _kAddEntryIcons.map((ic) {
+                final sel = _icon == ic;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _icon = ic);
+                    widget.onIconSelected(ic);
+                  },
+                  child: Container(
+                    width: 44, height: 44,
+                    decoration: BoxDecoration(
+                      color: sel
+                          ? _color.withValues(alpha: 0.2)
+                          : theme.colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                      border: sel ? Border.all(color: _color, width: 2) : null,
+                    ),
+                    child: Icon(ic,
+                      size: 20,
+                      color: sel ? _color : theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _teal,
+                  foregroundColor: Colors.black,
+                ),
+                child: const Text('Done', style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Attachment button
+// ---------------------------------------------------------------------------
+class AttachButton extends StatelessWidget {
+  const AttachButton({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData    icon;
+  final String      label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: _teal.withValues(alpha: 0.25),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: _teal),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: _teal,
+              ),
+            ),
+          ],
         ),
       ),
     );

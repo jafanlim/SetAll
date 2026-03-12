@@ -82,8 +82,8 @@
 	<key>NSFaceIDUsageDescription</key>
 	<string>Use Face ID to unlock SetAll quickly and securely.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SetAll uses your photo library to set your profile picture.</string>
+	<string>SetAll uses your photo library to attach receipts and images to wallet entries.</string>
 	<key>NSCameraUsageDescription</key>
-	<string>SetAll uses your camera to take a profile picture.</string>
+	<string>SetAll uses your camera to photograph receipts and bills for wallet entries.</string>
 </dict>
 </plist>

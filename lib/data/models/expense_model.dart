@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import '../../domain/entities/expense.dart';
 
 class ExpenseModel extends Expense {
@@ -17,6 +19,10 @@ class ExpenseModel extends Expense {
     super.originalCurrency,
     super.exchangeRateApplied,
     super.universalUsdAmount,
+    super.iconCodepoint,
+    super.iconColor,
+    super.attachmentUrls,
+    super.notes,
   });
 
   static SplitType _splitTypeFromString(String? v) {
@@ -53,6 +59,10 @@ class ExpenseModel extends Expense {
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
       // 'universal_usd_amount' is the USD anchor
       universalUsdAmount: (json['universal_usd_amount'])?.toString(),
+      iconCodepoint: json['icon_codepoint'] as int?,
+      iconColor: json['icon_color'] as int?,
+      attachmentUrls: _parseAttachmentUrls(json['attachment_urls']),
+      notes: json['notes'] as String?,
     );
   }
 
@@ -72,5 +82,21 @@ class ExpenseModel extends Expense {
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,
         if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,
+        if (iconCodepoint != null) 'icon_codepoint': iconCodepoint,
+        if (iconColor != null) 'icon_color': iconColor,
+        if (attachmentUrls != null && attachmentUrls!.isNotEmpty)
+          'attachment_urls': jsonEncode(attachmentUrls),
+        if (notes != null && notes!.isNotEmpty) 'notes': notes,
       };
+
+  static List<String>? _parseAttachmentUrls(dynamic raw) {
+    if (raw == null) return null;
+    try {
+      if (raw is String && raw.isNotEmpty) {
+        final decoded = jsonDecode(raw);
+        if (decoded is List) return decoded.cast<String>();
+      }
+    } catch (_) {}
+    return null;
+  }
 }

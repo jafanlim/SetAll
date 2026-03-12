@@ -1,0 +1,3 @@
+ALTER TABLE expenses
+  ADD COLUMN IF NOT EXISTS icon_codepoint INTEGER,
+  ADD COLUMN IF NOT EXISTS icon_color     BIGINT;
