@@ -822,23 +822,36 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   onTap: () async {
+                    // Best-effort sync: push pending writes but never let it
+                    // block sign-out (3 s cap covers slow / offline Windows).
                     try {
-                      // Push any pending local writes before wiping so
-                      // offline-created data isn't permanently lost on logout.
-                      await ref.read(syncServiceProvider).performFullSync();
-                      // Wipe SQLite BEFORE signOut so the auth-state listener
-                      // never races with the delete and re-populates the cache.
+                      await ref
+                          .read(syncServiceProvider)
+                          .performFullSync()
+                          .timeout(const Duration(seconds: 3));
+                    } catch (_) {}
+
+                    // Wipe SQLite BEFORE signOut so the auth-state listener
+                    // never races with the delete and re-populates the cache.
+                    try {
                       await LocalDatabase.db.delete('splits');
                       await LocalDatabase.db.delete('expenses');
                       await LocalDatabase.db.delete('group_members');
                       await LocalDatabase.db.delete('groups');
                       await LocalDatabase.db.delete('profiles');
-                      await Supabase.instance.client.auth.signOut();
-                      // app.dart _onAuthChange(signedOut) handles provider
-                      // invalidation — no need to duplicate it here.
-                      if (context.mounted) context.go('/login');
                     } catch (e) {
-                      debugPrint('❌ Logout Error: $e');
+                      debugPrint('❌ Logout wipe error: $e');
+                    }
+
+                    try {
+                      await Supabase.instance.client.auth.signOut();
+                      // _AuthRefresh notifies GoRouter → redirects to /login.
+                      // Do NOT call context.go here — double-navigation on
+                      // Windows silently no-ops when the widget is already gone.
+                    } catch (e) {
+                      debugPrint('❌ Logout signOut error: $e');
+                      // Force-navigate even if signOut threw (e.g. network error).
+                      if (context.mounted) context.go('/login');
                     }
                   },
                 ),

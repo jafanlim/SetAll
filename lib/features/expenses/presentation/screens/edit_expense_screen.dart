@@ -193,7 +193,13 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     final expense    = await repo.getExpense(widget.expenseId);
     final splits     = await repo.getSplitsForExpense(widget.expenseId);
     final currentUid = await repo.ensureUser();
-    var members      = await repo.getGroupMembers(widget.groupId);
+
+    // Wallet entries have no groupId — skip getGroupMembers entirely (avoids
+    // Supabase calls with empty group_id which hang on Windows without timeout).
+    List<ProfileModel> members = [];
+    if (widget.groupId.isNotEmpty) {
+      members = await repo.getGroupMembers(widget.groupId);
+    }
 
     // Wallet entry — no group, so use the current user as sole member.
     if (members.isEmpty && currentUid != null) {

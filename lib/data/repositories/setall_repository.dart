@@ -1440,6 +1440,9 @@ class SetAllRepository {
   // ---------------------------------------------------------------------------
 
   Future<List<ProfileModel>> getGroupMembers(String groupId) async {
+    // Empty groupId = wallet/personal entry — no members to fetch.
+    if (groupId.isEmpty) return [];
+
     // Web always uses Supabase directly.
     if (_isWeb && _client != null) {
       return _getGroupMembersFromSupabase(groupId);
