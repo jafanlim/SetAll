@@ -9,6 +9,7 @@ import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
+import '../../../../core/utils/accent_text_style.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../domain/entities/activity_event.dart';
@@ -852,6 +853,7 @@ Widget _buildEventTile({
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
                         color: accent,
+                        shadows: accentShadows(context),
                       ),
                     ),
                   ),
@@ -878,7 +880,7 @@ Widget _buildEventTile({
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                   color: amountPositive ? _green : accent,
-                ),
+                ).withAccentShadow(context),
               ),
               if (amountSub != null)
                 Text(

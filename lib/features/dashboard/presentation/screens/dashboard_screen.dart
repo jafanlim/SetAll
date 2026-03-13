@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/accent_text_style.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -217,7 +218,7 @@ class _MasterNetWorthHero extends StatelessWidget {
                 fontSize: 32,
                 letterSpacing: -1,
                 color: _error ? theme.colorScheme.onSurfaceVariant : accent,
-              ),
+              ).withAccentShadow(context, opacity: 0.28),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -281,11 +282,13 @@ class _StatPill extends StatelessWidget {
         children: [
           Text(label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: color, fontWeight: FontWeight.w600, fontSize: 10),
+              color: color, fontWeight: FontWeight.w600, fontSize: 10,
+              shadows: accentShadows(context)),
             overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
           Text(value,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)
+                .withAccentShadow(context),
             overflow: TextOverflow.ellipsis),
         ],
       ),
