@@ -63,6 +63,34 @@ supabase/migrations/         # SQL: profiles, groups, expenses, splits
 - **Even split**: `SplitEngine.splitEven(total, participantIds)` → total / N with remainder on first.
 - **Custom split**: `SplitEngine.splitCustom(total, participantIds, weights: [...])` or fixed `amountsOwed`.
 
+## Security & Transparency
+
+SetAll is open source. We believe transparency builds trust — especially in a fintech app that handles real money between real people.
+
+### Client-Side API Keys
+
+This repository contains Firebase/GCP API keys in `lib/main.dart` and platform config files. **This is intentional and safe** for the following reasons:
+
+| Key | Restriction | Why it's safe |
+|-----|-------------|---------------|
+| Android | SHA-1 fingerprint + `com.setall.setall` package | Useless without our release keystore |
+| iOS | Bundle ID `com.jafa.setall.app` | Only works with App Store/TestFlight signed builds |
+| Web | HTTP referrer `https://setall.app/*` | Rejected from any other origin |
+
+This is the same model used by Firebase's own documentation and all major apps shipping Firebase. The keys are designed to be client-facing.
+
+> **Note:** `google-services.json`, `GoogleService-Info.plist`, and `lib/firebase_options.dart` are in `.gitignore` and are never committed. Share them via a secure channel (1Password, CI/CD secrets, team vault).
+
+### Auditing the Logic
+
+We welcome security audits. If you find a vulnerability, please open a private GitHub Security Advisory rather than a public issue.
+
+### Supply Chain
+
+- All dependencies are pinned in `pubspec.lock`
+- CI/CD via GitHub Actions — see `.github/workflows/`
+- Supabase Row Level Security policies are in `supabase/migrations/`
+
 ## License
 
-Private / your choice.
+MIT — see [LICENSE](LICENSE).

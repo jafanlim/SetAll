@@ -50,6 +50,16 @@ app.*.map.json
 .env.*
 !.env.example
 
+# Firebase config files — contain API keys, never commit these
+# Keep local copies but do NOT push to public repos.
+# Share via secure channel (1Password, team vault, CI/CD secrets).
+google-services.json
+GoogleService-Info.plist
+lib/firebase_options.dart
+
+# Firebase CLI cache
+.firebase/
+
 # Xcode / test artifacts (large)
 xcresult_*.json
 *.xcresult
