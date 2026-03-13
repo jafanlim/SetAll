@@ -196,6 +196,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     String? errorMsg;
     final prefs = await SharedPreferences.getInstance();
     final savedPin = prefs.getString(_kPinKey) ?? '';
+    if (!mounted) return;
 
     final confirmed = await showDialog<bool>(
       context: context,
