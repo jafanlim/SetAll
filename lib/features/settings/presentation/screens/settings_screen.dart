@@ -6,32 +6,23 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../app.dart' show updateResultProvider;
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
-import '../../../../core/services/biometric_service.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
-import '../../../../data/models/profile_model.dart';
 import '../../../../data/local/local_database.dart';
+import '../../../../data/models/profile_model.dart';
+import 'notifications_screen.dart';
+import 'regional_screen.dart';
+import 'security_screen.dart';
+import 'splitwise_import_screen.dart';
 
 const _teal = Color(0xFF00D9B0);
-const _tealDim = Color(0x2600D9B0);
 
-// ---------------------------------------------------------------------------
-// Grace period options (seconds)
-// ---------------------------------------------------------------------------
-const List<({int seconds, String label})> kGracePeriodOptions = [
-  (seconds: 0,   label: 'Immediately'),
-  (seconds: 30,  label: '30 seconds'),
-  (seconds: 60,  label: '1 minute'),
-  (seconds: 300, label: '5 minutes'),
-];
-const String _kGracePeriodKey = 'setall_biometric_grace_seconds';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -69,16 +60,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _currencySaving = false;
   bool _currencyUserSelected = false; // true once user explicitly picks a value
 
-  // ── Biometric ───────────────────────────────────────────────────────────
-  bool _biometricAvailable = false;
-  bool _biometricEnabled   = false;
-  int  _gracePeriodSeconds = 30;
-  bool _biometricLoading   = true;
-
   @override
   void initState() {
     super.initState();
-    _loadBiometricSettings();
     _loadAppVersion();
     _currentEmail = Supabase.instance.client.auth.currentUser?.email;
     // Seed controllers from a cached profile immediately (no wait for first frame).
@@ -100,22 +84,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _loadAppVersion() async {
     final info = await PackageInfo.fromPlatform();
     if (mounted) setState(() => _appVersion = 'v${info.version}');
-  }
-
-  Future<void> _loadBiometricSettings() async {
-    final bio = BiometricService.instance;
-    final available = await bio.canUseBiometrics();
-    final enabled   = await bio.getUseBiometric();
-    final prefs     = await SharedPreferences.getInstance();
-    final grace     = prefs.getInt(_kGracePeriodKey) ?? 30;
-    if (mounted) {
-      setState(() {
-        _biometricAvailable  = available;
-        _biometricEnabled    = enabled;
-        _gracePeriodSeconds  = grace;
-        _biometricLoading    = false;
-      });
-    }
   }
 
   void _seedFromProfile(ProfileModel profile) {
@@ -464,22 +432,86 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _toggleBiometric(bool value) async {
-    final bio = BiometricService.instance;
-    if (value) {
-      final ok = await bio.authenticate(reason: 'Confirm Face ID / Touch ID to enable');
-      if (!ok) return;
-    }
-    await bio.setUseBiometric(value);
-    if (mounted) setState(() => _biometricEnabled = value);
-    HapticUtils.success();
-  }
+  Future<void> _showDeleteAccountDialog() async {
+    HapticUtils.primaryTap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '30-day cooling-off period',
+                      style: TextStyle(fontWeight: FontWeight.w700, color: Colors.redAccent, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              'Your account will be marked for deletion but all data is retained for 30 days.\n\n'
+              'Log back in within 30 days to restore everything.\n\n'
+              'After 30 days your account and all data are permanently deleted.',
+              style: TextStyle(fontSize: 13),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete My Account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
 
-  Future<void> _setGracePeriod(int seconds) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_kGracePeriodKey, seconds);
-    if (mounted) setState(() => _gracePeriodSeconds = seconds);
-    HapticUtils.selection();
+    final messenger  = ScaffoldMessenger.of(context);
+    final errorColor = Theme.of(context).colorScheme.error;
+    try {
+      final uid    = Supabase.instance.client.auth.currentUser?.id;
+      final client = Supabase.instance.client;
+      if (uid != null) {
+        // Soft-delete: mark profile with is_deleted + scheduled_deletion_at
+        final deletionAt = DateTime.now().toUtc().add(const Duration(days: 30)).toIso8601String();
+        await client.from('profiles').update({
+          'is_deleted': true,
+          'scheduled_deletion_at': deletionAt,
+        }).eq('id', uid);
+      }
+      // Wipe local cache
+      await LocalDatabase.db.delete('splits');
+      await LocalDatabase.db.delete('expenses');
+      await LocalDatabase.db.delete('group_members');
+      await LocalDatabase.db.delete('groups');
+      await LocalDatabase.db.delete('profiles');
+      await client.auth.signOut();
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('Error: ${e.toString()}'),
+        backgroundColor: errorColor,
+      ));
+    }
   }
 
   @override
@@ -551,106 +583,61 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          // ── Security ─────────────────────────────────────────────────────
-          _SectionHeader(label: 'Security'),
+          // ── Sub-menus ─────────────────────────────────────────────────────
+          _SectionHeader(label: 'Preferences'),
           const SizedBox(height: 8),
           GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            padding: EdgeInsets.zero,
             child: Column(
               children: [
-                if (_biometricLoading)
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: CircularProgressIndicator(),
-                  )
-                else if (!_biometricAvailable)
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      children: [
-                        Icon(Icons.fingerprint,
-                            color: theme.colorScheme.onSurfaceVariant),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Biometrics not available on this device.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )
-                else ...[
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: const Text(
-                      'Face ID / Touch ID',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      'Require biometric unlock when opening the app.',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    value: _biometricEnabled,
-                    activeThumbColor: _teal,
-                    onChanged: _toggleBiometric,
+                _NavRow(
+                  icon: Icons.security_rounded,
+                  iconColor: _teal,
+                  label: 'Security',
+                  subtitle: 'Biometrics, PIN, fallback auth',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SecurityScreen()),
                   ),
-                  if (_biometricEnabled) ...[
-                    const Divider(height: 1, indent: 0, endIndent: 0),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Grace Period',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          Text(
-                            'Skip Face ID if app was closed less than this long ago.',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Wrap(
-                            spacing: 8,
-                            children: kGracePeriodOptions.map((opt) {
-                              final active = _gracePeriodSeconds == opt.seconds;
-                              return ChoiceChip(
-                                label: Text(opt.label),
-                                selected: active,
-                                selectedColor: _tealDim,
-                                labelStyle: TextStyle(
-                                  color: active ? _teal : theme.colorScheme.onSurface,
-                                  fontWeight: active
-                                      ? FontWeight.w700
-                                      : FontWeight.w400,
-                                  fontSize: 12,
-                                ),
-                                onSelected: (_) => _setGracePeriod(opt.seconds),
-                              );
-                            }).toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ],
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: Icons.notifications_outlined,
+                  iconColor: _teal,
+                  label: 'Notifications',
+                  subtitle: 'Push and email alerts',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
+                  ),
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: Icons.language_rounded,
+                  iconColor: _teal,
+                  label: 'Regional Settings',
+                  subtitle: 'Date & time format',
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const RegionalScreen()),
+                  ),
+                ),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // ── Splitwise Import ─────────────────────────────────────────────
+          _SectionHeader(label: 'Data'),
+          const SizedBox(height: 8),
+          GlassCard(
+            padding: EdgeInsets.zero,
+            child: _NavRow(
+              icon: Icons.upload_file_rounded,
+              iconColor: const Color(0xFF22C55E),
+              label: 'Import from Splitwise',
+              subtitle: 'CSV import — map expenses into your Wallet',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const SplitwiseImportScreen()),
+              ),
             ),
           ),
 
@@ -810,6 +797,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       debugPrint('Reset Local Cache error: $e');
                     }
                   },
+                ),
+                const Divider(height: 1, indent: 16, endIndent: 16),
+                ListTile(
+                  leading: const Icon(Icons.person_remove_outlined, color: Colors.redAccent),
+                  title: const Text(
+                    'Delete Account',
+                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: Text(
+                    '30-day cooling-off period. Log back in within 30 days to restore.',
+                    style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                  onTap: _showDeleteAccountDialog,
                 ),
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
@@ -1435,6 +1435,52 @@ class _SectionHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nav row: icon + label + subtitle + chevron
+// ---------------------------------------------------------------------------
+class _NavRow extends StatelessWidget {
+  const _NavRow({
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData  icon;
+  final Color     iconColor;
+  final String    label;
+  final String    subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: iconColor, size: 18),
+      ),
+      title: Text(label,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle,
+          style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+      trailing: Icon(Icons.chevron_right, size: 18,
+          color: theme.colorScheme.onSurfaceVariant),
+      onTap: () {
+        HapticUtils.lightTap();
+        onTap();
+      },
     );
   }
 }
