@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../data/models/group_model.dart';
@@ -955,11 +956,15 @@ class _ExpenseTile extends ConsumerWidget {
         HapticUtils.lightTap();
         if (e.groupId != null) {
           context.push(
-            '/group/${e.groupId}/expense/${e.id}',
-            extra: {'groupName': event.groupName},
+            '/group-expense-detail',
+            extra: {
+              'expense':   e,
+              'groupId':   e.groupId,
+              'groupName': event.groupName,
+            },
           );
         } else {
-          context.push('/group/wallet/expense/${e.id}');
+          context.push('/wallet/entry', extra: e);
         }
       },
     );
@@ -1219,12 +1224,10 @@ class _ExpenseEditedTile extends StatelessWidget {
           onTap: () {
             HapticUtils.lightTap();
             if (ev.groupId != null) {
-              context.push(
-                '/group/${ev.groupId}/expense/${ev.expenseId}',
-                extra: {'groupName': ev.groupName},
-              );
+              context.push('/group/${ev.groupId}',
+                  extra: {'groupName': ev.groupName});
             } else {
-              context.push('/group/wallet/expense/${ev.expenseId}');
+              context.push(AppRouter.wallet);
             }
           },
           child: Row(
