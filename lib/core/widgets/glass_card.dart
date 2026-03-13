@@ -20,9 +20,9 @@ class GlassCard extends StatelessWidget {
   final Color? color;
   final Border? border;
 
-  // Slate-100 / Slate-200 for light mode clarity; glassmorphic in dark mode.
-  static const _slate100 = Color(0xFFF1F5F9);
-  static const _slate200 = Color(0xFFE2E8F0);
+  // Slate-300 / Slate-400 for light mode clarity; glassmorphic in dark mode.
+  static const _slate300 = Color(0xFFCBD5E1);
+  static const _slate400 = Color(0xFF94A3B8);
 
   @override
   Widget build(BuildContext context) {
@@ -32,10 +32,10 @@ class GlassCard extends StatelessWidget {
 
     final surfaceColor = color ?? (isDark
         ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-        : _slate100);
+        : _slate300);
     final borderColor = isDark
         ? theme.colorScheme.outline.withValues(alpha: 0.2)
-        : _slate200;
+        : _slate400;
 
     final container = Container(
       padding: padding ?? const EdgeInsets.all(16),

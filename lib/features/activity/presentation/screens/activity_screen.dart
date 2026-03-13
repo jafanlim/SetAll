@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -490,16 +491,18 @@ class _ControlHeader extends StatelessWidget {
                         child: const Text('Done', style: TextStyle(color: _teal, fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ] else ...[  
-                      IconButton(
-                        icon: const Icon(Icons.checklist_rounded, size: 20),
+                      AppTopButton(
+                        icon: Icons.checklist_rounded,
                         tooltip: 'Select',
                         onPressed: onEnterEdit,
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                      const SizedBox(width: 4),
+                      AppTopButton(
+                        icon: Icons.refresh_rounded,
                         tooltip: 'Refresh',
                         onPressed: onRefresh,
                       ),
+                      const SizedBox(width: 4),
                     ],
                   ],
                 ),
@@ -1024,7 +1027,7 @@ class _SelectableTileWrapper extends StatelessWidget {
             child: child,
           ),
           Positioned(
-            top: 10, right: 22,
+            top: 10, left: 22,
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 150),
               width: 22, height: 22,

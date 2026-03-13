@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/biometric_service.dart';
+import 'change_password_screen.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 
@@ -191,25 +192,56 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   }
 
   Future<void> _removePin() async {
+    final pinCtrl = TextEditingController();
+    String? errorMsg;
+    final prefs = await SharedPreferences.getInstance();
+    final savedPin = prefs.getString(_kPinKey) ?? '';
+
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Remove PIN?'),
-        content: const Text(
-          'Without a PIN, account password becomes your only fallback if biometrics fail.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Remove'),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDlg) => AlertDialog(
+          title: const Text('Remove PIN'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Enter your current PIN to confirm removal.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: pinCtrl,
+                autofocus: true,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                maxLength: 8,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: 'Current PIN',
+                  prefixIcon: const Icon(Icons.pin_outlined),
+                  counterText: '',
+                  errorText: errorMsg,
+                ),
+              ),
+            ],
           ),
-        ],
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+              onPressed: () {
+                if (pinCtrl.text.trim() != savedPin) {
+                  setDlg(() => errorMsg = 'Incorrect PIN');
+                  return;
+                }
+                Navigator.pop(ctx, true);
+              },
+              child: const Text('Remove'),
+            ),
+          ],
+        ),
       ),
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) => pinCtrl.dispose());
     if (confirmed != true || !mounted) return;
-    final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kPinKey);
     if (mounted) setState(() => _pinSet = false);
     HapticUtils.success();
@@ -345,7 +377,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                     subtitle: Text('Update your account login password',
                         style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                     trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () => Navigator.of(context).pop(),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
+                    ),
                   ),
                 ),
 
