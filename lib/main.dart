@@ -10,6 +10,7 @@ import 'package:window_manager/window_manager.dart';
 import 'package:firebase_core/firebase_core.dart';
 
 import 'app.dart';
+import 'firebase_options.dart';
 import 'core/services/currency_sync_service.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
@@ -138,7 +139,9 @@ class _AppLoaderState extends State<_AppLoader> {
       // Initialise Firebase (graceful no-op if GoogleService-Info.plist /
       // google-services.json not yet added) then request push permission.
       try {
-        await Firebase.initializeApp();
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
         unawaited(NotificationService.instance.init());
       } catch (_) {
         // Firebase not configured yet — skip silently.

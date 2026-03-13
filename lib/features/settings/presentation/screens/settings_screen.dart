@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -58,6 +59,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _selectedCurrency;
   bool _currencySaving = false;
   bool _currencyUserSelected = false; // true once user explicitly picks a value
+
+  // ── Developer tools ──────────────────────────────────────────────────────
+  bool _sendingTestEmail = false;
+  String? _testEmailResult;
 
   @override
   void initState() {
@@ -952,6 +957,92 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ],
                           ),
                         ),
+
+                        if (kDebugMode) ...[
+                          const SizedBox(height: 24),
+
+                          // ── Developer ───────────────────────────────────
+                          _SectionHeader(label: 'Developer'),
+                          const SizedBox(height: 8),
+                          GlassCard(
+                            padding: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  leading: _sendingTestEmail
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: _teal,
+                                          ),
+                                        )
+                                      : const Icon(Icons.mail_outline_rounded,
+                                          color: _teal),
+                                  title: const Text(
+                                    'Send Test Email',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: _testEmailResult != null
+                                      ? Text(
+                                          _testEmailResult!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Sends a test email via noreply@setall.app',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        ),
+                                  onTap: _sendingTestEmail
+                                      ? null
+                                      : () async {
+                                          HapticUtils.lightTap();
+                                          final email = _currentEmail;
+                                          if (email == null || email.isEmpty) {
+                                            setState(() => _testEmailResult =
+                                                'No email address on account');
+                                            return;
+                                          }
+                                          setState(() {
+                                            _sendingTestEmail = true;
+                                            _testEmailResult = null;
+                                          });
+                                          try {
+                                            await Supabase.instance.client.functions
+                                                .invoke(
+                                              'send-test-email',
+                                              body: {'to': email},
+                                            );
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _sendingTestEmail = false;
+                                              _testEmailResult =
+                                                  'Sent to $email ✓';
+                                            });
+                                          } catch (e) {
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _sendingTestEmail = false;
+                                              _testEmailResult =
+                                                  'Failed: ${e.toString().replaceFirst('Exception: ', '')}';
+                                            });
+                                          }
+                                        },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: 32),
                       ],
