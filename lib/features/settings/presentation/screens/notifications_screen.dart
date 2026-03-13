@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/utils/haptic_utils.dart';
@@ -6,16 +7,24 @@ import '../../../../core/widgets/glass_card.dart';
 
 const _teal  = Color(0xFF00D9B0);
 const _slate = Color(0xFF94A3B8);
+const _amber = Color(0xFFF59E0B);
 
 // ---------------------------------------------------------------------------
-// Prefs keys
+// Prefs keys — push mirrors every notification type; email does the same.
 // ---------------------------------------------------------------------------
-const _kPushExpense    = 'notif_push_expense';
-const _kPushSettlement = 'notif_push_settlement';
-const _kPushGroupEvent = 'notif_push_group_event';
-const _kEmailDigest    = 'notif_email_digest';
-const _kEmailSettlement = 'notif_email_settlement';
+const _kPushExpense      = 'notif_push_expense';
+const _kPushSettlement   = 'notif_push_settlement';
+const _kPushGroupEvent   = 'notif_push_group_event';
+const _kPushDigest       = 'notif_push_digest';
 
+const _kEmailExpense     = 'notif_email_expense';
+const _kEmailSettlement  = 'notif_email_settlement';
+const _kEmailGroupEvent  = 'notif_email_group_event';
+const _kEmailDigest      = 'notif_email_digest';
+
+// ---------------------------------------------------------------------------
+// NotificationsScreen
+// ---------------------------------------------------------------------------
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
 
@@ -24,14 +33,17 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  // Push (default ON)
+  // Push defaults: ON
   bool _pushExpense    = true;
   bool _pushSettlement = true;
   bool _pushGroupEvent = true;
+  bool _pushDigest     = false;
 
-  // Email (default OFF)
-  bool _emailDigest     = false;
+  // Email defaults: OFF
+  bool _emailExpense    = false;
   bool _emailSettlement = false;
+  bool _emailGroupEvent = false;
+  bool _emailDigest     = false;
 
   bool _loading = true;
 
@@ -43,16 +55,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _pushExpense    = p.getBool(_kPushExpense)    ?? true;
-        _pushSettlement = p.getBool(_kPushSettlement) ?? true;
-        _pushGroupEvent = p.getBool(_kPushGroupEvent) ?? true;
-        _emailDigest    = p.getBool(_kEmailDigest)    ?? false;
-        _emailSettlement = p.getBool(_kEmailSettlement) ?? false;
-        _loading        = false;
-      });
-    }
+    if (!mounted) return;
+    setState(() {
+      _pushExpense    = p.getBool(_kPushExpense)    ?? true;
+      _pushSettlement = p.getBool(_kPushSettlement) ?? true;
+      _pushGroupEvent = p.getBool(_kPushGroupEvent) ?? true;
+      _pushDigest     = p.getBool(_kPushDigest)     ?? false;
+      _emailExpense    = p.getBool(_kEmailExpense)    ?? false;
+      _emailSettlement = p.getBool(_kEmailSettlement) ?? false;
+      _emailGroupEvent = p.getBool(_kEmailGroupEvent) ?? false;
+      _emailDigest     = p.getBool(_kEmailDigest)     ?? false;
+      _loading = false;
+    });
   }
 
   Future<void> _set(String key, bool value) async {
@@ -68,7 +82,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Notifications', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        title: const Text('Notifications',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -78,91 +93,107 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                // ── Push ────────────────────────────────────────────────
-                _SectionLabel('Push Notifications'),
-                Text(
-                  'Receive alerts directly on your device.',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                // ── FCM/APNs wiring note ─────────────────────────────────
+                _InfoBanner(
+                  icon: LucideIcons.info,
+                  text: 'Push delivery requires Firebase Cloud Messaging (FCM) or APNs '
+                      'to be configured in the server. Preferences below are saved and '
+                      'will take effect once the push service is wired up.',
                 ),
-                const SizedBox(height: 8),
-                GlassCard(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  child: Column(
+                const SizedBox(height: 20),
+
+                // ── Column headers ───────────────────────────────────────
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
                     children: [
-                      _Toggle(
-                        icon: Icons.receipt_long_outlined,
-                        iconColor: _teal,
-                        title: 'New expenses & income',
-                        subtitle: 'Alert when a new expense or income is added.',
-                        value: _pushExpense,
-                        onChanged: (v) {
-                          setState(() => _pushExpense = v);
-                          _set(_kPushExpense, v);
-                        },
+                      const Expanded(flex: 5, child: SizedBox()),
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.smartphone, size: 12, color: _teal),
+                              const SizedBox(width: 4),
+                              Text('Push',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: theme.colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
                       ),
-                      const Divider(height: 1, indent: 16, endIndent: 0),
-                      _Toggle(
-                        icon: Icons.check_circle_outline,
-                        iconColor: _teal,
-                        title: 'Settlements',
-                        subtitle: 'Alert when a balance is settled.',
-                        value: _pushSettlement,
-                        onChanged: (v) {
-                          setState(() => _pushSettlement = v);
-                          _set(_kPushSettlement, v);
-                        },
-                      ),
-                      const Divider(height: 1, indent: 16, endIndent: 0),
-                      _Toggle(
-                        icon: Icons.group_outlined,
-                        iconColor: _teal,
-                        title: 'Group events',
-                        subtitle: 'Alert for group creation, member additions.',
-                        value: _pushGroupEvent,
-                        onChanged: (v) {
-                          setState(() => _pushGroupEvent = v);
-                          _set(_kPushGroupEvent, v);
-                        },
+                      Expanded(
+                        flex: 2,
+                        child: Center(
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(LucideIcons.mail, size: 12, color: _slate),
+                              const SizedBox(width: 4),
+                              Text('Email',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w700,
+                                      color: theme.colorScheme.onSurfaceVariant)),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(height: 6),
 
-                const SizedBox(height: 20),
-
-                // ── Email ───────────────────────────────────────────────
-                _SectionLabel('Email Notifications'),
-                Text(
-                  'Email updates are off by default.',
-                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
-                ),
-                const SizedBox(height: 8),
+                // ── Notification rows ────────────────────────────────────
                 GlassCard(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   child: Column(
                     children: [
-                      _Toggle(
-                        icon: Icons.email_outlined,
-                        iconColor: _slate,
-                        title: 'Weekly digest',
-                        subtitle: 'Summary of your activity sent every Monday.',
-                        value: _emailDigest,
-                        onChanged: (v) {
-                          setState(() => _emailDigest = v);
-                          _set(_kEmailDigest, v);
-                        },
+                      _NotifRow(
+                        icon: LucideIcons.receipt,
+                        iconColor: _teal,
+                        title: 'New expenses',
+                        subtitle: 'When an expense or income is added',
+                        pushValue: _pushExpense,
+                        emailValue: _emailExpense,
+                        onPushChanged: (v) { setState(() => _pushExpense = v);    _set(_kPushExpense, v); },
+                        onEmailChanged: (v) { setState(() => _emailExpense = v);  _set(_kEmailExpense, v); },
                       ),
-                      const Divider(height: 1, indent: 16, endIndent: 0),
-                      _Toggle(
-                        icon: Icons.attach_money_rounded,
-                        iconColor: _slate,
-                        title: 'Settlement reminders',
-                        subtitle: 'Email when you have pending balances.',
-                        value: _emailSettlement,
-                        onChanged: (v) {
-                          setState(() => _emailSettlement = v);
-                          _set(_kEmailSettlement, v);
-                        },
+                      const Divider(height: 1, indent: 52, endIndent: 0),
+                      _NotifRow(
+                        icon: LucideIcons.handCoins,
+                        iconColor: _teal,
+                        title: 'Settlements',
+                        subtitle: 'When a balance is settled',
+                        pushValue: _pushSettlement,
+                        emailValue: _emailSettlement,
+                        onPushChanged: (v) { setState(() => _pushSettlement = v);  _set(_kPushSettlement, v); },
+                        onEmailChanged: (v) { setState(() => _emailSettlement = v); _set(_kEmailSettlement, v); },
+                      ),
+                      const Divider(height: 1, indent: 52, endIndent: 0),
+                      _NotifRow(
+                        icon: LucideIcons.users,
+                        iconColor: _teal,
+                        title: 'Group events',
+                        subtitle: 'New members, group creation',
+                        pushValue: _pushGroupEvent,
+                        emailValue: _emailGroupEvent,
+                        onPushChanged: (v) { setState(() => _pushGroupEvent = v);  _set(_kPushGroupEvent, v); },
+                        onEmailChanged: (v) { setState(() => _emailGroupEvent = v); _set(_kEmailGroupEvent, v); },
+                      ),
+                      const Divider(height: 1, indent: 52, endIndent: 0),
+                      _NotifRow(
+                        icon: LucideIcons.calendarDays,
+                        iconColor: _amber,
+                        title: 'Weekly digest',
+                        subtitle: 'Activity summary every Monday',
+                        pushValue: _pushDigest,
+                        emailValue: _emailDigest,
+                        onPushChanged: (v) { setState(() => _pushDigest = v);  _set(_kPushDigest, v); },
+                        onEmailChanged: (v) { setState(() => _emailDigest = v); _set(_kEmailDigest, v); },
                       ),
                     ],
                   ),
@@ -176,61 +207,124 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 }
 
 // ---------------------------------------------------------------------------
-// Reusable toggle row
+// Single notification row: title + push toggle + email toggle
 // ---------------------------------------------------------------------------
-class _Toggle extends StatelessWidget {
-  const _Toggle({
+class _NotifRow extends StatelessWidget {
+  const _NotifRow({
     required this.icon,
     required this.iconColor,
     required this.title,
     required this.subtitle,
-    required this.value,
-    required this.onChanged,
+    required this.pushValue,
+    required this.emailValue,
+    required this.onPushChanged,
+    required this.onEmailChanged,
   });
 
   final IconData icon;
-  final Color iconColor;
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
+  final Color    iconColor;
+  final String   title;
+  final String   subtitle;
+  final bool     pushValue;
+  final bool     emailValue;
+  final ValueChanged<bool> onPushChanged;
+  final ValueChanged<bool> onEmailChanged;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SwitchListTile(
-      contentPadding: EdgeInsets.zero,
-      secondary: Icon(icon, color: iconColor, size: 20),
-      title: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        children: [
+          // Icon
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, color: iconColor, size: 16),
+          ),
+          const SizedBox(width: 12),
+          // Text
+          Expanded(
+            flex: 5,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(subtitle,
+                    style: TextStyle(
+                        fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          // Push toggle
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Switch(
+                value: pushValue,
+                activeThumbColor: _teal,
+                onChanged: onPushChanged,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+          // Email toggle
+          Expanded(
+            flex: 2,
+            child: Center(
+              child: Switch(
+                value: emailValue,
+                activeThumbColor: _slate,
+                onChanged: onEmailChanged,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+          ),
+        ],
       ),
-      value: value,
-      activeColor: _teal,
-      onChanged: onChanged,
     );
   }
 }
 
 // ---------------------------------------------------------------------------
-// Section label
+// Info banner
 // ---------------------------------------------------------------------------
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel(this.label);
-  final String label;
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner({required this.icon, required this.text});
+  final IconData icon;
+  final String   text;
 
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 4),
-        child: Text(
-          label.toUpperCase(),
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.8,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _teal.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _teal.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: _teal),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                  fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+            ),
           ),
-        ),
-      );
+        ],
+      ),
+    );
+  }
 }
+

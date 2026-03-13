@@ -8,6 +8,7 @@ import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'core/services/currency_sync_service.dart';
+import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
 import 'data/local/local_database.dart';
 
@@ -127,6 +128,9 @@ class _AppLoaderState extends State<_AppLoader> {
           if (hasSupabase) _initSupabase() else Future<void>.value(),
         ]);
       }
+      // Load date format preference before UI renders.
+      await DateFormatService.instance.reload();
+
       if (mounted) setState(() => _ready = true);
 
       // Sync exchange rates in background after UI is ready (non-blocking).

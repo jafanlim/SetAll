@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../app.dart' show updateResultProvider;
@@ -591,7 +592,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: Column(
               children: [
                 _NavRow(
-                  icon: Icons.security_rounded,
+                  icon: LucideIcons.shieldCheck,
                   iconColor: _teal,
                   label: 'Security',
                   subtitle: 'Biometrics, PIN, fallback auth',
@@ -601,7 +602,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
-                  icon: Icons.notifications_outlined,
+                  icon: LucideIcons.bell,
                   iconColor: _teal,
                   label: 'Notifications',
                   subtitle: 'Push and email alerts',
@@ -611,7 +612,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
-                  icon: Icons.language_rounded,
+                  icon: LucideIcons.globe,
                   iconColor: _teal,
                   label: 'Regional Settings',
                   subtitle: 'Date & time format',
@@ -631,7 +632,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           GlassCard(
             padding: EdgeInsets.zero,
             child: _NavRow(
-              icon: Icons.upload_file_rounded,
+              icon: LucideIcons.fileUp,
               iconColor: const Color(0xFF22C55E),
               label: 'Import from Splitwise',
               subtitle: 'CSV import — map expenses into your Wallet',

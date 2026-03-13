@@ -5,8 +5,9 @@ import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:pdfx/pdfx.dart';
+
+import '../../../../core/services/date_format_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -161,7 +162,7 @@ class _WalletEntryDetailScreenState
         ? () {
             try {
               final dt = DateTime.parse(expense.createdAt!).toLocal();
-              return DateFormat('EEE, d MMM yyyy  HH:mm').format(dt);
+              return DateFormatService.instance.formatWithTime(dt);
             } catch (_) { return expense.createdAt!; }
           }()
         : '—';

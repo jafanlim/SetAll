@@ -164,7 +164,7 @@ class _RegionalScreenState extends State<RegionalScreen> {
                       style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                     ),
                     value: _manualOverride,
-                    activeColor: _teal,
+                    activeThumbColor: _teal,
                     onChanged: (v) {
                       setState(() => _manualOverride = v);
                       _save();

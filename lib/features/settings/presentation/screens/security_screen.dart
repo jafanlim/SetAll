@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/services/biometric_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -85,89 +84,100 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
   }
 
   Future<void> _showSetPinDialog() async {
+    // Controllers are created here and disposed after the dialog's exit
+    // animation completes (post-frame), so Flutter never references a
+    // disposed controller during the close animation (root cause of the freeze).
     final pinCtrl1 = TextEditingController();
     final pinCtrl2 = TextEditingController();
-    String? error;
 
-    final confirmed = await showDialog<bool>(
+    // The dialog returns the validated PIN string on success, or null on cancel.
+    final savedPin = await showDialog<String>(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDlg) => AlertDialog(
-          title: Text(_pinSet ? 'Change PIN' : 'Set PIN'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Your PIN is the secondary fallback when biometrics fail.',
-                style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: pinCtrl1,
-                autofocus: true,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 8,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'PIN (4–8 digits)',
-                  prefixIcon: Icon(Icons.pin_outlined),
-                  counterText: '',
+      builder: (ctx) {
+        String? error;
+        return StatefulBuilder(
+          builder: (ctx, setDlg) => AlertDialog(
+            title: Text(_pinSet ? 'Change PIN' : 'Set PIN'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Used as fallback when biometrics fail.',
+                  style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: pinCtrl2,
-                obscureText: true,
-                keyboardType: TextInputType.number,
-                maxLength: 8,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Confirm PIN',
-                  prefixIcon: Icon(Icons.pin_outlined),
-                  counterText: '',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinCtrl1,
+                  autofocus: true,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 8,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'PIN (4–8 digits)',
+                    prefixIcon: Icon(Icons.pin_outlined),
+                    counterText: '',
+                  ),
                 ),
-              ),
-              if (error != null) ...[
-                const SizedBox(height: 8),
-                Text(error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: pinCtrl2,
+                  obscureText: true,
+                  keyboardType: TextInputType.number,
+                  maxLength: 8,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: const InputDecoration(
+                    labelText: 'Confirm PIN',
+                    prefixIcon: Icon(Icons.pin_outlined),
+                    counterText: '',
+                  ),
+                ),
+                if (error != null) ...[
+                  const SizedBox(height: 8),
+                  Text(error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                ],
               ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+                onPressed: () {
+                  final p1 = pinCtrl1.text.trim();
+                  final p2 = pinCtrl2.text.trim();
+                  if (p1.length < 4) {
+                    setDlg(() => error = 'PIN must be at least 4 digits');
+                    return;
+                  }
+                  if (p1 != p2) {
+                    setDlg(() => error = 'PINs do not match');
+                    return;
+                  }
+                  // Pass the pin as result BEFORE the dialog closes so we
+                  // never read a potentially-disposed controller after close.
+                  Navigator.pop(ctx, p1);
+                },
+                child: const Text('Save PIN'),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
-              onPressed: () {
-                final p1 = pinCtrl1.text.trim();
-                final p2 = pinCtrl2.text.trim();
-                if (p1.length < 4) {
-                  setDlg(() => error = 'PIN must be at least 4 digits');
-                  return;
-                }
-                if (p1 != p2) {
-                  setDlg(() => error = 'PINs do not match');
-                  return;
-                }
-                Navigator.pop(ctx, true);
-              },
-              child: const Text('Save PIN'),
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
 
-    final pin1 = pinCtrl1.text.trim();
-    pinCtrl1.dispose();
-    pinCtrl2.dispose();
-    if (confirmed != true || !mounted) return;
+    // Dispose controllers after the dialog exit animation has finished.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      pinCtrl1.dispose();
+      pinCtrl2.dispose();
+    });
+
+    if (savedPin == null || savedPin.isEmpty || !mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kPinKey, pin1);
+    await prefs.setString(_kPinKey, savedPin);
     if (mounted) {
       setState(() => _pinSet = true);
       ScaffoldMessenger.of(context).showSnackBar(
@@ -222,14 +232,6 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
           : ListView(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
-                // ── Auth fallback explainer ─────────────────────────────
-                _Banner(
-                  icon: Icons.security_rounded,
-                  title: 'Multi-tier authentication',
-                  body: 'Face ID / Fingerprint → PIN → Account Password → Email Recovery',
-                ),
-                const SizedBox(height: 20),
-
                 // ── Biometrics ──────────────────────────────────────────
                 _SectionLabel('Biometrics'),
                 const SizedBox(height: 8),
@@ -240,17 +242,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                       if (!_biometricAvailable)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.fingerprint, color: _slate),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  'Biometrics not available on this device.',
-                                  style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            'Biometrics not available on this device.',
+                            style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                           ),
                         )
                       else ...[
@@ -259,12 +253,10 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                           secondary: const Icon(Icons.face_retouching_natural_rounded, color: _teal),
                           title: const Text('Face ID / Fingerprint',
                               style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: Text(
-                            'Require biometric unlock on app open.',
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                          ),
+                          subtitle: Text('Require on app open',
+                              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                           value: _biometricEnabled,
-                          activeColor: _teal,
+                          activeThumbColor: _teal,
                           onChanged: _toggleBiometric,
                         ),
                         if (_biometricEnabled) ...[
@@ -274,12 +266,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text('Grace Period',
-                                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                                Text(
-                                  'Skip biometric if the app was closed less than this long ago.',
-                                  style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                                ),
+                                Text('Grace period',
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                                        color: theme.colorScheme.onSurfaceVariant)),
                                 const SizedBox(height: 8),
                                 Wrap(
                                   spacing: 8,
@@ -310,7 +299,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                 const SizedBox(height: 20),
 
                 // ── PIN ─────────────────────────────────────────────────
-                _SectionLabel('PIN Code  (Fallback tier 2)'),
+                _SectionLabel('PIN'),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: EdgeInsets.zero,
@@ -323,16 +312,14 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          _pinSet
-                              ? 'A PIN is set. Used when biometrics fail.'
-                              : 'No PIN set. Add one as a biometric fallback.',
+                          _pinSet ? 'PIN is active' : 'No PIN set',
                           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                         ),
                         trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                         onTap: _showSetPinDialog,
                       ),
                       if (_pinSet) ...[
-                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        const Divider(height: 1, indent: 56, endIndent: 16),
                         ListTile(
                           leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
                           title: const Text('Remove PIN',
@@ -346,41 +333,19 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
 
                 const SizedBox(height: 20),
 
-                // ── Password / Email recovery ────────────────────────────
-                _SectionLabel('Account Password  (Fallback tier 3)'),
+                // ── Account Password ────────────────────────────────────
+                _SectionLabel('Account Password'),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: ListTile(
-                    leading: const Icon(Icons.lock_outline, color: _slate),
-                    title: const Text('Manage Password',
+                    leading: const Icon(Icons.lock_outline_rounded, color: _slate),
+                    title: const Text('Change Password',
                         style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text(
-                      'Change or set your account password in Settings → Account.',
-                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                    ),
-                    trailing: Icon(Icons.open_in_new, size: 16, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () => Navigator.of(context).pop(),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── Email recovery ───────────────────────────────────────
-                _SectionLabel('Email Recovery  (Final tier)'),
-                const SizedBox(height: 8),
-                GlassCard(
-                  padding: EdgeInsets.zero,
-                  child: ListTile(
-                    leading: const Icon(Icons.email_outlined, color: _slate),
-                    title: const Text('Send Recovery Email',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text(
-                      'Sends a password reset to your registered email address.',
-                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
-                    ),
+                    subtitle: Text('Update your account login password',
+                        style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                     trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: _sendRecoveryEmail,
+                    onTap: () => Navigator.of(context).pop(),
                   ),
                 ),
 
@@ -390,28 +355,6 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     );
   }
 
-  Future<void> _sendRecoveryEmail() async {
-    final email = Supabase.instance.client.auth.currentUser?.email;
-    if (email == null || !mounted) return;
-    try {
-      await Supabase.instance.client.auth.resetPasswordForEmail(email);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Recovery email sent to $email'),
-          backgroundColor: _teal.withValues(alpha: 0.9),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed: ${e.toString()}'),
-          backgroundColor: Theme.of(context).colorScheme.error,
-        ),
-      );
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
@@ -433,39 +376,3 @@ class _SectionLabel extends StatelessWidget {
       );
 }
 
-class _Banner extends StatelessWidget {
-  const _Banner({required this.icon, required this.title, required this.body});
-  final IconData icon;
-  final String title;
-  final String body;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: const Color(0x1400D9B0),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: const Color(0x3300D9B0)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: _teal, size: 22),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _teal)),
-                const SizedBox(height: 3),
-                Text(body,
-                    style: const TextStyle(fontSize: 11, color: _slate)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
