@@ -223,6 +223,20 @@ class SyncService {
           'create_group',
           params: {'p_name': groupName},
         ) as String;
+        final finalId = remoteId != localId ? remoteId : localId;
+        // Patch identity fields the RPC doesn't set.
+        final iconName   = row['icon_name']   as String?;
+        final colorValue = row['color_value'] as int?;
+        final avatarUrl  = row['avatar_url']  as String?;
+        if (iconName != null || colorValue != null || avatarUrl != null) {
+          try {
+            await _client.from('groups').update({
+              if (iconName   != null) 'icon_name':   iconName,
+              if (colorValue != null) 'color_value': colorValue,
+              if (avatarUrl  != null) 'avatar_url':  avatarUrl,
+            }).eq('id', finalId);
+          } catch (_) {}
+        }
         if (remoteId != localId) {
           // RPC generated a new UUID — update local rows to match.
           await LocalDatabase.db.update('groups',
@@ -349,14 +363,14 @@ class SyncService {
         .map((e) => (e as Map<String, dynamic>)['group_id'] as String)
         .toSet();
 
-    // If a group is in left_groups but Supabase still shows us as a member,
-    // the left_groups entry is stale (e.g. from a bug or old schema). Remove it
-    // so the group is re-pulled and never falsely treated as an orphan.
-    // EXCEPTION: if the group is locally soft-deleted (is_deleted = 1), the
-    // left_groups row is intentional — never remove it or the group resurrects.
+    // For every group in left_groups where Supabase still shows us as a member,
+    // retry the group_members removal (it may have failed offline on a previous
+    // delete). Also keep the left_groups row unless the group exists locally AND
+    // is NOT soft-deleted — that's the only genuine stale case (e.g. the user
+    // was re-added to a group they previously left voluntarily).
     if (leftGroupIds.isNotEmpty) {
-      final staleLeftIds = leftGroupIds.intersection(allCloudMemberIds);
-      for (final gid in staleLeftIds) {
+      final stillMemberIds = leftGroupIds.intersection(allCloudMemberIds);
+      for (final gid in stillMemberIds) {
         try {
           final rows = await LocalDatabase.db.query(
             'groups',
@@ -364,12 +378,27 @@ class SyncService {
             where: 'id = ?',
             whereArgs: [gid],
           );
-          final isSoftDeleted = rows.isNotEmpty && (rows.first['is_deleted'] as int? ?? 0) == 1;
-          if (isSoftDeleted) {
-            debugPrint('[SyncService] keeping left_groups entry for $gid (soft-deleted locally)');
+          // Keep if: group is absent from local DB (deleted in an older app
+          // version that didn't use is_deleted) OR it is soft-deleted.
+          // Only remove the left_groups row when the group exists locally and
+          // is NOT soft-deleted — meaning the user was legitimately re-added.
+          final keepEntry = rows.isEmpty ||
+              (rows.first['is_deleted'] as int? ?? 0) == 1;
+          if (keepEntry) {
+            debugPrint('[SyncService] keeping left_groups for $gid '
+                '(${rows.isEmpty ? "absent locally" : "soft-deleted"}); '
+                'retrying Supabase group_members cleanup');
+            try {
+              await _client.from('group_members').delete()
+                  .eq('group_id', gid).eq('user_id', uid);
+              debugPrint('[SyncService] removed stale group_members row for $gid');
+            } catch (e) {
+              debugPrint('[SyncService] group_members cleanup failed for $gid: $e');
+            }
             continue;
           }
-          debugPrint('[SyncService] removing stale left_groups entry for $gid (still a member in Supabase)');
+          debugPrint('[SyncService] removing stale left_groups for $gid '
+              '(group exists locally, not deleted — user was re-added)');
           await LocalDatabase.db.delete('left_groups', where: 'group_id = ?', whereArgs: [gid]);
           leftGroupIds.remove(gid);
         } catch (_) {}
@@ -484,6 +513,11 @@ class SyncService {
       final gid = map['id'] as String;
       // Never restore a group the user explicitly deleted on this device.
       if (softDeletedIds.contains(gid)) continue;
+      // Preserve local identity fields (icon, colour, avatar) when Supabase
+      // doesn't have them yet (pre-migration groups or failed remote patch).
+      final existing = await LocalDatabase.db
+          .query('groups', where: 'id = ?', whereArgs: [gid]);
+      final ex = existing.isNotEmpty ? existing.first : const <String, dynamic>{};
       await LocalDatabase.db.insert(
         'groups',
         {
@@ -495,6 +529,9 @@ class SyncService {
           'updated_at': map['updated_at']?.toString(),
           'synced_at': DateTime.now().millisecondsSinceEpoch,
           'is_deleted': 0,
+          'icon_name':   map['icon_name']   ?? ex['icon_name'],
+          'color_value': map['color_value'] ?? ex['color_value'],
+          'avatar_url':  map['avatar_url']  ?? ex['avatar_url'],
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );

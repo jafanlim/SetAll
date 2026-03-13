@@ -296,6 +296,26 @@ final userCategoriesProvider = FutureProvider<List<Map<String, String>>>((ref) a
   return ref.watch(setAllRepositoryProvider).getUserCategories();
 });
 
+/// All unique profiles from every group the current user belongs to.
+/// Used for fast-add member suggestions in group create/edit screens.
+final allGroupMembersProvider = FutureProvider<List<ProfileModel>>((ref) async {
+  final groups = await ref.watch(myGroupsProvider.future);
+  final repo   = ref.watch(setAllRepositoryProvider);
+  final uid    = await repo.ensureUser();
+  final seen   = <String>{};
+  final result = <ProfileModel>[];
+  for (final g in groups) {
+    final members = await repo.getGroupMembers(g.id);
+    for (final m in members) {
+      if (m.id != uid && seen.add(m.id)) {
+        result.add(m);
+      }
+    }
+  }
+  result.sort((a, b) => a.name.compareTo(b.name));
+  return result;
+});
+
 // ---------------------------------------------------------------------------
 // Profile
 // ---------------------------------------------------------------------------

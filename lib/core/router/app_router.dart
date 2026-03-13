@@ -17,8 +17,12 @@ import '../../features/activity/presentation/screens/activity_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
+import '../../features/dashboard/presentation/screens/group_expense_detail_screen.dart';
 import '../../data/models/expense_model.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
+import '../../features/groups/presentation/screens/edit_group_screen.dart';
+import '../../features/groups/presentation/screens/group_info_screen.dart';
+import '../../data/models/group_model.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/friends/presentation/screens/invite_friend_screen.dart';
@@ -41,8 +45,11 @@ final class AppRouter {
   static const String groupDetail      = '/group/:id';
   static const String inviteMember     = '/group/:id/invite';
   static const String inviteFriend     = '/invite-friend';
-  static const String walletEntryType  = '/wallet/add';
-  static const String walletEntryDetail = '/wallet/entry';
+  static const String walletEntryType       = '/wallet/add';
+  static const String walletEntryDetail      = '/wallet/entry';
+  static const String groupExpenseDetail     = '/group-expense-detail';
+  static const String groupInfo              = '/group-info';
+  static const String editGroup              = '/group/:id/edit';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -248,6 +255,46 @@ final class AppRouter {
           ),
         ),
 
+        // ── Group: info screen (tap from groups list) ─────────────────
+        GoRoute(
+          path: groupInfo,
+          name: 'groupInfo',
+          pageBuilder: (context, state) {
+            final extra = state.extra;
+            if (extra is! GroupModel) {
+              return const NoTransitionPage(child: SizedBox.shrink());
+            }
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: GroupInfoScreen(group: extra),
+              ),
+            );
+          },
+        ),
+
+        // ── Group: expense detail (info) screen ─────────────────────────
+        GoRoute(
+          path: groupExpenseDetail,
+          name: 'groupExpenseDetail',
+          pageBuilder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            if (extra == null || extra['expense'] is! ExpenseModel) {
+              return const NoTransitionPage(child: SizedBox.shrink());
+            }
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: GroupExpenseDetailScreen(
+                  expense:   extra['expense']  as ExpenseModel,
+                  groupId:   extra['groupId']  as String? ?? '',
+                  groupName: extra['groupName'] as String? ?? 'Group',
+                ),
+              ),
+            );
+          },
+        ),
+
         // ── Wallet: entry detail (info) screen ────────────────────────────
         GoRoute(
           path: walletEntryDetail,
@@ -321,6 +368,22 @@ final class AppRouter {
                       groupId: groupId == 'wallet' ? '' : groupId,
                       groupName: groupName,
                     ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'edit',
+              name: 'editGroup',
+              pageBuilder: (context, state) {
+                final extra = state.extra;
+                if (extra is! GroupModel) {
+                  return const NoTransitionPage(child: SizedBox.shrink());
+                }
+                return MaterialPage(
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: EditGroupScreen(group: extra),
                   ),
                 );
               },

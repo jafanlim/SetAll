@@ -6,6 +6,7 @@ class SplitModel extends Split {
     required super.expenseId,
     required super.userId,
     required super.universalUsdOwed,
+    super.entryAmountOwed,
   });
 
    factory SplitModel.fromJson(Map<String, dynamic> json) {
@@ -16,6 +17,7 @@ class SplitModel extends Split {
       // Support both the new column name (universal_usd_owed, schema v8+) and
       // the old name (amount_owed) for DBs not yet migrated via 20260220110135.
       universalUsdOwed: (json['universal_usd_owed'] ?? json['amount_owed'] ?? '0').toString(),
+      entryAmountOwed: json['entry_amount_owed']?.toString(),
     );
   }
 
@@ -24,5 +26,6 @@ class SplitModel extends Split {
         'expense_id': expenseId,
         'user_id': userId,
         'universal_usd_owed': universalUsdOwed,
+        if (entryAmountOwed != null) 'entry_amount_owed': entryAmountOwed,
       };
 }

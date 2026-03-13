@@ -72,7 +72,11 @@ class LocalDatabase {
   ///   • groups.icon_name  – Material icon name for group identity
   ///   • groups.color_value – ARGB integer accent colour
   ///   • groups.avatar_url  – Supabase Storage path for group avatar photo
-  static const int _version = 23;
+  /// Schema v24 adds:
+  ///   • splits.entry_amount_owed – per-person amount in the expense's entry
+  ///     currency (e.g. GEL), stored alongside universal_usd_owed so the
+  ///     breakdown display never needs a lossy USD back-conversion.
+  static const int _version = 24;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -378,6 +382,9 @@ class LocalDatabase {
       await _addColumnIfNotExists(db, 'groups', 'color_value', 'INTEGER');
       await _addColumnIfNotExists(db, 'groups', 'avatar_url',  'TEXT');
     }
+    if (oldVersion < 24) {
+      await _addColumnIfNotExists(db, 'splits', 'entry_amount_owed', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -456,6 +463,7 @@ class LocalDatabase {
         expense_id         TEXT NOT NULL,
         user_id            TEXT NOT NULL,
         universal_usd_owed TEXT NOT NULL, -- Schema v8
+        entry_amount_owed  TEXT,          -- Schema v24: amount in expense's entry currency
         created_at         TEXT,
         synced_at          INTEGER,
         UNIQUE(expense_id, user_id) -- Schema v9

@@ -75,6 +75,7 @@ class ExpenseDeletedEvent extends ActivityEvent {
     required this.deletedByName,
     required this.deletedAt,
     required this.category,
+    this.deletedWithGroupId,
   });
 
   final String  expenseId;
@@ -88,6 +89,8 @@ class ExpenseDeletedEvent extends ActivityEvent {
   final String  deletedByName;
   final DateTime deletedAt;
   final String  category;
+  /// Non-null when this expense was cascade-deleted together with its group.
+  final String? deletedWithGroupId;
 }
 
 /// An expense was edited (description, category, amount, etc.) by any user.

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/amount_formatter.dart';
+import '../../../../data/models/group_model.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../domain/entities/activity_event.dart';
@@ -327,6 +328,14 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Group avatar provider (signed URL, 1 h TTL)
+// ---------------------------------------------------------------------------
+final _activityAvatarProvider =
+    FutureProvider.family<String?, String>((ref, path) async {
+  return ref.watch(setAllRepositoryProvider).generateGroupAvatarSignedUrl(path);
+});
+
+// ---------------------------------------------------------------------------
 // Feed item wrapper
 // ---------------------------------------------------------------------------
 class _FeedItem {
@@ -412,6 +421,7 @@ Widget _buildEventTile({
   String? amount,
   bool amountPositive = false,
   VoidCallback? onTap,
+  Widget? leadingOverride,
 }) {
   return Padding(
     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -422,14 +432,27 @@ Widget _buildEventTile({
         onTap: onTap,
         child: Row(
           children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: accent.withAlpha(28),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: Icon(icon, size: 19, color: accent),
+            leadingOverride ?? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 4, height: 44,
+                  decoration: BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 16,
+                      color: Theme.of(context).colorScheme.onSurface.withAlpha(180)),
+                ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -485,7 +508,7 @@ Widget _buildEventTile({
               ),
             if (onTap != null) ...[
               const SizedBox(width: 4),
-              const Icon(Icons.chevron_right, color: Colors.white24, size: 18),
+              const Icon(Icons.chevron_right, color: Color(0xFF94A3B8), size: 16),
             ],
           ],
         ),
@@ -506,7 +529,7 @@ String _fmtTime(String iso) {
 // ---------------------------------------------------------------------------
 // Expense event tile
 // ---------------------------------------------------------------------------
-class _ExpenseTile extends StatelessWidget {
+class _ExpenseTile extends ConsumerWidget {
   const _ExpenseTile({required this.event});
   final ExpenseEvent event;
 
@@ -522,16 +545,26 @@ class _ExpenseTile extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme        = Theme.of(context);
     final e            = event.expense;
     final isPersonal   = e.groupId == null;
     final isSettlement = e.category == 'Settlement';
 
+    // Look up group for color + avatar
+    final groups = ref.watch(myGroupsProvider).valueOrNull ?? <GroupModel>[];
+    GroupModel? group;
+    if (e.groupId != null) {
+      final matches = groups.where((g) => g.id == e.groupId);
+      if (matches.isNotEmpty) group = matches.first;
+    }
+
+    final groupAccent = group?.colorValue != null ? Color(group!.colorValue!) : null;
     final defaultAccent = isSettlement ? _green : isPersonal ? _purple : _teal;
-    final accent = (e.iconColor != null && !isSettlement)
-        ? Color(e.iconColor!)
-        : defaultAccent;
+    final accent = isSettlement
+        ? _green
+        : groupAccent ?? (e.iconColor != null ? Color(e.iconColor!) : defaultAccent);
+
     final defaultIcon = isSettlement
         ? Icons.check_circle_outline
         : e.isIncome
@@ -556,11 +589,16 @@ class _ExpenseTile extends StatelessWidget {
     final displayCcy  = e.originalCurrency ?? e.currency;
     final amountStr   = '${e.isIncome ? '+' : ''}$displayCcy $displayAmt';
 
+    final leadingOverride = group?.avatarUrl != null
+        ? _AvatarLeading(storagePath: group!.avatarUrl!, accent: accent, fallbackIcon: icon)
+        : null;
+
     return _buildEventTile(
       context:        context,
       theme:          theme,
       accent:         accent,
       icon:           icon,
+      leadingOverride: leadingOverride,
       title:          title,
       badge:          badge,
       timestamp:      e.createdAt,
@@ -574,10 +612,58 @@ class _ExpenseTile extends StatelessWidget {
             extra: {'groupName': event.groupName},
           );
         } else {
-          // Personal (wallet) entry — use sentinel group segment
           context.push('/group/wallet/expense/${e.id}');
         }
       },
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Avatar leading widget — stripe + group photo
+// ---------------------------------------------------------------------------
+class _AvatarLeading extends ConsumerWidget {
+  const _AvatarLeading({
+    required this.storagePath,
+    required this.accent,
+    required this.fallbackIcon,
+  });
+  final String storagePath;
+  final Color accent;
+  final IconData fallbackIcon;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme    = Theme.of(context);
+    final urlAsync = ref.watch(_activityAvatarProvider(storagePath));
+    final neutral  = theme.colorScheme.surfaceContainerHighest.withAlpha(80);
+    final iconWidget = Icon(fallbackIcon, size: 16,
+        color: theme.colorScheme.onSurface.withAlpha(180));
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 4, height: 44,
+          decoration: BoxDecoration(
+            color: accent, borderRadius: BorderRadius.circular(4)),
+        ),
+        const SizedBox(width: 10),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: SizedBox(
+            width: 34, height: 34,
+            child: urlAsync.when(
+              data: (url) => url != null
+                  ? Image.network(url, fit: BoxFit.cover,
+                      errorBuilder: (_, e, s) =>
+                          Container(color: neutral, child: iconWidget))
+                  : Container(color: neutral, child: iconWidget),
+              loading: () => Container(color: neutral),
+              error: (_, e) => Container(color: neutral, child: iconWidget),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -761,13 +847,27 @@ class _ExpenseEditedTile extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: accent.withAlpha(28),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(Icons.edit_outlined, size: 19, color: accent),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 4, height: 44,
+                  decoration: const BoxDecoration(
+                    color: accent,
+                    borderRadius: BorderRadius.all(Radius.circular(4)),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.edit_outlined, size: 16,
+                      color: Theme.of(context).colorScheme.onSurface.withAlpha(180)),
+                ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -816,6 +916,8 @@ class _ExpenseEditedTile extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Expense deleted event tile
 // ---------------------------------------------------------------------------
+enum _RestoreChoice { expenseOnly, wholeGroup }
+
 class _ExpenseDeletedTile extends ConsumerStatefulWidget {
   const _ExpenseDeletedTile({required this.event});
   final ExpenseDeletedEvent event;
@@ -827,19 +929,25 @@ class _ExpenseDeletedTile extends ConsumerStatefulWidget {
 class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
   bool _restoring = false;
 
-  Future<void> _restore() async {
+  void _invalidateProviders() {
+    ref.invalidate(omniActivityProvider);
+    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletBalanceProvider);
+    ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(myGroupsProvider);
+  }
+
+  Future<void> _doRestoreExpense() async {
     setState(() => _restoring = true);
     final ok = await ref.read(setAllRepositoryProvider).restoreExpense(widget.event.expenseId);
     if (!mounted) return;
     setState(() => _restoring = false);
     if (ok) {
-      ref.invalidate(omniActivityProvider);
-      ref.invalidate(personalExpensesProvider);
-      ref.invalidate(walletBalanceProvider);
-      ref.invalidate(balanceSummaryProvider);
+      _invalidateProviders();
+      final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('"${widget.event.description.isEmpty ? widget.event.category : widget.event.description}" restored'),
+          content: Text('"$label" restored'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -850,6 +958,71 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
     }
   }
 
+  Future<void> _doRestoreGroup(String groupId) async {
+    setState(() => _restoring = true);
+    final repo = ref.read(setAllRepositoryProvider);
+    final ok = await repo.restoreGroup(groupId);
+    if (!mounted) return;
+    setState(() => _restoring = false);
+    if (ok) {
+      _invalidateProviders();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('"${widget.event.groupName}" and all its expenses restored'),
+          backgroundColor: _teal.withAlpha(220),
+        ),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore group')),
+      );
+    }
+  }
+
+  Future<void> _restore() async {
+    final ev = widget.event;
+    // If this expense was cascade-deleted with its group, check if that group
+    // is still soft-deleted and ask the user what to restore.
+    if (ev.deletedWithGroupId != null) {
+      final repo = ref.read(setAllRepositoryProvider);
+      final groupStillDeleted = await repo.isGroupSoftDeleted(ev.deletedWithGroupId!);
+      if (!mounted) return;
+      if (groupStillDeleted) {
+        final choice = await showDialog<_RestoreChoice>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Restore options'),
+            content: Text(
+              'The group "${ev.groupName}" was also deleted. '  
+              'What would you like to restore?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, _RestoreChoice.expenseOnly),
+                child: const Text('This expense only'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(ctx, _RestoreChoice.wholeGroup),
+                child: const Text('Whole group + all expenses'),
+              ),
+            ],
+          ),
+        );
+        if (!mounted || choice == null) return;
+        if (choice == _RestoreChoice.wholeGroup) {
+          await _doRestoreGroup(ev.deletedWithGroupId!);
+          return;
+        }
+      }
+    }
+    await _doRestoreExpense();
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -858,9 +1031,11 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
     final title = ev.deletedByYou
         ? 'You deleted "$label"'
         : '${ev.deletedByName} deleted "$label"';
-    final badge = ev.groupId != null
-        ? (ev.groupName.isEmpty ? 'Group' : ev.groupName)
-        : 'Wallet';
+    final badge = ev.deletedWithGroupId != null
+        ? '${ev.groupName.isEmpty ? 'Group' : ev.groupName} (deleted)'
+        : ev.groupId != null
+            ? (ev.groupName.isEmpty ? 'Group' : ev.groupName)
+            : 'Wallet';
     final amountStr = '${ev.currency} ${formatAmount(ev.amount)}';
     final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 30;
     final canRestore = ev.deletedByYou && withinWindow;
@@ -871,13 +1046,27 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         child: Row(
           children: [
-            Container(
-              width: 42, height: 42,
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withAlpha(28),
-                borderRadius: BorderRadius.circular(13),
-              ),
-              child: const Icon(Icons.delete_outline, size: 19, color: Colors.redAccent),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 4, height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.redAccent,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 34, height: 34,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest.withAlpha(80),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(Icons.delete_outline, size: 16,
+                      color: Theme.of(context).colorScheme.onSurface.withAlpha(180)),
+                ),
+              ],
             ),
             const SizedBox(width: 12),
             Expanded(

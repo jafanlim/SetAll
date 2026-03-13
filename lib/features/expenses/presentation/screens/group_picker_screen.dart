@@ -42,13 +42,19 @@ class GroupPickerScreen extends ConsumerWidget {
         leading: IconButton(
             icon: const Icon(Icons.close), onPressed: () => context.pop()),
       ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openCreateGroup(context),
+        icon: const Icon(Icons.group_add_outlined),
+        label: const Text('New group',
+            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+      ),
       body: groupsAsync.when(
         data: (groups) {
           final others = groups
               .where((g) => g.name != 'Personal' && g.type != GroupType.direct)
               .toList();
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             children: [
               // ── Existing groups ───────────────────────────────────────────────
               Text(
@@ -63,7 +69,7 @@ class GroupPickerScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'No groups yet. Create one below.',
+                    'No groups yet. Tap "New group" to create one.',
                     style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant),
                   ),
@@ -76,15 +82,6 @@ class GroupPickerScreen extends ConsumerWidget {
                       onTap: () => _openAddExpense(context, g),
                     ),
                   )),
-
-              const SizedBox(height: 24),
-
-              // ── Create new ──────────────────────────────────────────────────
-              OutlinedButton.icon(
-                onPressed: () => _openCreateGroup(context),
-                icon: const Icon(Icons.group_add_outlined),
-                label: const Text('Create new group'),
-              ),
             ],
           );
         },

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io' as _io;
+import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
@@ -799,6 +800,8 @@ class SetAllRepository {
     }
 
     final now = _now();
+    // Use -1 as a "syncing in progress" sentinel so the background sync service
+    // does not race with the Supabase RPC and create a duplicate group.
     await db.insert('groups', {
       'id': id,
       'name': name,
@@ -806,7 +809,7 @@ class SetAllRepository {
       'type': 'normal',
       'created_at': now,
       'updated_at': now,
-      'synced_at': null,
+      'synced_at': -1,
       if (iconName != null) 'icon_name': iconName,
       if (colorValue != null) 'color_value': colorValue,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
@@ -815,7 +818,7 @@ class SetAllRepository {
       'group_id': id,
       'user_id': uid,
       'joined_at': now,
-      'synced_at': null,
+      'synced_at': -1,
     });
 
     if (await _isOnline && _client != null) {
@@ -834,17 +837,25 @@ class SetAllRepository {
             }).eq('id', finalId);
           } catch (_) {}
         }
+        final millis = DateTime.now().millisecondsSinceEpoch;
         if (remoteId != id) {
-          await db.update('groups', {'id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
-          await db.update('group_members', {'group_id': remoteId, 'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+          await db.update('groups', {'id': remoteId, 'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
+          await db.update('group_members', {'group_id': remoteId, 'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
           return GroupModel(id: remoteId, name: name, creatorId: uid,
               iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
         }
-        await db.update('groups', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'id = ?', whereArgs: [id]);
-        await db.update('group_members', {'synced_at': DateTime.now().millisecondsSinceEpoch}, where: 'group_id = ?', whereArgs: [id]);
+        await db.update('groups', {'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
+        await db.update('group_members', {'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
       } catch (e) {
+        // Reset sentinel so the sync service can retry later.
+        await db.update('groups', {'synced_at': null}, where: 'id = ?', whereArgs: [id]);
+        await db.update('group_members', {'synced_at': null}, where: 'group_id = ?', whereArgs: [id]);
         debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
       }
+    } else {
+      // Offline — reset sentinel so sync can push when connectivity returns.
+      await db.update('groups', {'synced_at': null}, where: 'id = ?', whereArgs: [id]);
+      await db.update('group_members', {'synced_at': null}, where: 'group_id = ?', whereArgs: [id]);
     }
     _notify();
     return GroupModel(id: id, name: name, creatorId: uid,
@@ -858,6 +869,7 @@ class SetAllRepository {
     String? iconName,
     int? colorValue,
     String? avatarUrl,
+    bool clearAvatarUrl = false,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return false;
@@ -865,6 +877,7 @@ class SetAllRepository {
     if (iconName != null)   updates['icon_name']   = iconName;
     if (colorValue != null) updates['color_value'] = colorValue;
     if (avatarUrl != null)  updates['avatar_url']  = avatarUrl;
+    if (clearAvatarUrl)     updates['avatar_url']  = null;
     if (updates.isEmpty) return true;
 
     if (_isWeb && _client != null) {
@@ -892,24 +905,46 @@ class SetAllRepository {
     return true;
   }
 
+  /// Returns a signed URL (valid 1 hour) for a group avatar storage path.
+  Future<String?> generateGroupAvatarSignedUrl(String storagePath) async {
+    if (_client == null) return null;
+    try {
+      return await _client.storage
+          .from('group-avatars')
+          .createSignedUrl(storagePath, 3600);
+    } catch (e) {
+      debugPrint('[generateGroupAvatarSignedUrl] $e');
+      return null;
+    }
+  }
+
   /// Upload a group avatar photo. Applies the "Clean Storage" pipeline:
-  /// resize to 512×512, convert to WebP, strip EXIF.
+  /// resize to 512×512, convert to WebP (with JPEG fallback for macOS), strip EXIF.
   /// Returns the storage path on success, null on failure.
   Future<String?> uploadGroupAvatar(String groupId, String localPath) async {
     if (_client == null) return null;
     final uid = await ensureUser();
     if (uid == null) return null;
     try {
-      final bytes = await FlutterImageCompress.compressWithFile(
-        localPath,
-        minWidth: 512,
-        minHeight: 512,
-        quality: 85,
-        format: CompressFormat.webp,
-        keepExif: false,
-      );
+      Uint8List? bytes;
+      String ext = 'webp';
+      try {
+        bytes = await FlutterImageCompress.compressWithFile(
+          localPath,
+          minWidth: 512, minHeight: 512, quality: 85,
+          format: CompressFormat.webp, keepExif: false,
+        );
+      } catch (_) {
+        // WebP not supported on this platform (e.g. macOS) — fall back to JPEG.
+        ext = 'jpeg';
+        bytes = await FlutterImageCompress.compressWithFile(
+          localPath,
+          minWidth: 512, minHeight: 512, quality: 85,
+          format: CompressFormat.jpeg, keepExif: false,
+        );
+      }
       final uploadBytes = bytes ?? await _io.File(localPath).readAsBytes();
-      final storagePath = '$uid/$groupId/avatar.webp';
+      final storagePath = '$uid/$groupId/avatar.$ext';
       await _client.storage
           .from('group-avatars')
           .uploadBinary(storagePath, uploadBytes,
@@ -1144,6 +1179,22 @@ class SetAllRepository {
     _logGroupDeletedEvents(uid, {groupId: (groupName, creatorId ?? uid)});
     _notify();
     return true;
+  }
+
+  /// Returns true when [groupId] exists locally and is currently soft-deleted.
+  Future<bool> isGroupSoftDeleted(String groupId) async {
+    if (_isWeb) return false;
+    try {
+      final rows = await LocalDatabase.db.query(
+        'groups',
+        columns: ['is_deleted'],
+        where: 'id = ? AND is_deleted = 1',
+        whereArgs: [groupId],
+      );
+      return rows.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
   }
 
   /// Restore a soft-deleted group. Only the original owner (creator_id) may call this.
@@ -2026,13 +2077,14 @@ class SetAllRepository {
             try {
                         await _client.from('expenses').insert(supabaseExpenseData);
                         for (final s in splits) {
-                          // Calculate proportional universal_usd_owed
+                          // s.universalUsdOwed is the entry-currency amount; convert to USD for storage.
                           final usdOwed = (s.universalUsdOwed * rateToUsd).round(scale: 2);
                           final split = SplitModel(
                             id: const Uuid().v4(),
                             expenseId: expenseId,
                             userId: s.userId,
                             universalUsdOwed: usdOwed.toString(),
+                            entryAmountOwed: s.universalUsdOwed.toString(),
                           );
                           await _client.from('splits').insert(split.toJson());
                         }
@@ -2062,6 +2114,7 @@ class SetAllRepository {
                         expenseId: expenseId,
                         userId: s.userId,
                         universalUsdOwed: usdOwed.toString(),
+                        entryAmountOwed: s.universalUsdOwed.toString(),
                       );
                     }).toList();
 
@@ -2087,10 +2140,15 @@ class SetAllRepository {
                       }
                       debugPrint('[addExpense] bg push start for $expenseId');
                       try {
-                        await Future.wait([
-                          _client.from('expenses').insert(supabaseExpenseData),
-                          ...splitModels.map((s) => _client.from('splits').insert(s.toJson())),
-                        ]).timeout(const Duration(seconds: 8));
+                        // Insert expense FIRST and wait for it to commit before
+                        // inserting splits — parallel inserts trigger an RLS race
+                        // where splits arrive before the expense is visible.
+                        await _client.from('expenses').insert(supabaseExpenseData)
+                            .timeout(const Duration(seconds: 8));
+                        for (final s in splitModels) {
+                          await _client.from('splits').insert(s.toJson())
+                              .timeout(const Duration(seconds: 8));
+                        }
                         await LocalDatabase.db.update(
                           'expenses',
                           {'synced_at': DateTime.now().millisecondsSinceEpoch},
@@ -2675,27 +2733,25 @@ class SetAllRepository {
       try {
         final deletedRows = await LocalDatabase.db.query(
           'deleted_expenses',
-          // Exclude cascade-deleted expenses (deleted together with their group).
-          // Those are restorable only via the GroupDeletedEvent tile, not individually.
-          where: 'deleted_with_group_id IS NULL',
           orderBy: 'deleted_at DESC',
           limit: limit,
         );
         for (final r in deletedRows) {
           final deletedByUid = r['deleted_by'] as String? ?? '';
           events.add(ExpenseDeletedEvent(
-            timestamp:     r['deleted_at'] as String? ?? '',
-            expenseId:     r['expense_id'] as String,
-            description:   r['description'] as String? ?? '',
-            amount:        r['amount'] as String? ?? '0',
-            currency:      r['currency'] as String? ?? 'USD',
-            groupId:       r['group_id'] as String?,
-            groupName:     r['group_name'] as String? ?? '',
-            isIncome:      (r['is_income'] as int? ?? 0) == 1,
-            deletedByYou:  deletedByUid == uid,
-            deletedByName: r['deleted_by_name'] as String? ?? 'Someone',
-            deletedAt:     DateTime.tryParse(r['deleted_at'] as String? ?? '') ?? DateTime.now(),
-            category:      r['category'] as String? ?? 'Other',
+            timestamp:          r['deleted_at'] as String? ?? '',
+            expenseId:          r['expense_id'] as String,
+            description:        r['description'] as String? ?? '',
+            amount:             r['amount'] as String? ?? '0',
+            currency:           r['currency'] as String? ?? 'USD',
+            groupId:            r['group_id'] as String?,
+            groupName:          r['group_name'] as String? ?? '',
+            isIncome:           (r['is_income'] as int? ?? 0) == 1,
+            deletedByYou:       deletedByUid == uid,
+            deletedByName:      r['deleted_by_name'] as String? ?? 'Someone',
+            deletedAt:          DateTime.tryParse(r['deleted_at'] as String? ?? '') ?? DateTime.now(),
+            category:           r['category'] as String? ?? 'Other',
+            deletedWithGroupId: r['deleted_with_group_id'] as String?,
           ));
         }
       } catch (e) {
@@ -2802,9 +2858,12 @@ class SetAllRepository {
           final expenseData = expense.toJson()
             ..remove('created_at')
             ..remove('created_by');
-          // Supabase payload: remap types + clamp icon_color to signed INT4.
-          final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
-            ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
+        // When all attachments were removed, toJson omits the key → old SQLite
+        // value is never cleared.  Explicitly null it so the UPDATE wipes it.
+        if (finalAttachmentUrls.isEmpty) expenseData['attachment_urls'] = null;
+        // Supabase payload: remap types + clamp icon_color to signed INT4.
+        final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
+          ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
     
           if (_isWeb && _client != null) {
             try {
@@ -2824,6 +2883,7 @@ class SetAllRepository {
                   expenseId: expenseId,
                   userId: s.userId,
                   universalUsdOwed: usdOwed.toString(),
+                  entryAmountOwed: s.universalUsdOwed.toString(),
                 );
                 await _client.from('splits').insert(split.toJson());
               }
@@ -2853,6 +2913,7 @@ class SetAllRepository {
               expenseId: expenseId,
               userId: s.userId,
               universalUsdOwed: usdOwed.toString(),
+              entryAmountOwed: s.universalUsdOwed.toString(),
             );
           }).toList();
 

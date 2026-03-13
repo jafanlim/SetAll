@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../data/models/group_model.dart';
 import '../../../../data/repositories/setall_repository.dart' show BalanceSummary;
 import '../../../../domain/services/settlement_engine.dart' show SettlementTransaction;
 import '../../../../core/utils/amount_formatter.dart';
@@ -225,6 +226,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final expensesAsync = ref.watch(groupExpensesProvider(groupId));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(groupId));
     final creatorAsync = ref.watch(groupCreatorProvider(groupId));
+    final groupsAsync  = ref.watch(myGroupsProvider);
+    final group = groupsAsync.valueOrNull
+        ?.where((g) => g.id == groupId)
+        .firstOrNull;
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -316,10 +321,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
                     if (value == 'rename') _renameGroup(context);
+                    if (value == 'editGroup' && group != null) context.push('/group/$groupId/edit', extra: group);
                     if (value == 'delete') _deleteGroup(context);
                     if (value == 'editExpenses') _toggleEditMode();
                   },
                   itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'editGroup', child: Text('Edit group')),
                     const PopupMenuItem(value: 'rename', child: Text('Rename group')),
                     const PopupMenuItem(value: 'editExpenses', child: Text('Select expenses')),
                     const PopupMenuItem(
@@ -341,6 +348,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         },
         child: CustomScrollView(
           slivers: [
+            // ── Group hero (avatar / colour chip) ─────────────────────
+            if (group != null)
+              SliverToBoxAdapter(
+                child: _GroupHeroBar(group: group),
+              ),
+
             // ── Balance summary ──────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
@@ -855,8 +868,12 @@ class _ExpenseTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final icon =
-        _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
+    final icon = expense.iconCodepoint != null
+        ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
+        : (_categoryIcons[expense.category] ?? Icons.attach_money_outlined);
+    final iconColor = expense.iconColor != null
+        ? Color(expense.iconColor!)
+        : theme.colorScheme.onSurfaceVariant;
     final displayAmount = formatAmount(expense.originalAmount ?? expense.amount);
     final displayCurrency = expense.originalCurrency ?? expense.currency;
     final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
@@ -900,23 +917,36 @@ class _ExpenseTile extends ConsumerWidget {
               ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
               : null,
           child: GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () => context.push(
-                '/group/$groupId/expense/${expense.id}',
-                extra: {'groupName': groupName},
+                AppRouter.groupExpenseDetail,
+                extra: {'expense': expense, 'groupId': groupId, 'groupName': groupName},
               ),
               child: Row(
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 4, height: 44,
+                        decoration: BoxDecoration(
+                          color: iconColor,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, size: 16,
+                            color: theme.colorScheme.onSurface.withAlpha(180)),
+                      ),
+                    ],
                   ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -960,11 +990,15 @@ class _ExpenseTile extends ConsumerWidget {
                 const SizedBox(width: 8),
                 Text(
                   '$displayCurrency $displayAmount',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: _teal,
+                    color: iconColor,
                   ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.only(left: 6),
+                  child: Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
                 ),
               ],
               ),
@@ -1311,6 +1345,133 @@ class _SettlementPlanSection extends ConsumerWidget {
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// Group hero bar — shows avatar/icon/colour strip at top of detail screen
+// ---------------------------------------------------------------------------
+const Map<String, IconData> _kGroupIconMap = {
+  'groups':     Icons.groups_outlined,
+  'home':       Icons.home_outlined,
+  'flight':     Icons.flight_outlined,
+  'hotel':      Icons.hotel_outlined,
+  'restaurant': Icons.restaurant_outlined,
+  'shopping':   Icons.shopping_bag_outlined,
+  'sports':     Icons.sports_soccer_outlined,
+  'music':      Icons.music_note_outlined,
+  'school':     Icons.school_outlined,
+  'work':       Icons.work_outline,
+  'car':        Icons.directions_car_outlined,
+  'beach':      Icons.beach_access_outlined,
+  'party':      Icons.celebration_outlined,
+  'health':     Icons.favorite_outline,
+  'coffee':     Icons.local_cafe_outlined,
+};
+
+class _GroupHeroBar extends ConsumerWidget {
+  const _GroupHeroBar({required this.group});
+  final GroupModel group;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme       = Theme.of(context);
+    final accentColor = group.colorValue != null
+        ? Color(group.colorValue!)
+        : _teal;
+    final iconData    = _kGroupIconMap[group.iconName] ?? Icons.groups_outlined;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: accentColor.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: accentColor.withValues(alpha: 0.2)),
+        ),
+        child: Row(
+          children: [
+            // Avatar or icon
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: accentColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: group.avatarUrl != null
+                  ? _GroupAvatarImage(storagePath: group.avatarUrl!, accent: accentColor, iconData: iconData)
+                  : Icon(iconData, size: 24, color: accentColor),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    group.name,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 15,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    group.type.name == 'direct' ? 'Direct' : 'Group',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: accentColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GroupAvatarImage extends ConsumerWidget {
+  const _GroupAvatarImage({
+    required this.storagePath,
+    required this.accent,
+    required this.iconData,
+  });
+  final String storagePath;
+  final Color accent;
+  final IconData iconData;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final urlAsync = ref.watch(_groupDetailAvatarProvider(storagePath));
+    return urlAsync.when(
+      data: (url) => url != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.network(url,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Icon(iconData, size: 24, color: accent)),
+            )
+          : Icon(iconData, size: 24, color: accent),
+      loading: () => const Center(
+          child: SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2))),
+      error: (_, __) => Icon(iconData, size: 24, color: accent),
+    );
+  }
+}
+
+final _groupDetailAvatarProvider =
+    FutureProvider.family<String?, String>((ref, storagePath) async {
+  return ref
+      .watch(setAllRepositoryProvider)
+      .generateGroupAvatarSignedUrl(storagePath);
+});
 
 // ---------------------------------------------------------------------------
 // Split method badge

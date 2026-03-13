@@ -220,7 +220,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       _category  = expense.category;
       _splitMode = expense.splitType == SplitType.even
           ? SplitMode.even
-          : SplitMode.manual;
+          : expense.splitType == SplitType.parts
+              ? SplitMode.shares
+              : SplitMode.manual;
       _payerId   = expense.payerId.isNotEmpty ? expense.payerId : currentUid;
       if (expense.createdAt != null) {
         _entryDate = DateTime.tryParse(expense.createdAt!)?.toLocal() ?? DateTime.now();
@@ -238,17 +240,42 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         _notesController.text = expense.notes!;
       }
 
-      // Pre-fill custom controllers with original-currency amounts (reverse USD).
-      final rate = Decimal.tryParse(expense.exchangeRateApplied ?? '') ?? Decimal.one;
+      // Pre-fill custom controllers based on split mode.
+      final rate     = Decimal.tryParse(expense.exchangeRateApplied ?? '') ?? Decimal.one;
+      final totalUsd = splits.fold<Decimal>(Decimal.zero,
+          (acc, s) => acc + (Decimal.tryParse(s.universalUsdOwed) ?? Decimal.zero));
       for (final m in members) {
         SplitModel? split;
         try { split = splits.firstWhere((s) => s.userId == m.id); } catch (_) {}
         String initial = '';
         if (split != null) {
           final usdAmt = Decimal.tryParse(split.universalUsdOwed) ?? Decimal.zero;
-          initial = rate > Decimal.zero
-              ? (usdAmt / rate).toDecimal(scaleOnInfinitePrecision: 2).toString()
-              : split.universalUsdOwed;
+          switch (_splitMode) {
+            case SplitMode.percentage:
+              // Percentage of total based on USD ratio.
+              if (totalUsd > Decimal.zero) {
+                initial = ((usdAmt / totalUsd).toDecimal(scaleOnInfinitePrecision: 4)
+                    * Decimal.fromInt(100)).round(scale: 2).toString();
+              }
+            case SplitMode.shares:
+              // Original weights are not stored; default every member to 1.
+              initial = '1';
+            case SplitMode.manual:
+              // Use stored entry-currency amount when available, else reverse-convert.
+              if (split.entryAmountOwed != null) {
+                initial = Decimal.parse(split.entryAmountOwed!)
+                    .toStringAsFixed(2);
+              } else if (rate > Decimal.zero) {
+                initial = (usdAmt / rate)
+                    .toDecimal(scaleOnInfinitePrecision: 2)
+                    .round(scale: 2)
+                    .toString();
+              } else {
+                initial = split.universalUsdOwed;
+              }
+            case SplitMode.even:
+              initial = ''; // not shown
+          }
         }
         _customCtrl[m.id] = TextEditingController(text: initial);
       }
@@ -361,6 +388,144 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             .showSnackBar(const SnackBar(content: Text('Could not update expense')));
       }
     }
+  }
+
+  // ── Payer selector ──────────────────────────────────────────────────────
+  List<Widget> _buildPayerSection(ThemeData theme) {
+    return [
+      Row(children: [
+        Text('Paid by',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+      ]),
+      const SizedBox(height: 8),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: _members.map((m) {
+            final selected = _payerId == m.id;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(m.name, style: const TextStyle(fontSize: 12)),
+                selected: selected,
+                selectedColor: _teal.withValues(alpha: 0.18),
+                checkmarkColor: _teal,
+                labelStyle: TextStyle(
+                  color: selected ? _teal : null,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.normal,
+                ),
+                onSelected: (_) => setState(() => _payerId = m.id),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
+  // ── Split mode + per-member inputs ──────────────────────────────────────
+  List<Widget> _buildSplitSection(ThemeData theme) {
+    const modes = [
+      (SplitMode.even,       'Even'),
+      (SplitMode.shares,     'Shares'),
+      (SplitMode.percentage, '%'),
+      (SplitMode.manual,     'Manual'),
+    ];
+    final suffix = _splitMode == SplitMode.percentage
+        ? '%'
+        : _splitMode == SplitMode.shares
+            ? '×'
+            : _currency;
+
+    return [
+      Row(children: [
+        Text('Split',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+      ]),
+      const SizedBox(height: 8),
+      SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: modes.map((entry) {
+            final (mode, label) = entry;
+            final sel = _splitMode == mode;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: ChoiceChip(
+                label: Text(label, style: const TextStyle(fontSize: 12)),
+                selected: sel,
+                selectedColor: _teal.withValues(alpha: 0.18),
+                checkmarkColor: _teal,
+                labelStyle: TextStyle(
+                  color: sel ? _teal : null,
+                  fontWeight: sel ? FontWeight.w700 : FontWeight.normal,
+                ),
+                onSelected: (_) => setState(() {
+                  _splitMode = mode;
+                  for (final c in _customCtrl.values) { c.clear(); }
+                }),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+      if (_splitMode != SplitMode.even) ...[
+        const SizedBox(height: 12),
+        ..._members.map((m) {
+          _customCtrl.putIfAbsent(m.id, TextEditingController.new);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 14,
+                  backgroundColor: _teal.withValues(alpha: 0.15),
+                  child: Text(
+                    m.name.isNotEmpty ? m.name[0].toUpperCase() : '?',
+                    style: const TextStyle(fontSize: 11, color: _teal,
+                        fontWeight: FontWeight.w700),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(m.name,
+                      style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13)),
+                ),
+                SizedBox(
+                  width: 90,
+                  child: TextField(
+                    controller: _customCtrl[m.id],
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    textAlign: TextAlign.end,
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                    decoration: InputDecoration(
+                      suffixText: suffix,
+                      suffixStyle: TextStyle(
+                          fontSize: 11,
+                          color: theme.colorScheme.onSurfaceVariant),
+                      isDense: true,
+                      filled: true,
+                      fillColor: theme.colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.5),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 8),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+        }),
+      ],
+      const SizedBox(height: 4),
+    ];
   }
 
   @override
@@ -739,7 +904,15 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
               minLines: 1,
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 16),
+
+            // ── Payer selector (group expenses only) ─────────────────────
+            if (widget.groupId.isNotEmpty && _members.isNotEmpty) ..._buildPayerSection(theme),
+
+            // ── Split mode + per-member inputs ───────────────────────────
+            if (widget.groupId.isNotEmpty && _members.length > 1) ..._buildSplitSection(theme),
+
+            const SizedBox(height: 24),
             FilledButton(
               onPressed: _isSubmitting ? null : _submit,
               style: FilledButton.styleFrom(

@@ -20,6 +20,28 @@ const _orange     = Color(0xFFFF8C42);
 const _orangeDim = Color(0x26FF8C42);
 const _brandOrange = Color(0xFFF97316);
 
+const Map<String, IconData> _kGroupIconMap = {
+  'groups':     Icons.groups_outlined,
+  'home':       Icons.home_outlined,
+  'flight':     Icons.flight_outlined,
+  'hotel':      Icons.hotel_outlined,
+  'restaurant': Icons.restaurant_outlined,
+  'shopping':   Icons.shopping_bag_outlined,
+  'sports':     Icons.sports_soccer_outlined,
+  'music':      Icons.music_note_outlined,
+  'school':     Icons.school_outlined,
+  'work':       Icons.work_outline,
+  'car':        Icons.directions_car_outlined,
+  'beach':      Icons.beach_access_outlined,
+  'party':      Icons.celebration_outlined,
+  'health':     Icons.favorite_outline,
+  'coffee':     Icons.local_cafe_outlined,
+};
+
+enum _GroupSort      { nameAZ, nameZA }
+enum _ActivityFilter { all, income, expense }
+enum _ActivitySort   { newest, oldest, largest, smallest }
+
 class GroupsScreen extends ConsumerStatefulWidget {
   const GroupsScreen({super.key});
 
@@ -30,6 +52,12 @@ class GroupsScreen extends ConsumerStatefulWidget {
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   bool _editMode = false;
   final Set<String> _selected = {};
+  _GroupSort        _groupSort   = _GroupSort.nameAZ;
+  _ActivityFilter   _actFilter   = _ActivityFilter.all;
+  _ActivitySort     _actSort     = _ActivitySort.newest;
+  String?           _actCatFilter;
+  Set<String>       _groupNameFilter  = {};
+  Set<int>          _groupColorFilter = {};
 
   @override
   void initState() {
@@ -73,7 +101,113 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     setState(() => _selected.clear());
   }
 
+  Future<void> _showGroupNamePicker(BuildContext ctx, List<GroupModel> groups) async {
+    final tempSelected = Set<String>.from(_groupNameFilter);
+    final confirmed = await showDialog<bool>(
+      context: ctx,
+      builder: (dlgCtx) => StatefulBuilder(
+        builder: (dlgCtx, setLocal) => AlertDialog(
+          title: const Text('Filter by group',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          contentPadding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: ListView(
+              shrinkWrap: true,
+              children: groups.map((g) {
+                final accent = g.colorValue != null ? Color(g.colorValue!) : _teal;
+                return CheckboxListTile(
+                  value: tempSelected.contains(g.id),
+                  onChanged: (v) => setLocal(() {
+                    if (v == true) tempSelected.add(g.id); else tempSelected.remove(g.id);
+                  }),
+                  title: Text(g.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                  secondary: Container(
+                    width: 10, height: 10,
+                    decoration: BoxDecoration(color: accent, shape: BoxShape.circle),
+                  ),
+                  activeColor: accent,
+                  checkColor: Colors.white,
+                  controlAffinity: ListTileControlAffinity.trailing,
+                );
+              }).toList(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => setLocal(() => tempSelected.clear()),
+              child: const Text('Clear all'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dlgCtx, true),
+              child: const Text('Apply'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (confirmed == true && mounted) {
+      setState(() => _groupNameFilter = tempSelected);
+    }
+  }
+
   bool _batchDeleting = false;
+
+  List<GroupModel> _applyGroupSort(List<GroupModel> all) {
+    var list = List<GroupModel>.from(all);
+    if (_groupNameFilter.isNotEmpty) {
+      list = list.where((g) => _groupNameFilter.contains(g.id)).toList();
+    }
+    if (_groupColorFilter.isNotEmpty) {
+      list = list.where(
+          (g) => g.colorValue != null && _groupColorFilter.contains(g.colorValue)).toList();
+    }
+    switch (_groupSort) {
+      case _GroupSort.nameAZ: list.sort((a, b) => a.name.compareTo(b.name));
+      case _GroupSort.nameZA: list.sort((a, b) => b.name.compareTo(a.name));
+    }
+    return list;
+  }
+
+  List<ExpenseModel> _applyActivityFilterSort(List<ExpenseModel> all,
+      {List<GroupModel> groups = const []}) {
+    final colorById = <String, int?>{for (final g in groups) g.id: g.colorValue};
+    var list = all.where((e) {
+      if (_groupNameFilter.isNotEmpty && !_groupNameFilter.contains(e.groupId)) return false;
+      if (_groupColorFilter.isNotEmpty) {
+        final cv = e.groupId != null ? colorById[e.groupId] : null;
+        if (cv == null || !_groupColorFilter.contains(cv)) return false;
+      }
+      if (_actCatFilter != null) {
+        return (e.category.isEmpty ? 'Other' : e.category) == _actCatFilter;
+      }
+      switch (_actFilter) {
+        case _ActivityFilter.all:     return true;
+        case _ActivityFilter.income:  return e.isIncome;
+        case _ActivityFilter.expense: return !e.isIncome;
+      }
+    }).toList();
+    switch (_actSort) {
+      case _ActivitySort.newest:
+        list.sort((a, b) => (b.createdAt ?? '').compareTo(a.createdAt ?? ''));
+      case _ActivitySort.oldest:
+        list.sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
+      case _ActivitySort.largest:
+        list.sort((a, b) {
+          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          return bv.compareTo(av);
+        });
+      case _ActivitySort.smallest:
+        list.sort((a, b) {
+          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          return av.compareTo(bv);
+        });
+    }
+    return list;
+  }
 
   Future<void> _deleteBatch() async {
     if (_selected.isEmpty) return;
@@ -175,6 +309,28 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ),
               ]
             : [
+                PopupMenuButton<_GroupSort>(
+                  icon: const Icon(Icons.sort_rounded),
+                  tooltip: 'Sort groups',
+                  initialValue: _groupSort,
+                  onSelected: (s) { HapticUtils.selection(); setState(() => _groupSort = s); },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: _GroupSort.nameAZ, child: Text('Name A→Z')),
+                    PopupMenuItem(value: _GroupSort.nameZA, child: Text('Name Z→A')),
+                  ],
+                ),
+                PopupMenuButton<_ActivitySort>(
+                  icon: const Icon(Icons.swap_vert_rounded),
+                  tooltip: 'Sort activity',
+                  initialValue: _actSort,
+                  onSelected: (s) { HapticUtils.selection(); setState(() => _actSort = s); },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: _ActivitySort.newest,   child: Text('Newest first')),
+                    PopupMenuItem(value: _ActivitySort.oldest,   child: Text('Oldest first')),
+                    PopupMenuItem(value: _ActivitySort.largest,  child: Text('Largest first')),
+                    PopupMenuItem(value: _ActivitySort.smallest, child: Text('Smallest first')),
+                  ],
+                ),
                 IconButton(
                   icon: const Icon(Icons.refresh_rounded),
                   tooltip: 'Refresh',
@@ -200,7 +356,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                FloatingActionButton(
+                FloatingActionButton.extended(
                   heroTag: 'fab_new_group',
                   onPressed: () async {
                     HapticUtils.primaryTap();
@@ -211,10 +367,13 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   backgroundColor: _teal.withValues(alpha: 0.15),
                   foregroundColor: _teal,
                   elevation: 2,
-                  tooltip: 'New group',
-                  child: const Icon(Icons.group_add_outlined),
+                  icon: const Icon(Icons.group_add_outlined),
+                  label: const Text(
+                    'New Group',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  ),
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
                 FloatingActionButton.extended(
                   heroTag: 'fab_add_expense',
                   onPressed: () {
@@ -225,7 +384,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   foregroundColor: Colors.black,
                   icon: const Icon(Icons.add),
                   label: const Text(
-                    'Add Group Expense',
+                    'Add Expense',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
@@ -271,7 +430,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             // ── Groups section header ──────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(
                   'Your groups',
                   style: theme.textTheme.labelLarge?.copyWith(
@@ -282,9 +441,153 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               ),
             ),
 
+            // ── Group filter (name dropdown + color dots) ──────────────────
+            groupsAsync.when(
+              data: (groups) {
+                if (groups.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
+                final uniqueColors = <int>{
+                  for (final g in groups)
+                    if (g.colorValue != null) g.colorValue!
+                }.toList();
+                final hasFilters = _groupNameFilter.isNotEmpty || _groupColorFilter.isNotEmpty;
+                return SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          // ── Name dropdown ──────────────────────────────
+                          GestureDetector(
+                            onTap: () => _showGroupNamePicker(context, groups),
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 160),
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                              decoration: BoxDecoration(
+                                color: _groupNameFilter.isNotEmpty ? _teal.withAlpha(38) : Colors.transparent,
+                                border: Border.all(
+                                  color: _groupNameFilter.isNotEmpty
+                                      ? _teal
+                                      : theme.colorScheme.outline.withAlpha(100),
+                                  width: _groupNameFilter.isNotEmpty ? 1.5 : 1,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.group_outlined, size: 14,
+                                      color: _groupNameFilter.isNotEmpty
+                                          ? _teal
+                                          : theme.colorScheme.onSurfaceVariant),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    _groupNameFilter.isEmpty
+                                        ? 'Groups'
+                                        : '${_groupNameFilter.length} group${_groupNameFilter.length == 1 ? '' : 's'}',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w600,
+                                      color: _groupNameFilter.isNotEmpty
+                                          ? _teal
+                                          : theme.colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Icon(Icons.expand_more_rounded, size: 14,
+                                      color: _groupNameFilter.isNotEmpty
+                                          ? _teal
+                                          : theme.colorScheme.onSurfaceVariant),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // ── Color dots ─────────────────────────────────
+                          if (uniqueColors.isNotEmpty) ...[const SizedBox(width: 8),
+                            Container(width: 1, height: 20,
+                                color: theme.colorScheme.outlineVariant),
+                            const SizedBox(width: 8),
+                            ...uniqueColors.map((cv) {
+                              final c = Color(cv);
+                              final isSelected = _groupColorFilter.contains(cv);
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: GestureDetector(
+                                  onTap: () => setState(() {
+                                    if (isSelected) {
+                                      _groupColorFilter.remove(cv);
+                                    } else {
+                                      _groupColorFilter.add(cv);
+                                    }
+                                  }),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 160),
+                                    width: 28, height: 28,
+                                    decoration: BoxDecoration(
+                                      color: c,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(
+                                        color: isSelected ? Colors.white : Colors.transparent,
+                                        width: 2.5,
+                                      ),
+                                      boxShadow: isSelected
+                                          ? [BoxShadow(color: c.withAlpha(160),
+                                              blurRadius: 6, spreadRadius: 1)]
+                                          : null,
+                                    ),
+                                    child: isSelected
+                                        ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                        : null,
+                                  ),
+                                ),
+                              );
+                            }),
+                          ],
+                          // ── Clear all ──────────────────────────────────
+                          if (hasFilters) ...[const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => setState(() {
+                                _groupNameFilter.clear();
+                                _groupColorFilter.clear();
+                              }),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 160),
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                      color: theme.colorScheme.outline.withAlpha(100)),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.close, size: 12,
+                                        color: theme.colorScheme.onSurfaceVariant),
+                                    const SizedBox(width: 4),
+                                    Text('Clear', style: TextStyle(
+                                        fontSize: 11,
+                                        color: theme.colorScheme.onSurfaceVariant)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+              loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
+              error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
+            ),
+
             // ── Group list ────────────────────────────────────────────────
             groupsAsync.when(
-              data: (groups) => groups.isEmpty
+              data: (groups) {
+                final sorted = _applyGroupSort(groups);
+                return sorted.isEmpty
                   ? SliverToBoxAdapter(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -300,7 +603,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   : SliverList(
                       delegate: SliverChildBuilderDelegate(
                         (ctx, i) {
-                          final group = groups[i];
+                          final group = sorted[i];
                           if (_editMode) {
                             return _GroupCardSelectable(
                               group: group,
@@ -310,8 +613,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                           }
                           return _GroupCard(group: group);
                         },
-                        childCount: groups.length,
-                      )),
+                        childCount: sorted.length,
+                      ));
+              },
               loading: () => const SliverToBoxAdapter(
                   child: Padding(padding: EdgeInsets.all(24),
                       child: Center(child: CircularProgressIndicator()))),
@@ -321,16 +625,73 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                           style: TextStyle(color: Colors.redAccent))))),
             ),
 
-            // ── Recent Activity header ────────────────────────────────────
+            // ── Recent Activity header + filter chips ─────────────────────
             if (!_editMode)
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 10),
-                  child: Text(
-                    'Recent activity',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700, fontSize: 13,
-                      letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                  padding: const EdgeInsets.fromLTRB(16, 24, 16, 4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Recent activity',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700, fontSize: 13,
+                            letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        expensesAsync.whenData((e) {
+                          final filtered = _applyActivityFilterSort(e, groups: groupsAsync.valueOrNull ?? []);
+                          return '${filtered.length} item${filtered.length == 1 ? '' : 's'}';
+                        }).valueOrNull ?? '',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant, fontSize: 11),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+            // ── Activity filter chips ─────────────────────────────────────
+            if (!_editMode)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        _FilterChip(
+                          label: 'All',
+                          selected: _actCatFilter == null && _actFilter == _ActivityFilter.all,
+                          onTap: () => setState(() { _actFilter = _ActivityFilter.all; _actCatFilter = null; }),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Income',
+                          selected: _actCatFilter == null && _actFilter == _ActivityFilter.income,
+                          color: _teal,
+                          onTap: () => setState(() { _actFilter = _ActivityFilter.income; _actCatFilter = null; }),
+                        ),
+                        const SizedBox(width: 8),
+                        _FilterChip(
+                          label: 'Expense',
+                          selected: _actCatFilter == null && _actFilter == _ActivityFilter.expense,
+                          color: _orange,
+                          onTap: () => setState(() { _actFilter = _ActivityFilter.expense; _actCatFilter = null; }),
+                        ),
+                        if (_actCatFilter != null) ...[const SizedBox(width: 8),
+                          _FilterChip(
+                            label: _actCatFilter!,
+                            selected: true,
+                            color: _brandOrange,
+                            onTap: () => setState(() => _actCatFilter = null),
+                            trailing: const Icon(Icons.close, size: 11, color: Colors.white),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
@@ -342,23 +703,47 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 data: (groups) {
                   final groupNameMap = {for (final g in groups) g.id: g.name};
                   return expensesAsync.when(
-                    data: (expenses) => expenses.isEmpty
-                        ? SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              child: Text(
-                                'No expenses yet. Tap Add expense to get started.',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: theme.colorScheme.onSurfaceVariant),
-                              )))
-                        : SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (ctx, i) => _ActivityTile(
-                                expense:   expenses[i],
-                                groupId:   expenses[i].groupId,
-                                groupName: groupNameMap[expenses[i].groupId] ?? ''),
-                              childCount: expenses.length,
-                            )),
+                    data: (allExpenses) {
+                      final expenses = _applyActivityFilterSort(allExpenses, groups: groups);
+                      if (expenses.isEmpty) {
+                        return SliverToBoxAdapter(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+                            child: Center(
+                              child: Column(children: [
+                                Icon(Icons.receipt_long_outlined,
+                                    size: 40, color: theme.colorScheme.onSurfaceVariant.withAlpha(100)),
+                                const SizedBox(height: 12),
+                                Text(
+                                  allExpenses.isEmpty
+                                      ? 'No expenses yet. Tap Add expense to get started.'
+                                      : 'No expenses match the current filter.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: theme.colorScheme.onSurfaceVariant),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ]),
+                            ),
+                          ),
+                        );
+                      }
+                      final groupMap = {for (final g in groups) g.id: g};
+                      return SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (ctx, i) => _ActivityTile(
+                            expense:   expenses[i],
+                            groupId:   expenses[i].groupId,
+                            groupName: groupNameMap[expenses[i].groupId] ?? '',
+                            group:     expenses[i].groupId != null ? groupMap[expenses[i].groupId] : null,
+                            onCategoryTap: (cat) => setState(() {
+                              _actCatFilter = cat;
+                              _actFilter = _ActivityFilter.all;
+                            }),
+                          ),
+                          childCount: expenses.length,
+                        ),
+                      );
+                    },
                     loading: () => const SliverToBoxAdapter(child: SizedBox.shrink()),
                     error: (_, _) => const SliverToBoxAdapter(child: SizedBox.shrink()),
                   );
@@ -833,6 +1218,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                   ref: ref,
                   groupId: widget.group.id,
                   groupName: widget.group.name,
+                  group: widget.group,
                 );
               },
               borderRadius: BorderRadius.circular(16),
@@ -976,10 +1362,18 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 // Activity tile  (tap → Edit, swipe left → Delete, right-click → menu)
 // ---------------------------------------------------------------------------
 class _ActivityTile extends ConsumerWidget {
-  const _ActivityTile({required this.expense, required this.groupId, required this.groupName});
+  const _ActivityTile({
+    required this.expense,
+    required this.groupId,
+    required this.groupName,
+    this.group,
+    this.onCategoryTap,
+  });
   final ExpenseModel expense;
   final String? groupId;
   final String groupName;
+  final GroupModel? group;
+  final void Function(String category)? onCategoryTap;
 
   static const Map<String, IconData> _categoryIcons = {
     'Food & drink': Icons.restaurant_outlined,
@@ -1091,6 +1485,21 @@ class _ActivityTile extends ConsumerWidget {
     final displayAmount   = formatAmount(expense.originalAmount ?? expense.amount);
     final displayCurrency = expense.originalCurrency ?? expense.currency;
 
+    // Group visual identity
+    final groupAccent = group?.colorValue != null ? Color(group!.colorValue!) : null;
+    final groupIcon   = _kGroupIconMap[group?.iconName] ?? icon;
+    // Base-currency equivalent
+    final baseCcyAsync      = ref.watch(baseCurrencyProvider);
+    final baseCcy           = baseCcyAsync.valueOrNull ?? 'USD';
+    final entryCcy          = expense.currency.isEmpty ? 'USD' : expense.currency;
+    final showConversion    = entryCcy != baseCcy;
+    final rateAsync         = showConversion
+        ? ref.watch(rateToBaseProvider((from: 'USD', base: baseCcy)))
+        : null;
+    final rateUsdToBase     = Decimal.tryParse(rateAsync?.valueOrNull ?? '1') ?? Decimal.one;
+    final usdAmt            = Decimal.tryParse(expense.universalUsdAmount ?? '') ?? Decimal.zero;
+    final baseAmt           = (usdAmt * rateUsdToBase).round(scale: 2);
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
       child: SwipeActionCard(
@@ -1105,21 +1514,43 @@ class _ActivityTile extends ConsumerWidget {
               ? (d) => _showRightClickMenu(context, ref, d.globalPosition)
               : null,
           child: GlassCard(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: groupId != null
-                  ? () => context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': ''})
+                  ? () => context.push(
+                      AppRouter.groupExpenseDetail,
+                      extra: {'expense': expense, 'groupId': groupId, 'groupName': groupName},
+                    )
                   : null,
               child: Row(
                 children: [
-                  Container(
-                    width: 38, height: 38,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(icon, size: 18, color: theme.colorScheme.onSurfaceVariant),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 4, height: 44,
+                        decoration: BoxDecoration(
+                          color: groupAccent ?? _teal,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        width: 34, height: 34,
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest.withAlpha(80),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(
+                          expense.iconCodepoint != null
+                              ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
+                              : groupIcon,
+                          size: 16,
+                          color: theme.colorScheme.onSurface.withAlpha(180),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -1134,7 +1565,10 @@ class _ActivityTile extends ConsumerWidget {
                         if (groupName.isNotEmpty) ...[const SizedBox(height: 2),
                           Text(groupName,
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant, fontSize: 10),
+                              color: groupAccent ?? theme.colorScheme.onSurfaceVariant,
+                              fontSize: 10,
+                              fontWeight: groupAccent != null ? FontWeight.w600 : FontWeight.normal,
+                            ),
                             overflow: TextOverflow.ellipsis)],
                       ],
                     ),
@@ -1145,13 +1579,24 @@ class _ActivityTile extends ConsumerWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text('$displayCurrency $displayAmount',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _teal)),
+                          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: groupAccent ?? _teal)),
+                        if (showConversion && usdAmt > Decimal.zero)
+                          Text('≈ $baseCcy ${baseAmt.toStringAsFixed(2)}',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w500,
+                            )),
                         if (expense.createdAt != null)
                           Text(_shortDate(expense.createdAt!),
                             style: theme.textTheme.bodySmall?.copyWith(
                               fontSize: 10, color: theme.colorScheme.onSurfaceVariant)),
                       ],
                     ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.only(left: 6),
+                    child: Icon(Icons.chevron_right, size: 16, color: Color(0xFF94A3B8)),
                   ),
                 ],
               ),
@@ -1169,5 +1614,58 @@ class _ActivityTile extends ConsumerWidget {
     } catch (_) {
       return '';
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Filter chip
+// ---------------------------------------------------------------------------
+class _FilterChip extends StatelessWidget {
+  const _FilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+    this.color,
+    this.trailing,
+  });
+
+  final String        label;
+  final bool          selected;
+  final VoidCallback  onTap;
+  final Color?        color;
+  final Widget?       trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = color ?? _teal;
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected ? accent : accent.withAlpha(22),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected ? accent : accent.withAlpha(60),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : accent,
+              ),
+            ),
+            if (trailing != null) ...[const SizedBox(width: 4), trailing!],
+          ],
+        ),
+      ),
+    );
   }
 }
