@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
-import '../../../../core/utils/accent_text_style.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -165,9 +164,15 @@ class _MasterNetWorthHero extends StatelessWidget {
         ? '—'
         : '${master!.currency} ${master!.netWorth.abs().toStringAsFixed(2)}';
 
-    final isDark = theme.brightness == Brightness.dark;
-    final gradStart = isDark ? theme.colorScheme.surfaceContainerHigh    : const Color(0xFFF1F5F9); // Slate-100
-    final gradEnd   = isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFE2E8F0); // Slate-200
+    final isDark    = theme.brightness == Brightness.dark;
+    final scaffold   = theme.scaffoldBackgroundColor;
+    final isDesktop  = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+    final gradStart  = isDark    ? theme.colorScheme.surfaceContainerHigh
+                     : isDesktop ? const Color(0xFFE2E8F0)  // Slate-200
+                     :             const Color(0xFFF8FAFC); // Slate-50 (mobile)
+    final gradEnd    = isDark    ? theme.colorScheme.surfaceContainerHighest
+                     : isDesktop ? const Color(0xFFCBD5E1)  // Slate-300 (blends into scaffold)
+                     :             const Color(0xFFE2E8F0); // Slate-200 (mobile)
 
     return Container(
       decoration: BoxDecoration(
@@ -218,7 +223,7 @@ class _MasterNetWorthHero extends StatelessWidget {
                 fontSize: 32,
                 letterSpacing: -1,
                 color: _error ? theme.colorScheme.onSurfaceVariant : accent,
-              ).withAccentShadow(context, opacity: 0.28),
+),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -282,13 +287,11 @@ class _StatPill extends StatelessWidget {
         children: [
           Text(label,
             style: theme.textTheme.bodySmall?.copyWith(
-              color: color, fontWeight: FontWeight.w600, fontSize: 10,
-              shadows: accentShadows(context)),
+              color: color, fontWeight: FontWeight.w600, fontSize: 10),
             overflow: TextOverflow.ellipsis),
           const SizedBox(height: 2),
           Text(value,
-            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13)
-                .withAccentShadow(context),
+            style: TextStyle(color: color, fontWeight: FontWeight.w700, fontSize: 13),
             overflow: TextOverflow.ellipsis),
         ],
       ),

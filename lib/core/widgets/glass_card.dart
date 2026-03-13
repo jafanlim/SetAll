@@ -20,22 +20,49 @@ class GlassCard extends StatelessWidget {
   final Color? color;
   final Border? border;
 
-  // Slate-100 card bg / Slate-200 border in light mode (scaffold is Slate-300 so cards pop).
-  static const _slate100 = Color(0xFFF1F5F9);
-  static const _slate200 = Color(0xFFE2E8F0);
+  static const _slate50  = Color(0xFFF8FAFC); // mobile light card bg
+  static const _slate200 = Color(0xFFE2E8F0); // mobile light border / desktop card bg
+  static const _slate300 = Color(0xFFCBD5E1); // desktop light border
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
+    final theme    = Theme.of(context);
+    final isDark   = theme.brightness == Brightness.dark;
+    // Detect desktop by checking if the scaffold is close to Slate-300.
+    // We key off surfaceContainerHighest being overridden in desktopLight.
+    final scaffold = theme.scaffoldBackgroundColor;
+    final isDesktopLight = !isDark &&
+        scaffold.red   < 215 &&
+        scaffold.green < 225 &&
+        scaffold.blue  < 235;
     final radius = borderRadius ?? BorderRadius.circular(16);
 
-    final surfaceColor = color ?? (isDark
-        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
-        : _slate100);
-    final borderColor = isDark
-        ? theme.colorScheme.outline.withValues(alpha: 0.2)
-        : _slate200;
+    Color surfaceColor;
+    Color borderColor;
+    List<BoxShadow>? shadows;
+
+    if (isDark) {
+      surfaceColor = color ?? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
+      borderColor  = theme.colorScheme.outline.withValues(alpha: 0.2);
+      shadows      = null;
+    } else if (isDesktopLight) {
+      // Desktop light: card sits just above the Slate-300 scaffold via shadow,
+      // not a stark white fill. Slate-200 bg + faint shadow = gentle lift.
+      surfaceColor = color ?? _slate200;
+      borderColor  = _slate300.withValues(alpha: 0.6);
+      shadows      = [
+        BoxShadow(
+          color: const Color(0xFF64748B).withValues(alpha: 0.10), // Slate-500 10%
+          blurRadius: 8,
+          offset: const Offset(0, 2),
+        ),
+      ];
+    } else {
+      // Mobile light: Slate-50 bg (near-white) on #F5F5F7 scaffold — subtle.
+      surfaceColor = color ?? _slate50;
+      borderColor  = _slate200;
+      shadows      = null;
+    }
 
     final container = Container(
       padding: padding ?? const EdgeInsets.all(16),
@@ -43,12 +70,12 @@ class GlassCard extends StatelessWidget {
         color: surfaceColor,
         borderRadius: radius,
         border: border ?? Border.all(color: borderColor, width: 1),
+        boxShadow: shadows,
       ),
       child: child,
     );
 
     if (!isDark) {
-      // Skip backdrop blur in light mode — nothing to blur behind a solid card.
       return ClipRRect(borderRadius: radius, child: container);
     }
 
