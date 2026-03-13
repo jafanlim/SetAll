@@ -783,15 +783,17 @@ Widget _lookbookCard({
   required Widget child,
   EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 }) {
-  final theme = Theme.of(context);
+  final theme  = Theme.of(context);
+  final isDark = theme.brightness == Brightness.dark;
+  final cardBg = isDark ? theme.colorScheme.surface : const Color(0xFFF1F5F9); // Slate-100
+  final border = isDark
+      ? theme.colorScheme.outlineVariant.withAlpha(50)
+      : const Color(0xFFE2E8F0); // Slate-200
   return Container(
     decoration: BoxDecoration(
-      color: theme.colorScheme.surface,
+      color: cardBg,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: theme.colorScheme.outlineVariant.withAlpha(50),
-        width: 1,
-      ),
+      border: Border.all(color: border, width: 1),
     ),
     child: Padding(padding: padding, child: child),
   );

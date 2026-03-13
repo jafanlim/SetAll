@@ -164,16 +164,17 @@ class _MasterNetWorthHero extends StatelessWidget {
         ? '—'
         : '${master!.currency} ${master!.netWorth.abs().toStringAsFixed(2)}';
 
+    final isDark = theme.brightness == Brightness.dark;
+    final gradStart = isDark ? theme.colorScheme.surfaceContainerHigh    : const Color(0xFFF1F5F9); // Slate-100
+    final gradEnd   = isDark ? theme.colorScheme.surfaceContainerHighest : const Color(0xFFE2E8F0); // Slate-200
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHigh,
-            theme.colorScheme.surfaceContainerHighest,
-          ],
+          colors: [gradStart, gradEnd],
         ),
         boxShadow: [
           BoxShadow(

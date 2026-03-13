@@ -25,6 +25,10 @@ import '../../features/groups/presentation/screens/group_info_screen.dart';
 import '../../data/models/group_model.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/security_screen.dart';
+import '../../features/settings/presentation/screens/notifications_screen.dart';
+import '../../features/settings/presentation/screens/regional_screen.dart';
+import '../../features/settings/presentation/screens/change_password_screen.dart';
 import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 
 final class AppRouter {
@@ -38,7 +42,11 @@ final class AppRouter {
   static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
-  static const String settings = '/settings';
+  static const String settings            = '/settings';
+  static const String settingsSecurity     = '/settings/security';
+  static const String settingsNotifications = '/settings/notifications';
+  static const String settingsRegional     = '/settings/regional';
+  static const String settingsChangePassword = '/settings/change-password';
   static const String addExpense       = '/add-expense';
   static const String editExpense      = '/group/:id/expense/:expenseId';
   static const String groupPicker      = '/add-expense/choose-group';
@@ -203,6 +211,48 @@ final class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // ── Settings sub-screens (outside shell so they push over everything) ──
+        GoRoute(
+          path: settingsSecurity,
+          name: 'settingsSecurity',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const SecurityScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsNotifications,
+          name: 'settingsNotifications',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const NotificationsScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsRegional,
+          name: 'settingsRegional',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const RegionalScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsChangePassword,
+          name: 'settingsChangePassword',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const ChangePasswordScreen(),
+            ),
+          ),
         ),
 
         // ── Invite friend (modal push, no shell nav bar) ─────────────────
