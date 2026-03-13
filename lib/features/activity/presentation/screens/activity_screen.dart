@@ -811,6 +811,7 @@ Widget _buildEventTile({
   String? amount,
   String? amountSub,
   bool amountPositive = false,
+  bool editMode = false,
   VoidCallback? onTap,
   Widget? leadingOverride,
   List<_ContextAction>? contextActions,
@@ -898,7 +899,7 @@ Widget _buildEventTile({
   }
 
   return Padding(
-    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    padding: EdgeInsets.fromLTRB(editMode ? 52 : 16, 4, 16, 4),
     child: _lookbookCard(context: context, child: tile),
   );
 }
@@ -1169,6 +1170,7 @@ class _ExpenseTile extends ConsumerWidget {
           amount:          amountStr,
           amountSub:       amountSub,
           amountPositive:  e.isIncome || isSettlement,
+          editMode:        true,
         ),
       );
     }
@@ -1457,7 +1459,7 @@ class _ExpenseEditedTile extends StatelessWidget {
     }
 
     Widget card = Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: EdgeInsets.fromLTRB(editMode ? 52 : 16, 4, 16, 4),
       child: _lookbookCard(
         context: context,
         child: InkWell(

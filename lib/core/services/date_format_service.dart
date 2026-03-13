@@ -1,5 +1,4 @@
-import 'dart:io';
-
+import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -67,12 +66,13 @@ class DateFormatService {
 
   String _systemPattern() {
     try {
-      final locale = Platform.localeName;
-      if (locale.startsWith('en_US') || locale.startsWith('en_CA')) {
+      final locale = WidgetsBinding.instance.platformDispatcher.locale;
+      final lang   = locale.languageCode;
+      final country = locale.countryCode ?? '';
+      if (lang == 'en' && (country == 'US' || country == 'CA' || country == 'PH')) {
         return 'MM/dd/yyyy';
       }
-      if (locale.startsWith('ja') || locale.startsWith('zh') ||
-          locale.startsWith('ko')) {
+      if (lang == 'ja' || lang == 'zh' || lang == 'ko') {
         return 'yyyy-MM-dd';
       }
     } catch (_) {}

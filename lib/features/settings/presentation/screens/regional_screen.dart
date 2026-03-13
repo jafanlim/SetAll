@@ -1,8 +1,8 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../../../core/services/date_format_service.dart';
 
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -35,19 +35,21 @@ class _RegionalScreenState extends State<RegionalScreen> {
   String _dateFormat     = _kFmtDMY;
   bool   _loading        = true;
 
-  String get _systemLocale {
+  Locale get _sysLocale {
     try {
-      final locale = Platform.localeName;
-      return locale.isEmpty ? 'en_US' : locale;
+      return WidgetsBinding.instance.platformDispatcher.locale;
     } catch (_) {
-      return 'en_US';
+      return const Locale('en', 'GB');
     }
   }
 
+  String get _systemLocale => _sysLocale.toString();
+
   String get _systemDateFormat {
-    final locale = _systemLocale;
-    if (locale.startsWith('en_US') || locale.startsWith('en_CA')) return _kFmtMDY;
-    if (locale.startsWith('jp') || locale.startsWith('zh') || locale.startsWith('ko')) return _kFmtYMD;
+    final lang    = _sysLocale.languageCode;
+    final country = _sysLocale.countryCode ?? '';
+    if (lang == 'en' && (country == 'US' || country == 'CA' || country == 'PH')) return _kFmtMDY;
+    if (lang == 'ja' || lang == 'zh' || lang == 'ko') return _kFmtYMD;
     return _kFmtDMY;
   }
 
@@ -88,6 +90,7 @@ class _RegionalScreenState extends State<RegionalScreen> {
     final p = await SharedPreferences.getInstance();
     await p.setBool(_kManualFmt,   _manualOverride);
     await p.setString(_kDateFmtKey, _dateFormat);
+    await DateFormatService.instance.reload();
     HapticUtils.success();
   }
 

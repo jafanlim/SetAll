@@ -112,9 +112,9 @@ class SetAllTheme {
 
   /// Light theme — same brand, light surfaces.
   static ThemeData get light {
-    const Color surfaceLight = Color(0xFFF5F5F7);
-    const Color surfaceVariantLight = Color(0xFFE8E8EC);
-    const Color surfaceContainerLight = Color(0xFFDEDEE2);
+    const Color surfaceLight = Color(0xFFCBD5E1);          // Slate-300 scaffold
+    const Color surfaceVariantLight = Color(0xFFE2E8F0);   // Slate-200
+    const Color surfaceContainerLight = Color(0xFFCBD5E1); // Slate-300
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -133,7 +133,7 @@ class SetAllTheme {
       ),
       scaffoldBackgroundColor: surfaceLight,
       appBarTheme: const AppBarTheme(
-        backgroundColor: surfaceLight,
+        backgroundColor: surfaceLight,  // matches scaffold
         foregroundColor: _onGold,
         elevation: 0,
         centerTitle: true,
