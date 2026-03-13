@@ -22,6 +22,7 @@ local-db:
 # 5. Build Flutter web (release, CanvasKit renderer for best fidelity)
 build-web:
 	flutter build web --release --no-tree-shake-icons --web-renderer canvaskit --dart-define=FLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/
+	cp web/app.html build/web/app.html
 
 # 6. Build and deploy to Firebase Hosting (production channel)
 deploy-web: build-web
