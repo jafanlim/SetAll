@@ -13,7 +13,7 @@ import 'app.dart';
 import 'core/services/currency_sync_service.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
-import 'core/services/push_notification_service.dart';
+import 'core/services/notification_service.dart';
 import 'data/local/local_database.dart';
 
 /// SetAll Supabase project (organisation: Shoko12).
@@ -139,7 +139,7 @@ class _AppLoaderState extends State<_AppLoader> {
       // google-services.json not yet added) then request push permission.
       try {
         await Firebase.initializeApp();
-        unawaited(PushNotificationService.instance.init());
+        unawaited(NotificationService.instance.init());
       } catch (_) {
         // Firebase not configured yet — skip silently.
       }

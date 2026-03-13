@@ -12,6 +12,7 @@ import 'core/theme/setall_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/setall_providers.dart';
 import 'core/providers/theme_mode_provider.dart';
+import 'core/services/notification_service.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
@@ -99,6 +100,8 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
           ref.invalidate(recentExpensesProvider);
         }),
       );
+      // Sync FCM token to Supabase on first login so push notifications work.
+      if (isFirstLogin) unawaited(NotificationService.instance.syncToSupabase());
       // Check for updates once per session (first login / initial session).
       if (isFirstLogin) unawaited(_checkForUpdates());
     }
