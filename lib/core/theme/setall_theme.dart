@@ -41,7 +41,34 @@ class SetAllTheme {
     colorScheme: dark.colorScheme.copyWith(surface: const Color(0xFF020617)),
     textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onSurface, displayColor: _onSurface),
   );
-  static ThemeData get desktopLight => light.copyWith(textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onGold, displayColor: _onGold));
+  // Desktop light: Slate-300 scaffold (less blinding on large screens),
+  // cards stay Slate-100 via GlassCard/lookbookCard — clear contrast.
+  static const Color _deskScaffold  = Color(0xFFCBD5E1); // Slate-300
+  static const Color _deskCard      = Color(0xFFF1F5F9); // Slate-100
+  static const Color _deskBorder    = Color(0xFFE2E8F0); // Slate-200
+
+  static ThemeData get desktopLight {
+    final base = light;
+    return base.copyWith(
+      scaffoldBackgroundColor: _deskScaffold,
+      colorScheme: base.colorScheme.copyWith(
+        surface:                  _deskScaffold,
+        surfaceContainerHighest:  _deskCard,
+        outlineVariant:           _deskBorder,
+      ),
+      appBarTheme: base.appBarTheme.copyWith(
+        backgroundColor: _deskScaffold,
+      ),
+      cardTheme: base.cardTheme.copyWith(
+        color: _deskCard,
+      ),
+      textTheme: _compactTextTheme.apply(
+        fontFamily:   _fontFamily,
+        bodyColor:    _onGold,
+        displayColor: _onGold,
+      ),
+    );
+  }
 
   static ThemeData get dark {
     return ThemeData(
