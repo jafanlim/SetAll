@@ -44,6 +44,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   final _searchCtrl = TextEditingController();
   String _search = '';
 
+  // ── Multi-select ──────────────────────────────────────────────────────────
+  bool _editMode = false;
+  final Set<String> _selected = {};
+  bool _deleting = false;
+
   @override
   void initState() {
     super.initState();
@@ -58,6 +63,73 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   void dispose() {
     _searchCtrl.dispose();
     super.dispose();
+  }
+
+  // ── Multi-select helpers ──────────────────────────────────────────────────
+  String? _eventId(ActivityEvent ev) {
+    if (ev is ExpenseEvent)        return ev.expense.id;
+    if (ev is ExpenseDeletedEvent) return 'del-${ev.expenseId}';
+    if (ev is ExpenseEditedEvent)  return 'edit-${ev.expenseId}';
+    return null;
+  }
+
+  void _toggleSelect(String id) {
+    HapticUtils.selection();
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  void _enterEditMode() {
+    HapticUtils.lightTap();
+    setState(() { _editMode = true; _selected.clear(); });
+  }
+
+  void _exitEditMode() {
+    setState(() { _editMode = false; _selected.clear(); });
+  }
+
+  Future<void> _deleteSelected(List<ActivityEvent> feed) async {
+    if (_selected.isEmpty) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete ${_selected.length} item${_selected.length == 1 ? '' : 's'}?'),
+        content: const Text('This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    final repo = ref.read(setAllRepositoryProvider);
+    for (final ev in feed) {
+      final id = _eventId(ev);
+      if (id == null || !_selected.contains(id)) continue;
+      if (ev is ExpenseEvent) {
+        await repo.deleteExpense(ev.expense.id);
+      } else if (ev is ExpenseDeletedEvent) {
+        // already deleted — just skip
+      } else if (ev is ExpenseEditedEvent) {
+        await repo.deleteExpense(ev.expenseId);
+      }
+    }
+    if (!mounted) return;
+    setState(() { _deleting = false; _editMode = false; _selected.clear(); });
+    ref.invalidate(omniActivityProvider);
+    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(walletBalanceProvider);
   }
 
   // ── Search matching ───────────────────────────────────────────────────────
@@ -206,12 +278,15 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           children: [
             // ── Glass control header ────────────────────────────────────
             _ControlHeader(
-              searchCtrl:  _searchCtrl,
-              sort:        _sort,
-              sortLabel:   _sortLabel,
-              groupBy:     _groupBy,
-              filter:      _filter,
-              onCycleSort: _cycleSortOrder,
+              searchCtrl:      _searchCtrl,
+              sort:            _sort,
+              sortLabel:       _sortLabel,
+              groupBy:         _groupBy,
+              filter:          _filter,
+              editMode:        _editMode,
+              selectedCount:   _selected.length,
+              deleting:        _deleting,
+              onCycleSort:     _cycleSortOrder,
               onToggleGroupBy: _toggleGroupBy,
               onFilterChanged: (f) {
                 HapticUtils.selection();
@@ -222,6 +297,26 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                 await ref.read(syncServiceProvider).performFullSync();
                 if (!mounted) return;
                 ref.invalidate(omniActivityProvider);
+              },
+              onEnterEdit: _enterEditMode,
+              onExitEdit:  _exitEditMode,
+              onDeleteSelected: () {
+                final feed = ref.read(omniActivityProvider).valueOrNull ?? [];
+                _deleteSelected(feed);
+              },
+              onSelectAll: () {
+                final feed = _applyFilterSort(
+                    ref.read(omniActivityProvider).valueOrNull ?? []);
+                setState(() {
+                  final allIds = feed.map(_eventId).whereType<String>().toSet();
+                  if (_selected.length == allIds.length) {
+                    _selected.clear();
+                  } else {
+                    _selected
+                      ..clear()
+                      ..addAll(allIds);
+                  }
+                });
               },
             ),
 
@@ -253,13 +348,16 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                           return _SectionHeader(label: item.header!, theme: theme);
                         }
                         final ev = item.event!;
-                        if (ev is ExpenseEvent)        return _ExpenseTile(event: ev);
+                        final evId = _eventId(ev);
+                        final isSelected = evId != null && _selected.contains(evId);
+                        void onSelect() { if (evId != null) _toggleSelect(evId); }
+                        if (ev is ExpenseEvent)        return _ExpenseTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
                         if (ev is GroupCreatedEvent)   return _GroupCreatedTile(event: ev);
                         if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
                         if (ev is MemberAddedEvent)    return _MemberAddedTile(event: ev);
                         if (ev is SettlementEvent)     return _SettlementTile(event: ev);
                         if (ev is ExpenseDeletedEvent) return _ExpenseDeletedTile(event: ev);
-                        if (ev is ExpenseEditedEvent)  return _ExpenseEditedTile(event: ev);
+                        if (ev is ExpenseEditedEvent)  return _ExpenseEditedTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
                         return const SizedBox.shrink();
                       },
                     );
@@ -294,10 +392,17 @@ class _ControlHeader extends StatelessWidget {
     required this.sortLabel,
     required this.groupBy,
     required this.filter,
+    required this.editMode,
+    required this.selectedCount,
+    required this.deleting,
     required this.onCycleSort,
     required this.onToggleGroupBy,
     required this.onFilterChanged,
     required this.onRefresh,
+    required this.onEnterEdit,
+    required this.onExitEdit,
+    required this.onDeleteSelected,
+    required this.onSelectAll,
   });
 
   final TextEditingController searchCtrl;
@@ -305,10 +410,17 @@ class _ControlHeader extends StatelessWidget {
   final String         sortLabel;
   final _GroupBy       groupBy;
   final _ActivityFilter filter;
+  final bool           editMode;
+  final int            selectedCount;
+  final bool           deleting;
   final VoidCallback   onCycleSort;
   final VoidCallback   onToggleGroupBy;
   final ValueChanged<_ActivityFilter> onFilterChanged;
   final VoidCallback   onRefresh;
+  final VoidCallback   onEnterEdit;
+  final VoidCallback   onExitEdit;
+  final VoidCallback   onDeleteSelected;
+  final VoidCallback   onSelectAll;
 
   @override
   Widget build(BuildContext context) {
@@ -335,20 +447,60 @@ class _ControlHeader extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(20, 12, 8, 0),
                 child: Row(
                   children: [
-                    const Text(
-                      'Activity',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 22,
-                        letterSpacing: -0.4,
+                    if (editMode) ...[  
+                      GestureDetector(
+                        onTap: onSelectAll,
+                        child: const Text(
+                          'Select All',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            color: _teal,
+                          ),
+                        ),
                       ),
-                    ),
+                    ] else
+                      const Text(
+                        'Activity',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
                     const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.refresh_rounded, size: 20),
-                      tooltip: 'Refresh',
-                      onPressed: onRefresh,
-                    ),
+                    if (editMode) ...[  
+                      if (selectedCount > 0)
+                        deleting
+                            ? const SizedBox(
+                                width: 20, height: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.redAccent),
+                              )
+                            : TextButton.icon(
+                                onPressed: onDeleteSelected,
+                                icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+                                label: Text(
+                                  'Delete ($selectedCount)',
+                                  style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w700),
+                                ),
+                                style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
+                              ),
+                      TextButton(
+                        onPressed: onExitEdit,
+                        child: const Text('Done', style: TextStyle(color: _teal, fontWeight: FontWeight.w700, fontSize: 14)),
+                      ),
+                    ] else ...[  
+                      IconButton(
+                        icon: const Icon(Icons.checklist_rounded, size: 20),
+                        tooltip: 'Select',
+                        onPressed: onEnterEdit,
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh_rounded, size: 20),
+                        tooltip: 'Refresh',
+                        onPressed: onRefresh,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -846,11 +998,69 @@ String _fmtTime(String iso) {
 }
 
 // ---------------------------------------------------------------------------
+// Selectable tile wrapper — checkbox overlay for multi-select mode
+// ---------------------------------------------------------------------------
+class _SelectableTileWrapper extends StatelessWidget {
+  const _SelectableTileWrapper({
+    required this.selected,
+    required this.onSelect,
+    required this.accent,
+    required this.child,
+  });
+  final bool selected;
+  final VoidCallback onSelect;
+  final Color accent;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onSelect,
+      child: Stack(
+        children: [
+          AnimatedOpacity(
+            duration: const Duration(milliseconds: 150),
+            opacity: selected ? 0.85 : 1.0,
+            child: child,
+          ),
+          Positioned(
+            top: 10, right: 22,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: 22, height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: selected ? accent : Colors.transparent,
+                border: Border.all(
+                  color: selected ? accent : const Color(0xFF64748B),
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, size: 13, color: Colors.black)
+                  : null,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Expense event tile (with currency fix + context menu + avatar)
 // ---------------------------------------------------------------------------
 class _ExpenseTile extends ConsumerWidget {
-  const _ExpenseTile({required this.event});
+  const _ExpenseTile({
+    required this.event,
+    this.editMode = false,
+    this.selected = false,
+    this.onSelect,
+  });
   final ExpenseEvent event;
+  final bool editMode;
+  final bool selected;
+  final VoidCallback? onSelect;
 
   static const Map<String, IconData> _categoryIcons = {
     'Food & drink':      Icons.restaurant_outlined,
@@ -939,6 +1149,26 @@ class _ExpenseTile extends ConsumerWidget {
       ),
     ];
 
+    if (editMode) {
+      return _SelectableTileWrapper(
+        selected: selected,
+        onSelect: onSelect ?? () {},
+        accent: accent,
+        child: _buildEventTile(
+          context:         context,
+          theme:           theme,
+          accent:          accent,
+          icon:            icon,
+          leadingOverride: leadingOverride,
+          title:           title,
+          badge:           badge,
+          timestamp:       e.createdAt,
+          amount:          amountStr,
+          amountSub:       amountSub,
+          amountPositive:  e.isIncome || isSettlement,
+        ),
+      );
+    }
     return _buildEventTile(
       context:         context,
       theme:           theme,
@@ -1189,8 +1419,16 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
 // Expense edited event tile — deep-links to edit screen
 // ---------------------------------------------------------------------------
 class _ExpenseEditedTile extends StatelessWidget {
-  const _ExpenseEditedTile({required this.event});
+  const _ExpenseEditedTile({
+    required this.event,
+    this.editMode = false,
+    this.selected = false,
+    this.onSelect,
+  });
   final ExpenseEditedEvent event;
+  final bool editMode;
+  final bool selected;
+  final VoidCallback? onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -1215,13 +1453,13 @@ class _ExpenseEditedTile extends StatelessWidget {
       changes.add('${ev.currency} ${formatAmount(ev.oldAmount)} → ${ev.currency} ${formatAmount(ev.newAmount)}');
     }
 
-    return Padding(
+    Widget card = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: _lookbookCard(
         context: context,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
-          onTap: () {
+          onTap: editMode ? onSelect : () {
             HapticUtils.lightTap();
             if (ev.groupId != null) {
               context.push('/group/${ev.groupId}',
@@ -1277,6 +1515,15 @@ class _ExpenseEditedTile extends StatelessWidget {
         ),
       ),
     );
+    if (editMode) {
+      return _SelectableTileWrapper(
+        selected: selected,
+        onSelect: onSelect ?? () {},
+        accent: _indigo,
+        child: card,
+      );
+    }
+    return card;
   }
 }
 
