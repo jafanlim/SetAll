@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart';
@@ -6,9 +7,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
+import 'package:firebase_core/firebase_core.dart';
+
 import 'app.dart';
 import 'core/services/currency_sync_service.dart';
+import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
+import 'core/services/push_notification_service.dart';
 import 'data/local/local_database.dart';
 
 /// SetAll Supabase project (organisation: Shoko12).
@@ -127,6 +132,18 @@ class _AppLoaderState extends State<_AppLoader> {
           if (hasSupabase) _initSupabase() else Future<void>.value(),
         ]);
       }
+      // Load date format preference before UI renders.
+      await DateFormatService.instance.reload();
+
+      // Initialise Firebase (graceful no-op if GoogleService-Info.plist /
+      // google-services.json not yet added) then request push permission.
+      try {
+        await Firebase.initializeApp();
+        unawaited(PushNotificationService.instance.init());
+      } catch (_) {
+        // Firebase not configured yet — skip silently.
+      }
+
       if (mounted) setState(() => _ready = true);
 
       // Sync exchange rates in background after UI is ready (non-blocking).

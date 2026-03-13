@@ -9,6 +9,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/navigation_utils.dart';
+import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
@@ -309,18 +310,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ),
               ]
             : [
-                PopupMenuButton<_GroupSort>(
-                  icon: const Icon(Icons.sort_rounded),
-                  tooltip: 'Sort groups',
-                  initialValue: _groupSort,
-                  onSelected: (s) { HapticUtils.selection(); setState(() => _groupSort = s); },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: _GroupSort.nameAZ, child: Text('Name A→Z')),
-                    PopupMenuItem(value: _GroupSort.nameZA, child: Text('Name Z→A')),
-                  ],
-                ),
-                PopupMenuButton<_ActivitySort>(
-                  icon: const Icon(Icons.swap_vert_rounded),
+                AppTopPopupButton<_ActivitySort>(
+                  icon: Icons.swap_vert_rounded,
                   tooltip: 'Sort activity',
                   initialValue: _actSort,
                   onSelected: (s) { HapticUtils.selection(); setState(() => _actSort = s); },
@@ -331,8 +322,20 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     PopupMenuItem(value: _ActivitySort.smallest, child: Text('Smallest first')),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                const SizedBox(width: 4),
+                AppTopPopupButton<_GroupSort>(
+                  icon: Icons.sort_rounded,
+                  tooltip: 'Sort groups',
+                  initialValue: _groupSort,
+                  onSelected: (s) { HapticUtils.selection(); setState(() => _groupSort = s); },
+                  itemBuilder: (_) => const [
+                    PopupMenuItem(value: _GroupSort.nameAZ, child: Text('Name A→Z')),
+                    PopupMenuItem(value: _GroupSort.nameZA, child: Text('Name Z→A')),
+                  ],
+                ),
+                const SizedBox(width: 4),
+                AppTopButton(
+                  icon: Icons.refresh_rounded,
                   tooltip: 'Refresh',
                   onPressed: () async {
                     HapticUtils.lightTap();
@@ -344,6 +347,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     ref.invalidate(omniActivityProvider);
                   },
                 ),
+                const SizedBox(width: 4),
                 TextButton(
                   onPressed: _toggleEditMode,
                   child: const Text('Edit'),

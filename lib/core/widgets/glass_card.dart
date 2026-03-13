@@ -20,28 +20,43 @@ class GlassCard extends StatelessWidget {
   final Color? color;
   final Border? border;
 
+  // Slate-100 card bg / Slate-200 border in light mode (scaffold is Slate-300 so cards pop).
+  static const _slate100 = Color(0xFFF1F5F9);
+  static const _slate200 = Color(0xFFE2E8F0);
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final radius = borderRadius ?? BorderRadius.circular(16);
-    final surfaceColor = color ?? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35);
+
+    final surfaceColor = color ?? (isDark
+        ? theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.35)
+        : _slate100);
+    final borderColor = isDark
+        ? theme.colorScheme.outline.withValues(alpha: 0.2)
+        : _slate200;
+
+    final container = Container(
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        borderRadius: radius,
+        border: border ?? Border.all(color: borderColor, width: 1),
+      ),
+      child: child,
+    );
+
+    if (!isDark) {
+      // Skip backdrop blur in light mode — nothing to blur behind a solid card.
+      return ClipRRect(borderRadius: radius, child: container);
+    }
 
     return ClipRRect(
       borderRadius: radius,
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 15.0, sigmaY: 15.0),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: surfaceColor,
-            borderRadius: radius,
-            border: border ?? Border.all(
-              color: theme.colorScheme.outline.withValues(alpha: 0.2),
-              width: 1,
-            ),
-          ),
-          child: child,
-        ),
+        child: container,
       ),
     );
   }
