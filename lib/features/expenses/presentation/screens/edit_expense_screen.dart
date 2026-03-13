@@ -7,9 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/services/date_format_service.dart';
 import '../../../../core/utils/attachment_processor.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/input_sanitizer.dart';
@@ -546,7 +545,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     }
 
     final userCatsAsync = ref.watch(userCategoriesProvider);
-    final dateLabel = DateFormat('EEE, d MMM yyyy  HH:mm').format(_entryDate);
+    final dateLabel = DateFormatService.instance.formatWithTime(_entryDate);
     final isToday = () {
       final now = DateTime.now();
       return _entryDate.year == now.year &&

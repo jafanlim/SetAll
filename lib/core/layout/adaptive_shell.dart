@@ -60,6 +60,14 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   void _onTap(int index) {
     HapticUtils.selection();
     ref.read(selectedGroupProvider.notifier).clear();
+    // Pop any Navigator-pushed overlays (e.g. settings sub-screens on iOS)
+    // before GoRouter navigates so they don't stay on top of the new tab.
+    final nav = Navigator.maybeOf(context);
+    if (nav != null) {
+      while (nav.canPop()) {
+        nav.pop();
+      }
+    }
     switch (index) {
       case 0:
         setState(() => _selectedIndex = 0);

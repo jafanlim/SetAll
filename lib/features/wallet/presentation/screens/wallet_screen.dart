@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/expense_model.dart';
 
@@ -228,9 +229,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
               ]
             : [
-                // Sort menu
-                PopupMenuButton<_WalletSort>(
-                  icon: const Icon(Icons.sort_rounded),
+                AppTopPopupButton<_WalletSort>(
+                  icon: Icons.sort_rounded,
                   tooltip: 'Sort',
                   initialValue: _sort,
                   onSelected: (s) { HapticUtils.selection(); setState(() => _sort = s); },
@@ -241,8 +241,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     PopupMenuItem(value: _WalletSort.smallest, child: Text('Smallest first')),
                   ],
                 ),
-                IconButton(
-                  icon: const Icon(Icons.refresh_rounded),
+                const SizedBox(width: 4),
+                AppTopButton(
+                  icon: Icons.refresh_rounded,
                   tooltip: 'Refresh',
                   onPressed: () async {
                     HapticUtils.lightTap();
@@ -254,6 +255,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     ref.invalidate(balanceSummaryProvider);
                   },
                 ),
+                const SizedBox(width: 4),
                 TextButton(onPressed: _toggleEditMode, child: const Text('Edit')),
               ],
       ),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 
 // ---------------------------------------------------------------------------
@@ -58,15 +59,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
         actions: [
-          IconButton(
+          AppTopButton(
             tooltip: 'Add friend',
-            icon: const Icon(Icons.person_add_outlined),
+            icon: Icons.person_add_outlined,
             onPressed: () {
               HapticUtils.lightTap();
               context.push(AppRouter.inviteFriend);
             },
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 8),
         ],
       ),
       body: RefreshIndicator(
