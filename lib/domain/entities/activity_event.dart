@@ -125,6 +125,26 @@ class ExpenseEditedEvent extends ActivityEvent {
   final String  editedByName;
 }
 
+/// A member was added to a group.
+class MemberAddedEvent extends ActivityEvent {
+  const MemberAddedEvent({
+    required super.timestamp,
+    required this.groupId,
+    required this.groupName,
+    required this.addedByName,
+    required this.addedByYou,
+    required this.addedUserName,
+    required this.addedYou,
+  });
+
+  final String groupId;
+  final String groupName;
+  final String addedByName;
+  final bool addedByYou;
+  final String addedUserName;
+  final bool addedYou;
+}
+
 /// A settlement was recorded in a group.
 class SettlementEvent extends ActivityEvent {
   const SettlementEvent({
