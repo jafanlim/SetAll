@@ -35,9 +35,13 @@ jobs:
       # ── macOS Build & Package ──────────────────────────────────────────────
       - name: Build macOS
         if: matrix.os == 'macos-latest'
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          CODE_SIGN_IDENTITY: ""
         run: |
           flutter config --enable-macos-desktop
-          flutter build macos --release --no-codesign --no-tree-shake-icons
+          flutter build macos --release --no-tree-shake-icons
 
       - name: Ad-hoc sign & package macOS DMG
         if: matrix.os == 'macos-latest'
