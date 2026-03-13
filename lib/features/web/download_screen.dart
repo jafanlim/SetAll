@@ -100,23 +100,31 @@ class _DownloadScreenState extends State<DownloadScreen> {
     if (!mounted) return;
     setState(() {
       _release = _ReleaseInfo(
-        tag: 'latest',
+        tag: 'releases',
         assets: [
           _DownloadAsset(
             platform: _Platform.macOS,
             icon: 'macos',
-            url: 'https://github.com/$_kRepo/releases/latest/download/SetAll-macOS.dmg',
-            filename: 'SetAll-macOS.dmg',
+            url: 'https://github.com/$_kRepo/releases',
+            filename: 'View on GitHub Releases',
             sizeMb: '—',
           ),
           _DownloadAsset(
             platform: _Platform.windows,
             icon: 'windows',
-            url: 'https://github.com/$_kRepo/releases/latest/download/SetAll-Windows.exe',
-            filename: 'SetAll-Windows.exe',
+            url: 'https://github.com/$_kRepo/releases',
+            filename: 'View on GitHub Releases',
+            sizeMb: '—',
+          ),
+          _DownloadAsset(
+            platform: _Platform.android,
+            icon: 'android',
+            url: 'https://github.com/$_kRepo/releases',
+            filename: 'View on GitHub Releases',
             sizeMb: '—',
           ),
         ],
+        notes: 'No releases published yet. Check back soon or follow the GitHub repository for updates.',
       );
       _loading = false;
     });
