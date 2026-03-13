@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -387,16 +389,13 @@ class _GlowBlob extends StatelessWidget {
         color: color,
       ),
       child: BackdropFilter(
-        filter: const _BlurFilter(),
+        filter: ImageFilter.blur(sigmaX: 0, sigmaY: 0),
         child: const SizedBox.shrink(),
       ),
     );
   }
 }
 
-class _BlurFilter extends ColorFilter {
-  const _BlurFilter() : super.mode(Colors.transparent, BlendMode.dst);
-}
 
 class _MessageBanner extends StatelessWidget {
   const _MessageBanner({required this.message, required this.isSuccess});
