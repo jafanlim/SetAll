@@ -168,10 +168,10 @@ class _MasterNetWorthHero extends StatelessWidget {
     final scaffold   = theme.scaffoldBackgroundColor;
     final isDesktop  = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
     final gradStart  = isDark    ? theme.colorScheme.surfaceContainerHigh
-                     : isDesktop ? const Color(0xFFE2E8F0)  // Slate-200
+                     : isDesktop ? const Color(0xFFFFFFFF)  // white — matches GlassCard
                      :             const Color(0xFFF8FAFC); // Slate-50 (mobile)
     final gradEnd    = isDark    ? theme.colorScheme.surfaceContainerHighest
-                     : isDesktop ? const Color(0xFFCBD5E1)  // Slate-300 (blends into scaffold)
+                     : isDesktop ? const Color(0xFFF1F5F9)  // Slate-100 subtle gradient end
                      :             const Color(0xFFE2E8F0); // Slate-200 (mobile)
 
     return Container(

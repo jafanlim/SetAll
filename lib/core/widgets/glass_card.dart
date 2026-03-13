@@ -20,16 +20,15 @@ class GlassCard extends StatelessWidget {
   final Color? color;
   final Border? border;
 
+  static const _white    = Color(0xFFFFFFFF);
   static const _slate50  = Color(0xFFF8FAFC); // mobile light card bg
-  static const _slate200 = Color(0xFFE2E8F0); // mobile light border / desktop card bg
-  static const _slate300 = Color(0xFFCBD5E1); // desktop light border
+  static const _slate200 = Color(0xFFE2E8F0); // border
 
   @override
   Widget build(BuildContext context) {
     final theme    = Theme.of(context);
     final isDark   = theme.brightness == Brightness.dark;
-    // Detect desktop by checking if the scaffold is close to Slate-300.
-    // We key off surfaceContainerHighest being overridden in desktopLight.
+    // Detect desktop light: scaffold overridden to Slate-300 in desktopLight.
     final scaffold = theme.scaffoldBackgroundColor;
     final isDesktopLight = !isDark &&
         scaffold.red   < 215 &&
@@ -46,19 +45,24 @@ class GlassCard extends StatelessWidget {
       borderColor  = theme.colorScheme.outline.withValues(alpha: 0.2);
       shadows      = null;
     } else if (isDesktopLight) {
-      // Desktop light: card sits just above the Slate-300 scaffold via shadow,
-      // not a stark white fill. Slate-200 bg + faint shadow = gentle lift.
-      surfaceColor = color ?? _slate200;
-      borderColor  = _slate300.withValues(alpha: 0.6);
+      // White card on grey scaffold — macOS-native look, lifted by shadow.
+      surfaceColor = color ?? _white;
+      borderColor  = _slate200.withValues(alpha: 0.5);
       shadows      = [
         BoxShadow(
-          color: const Color(0xFF64748B).withValues(alpha: 0.10), // Slate-500 10%
-          blurRadius: 8,
+          color: const Color(0xFF475569).withValues(alpha: 0.08), // Slate-600 8%
+          blurRadius: 12,
+          spreadRadius: 0,
           offset: const Offset(0, 2),
+        ),
+        BoxShadow(
+          color: const Color(0xFF475569).withValues(alpha: 0.04),
+          blurRadius: 4,
+          offset: const Offset(0, 1),
         ),
       ];
     } else {
-      // Mobile light: Slate-50 bg (near-white) on #F5F5F7 scaffold — subtle.
+      // Mobile light: Slate-50 bg on #F5F5F7 scaffold — subtle lift.
       surfaceColor = color ?? _slate50;
       borderColor  = _slate200;
       shadows      = null;
