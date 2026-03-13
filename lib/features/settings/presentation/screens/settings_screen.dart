@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -12,14 +13,12 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../app.dart' show updateResultProvider;
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
+import '../../../../core/router/app_router.dart';
 import '../../../../core/services/update_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/local/local_database.dart';
 import '../../../../data/models/profile_model.dart';
-import 'notifications_screen.dart';
-import 'regional_screen.dart';
-import 'security_screen.dart';
 import 'splitwise_import_screen.dart';
 
 const _teal = Color(0xFF00D9B0);
@@ -60,6 +59,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String? _selectedCurrency;
   bool _currencySaving = false;
   bool _currencyUserSelected = false; // true once user explicitly picks a value
+
+  // ── Developer tools ──────────────────────────────────────────────────────
+  bool _sendingTestEmail = false;
+  String? _testEmailResult;
 
   @override
   void initState() {
@@ -596,9 +599,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   iconColor: _teal,
                   label: 'Security',
                   subtitle: 'Biometrics, PIN, fallback auth',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const SecurityScreen()),
-                  ),
+                  onTap: () => context.push(AppRouter.settingsSecurity),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
@@ -606,9 +607,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   iconColor: _teal,
                   label: 'Notifications',
                   subtitle: 'Push and email alerts',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const NotificationsScreen()),
-                  ),
+                  onTap: () => context.push(AppRouter.settingsNotifications),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
@@ -616,9 +615,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   iconColor: _teal,
                   label: 'Regional Settings',
                   subtitle: 'Date & time format',
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const RegionalScreen()),
-                  ),
+                  onTap: () => context.push(AppRouter.settingsRegional),
                 ),
               ],
             ),
@@ -960,6 +957,92 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             ],
                           ),
                         ),
+
+                        if (kDebugMode) ...[
+                          const SizedBox(height: 24),
+
+                          // ── Developer ───────────────────────────────────
+                          _SectionHeader(label: 'Developer'),
+                          const SizedBox(height: 8),
+                          GlassCard(
+                            padding: EdgeInsets.zero,
+                            child: Column(
+                              children: [
+                                ListTile(
+                                  leading: _sendingTestEmail
+                                      ? const SizedBox(
+                                          width: 20,
+                                          height: 20,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                            color: _teal,
+                                          ),
+                                        )
+                                      : const Icon(Icons.mail_outline_rounded,
+                                          color: _teal),
+                                  title: const Text(
+                                    'Send Test Email',
+                                    style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w600),
+                                  ),
+                                  subtitle: _testEmailResult != null
+                                      ? Text(
+                                          _testEmailResult!,
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        )
+                                      : Text(
+                                          'Sends a test email via noreply@setall.app',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: theme.colorScheme
+                                                .onSurfaceVariant,
+                                          ),
+                                        ),
+                                  onTap: _sendingTestEmail
+                                      ? null
+                                      : () async {
+                                          HapticUtils.lightTap();
+                                          final email = _currentEmail;
+                                          if (email == null || email.isEmpty) {
+                                            setState(() => _testEmailResult =
+                                                'No email address on account');
+                                            return;
+                                          }
+                                          setState(() {
+                                            _sendingTestEmail = true;
+                                            _testEmailResult = null;
+                                          });
+                                          try {
+                                            await Supabase.instance.client.functions
+                                                .invoke(
+                                              'send-test-email',
+                                              body: {'to': email},
+                                            );
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _sendingTestEmail = false;
+                                              _testEmailResult =
+                                                  'Sent to $email ✓';
+                                            });
+                                          } catch (e) {
+                                            if (!mounted) return;
+                                            setState(() {
+                                              _sendingTestEmail = false;
+                                              _testEmailResult =
+                                                  'Failed: ${e.toString().replaceFirst('Exception: ', '')}';
+                                            });
+                                          }
+                                        },
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
 
                         const SizedBox(height: 32),
                       ],

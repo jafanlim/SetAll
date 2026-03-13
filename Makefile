@@ -1,6 +1,6 @@
 # Makefile for SetAll AI Workflow
 
-.PHONY: bundle prompt test local-db
+.PHONY: bundle prompt test local-db build-web deploy-web deploy-preview
 
 # 1. Bundles the current state of critical files
 bundle:
@@ -18,3 +18,17 @@ test:
 # 4. Start local Supabase sandbox
 local-db:
 	supabase start
+
+# 5. Build Flutter web (release, CanvasKit renderer for best fidelity)
+build-web:
+	flutter build web --release --no-tree-shake-icons --web-renderer canvaskit --dart-define=FLUTTER_WEB_CANVASKIT_URL=https://www.gstatic.com/flutter-canvaskit/
+	cp web/app.html build/web/app.html
+
+# 6. Build and deploy to Firebase Hosting (production channel)
+deploy-web: build-web
+	firebase deploy --only hosting
+
+# 7. Deploy to a preview channel (non-destructive — creates a temporary URL)
+#    Usage: make deploy-preview channel=my-feature
+deploy-preview: build-web
+	firebase hosting:channel:deploy $(or $(channel),preview) --expires 7d

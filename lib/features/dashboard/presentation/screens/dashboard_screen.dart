@@ -164,16 +164,23 @@ class _MasterNetWorthHero extends StatelessWidget {
         ? '—'
         : '${master!.currency} ${master!.netWorth.abs().toStringAsFixed(2)}';
 
+    final isDark    = theme.brightness == Brightness.dark;
+    final scaffold   = theme.scaffoldBackgroundColor;
+    final isDesktop  = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+    final gradStart  = isDark    ? theme.colorScheme.surfaceContainerHigh
+                     : isDesktop ? const Color(0xFFE2E8F0)  // Slate-200
+                     :             const Color(0xFFF8FAFC); // Slate-50 (mobile)
+    final gradEnd    = isDark    ? theme.colorScheme.surfaceContainerHighest
+                     : isDesktop ? const Color(0xFFCBD5E1)  // Slate-300 (blends into scaffold)
+                     :             const Color(0xFFE2E8F0); // Slate-200 (mobile)
+
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            theme.colorScheme.surfaceContainerHigh,
-            theme.colorScheme.surfaceContainerHighest,
-          ],
+          colors: [gradStart, gradEnd],
         ),
         boxShadow: [
           BoxShadow(
@@ -216,7 +223,7 @@ class _MasterNetWorthHero extends StatelessWidget {
                 fontSize: 32,
                 letterSpacing: -1,
                 color: _error ? theme.colorScheme.onSurfaceVariant : accent,
-              ),
+),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

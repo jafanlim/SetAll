@@ -631,7 +631,7 @@ class WalletHero extends StatelessWidget {
                 color: _error
                     ? theme.colorScheme.onSurfaceVariant
                     : (walletIsPos ? _purple : _orange),
-              ),
+),
               maxLines: 1, overflow: TextOverflow.ellipsis,
             ),
           const SizedBox(height: 12),

@@ -15,17 +15,36 @@
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
-	<string>setall</string>
+	<string>SetAll</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.jafa.setall</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
+	<key>FlutterDeepLinkingEnabled</key>
+	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>SetAll uses your camera to photograph receipts and bills for wallet entries.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Use Face ID to unlock SetAll quickly and securely.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>SetAll uses your photo library to attach receipts and images to wallet entries.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -66,24 +85,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>FlutterDeepLinkingEnabled</key>
-	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.jafa.setall</string>
-			</array>
-		</dict>
-	</array>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Use Face ID to unlock SetAll quickly and securely.</string>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>SetAll uses your photo library to attach receipts and images to wallet entries.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>SetAll uses your camera to photograph receipts and bills for wallet entries.</string>
 </dict>
 </plist>

@@ -4,32 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SetAll | Premium Multi-Currency Expense Sharing</title>
-    <meta name="description" content="The premium expense sharing app built for global friends. Real-time multi-currency conversion, smart debt simplification, and a beautiful dark UI.">
-
-    <!-- OpenGraph / Social sharing -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="https://setall.app/">
-    <meta property="og:title" content="SetAll | Premium Multi-Currency Expense Sharing">
-    <meta property="og:description" content="Stop doing math. Settle everything. Real-time multi-currency conversion, smart debt simplification, and a beautiful dark UI.">
-    <meta property="og:image" content="https://setall.app/icons/Icon-512.png">
-    <meta property="og:image:width" content="512">
-    <meta property="og:image:height" content="512">
-    <meta property="og:site_name" content="SetAll">
-
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="SetAll | Premium Multi-Currency Expense Sharing">
-    <meta name="twitter:description" content="Stop doing math. Settle everything. Real-time multi-currency, smart debt simplification.">
-    <meta name="twitter:image" content="https://setall.app/icons/Icon-512.png">
-
-    <!-- Favicon: Balance Scale emoji -->
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
-    <link rel="apple-touch-icon" href="icons/Icon-192.png">
-
-    <!-- PWA manifest -->
-    <link rel="manifest" href="manifest.json">
-
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -41,6 +16,7 @@
                             dark: '#0F172A',
                             teal: '#14B8A6',
                             orange: '#F97316',
+                            glass: 'rgba(255, 255, 255, 0.05)'
                         }
                     }
                 }
@@ -48,6 +24,7 @@
         }
     </script>
     <!-- Lucide Icons -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.260.0/lucide.min.css" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         .glass-card {
@@ -74,27 +51,21 @@
     <!-- Navigation -->
     <nav class="relative z-10 w-full px-6 py-6 flex justify-between items-center max-w-7xl mx-auto">
         <div class="flex items-center gap-2">
-            <span class="text-2xl">⚖️</span>
+            <i data-lucide="wallet" class="text-brand-teal w-8 h-8"></i>
             <span class="text-2xl font-bold tracking-tight">SetAll</span>
         </div>
         <div class="hidden md:flex gap-8 text-sm font-medium text-gray-300">
             <a href="#features" class="hover:text-white transition-colors">Features</a>
             <a href="#how-it-works" class="hover:text-white transition-colors">How it works</a>
         </div>
-        <div class="flex items-center gap-3">
-            <a href="/login" class="hidden md:inline-flex items-center gap-2 text-sm font-medium text-gray-300 hover:text-white transition-colors px-4 py-2 rounded-full border border-slate-700 hover:border-slate-500">
-                <i data-lucide="monitor" class="w-4 h-4"></i>
-                Open WebApp
-            </a>
-            <a href="/download" class="bg-brand-teal hover:bg-teal-400 text-brand-dark px-5 py-2.5 rounded-full font-semibold transition-all shadow-[0_0_15px_rgba(20,184,166,0.4)]">
-                Download Now
-            </a>
-        </div>
+        <a href="#download" class="bg-brand-teal hover:bg-teal-400 text-brand-dark px-5 py-2.5 rounded-full font-semibold transition-all shadow-[0_0_15px_rgba(20,184,166,0.4)]">
+            Download Now
+        </a>
     </nav>
 
     <!-- Hero Section -->
     <main class="relative z-10 flex-grow flex flex-col items-center justify-center px-4 pt-20 pb-32 max-w-7xl mx-auto text-center">
-
+        
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full glass-card text-xs font-medium text-brand-teal mb-8">
             <span class="relative flex h-2 w-2">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75"></span>
@@ -102,19 +73,20 @@
             </span>
             v1.0 Now Available
         </div>
-
+        
         <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 max-w-4xl leading-tight">
             Stop doing math.<br />
             <span class="text-gradient">Settle everything.</span>
         </h1>
-
+        
         <p class="text-lg md:text-xl text-gray-400 max-w-2xl mb-12 leading-relaxed">
             The premium expense sharing app built for global friends. Real-time multi-currency conversion, smart debt simplification, and a beautiful dark mode UI.
         </p>
 
-        <!-- Download CTA -->
-        <div class="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-2xl mx-auto">
-            <a href="/download"
+        <!-- Dynamic Download Buttons -->
+        <div id="download" class="flex flex-col sm:flex-row gap-4 justify-center items-center w-full max-w-2xl mx-auto">
+            <!-- macOS Button -->
+            <a href="https://github.com/jafanlim/SetAll/releases/latest/download/SetAll-macOS.dmg" 
                class="group flex items-center gap-3 bg-white text-brand-dark px-8 py-4 rounded-xl font-bold text-lg hover:bg-gray-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:-translate-y-1 w-full sm:w-auto justify-center">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91 1.65.17 2.79.81 3.49 1.83-3.06 1.8-2.56 5.89.37 7.08-.75 1.89-1.75 3.51-3.07 3.84zM12.04 6.64c-.13-1.42.53-2.82 1.48-3.64.95-.82 2.37-1.32 3.65-1.18.23 1.54-.53 2.94-1.44 3.76-.91.82-2.38 1.28-3.69 1.06z"/>
@@ -122,7 +94,8 @@
                 <span>Download for macOS</span>
             </a>
 
-            <a href="/download"
+            <!-- Windows Button -->
+            <a href="https://github.com/jafanlim/SetAll/releases/latest/download/SetAll-Windows.exe" 
                class="group flex items-center gap-3 bg-brand-teal text-brand-dark px-8 py-4 rounded-xl font-bold text-lg hover:bg-teal-400 transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:-translate-y-1 w-full sm:w-auto justify-center">
                 <svg class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
@@ -130,11 +103,11 @@
                 <span>Download for Windows</span>
             </a>
         </div>
-        <p class="text-sm text-gray-500 mt-6">See all platforms &amp; release notes · <a href="/download" class="text-brand-teal hover:underline">Download hub →</a></p>
-        <p class="text-sm text-gray-500 mt-2">Prefer the browser? <a href="/login" class="text-brand-teal hover:underline">Open WebApp →</a></p>
+        <p class="text-sm text-gray-500 mt-6">Always downloads the latest version via GitHub Actions</p>
 
         <!-- Feature Cards -->
         <div class="mt-24 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl w-full text-left" id="features">
+            <!-- Feature 1 -->
             <div class="glass-card p-8 rounded-2xl">
                 <div class="bg-slate-800 w-12 h-12 rounded-xl flex items-center justify-center mb-6">
                     <i data-lucide="globe" class="text-brand-teal"></i>
@@ -142,7 +115,8 @@
                 <h3 class="text-xl font-bold mb-3">True Multi-Currency</h3>
                 <p class="text-gray-400 text-sm leading-relaxed">Add expenses in USD, EUR, GEL, or TRY. SetAll normalizes everything to your base currency automatically using live market rates.</p>
             </div>
-
+            
+            <!-- Feature 2 -->
             <div class="glass-card p-8 rounded-2xl relative overflow-hidden">
                 <div class="absolute top-0 right-0 w-32 h-32 bg-brand-orange/10 blur-[50px]"></div>
                 <div class="bg-slate-800 w-12 h-12 rounded-xl flex items-center justify-center mb-6 relative z-10">
@@ -152,6 +126,7 @@
                 <p class="text-gray-400 text-sm leading-relaxed relative z-10">Our Greedy Flow engine minimizes transactions. If A owes B, and B owes C, SetAll tells A to just pay C. Less transfers, fewer fees.</p>
             </div>
 
+            <!-- Feature 3 -->
             <div class="glass-card p-8 rounded-2xl">
                 <div class="bg-slate-800 w-12 h-12 rounded-xl flex items-center justify-center mb-6">
                     <i data-lucide="dices" class="text-indigo-400"></i>
@@ -160,50 +135,20 @@
                 <p class="text-gray-400 text-sm leading-relaxed">At a café with friends? Let the app decide who pays this time. SetAll randomly selects a payer but keeps the exact split math accurate.</p>
             </div>
         </div>
-
-        <!-- How It Works -->
-        <div class="mt-24 max-w-3xl w-full text-left" id="how-it-works">
-            <h2 class="text-3xl md:text-4xl font-extrabold text-center mb-12">
-                How it <span class="text-gradient">works</span>
-            </h2>
-            <div class="flex flex-col gap-6">
-                <div class="glass-card p-6 rounded-2xl flex items-start gap-5">
-                    <div class="bg-brand-teal/20 text-brand-teal w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0">1</div>
-                    <div>
-                        <h4 class="font-bold text-lg mb-1">Create a group</h4>
-                        <p class="text-gray-400 text-sm">Add your friends, set a base currency, and start logging expenses together.</p>
-                    </div>
-                </div>
-                <div class="glass-card p-6 rounded-2xl flex items-start gap-5">
-                    <div class="bg-brand-teal/20 text-brand-teal w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0">2</div>
-                    <div>
-                        <h4 class="font-bold text-lg mb-1">Log expenses in any currency</h4>
-                        <p class="text-gray-400 text-sm">Paid in GEL at a Tbilisi restaurant? Log it. SetAll auto-converts to USD (or whatever your base is).</p>
-                    </div>
-                </div>
-                <div class="glass-card p-6 rounded-2xl flex items-start gap-5">
-                    <div class="bg-brand-teal/20 text-brand-teal w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg flex-shrink-0">3</div>
-                    <div>
-                        <h4 class="font-bold text-lg mb-1">Settle with one tap</h4>
-                        <p class="text-gray-400 text-sm">SetAll calculates the minimum number of transfers needed. Everyone pays once and it's done.</p>
-                    </div>
-                </div>
-            </div>
-        </div>
     </main>
 
     <!-- Footer -->
     <footer class="relative z-10 border-t border-slate-800 mt-auto py-8">
         <div class="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center text-sm text-gray-500">
             <p>&copy; 2026 SetAll App. All rights reserved.</p>
-            <div class="flex gap-6 mt-4 md:mt-0">
-                <a href="/download" class="hover:text-white transition-colors">Download</a>
-                <a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a>
-                <a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
+            <div class="flex gap-4 mt-4 md:mt-0">
+                <a href="#" class="hover:text-white transition-colors">Twitter</a>
+                <a href="#" class="hover:text-white transition-colors">Privacy Policy</a>
             </div>
         </div>
     </footer>
 
+    <!-- Initialize Icons -->
     <script>
         lucide.createIcons();
     </script>

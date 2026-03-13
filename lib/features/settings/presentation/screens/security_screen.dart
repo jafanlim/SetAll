@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../core/router/app_router.dart';
 import '../../../../core/services/biometric_service.dart';
-import 'change_password_screen.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 
@@ -378,9 +379,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                     subtitle: Text('Update your account login password',
                         style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                     trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
-                    ),
+                    onTap: () => context.push(AppRouter.settingsChangePassword),
                   ),
                 ),
 

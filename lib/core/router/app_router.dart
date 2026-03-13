@@ -25,7 +25,13 @@ import '../../features/groups/presentation/screens/group_info_screen.dart';
 import '../../data/models/group_model.dart';
 import '../../features/groups/presentation/screens/groups_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
+import '../../features/settings/presentation/screens/security_screen.dart';
+import '../../features/settings/presentation/screens/notifications_screen.dart';
+import '../../features/settings/presentation/screens/regional_screen.dart';
+import '../../features/settings/presentation/screens/change_password_screen.dart';
 import '../../features/friends/presentation/screens/invite_friend_screen.dart';
+import '../../features/web/download_screen.dart';
+import '../../features/web/legal_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -38,7 +44,11 @@ final class AppRouter {
   static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
-  static const String settings = '/settings';
+  static const String settings            = '/settings';
+  static const String settingsSecurity     = '/settings/security';
+  static const String settingsNotifications = '/settings/notifications';
+  static const String settingsRegional     = '/settings/regional';
+  static const String settingsChangePassword = '/settings/change-password';
   static const String addExpense       = '/add-expense';
   static const String editExpense      = '/group/:id/expense/:expenseId';
   static const String groupPicker      = '/add-expense/choose-group';
@@ -50,6 +60,9 @@ final class AppRouter {
   static const String groupExpenseDetail     = '/group-expense-detail';
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
+  static const String download = '/download';
+  static const String privacy  = '/privacy';
+  static const String terms    = '/terms';
 
   static GoRouter create() {
     final bio = BiometricService.instance;
@@ -62,7 +75,10 @@ final class AppRouter {
           final isLogin    = state.matchedLocation == login;
           final isRegister = state.matchedLocation == register;
           final isBiometricGate = state.matchedLocation == biometricGate;
-          if (user == null && !isLogin && !isRegister) return login;
+          final isPublic = state.matchedLocation == download ||
+              state.matchedLocation == privacy ||
+              state.matchedLocation == terms;
+          if (user == null && !isLogin && !isRegister && !isPublic) return login;
           if (user != null && isLogin) {
             final useBio = await bio.getUseBiometric();
             if (useBio) return biometricGate;
@@ -203,6 +219,48 @@ final class AppRouter {
               ),
             ),
           ],
+        ),
+
+        // ── Settings sub-screens (outside shell so they push over everything) ──
+        GoRoute(
+          path: settingsSecurity,
+          name: 'settingsSecurity',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const SecurityScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsNotifications,
+          name: 'settingsNotifications',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const NotificationsScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsRegional,
+          name: 'settingsRegional',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const RegionalScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsChangePassword,
+          name: 'settingsChangePassword',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const ChangePasswordScreen(),
+            ),
+          ),
         ),
 
         // ── Invite friend (modal push, no shell nav bar) ─────────────────
@@ -407,6 +465,35 @@ final class AppRouter {
               },
             ),
           ],
+        ),
+
+        // ── Public web routes (no auth required) ──────────────────────────
+        GoRoute(
+          path: download,
+          name: 'download',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: DownloadScreen(),
+          ),
+        ),
+        GoRoute(
+          path: privacy,
+          name: 'privacy',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: LegalScreen(
+              title: 'Privacy Policy',
+              assetPath: 'assets/legal/privacy.md',
+            ),
+          ),
+        ),
+        GoRoute(
+          path: terms,
+          name: 'terms',
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: LegalScreen(
+              title: 'Terms of Service',
+              assetPath: 'assets/legal/terms.md',
+            ),
+          ),
         ),
       ],
     );

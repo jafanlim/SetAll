@@ -783,15 +783,35 @@ Widget _lookbookCard({
   required Widget child,
   EdgeInsetsGeometry padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
 }) {
-  final theme = Theme.of(context);
+  final theme    = Theme.of(context);
+  final isDark    = theme.brightness == Brightness.dark;
+  final scaffold  = theme.scaffoldBackgroundColor;
+  final isDesktop = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+
+  final Color cardBg;
+  final Color border;
+  final List<BoxShadow>? shadows;
+
+  if (isDark) {
+    cardBg  = theme.colorScheme.surface;
+    border  = theme.colorScheme.outlineVariant.withAlpha(50);
+    shadows = null;
+  } else if (isDesktop) {
+    cardBg  = const Color(0xFFE2E8F0); // Slate-200 — close to Slate-300 scaffold
+    border  = const Color(0xFFCBD5E1).withValues(alpha: 0.6); // Slate-300 60%
+    shadows = [BoxShadow(color: const Color(0xFF64748B).withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 2))];
+  } else {
+    cardBg  = const Color(0xFFF8FAFC); // Slate-50 — near-white on mobile
+    border  = const Color(0xFFE2E8F0); // Slate-200
+    shadows = null;
+  }
+
   return Container(
     decoration: BoxDecoration(
-      color: theme.colorScheme.surface,
+      color: cardBg,
       borderRadius: BorderRadius.circular(16),
-      border: Border.all(
-        color: theme.colorScheme.outlineVariant.withAlpha(50),
-        width: 1,
-      ),
+      border: Border.all(color: border, width: 1),
+      boxShadow: shadows,
     ),
     child: Padding(padding: padding, child: child),
   );
