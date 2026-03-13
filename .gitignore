@@ -57,6 +57,9 @@ google-services.json
 GoogleService-Info.plist
 lib/firebase_options.dart
 
+# Firebase CLI cache
+.firebase/
+
 # Xcode / test artifacts (large)
 xcresult_*.json
 *.xcresult
