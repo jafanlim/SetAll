@@ -5,7 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' if (dart.library.html) 'core/stubs/window_manager_stub.dart';
 
 import 'package:firebase_core/firebase_core.dart';
 
@@ -26,9 +26,9 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Set minimum window size on desktop so the UI never breaks.
-  if (defaultTargetPlatform == TargetPlatform.macOS ||
+  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.macOS ||
       defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux) {
+      defaultTargetPlatform == TargetPlatform.linux)) {
     await windowManager.ensureInitialized();
     final options = WindowOptions(
       minimumSize: const Size(800, 600),
