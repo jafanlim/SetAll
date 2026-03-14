@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:io';
+import 'dart:io' if (dart.library.html) '../stubs/io_stub.dart';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -128,6 +128,12 @@ class UpdateService {
   /// Checks GitHub for a new release. Returns an [UpdateCheckResult].
   /// Never throws — returns an error result on failure.
   Future<UpdateCheckResult> checkForUpdate() async {
+    if (kIsWeb) {
+      return UpdateCheckResult(
+        hasUpdate: false, latestVersion: '0.0.0', currentVersion: '0.0.0',
+        releaseUrl: _fallbackUrl,
+      );
+    }
     try {
       final info    = await PackageInfo.fromPlatform();
       final current = info.version;
@@ -199,6 +205,7 @@ class UpdateService {
   ///
   /// If [result.hasDirectDownload] is false, falls back to opening the browser.
   Future<void> downloadUpdate(UpdateCheckResult result) async {
+    if (kIsWeb) return;
     if (!result.hasDirectDownload) {
       await openReleasePage(result.releaseUrl);
       return;
@@ -251,6 +258,7 @@ class UpdateService {
   /// Opens the downloaded installer file, then terminates the running app so
   /// the installer can replace the binary without file-lock conflicts.
   Future<void> launchInstaller(String localPath) async {
+    if (kIsWeb) return;
     try {
       if (Platform.isMacOS) {
         // 'open' launches .dmg / .app / .pkg and returns immediately.
@@ -301,12 +309,14 @@ class UpdateService {
 
   /// Returns the lowercase suffix used to pick the right asset from a release.
   static String _platformAssetSuffix() {
+    if (kIsWeb) return 'web';
     if (Platform.isMacOS)   return 'macos';
     if (Platform.isWindows) return 'windows';
     return 'linux';
   }
 
   static String _defaultAssetName() {
+    if (kIsWeb) return '';
     if (Platform.isMacOS)   return 'SetAll-macOS.dmg';
     if (Platform.isWindows) return 'SetAll-Windows.exe';
     return 'SetAll-Linux.tar.gz';

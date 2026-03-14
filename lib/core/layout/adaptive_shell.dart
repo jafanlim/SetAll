@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' if (dart.library.html) '../stubs/window_manager_stub.dart';
 
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
