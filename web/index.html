@@ -17,15 +17,28 @@
   </style>
 </head>
 <body>
-  <script src='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs' type='module'></script>
-  <script type='module'>
-  var { pdfjsLib } = globalThis;
-  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
-
-  var pdfRenderOptions = {
-    cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
-    cMapPacked: true,
-  }
+  <!-- pdf.js: loaded non-blocking; guarded so a CDN miss never hangs the app -->
+  <script>
+    (function () {
+      var s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs';
+      s.type = 'module';
+      s.onload = function () {
+        try {
+          var lib = globalThis['pdfjsLib'] || (globalThis['pdfjs-dist'] && globalThis['pdfjs-dist'].getDocument ? globalThis['pdfjs-dist'] : null);
+          if (lib) {
+            lib.GlobalWorkerOptions.workerSrc =
+              'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
+            window.pdfRenderOptions = {
+              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
+              cMapPacked: true,
+            };
+          }
+        } catch (e) { /* pdf.js optional — Flutter PDF viewer degrades gracefully */ }
+      };
+      s.onerror = function () { /* CDN unreachable — Flutter PDF viewer degrades gracefully */ };
+      document.head.appendChild(s);
+    })();
   </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
