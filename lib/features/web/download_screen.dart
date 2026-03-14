@@ -1,4 +1,6 @@
 import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -263,7 +265,7 @@ class _DownloadScreenState extends State<DownloadScreen> {
             children: assets.map((a) => _DownloadCard(
               asset: a,
               isMobile: isMobile,
-              onTap: () => _launch(a.url),
+              onTap: () => _download(a.url, a.filename),
             )).toList(),
           ),
           const SizedBox(height: 48),
@@ -740,4 +742,15 @@ class _Orb extends StatelessWidget {
 Future<void> _launch(String url) async {
   final uri = Uri.parse(url);
   if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
+/// Triggers a browser file download (save-file dialog) instead of navigating.
+void _download(String url, String filename) {
+  final anchor = html.AnchorElement(href: url)
+    ..setAttribute('download', filename)
+    ..setAttribute('target', '_blank')
+    ..style.display = 'none';
+  html.document.body!.append(anchor);
+  anchor.click();
+  anchor.remove();
 }
