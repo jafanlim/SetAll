@@ -20,35 +20,19 @@ SET search_path = public
 AS $$
 DECLARE
   edge_function_url text;
-  service_role_key  text;
 BEGIN
-  -- Edge Function URL for this project
+  -- Edge Function is deployed with --no-verify-jwt so no Authorization header
+  -- is required. pg_net fires an async HTTP POST and never blocks Auth.
   edge_function_url := 'https://vrsmsgyxeyzyrdonsnrk.supabase.co/functions/v1/send-email';
 
-  -- The service role key is used to authenticate the call to the Edge Function.
-  -- Store it as a Postgres secret via: supabase secrets set (or use vault).
-  -- For simplicity we read it from app.settings if set, otherwise fall back to
-  -- the env var injected by Supabase into Postgres at runtime.
-  BEGIN
-    service_role_key := current_setting('app.supabase_service_role_key', true);
-  EXCEPTION WHEN OTHERS THEN
-    service_role_key := '';
-  END;
-
-  -- Fire-and-forget: pg_net queues the HTTP request asynchronously.
-  -- Errors here (missing pg_net, network unreachable) are swallowed so
-  -- they never block the Auth flow.
   BEGIN
     PERFORM net.http_post(
       url     := edge_function_url,
-      headers := jsonb_build_object(
-        'Content-Type',  'application/json',
-        'Authorization', 'Bearer ' || service_role_key
-      ),
+      headers := jsonb_build_object('Content-Type', 'application/json'),
       body    := event::text
     );
   EXCEPTION WHEN OTHERS THEN
-    -- Log but never raise — Auth must not be blocked by email failures.
+    -- Never raise — Auth must not be blocked by email delivery failures.
     RAISE WARNING 'hook_send_email: pg_net call failed: %', SQLERRM;
   END;
 END;
