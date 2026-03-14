@@ -73,12 +73,16 @@ final class AppRouter {
       redirect: (context, state) async {
         try {
           final user = Supabase.instance.client.auth.currentUser;
-          final isLogin    = state.matchedLocation == login;
-          final isRegister = state.matchedLocation == register;
-          final isBiometricGate = state.matchedLocation == biometricGate;
-          final isPublic = state.matchedLocation == download ||
-              state.matchedLocation == privacy ||
-              state.matchedLocation == terms;
+          final loc = state.matchedLocation;
+          final isLogin    = loc == login;
+          final isRegister = loc == register;
+          final isBiometricGate = loc == biometricGate;
+          final isPublic = loc == download || loc == privacy || loc == terms;
+          // /dashboard is a web browser-friendly alias — treat it as dashboard.
+          if (loc == '/dashboard') {
+            if (user == null) return login;
+            return dashboard;
+          }
           if (user == null && !isLogin && !isRegister && !isPublic) return login;
           if (user != null && isLogin) {
             final useBio = await bio.getUseBiometric();
@@ -160,12 +164,6 @@ final class AppRouter {
               child: const BiometricGateScreen(),
             ),
           ),
-        ),
-
-        // /dashboard is a web-friendly alias that redirects to / (dashboard)
-        GoRoute(
-          path: '/dashboard',
-          redirect: (context, state) => dashboard,
         ),
 
         // ── Shell: AdaptiveShell wraps Dashboard, Wallet, Groups, Activity, Settings ──
