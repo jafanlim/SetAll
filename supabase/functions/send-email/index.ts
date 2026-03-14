@@ -24,9 +24,10 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
-const FROM_ADDRESS   = 'SetAll <noreply@setall.app>'
-const APP_URL        = 'https://setall.app'
+const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY') ?? ''
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+const FROM_ADDRESS      = 'SetAll <noreply@setall.app>'
+const APP_URL           = 'https://setall.app'
 
 // ── Shared email shell ────────────────────────────────────────────────────────
 
@@ -246,11 +247,11 @@ serve(async (req) => {
     }
 
     // Build the confirmation URL using the Supabase project verify endpoint.
-    // Always redirect back to the app after verification.
-    const SUPABASE_URL = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co'
+    // apikey is required by the /auth/v1/verify endpoint.
+    const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co'
     const finalRedirect = redirectTo ?? `${APP_URL}/login`
     const actionUrl = tokenHash
-      ? `${SUPABASE_URL}/auth/v1/verify?token_hash=${tokenHash}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+      ? `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token_hash=${tokenHash}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
       : finalRedirect
 
     // Select HTML template
