@@ -57,10 +57,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _authRedirectUrl() {
     if (kAuthRedirectBaseUrl.isNotEmpty) {
       if (!kAuthRedirectBaseUrl.startsWith('http')) {
-        if (kIsWeb) {
-          final origin = Uri.base.origin;
-          return origin.endsWith('/') ? origin : '$origin/';
-        }
+        if (kIsWeb) return '${Uri.base.origin}/login';
         return kAuthRedirectBaseUrl;
       }
       return kAuthRedirectBaseUrl.endsWith('/')
@@ -68,8 +65,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           : '$kAuthRedirectBaseUrl/';
     }
     if (kIsWeb) {
-      final origin = Uri.base.origin;
-      return origin.endsWith('/') ? origin : '$origin/';
+      return '${Uri.base.origin}/login';
     }
     return null;
   }

@@ -114,17 +114,13 @@ class _LoginScreenState extends State<LoginScreen> {
       // not have a trailing slash added — return them verbatim on native.
       // On web, the custom scheme is invalid; use the browser origin instead.
       if (!kAuthRedirectBaseUrl.startsWith('http')) {
-        if (kIsWeb) {
-          final origin = Uri.base.origin;
-          return origin.endsWith('/') ? origin : '$origin/';
-        }
+        if (kIsWeb) return '${Uri.base.origin}/login';
         return kAuthRedirectBaseUrl;
       }
       return kAuthRedirectBaseUrl.endsWith('/') ? kAuthRedirectBaseUrl : '$kAuthRedirectBaseUrl/';
     }
     if (kIsWeb) {
-      final origin = Uri.base.origin;
-      return origin.endsWith('/') ? origin : '$origin/';
+      return '${Uri.base.origin}/login';
     }
     return null;
   }
