@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -67,7 +68,7 @@ final class AppRouter {
   static GoRouter create() {
     final bio = BiometricService.instance;
     return GoRouter(
-      initialLocation: dashboard,
+      initialLocation: kIsWeb ? login : dashboard,
       debugLogDiagnostics: true,
       redirect: (context, state) async {
         try {
@@ -82,7 +83,7 @@ final class AppRouter {
           if (user != null && isLogin) {
             final useBio = await bio.getUseBiometric();
             if (useBio) return biometricGate;
-            return dashboard;
+            return kIsWeb ? '/dashboard' : dashboard;
           }
           if (user != null && isBiometricGate) return null;
           if (user != null) {
