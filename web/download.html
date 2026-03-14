@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Download SetAll | Free Multi-Currency Expense App</title>
+  <meta name="description" content="Download SetAll for macOS, Windows, Android, or iOS. Free forever. Real-time multi-currency expense sharing.">
+
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://setall.app/download">
+  <meta property="og:title" content="Download SetAll | Free Multi-Currency Expense App">
+  <meta property="og:description" content="Download SetAll for macOS, Windows, Android, or iOS. Free forever.">
+  <meta property="og:image" content="https://setall.app/icons/Icon-512.png">
+  <meta property="og:site_name" content="SetAll">
+
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #0F172A;
+      color: #fff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: #14B8A6; color: #0F172A; }
+
+    .bg-glows {
+      position: fixed; inset: 0; z-index: 0;
+      overflow: hidden; pointer-events: none;
+    }
+    .bg-glows::before {
+      content: ''; position: absolute;
+      top: -20%; left: -10%; width: 55%; height: 55%; border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(20,184,166,0.18) 0%, transparent 70%);
+    }
+    .bg-glows::after {
+      content: ''; position: absolute;
+      bottom: -10%; right: -10%; width: 45%; height: 45%; border-radius: 50%;
+      background: radial-gradient(ellipse at center, rgba(249,115,22,0.12) 0%, transparent 70%);
+    }
+
+    .z1 { position: relative; z-index: 1; }
+
+    /* ── Nav ── */
+    nav {
+      width: 100%; padding: 1.5rem;
+      display: flex; justify-content: space-between; align-items: center;
+      max-width: 80rem; margin: 0 auto;
+    }
+    .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.02em; }
+    .nav-links { display: none; gap: 2rem; font-size: 0.875rem; font-weight: 500; color: #cbd5e1; }
+    .nav-links a:hover { color: #fff; }
+    .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+    .btn-ghost {
+      display: none; align-items: center; gap: 0.5rem;
+      font-size: 0.875rem; font-weight: 500; color: #cbd5e1;
+      padding: 0.5rem 1rem; border-radius: 9999px;
+      border: 1px solid #334155; transition: color .15s, border-color .15s;
+    }
+    .btn-ghost:hover { color: #fff; border-color: #64748b; }
+    .btn-primary {
+      background: #14B8A6; color: #0F172A;
+      padding: 0.625rem 1.25rem; border-radius: 9999px;
+      font-weight: 600; font-size: 0.9375rem;
+      box-shadow: 0 0 15px rgba(20,184,166,0.35);
+      transition: background .15s;
+    }
+    .btn-primary:hover { background: #2dd4bf; }
+    @media (min-width: 768px) {
+      .nav-links { display: flex; }
+      .btn-ghost { display: inline-flex; }
+    }
+
+    /* ── Page layout ── */
+    .page { flex: 1; max-width: 72rem; margin: 0 auto; padding: 3rem 1.5rem 6rem; width: 100%; }
+
+    /* ── Hero ── */
+    .hero { text-align: center; padding-bottom: 3.5rem; }
+    .hero-icon { font-size: 3.5rem; margin-bottom: 1.25rem; }
+    .hero h1 {
+      font-size: clamp(2.25rem, 6vw, 3.5rem);
+      font-weight: 800; letter-spacing: -0.04em; line-height: 1.1;
+      margin-bottom: 1rem;
+    }
+    .text-gradient {
+      background: linear-gradient(90deg, #14B8A6, #3B82F6);
+      -webkit-background-clip: text; background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .hero-sub { font-size: 1.0625rem; color: #94a3b8; max-width: 36rem; margin: 0 auto 0; line-height: 1.7; }
+
+    /* ── Version badge ── */
+    .version-badge {
+      display: inline-flex; align-items: center; gap: 0.5rem;
+      background: rgba(20,184,166,0.1); border: 1px solid rgba(20,184,166,0.25);
+      border-radius: 9999px; padding: 0.3rem 0.875rem;
+      font-size: 0.8125rem; font-weight: 600; color: #14B8A6;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Section label ── */
+    .section-label {
+      font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #14B8A6; margin-bottom: 1rem;
+    }
+
+    /* ── Download grid ── */
+    .section { margin-bottom: 3rem; }
+    .dl-grid {
+      display: grid; gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 480px) { .dl-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 900px) { .dl-grid { grid-template-columns: repeat(4, 1fr); } }
+
+    /* ── Download card ── */
+    .dl-card {
+      background: rgba(30,41,59,0.65);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1.25rem;
+      padding: 1.75rem 1.5rem;
+      display: flex; flex-direction: column; gap: 0;
+      transition: border-color .18s, background .18s, transform .18s, box-shadow .18s;
+      cursor: pointer; text-decoration: none; color: inherit;
+    }
+    .dl-card:hover {
+      background: rgba(30,41,59,0.9);
+      transform: translateY(-3px);
+    }
+    .dl-card.macos:hover  { border-color: rgba(255,255,255,0.35); box-shadow: 0 8px 32px rgba(255,255,255,0.06); }
+    .dl-card.windows:hover{ border-color: rgba(0,173,239,0.45);   box-shadow: 0 8px 32px rgba(0,173,239,0.12); }
+    .dl-card.android:hover{ border-color: rgba(52,168,83,0.45);   box-shadow: 0 8px 32px rgba(52,168,83,0.12); }
+    .dl-card.ios:hover    { border-color: rgba(255,255,255,0.25);  box-shadow: 0 8px 32px rgba(255,255,255,0.05); }
+
+    .card-icon {
+      width: 3rem; height: 3rem; border-radius: 0.875rem;
+      display: flex; align-items: center; justify-content: center;
+      margin-bottom: 1.25rem; flex-shrink: 0;
+    }
+    .card-icon.macos   { background: rgba(255,255,255,0.1); }
+    .card-icon.windows { background: rgba(0,173,239,0.12); }
+    .card-icon.android { background: rgba(52,168,83,0.12); }
+    .card-icon.ios     { background: rgba(255,255,255,0.08); }
+
+    .card-icon svg { width: 1.5rem; height: 1.5rem; }
+
+    .card-platform { font-size: 1rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .card-filename {
+      font-size: 0.6875rem; color: rgba(255,255,255,0.4);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 0.25rem;
+    }
+    .card-size { font-size: 0.6875rem; color: rgba(255,255,255,0.28); margin-bottom: 1.25rem; }
+
+    .card-action {
+      display: flex; align-items: center; gap: 0.375rem;
+      font-size: 0.8125rem; font-weight: 600; color: #14B8A6;
+      margin-top: auto;
+    }
+    .card-action svg { width: 0.875rem; height: 0.875rem; }
+
+    /* ── Loading state ── */
+    .dl-card.loading { opacity: 0.5; pointer-events: none; }
+    .spinner {
+      width: 1.25rem; height: 1.25rem;
+      border: 2px solid rgba(20,184,166,0.3);
+      border-top-color: #14B8A6;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Store badges row ── */
+    .store-grid {
+      display: grid; gap: 1rem;
+      grid-template-columns: 1fr;
+    }
+    @media (min-width: 480px) { .store-grid { grid-template-columns: repeat(3, 1fr); } }
+
+    .store-card {
+      background: rgba(30,41,59,0.65);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1rem; padding: 1.25rem 1.5rem;
+      display: flex; align-items: center; gap: 1rem;
+      transition: border-color .18s, background .18s, transform .18s;
+      cursor: pointer; text-decoration: none; color: inherit;
+    }
+    .store-card:hover { background: rgba(30,41,59,0.9); transform: translateY(-2px); }
+    .store-card.appstore:hover  { border-color: rgba(255,255,255,0.3); }
+    .store-card.googleplay:hover{ border-color: rgba(52,168,83,0.4); }
+    .store-card.webapp:hover    { border-color: rgba(20,184,166,0.45); }
+
+    .store-card svg { width: 1.75rem; height: 1.75rem; flex-shrink: 0; }
+    .store-label { font-size: 0.875rem; font-weight: 600; }
+    .store-sub { font-size: 0.75rem; color: #64748b; }
+
+    /* ── Release notes ── */
+    .notes-box {
+      background: rgba(30,41,59,0.5);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 1rem; padding: 1.5rem;
+      font-size: 0.8125rem; color: rgba(255,255,255,0.55);
+      line-height: 1.8; font-family: ui-monospace, 'SF Mono', monospace;
+      white-space: pre-wrap; word-break: break-word;
+      max-height: 14rem; overflow-y: auto;
+    }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.06); margin: 2.5rem 0; }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid #1e293b; padding: 2rem 1.5rem;
+      font-size: 0.8125rem; color: #64748b;
+    }
+    .footer-inner {
+      max-width: 80rem; margin: 0 auto;
+      display: flex; flex-direction: column; align-items: center; gap: 1rem;
+    }
+    @media (min-width: 768px) { .footer-inner { flex-direction: row; justify-content: space-between; } }
+    .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+    .footer-links a:hover { color: #fff; }
+
+    /* ── Error state ── */
+    .error-msg {
+      text-align: center; color: #94a3b8; font-size: 0.9375rem;
+      padding: 2rem; display: none;
+    }
+    .error-msg a { color: #14B8A6; }
+    .error-msg a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div class="bg-glows" aria-hidden="true"></div>
+
+  <!-- Nav -->
+  <nav class="z1">
+    <a href="/" class="nav-logo">
+      <span aria-hidden="true">⚖️</span>
+      <span>SetAll</span>
+    </a>
+    <div class="nav-links">
+      <a href="/#features">Features</a>
+      <a href="/#how-it-works">How it works</a>
+    </div>
+    <div class="nav-actions">
+      <a href="/login" class="btn-ghost">
+        <svg style="width:1rem;height:1rem;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8m-4-4v4"/></svg>
+        Open WebApp
+      </a>
+      <a href="/download" class="btn-primary">Download</a>
+    </div>
+  </nav>
+
+  <!-- Page -->
+  <div class="page z1">
+
+    <!-- Hero -->
+    <div class="hero">
+      <div class="hero-icon">⚖️</div>
+      <div class="version-badge" id="versionBadge">
+        <svg style="width:0.625rem;height:0.625rem;fill:#14B8A6" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>
+        Loading…
+      </div>
+      <h1>Download <span class="text-gradient">SetAll</span></h1>
+      <p class="hero-sub">Premium multi-currency expense sharing. Free forever.<br>Available on macOS, Windows, Android, iOS &amp; Web.</p>
+    </div>
+
+    <!-- Desktop downloads -->
+    <div class="section">
+      <p class="section-label">Desktop</p>
+      <div class="dl-grid" id="desktopGrid">
+        <!-- macOS skeleton -->
+        <div class="dl-card macos loading" id="card-macos">
+          <div class="card-icon macos">
+            <svg fill="white" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91 1.65.17 2.79.81 3.49 1.83-3.06 1.8-2.56 5.89.37 7.08-.75 1.89-1.75 3.51-3.07 3.84zM12.04 6.64c-.13-1.42.53-2.82 1.48-3.64.95-.82 2.37-1.32 3.65-1.18.23 1.54-.53 2.94-1.44 3.76-.91.82-2.38 1.28-3.69 1.06z"/></svg>
+          </div>
+          <div class="card-platform">macOS</div>
+          <div class="card-filename">Fetching…</div>
+          <div class="card-size">&nbsp;</div>
+          <div class="card-action"><div class="spinner"></div></div>
+        </div>
+        <!-- Windows skeleton -->
+        <div class="dl-card windows loading" id="card-windows">
+          <div class="card-icon windows">
+            <svg fill="#00ADEF" viewBox="0 0 24 24" aria-hidden="true"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/></svg>
+          </div>
+          <div class="card-platform">Windows</div>
+          <div class="card-filename">Fetching…</div>
+          <div class="card-size">&nbsp;</div>
+          <div class="card-action"><div class="spinner"></div></div>
+        </div>
+        <!-- Android APK skeleton -->
+        <div class="dl-card android loading" id="card-android">
+          <div class="card-icon android">
+            <svg fill="#34A853" viewBox="0 0 24 24" aria-hidden="true"><path d="M17.523 15.341A5.97 5.97 0 0 0 18 13a5.97 5.97 0 0 0-.477-2.341l2.008-2.008a.75.75 0 0 0-1.06-1.06l-1.964 1.963A5.973 5.973 0 0 0 13 9a5.973 5.973 0 0 0-3.507 1.554L7.53 8.591a.75.75 0 0 0-1.06 1.06l1.963 1.963A5.97 5.97 0 0 0 8 13a5.97 5.97 0 0 0 .432 2.268l-2.009 2.009a.75.75 0 1 0 1.06 1.06l2.01-2.009A5.973 5.973 0 0 0 13 17a5.973 5.973 0 0 0 3.507-1.672l2.009 2.009a.75.75 0 1 0 1.06-1.06l-2.053-2.936zM5 8.5A1.5 1.5 0 0 1 6.5 7H9V5.5A1.5 1.5 0 0 1 10.5 4h3A1.5 1.5 0 0 1 15 5.5V7h2.5A1.5 1.5 0 0 1 19 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 5 17.5v-9z"/></svg>
+          </div>
+          <div class="card-platform">Android (APK)</div>
+          <div class="card-filename">Fetching…</div>
+          <div class="card-size">&nbsp;</div>
+          <div class="card-action"><div class="spinner"></div></div>
+        </div>
+        <!-- Linux skeleton -->
+        <div class="dl-card linux loading" id="card-linux">
+          <div class="card-icon" style="background:rgba(249,115,22,0.12)">
+            <svg fill="none" stroke="#F97316" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+          </div>
+          <div class="card-platform">Linux</div>
+          <div class="card-filename">Fetching…</div>
+          <div class="card-size">&nbsp;</div>
+          <div class="card-action"><div class="spinner"></div></div>
+        </div>
+      </div>
+      <p class="error-msg" id="errorMsg">
+        Could not load release info. <a href="https://github.com/jafanlim/SetAll/releases" target="_blank" rel="noopener">View all releases on GitHub →</a>
+      </p>
+    </div>
+
+    <hr class="divider">
+
+    <!-- Mobile / Store -->
+    <div class="section">
+      <p class="section-label">Mobile &amp; Web</p>
+      <div class="store-grid">
+        <a href="https://apps.apple.com/app/setall" target="_blank" rel="noopener" class="store-card appstore">
+          <svg fill="white" viewBox="0 0 24 24" aria-hidden="true"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91 1.65.17 2.79.81 3.49 1.83-3.06 1.8-2.56 5.89.37 7.08-.75 1.89-1.75 3.51-3.07 3.84zM12.04 6.64c-.13-1.42.53-2.82 1.48-3.64.95-.82 2.37-1.32 3.65-1.18.23 1.54-.53 2.94-1.44 3.76-.91.82-2.38 1.28-3.69 1.06z"/></svg>
+          <div>
+            <div class="store-label">App Store</div>
+            <div class="store-sub">iPhone &amp; iPad</div>
+          </div>
+        </a>
+        <a href="https://play.google.com/store/apps/details?id=com.jafa.setall" target="_blank" rel="noopener" class="store-card googleplay">
+          <svg fill="#34A853" viewBox="0 0 24 24" aria-hidden="true"><path d="m3.18 23.76 11.85-6.84-2.61-2.61zm16.1-9.29L5.26 7.01l8.72 8.72zM2.1 1.44A1.5 1.5 0 0 0 2 2.07v19.86a1.5 1.5 0 0 0 .1.63l.06.07 11.12-11.12v-.26zm16.18 8.2-2.94-1.7-2.93 2.93 2.93 2.93 2.96-1.71a1.5 1.5 0 0 0 0-2.45z"/></svg>
+          <div>
+            <div class="store-label">Google Play</div>
+            <div class="store-sub">Android</div>
+          </div>
+        </a>
+        <a href="/login" class="store-card webapp">
+          <svg fill="none" stroke="#14B8A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          <div>
+            <div class="store-label" style="color:#14B8A6">Web App</div>
+            <div class="store-sub">No install needed</div>
+          </div>
+        </a>
+      </div>
+    </div>
+
+    <!-- Release notes -->
+    <div class="section" id="notesSection" style="display:none">
+      <hr class="divider" style="margin-top:0">
+      <p class="section-label" id="notesLabel">What's New</p>
+      <div class="notes-box" id="notesBox"></div>
+    </div>
+
+  </div><!-- /.page -->
+
+  <!-- Footer -->
+  <footer class="z1">
+    <div class="footer-inner">
+      <p>&copy; <script>document.write(new Date().getFullYear())</script> SetAll App. All rights reserved.</p>
+      <nav class="footer-links" aria-label="Footer">
+        <a href="/">Home</a>
+        <a href="/privacy">Privacy Policy</a>
+        <a href="/terms">Terms of Service</a>
+        <a href="https://github.com/jafanlim/SetAll" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    const REPO = 'jafanlim/SetAll';
+    const API  = `https://api.github.com/repos/${REPO}/releases/latest`;
+
+    // Platform detection helpers
+    function classify(name) {
+      const n = name.toLowerCase();
+      if (n.endsWith('.dmg') || n.includes('macos') || n.includes('mac'))    return 'macos';
+      if (n.endsWith('.exe') || n.includes('windows') || n.includes('win'))  return 'windows';
+      if (n.endsWith('.apk') || n.includes('android'))                        return 'android';
+      if (n.includes('linux') || n.endsWith('.deb') || n.endsWith('.appimage') || n.endsWith('.tar.gz')) return 'linux';
+      return null;
+    }
+
+    function sizeMb(bytes) {
+      return bytes ? (bytes / 1024 / 1024).toFixed(1) + ' MB' : '';
+    }
+
+    function triggerDownload(url, filename) {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    function renderCard(platform, url, filename, size) {
+      const card = document.getElementById('card-' + platform);
+      if (!card) return;
+      card.classList.remove('loading');
+
+      const filenameEl = card.querySelector('.card-filename');
+      const sizeEl     = card.querySelector('.card-size');
+      const actionEl   = card.querySelector('.card-action');
+
+      filenameEl.textContent = filename;
+      sizeEl.textContent     = size;
+      actionEl.innerHTML = `
+        <svg fill="none" stroke="#14B8A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Download
+        <svg fill="none" stroke="rgba(20,184,166,0.6)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" style="width:0.625rem;height:0.625rem;margin-left:auto">
+          <polyline points="9 18 15 12 9 6"/>
+        </svg>`;
+
+      card.onclick = () => triggerDownload(url, filename);
+      card.style.cursor = 'pointer';
+    }
+
+    function markUnavailable(platform) {
+      const card = document.getElementById('card-' + platform);
+      if (!card) return;
+      card.classList.remove('loading');
+      card.style.opacity = '0.35';
+      card.style.cursor  = 'default';
+      card.querySelector('.card-filename').textContent = 'Not yet available';
+      card.querySelector('.card-size').textContent     = '';
+      card.querySelector('.card-action').innerHTML     = `<span style="font-size:0.75rem;color:#64748b">Coming soon</span>`;
+    }
+
+    async function loadRelease() {
+      try {
+        const res = await fetch(API, { headers: { Accept: 'application/vnd.github+json' } });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+
+        // Version badge
+        document.getElementById('versionBadge').innerHTML =
+          `<svg style="width:0.625rem;height:0.625rem;fill:#14B8A6" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4"/></svg>${data.tag_name}`;
+
+        // Map assets
+        const found = { macos: null, windows: null, android: null, linux: null };
+        for (const a of data.assets || []) {
+          const p = classify(a.name);
+          if (p && !found[p]) {
+            found[p] = { url: a.browser_download_url, name: a.name, size: sizeMb(a.size) };
+          }
+        }
+
+        for (const [platform, info] of Object.entries(found)) {
+          if (info) renderCard(platform, info.url, info.name, info.size);
+          else markUnavailable(platform);
+        }
+
+        // Release notes
+        if (data.body && data.body.trim()) {
+          document.getElementById('notesSection').style.display = '';
+          document.getElementById('notesLabel').textContent = `What's New in ${data.tag_name}`;
+          const notes = data.body.length > 1200 ? data.body.substring(0, 1200) + '…' : data.body;
+          document.getElementById('notesBox').textContent = notes;
+        }
+
+      } catch (e) {
+        console.error('Release fetch failed:', e);
+        document.getElementById('versionBadge').textContent = 'Latest Release';
+        ['macos','windows','android','linux'].forEach(p => {
+          const card = document.getElementById('card-' + p);
+          if (!card) return;
+          card.classList.remove('loading');
+          const url = `https://github.com/${REPO}/releases`;
+          card.querySelector('.card-filename').textContent = 'View on GitHub';
+          card.querySelector('.card-size').textContent = '';
+          card.querySelector('.card-action').innerHTML = `
+            <svg fill="none" stroke="#14B8A6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+            </svg>
+            GitHub Releases`;
+          card.onclick = () => window.open(url, '_blank', 'noopener');
+        });
+      }
+    }
+
+    loadRelease();
+  </script>
+</body>
+</html>

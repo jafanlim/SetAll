@@ -24,6 +24,7 @@ build-web:
 	flutter build web --release --no-tree-shake-icons
 	cp build/web/index.html build/web/app.html
 	cp web/landing.html build/web/index.html
+	cp web/download.html build/web/download.html
 	cp web/robots.txt build/web/robots.txt
 	cp web/sitemap.xml build/web/sitemap.xml
 	@grep -q 'flutter_bootstrap' build/web/app.html || (echo "ERROR: app.html missing flutter_bootstrap — build step order is wrong!" && exit 1)
