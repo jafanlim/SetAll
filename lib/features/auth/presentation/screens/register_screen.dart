@@ -43,6 +43,23 @@ class _RegisterScreenState extends State<RegisterScreen> {
   String? _message;
   bool _isSuccess       = false;
 
+  // ── Real-time password strength ───────────────────────────────────────────
+  static final _rxUpper   = RegExp(r'[A-Z]');
+  static final _rxNumber  = RegExp(r'[0-9]');
+  static final _rxSpecial = RegExp(r'[!@#\$%^&*(),.?":{}|<>_\-+=\[\]\\/~`]');
+
+  bool get _pwHasLength  => _passwordController.text.length >= 8;
+  bool get _pwHasUpper   => _rxUpper.hasMatch(_passwordController.text);
+  bool get _pwHasNumber  => _rxNumber.hasMatch(_passwordController.text);
+  bool get _pwHasSpecial => _rxSpecial.hasMatch(_passwordController.text);
+  bool get _pwValid      => _pwHasLength && _pwHasUpper && _pwHasNumber && _pwHasSpecial;
+
+  @override
+  void initState() {
+    super.initState();
+    _passwordController.addListener(() => setState(() {}));
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -220,7 +237,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 onFieldSubmitted: (_) => _confirmFocus.requestFocus(),
                 style: const TextStyle(color: _onSurface),
                 decoration: _inputDecoration(
-                  hint: 'Min. 6 characters',
+                  hint: 'Min. 8 chars, uppercase, number, symbol',
                   prefixIcon: Icons.lock_outline_rounded,
                   suffixIcon: IconButton(
                     icon: Icon(
@@ -234,10 +251,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 validator: (v) {
                   if (v == null || v.isEmpty) return 'Enter a password';
-                  if (v.length < 6) return 'Use at least 6 characters';
+                  if (!_pwValid) return 'Password does not meet the requirements below';
                   return null;
                 },
               ),
+              // ── Password strength checklist ──────────────────────────────────
+              if (_passwordController.text.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                _PasswordChecklist(
+                  hasLength:  _pwHasLength,
+                  hasUpper:   _pwHasUpper,
+                  hasNumber:  _pwHasNumber,
+                  hasSpecial: _pwHasSpecial,
+                ),
+              ],
               const SizedBox(height: 20),
 
               // ── Confirm Password ────────────────────────────────────────────
@@ -406,6 +433,78 @@ class _GlowBlob extends StatelessWidget {
   }
 }
 
+
+class _PasswordChecklist extends StatelessWidget {
+  const _PasswordChecklist({
+    required this.hasLength,
+    required this.hasUpper,
+    required this.hasNumber,
+    required this.hasSpecial,
+  });
+  final bool hasLength;
+  final bool hasUpper;
+  final bool hasNumber;
+  final bool hasSpecial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: [
+        _Req(label: '8+ chars',    met: hasLength),
+        _Req(label: 'Uppercase',   met: hasUpper),
+        _Req(label: 'Number',      met: hasNumber),
+        _Req(label: 'Symbol',      met: hasSpecial),
+      ],
+    );
+  }
+}
+
+class _Req extends StatelessWidget {
+  const _Req({required this.label, required this.met});
+  final String label;
+  final bool met;
+
+  static const _teal   = Color(0xFF14B8A6);
+  static const _subtle = Color(0xFF64748B);
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 180),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: met
+            ? _teal.withValues(alpha: 0.12)
+            : const Color(0xFF1E293B),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: met ? _teal.withValues(alpha: 0.4) : _subtle.withValues(alpha: 0.3),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            met ? Icons.check_rounded : Icons.remove_rounded,
+            size: 12,
+            color: met ? _teal : _subtle,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+              color: met ? _teal : _subtle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _MessageBanner extends StatelessWidget {
   const _MessageBanner({required this.message, required this.isSuccess});

@@ -1,11 +1,11 @@
 {
-    "name": "setall",
-    "short_name": "setall",
-    "start_url": ".",
+    "name": "SetAll",
+    "short_name": "SetAll",
+    "start_url": "/login",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0F172A",
+    "theme_color": "#14B8A6",
+    "description": "Premium multi-currency expense sharing. Real-time rates, smart debt simplification.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
