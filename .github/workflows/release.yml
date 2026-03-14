@@ -95,6 +95,10 @@ jobs:
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          # Patch AppVersion in installer.iss from the git tag (strip leading 'v')
+          $tag = "${{ github.ref_name }}" -replace '^v', ''
+          (Get-Content windows/installer.iss) -replace 'AppVersion=.*', "AppVersion=$tag" |
+            Set-Content windows/installer.iss
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           & $iscc windows/installer.iss
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

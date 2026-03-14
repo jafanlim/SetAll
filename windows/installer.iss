@@ -1,6 +1,6 @@
 [Setup]
 AppName=SetAll
-AppVersion=1.2.2
+AppVersion=1.2.8
 ; Stable GUID — must never change between versions so Inno detects upgrades.
 AppId={{A7F3C2E1-9D4B-4F8A-B6E0-12345678ABCD}
 AppPublisher=SetAll
