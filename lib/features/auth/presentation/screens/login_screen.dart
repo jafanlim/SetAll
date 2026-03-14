@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -39,8 +41,28 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _message;
   bool _isSuccess    = false;
 
+  StreamSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // On web, Google OAuth uses a redirect flow — the page reloads after
+    // the user authenticates. Listen for the resulting SIGNED_IN event and
+    // run the check-before-create guard so new Google users are blocked.
+    if (kIsWeb) {
+      _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
+        (data) {
+          if (data.event == AuthChangeEvent.signedIn && mounted) {
+            _checkProfileExistsOrSignOut();
+          }
+        },
+      );
+    }
+  }
+
   @override
   void dispose() {
+    _authSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _emailFocus.dispose();
