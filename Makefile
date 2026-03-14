@@ -26,6 +26,9 @@ build-web:
 	cp web/landing.html build/web/index.html
 	cp web/robots.txt build/web/robots.txt
 	cp web/sitemap.xml build/web/sitemap.xml
+	@grep -q 'flutter_bootstrap' build/web/app.html || (echo "ERROR: app.html missing flutter_bootstrap — build step order is wrong!" && exit 1)
+	@grep -q 'flutter_bootstrap' build/web/index.html && (echo "ERROR: index.html has flutter_bootstrap — landing page copy failed!" && exit 1) || true
+	@echo "✓ build/web: app.html=Flutter, index.html=Landing"
 
 # 6. Build and deploy to Firebase Hosting (production channel)
 deploy-web: build-web
