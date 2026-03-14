@@ -29,6 +29,22 @@ jobs:
         with:
           channel: 'stable'
 
+      - name: Restore Firebase config files
+        shell: bash
+        run: |
+          echo "${{ secrets.FIREBASE_OPTIONS_DART_B64 }}" | base64 --decode > lib/firebase_options.dart
+
+      - name: Restore macOS Firebase plist
+        if: matrix.os == 'macos-latest'
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICE_INFO_PLIST_B64 }}" | base64 --decode > macos/Runner/GoogleService-Info.plist
+
+      - name: Restore Windows google-services.json
+        if: matrix.os == 'windows-latest'
+        shell: bash
+        run: |
+          echo "${{ secrets.GOOGLE_SERVICES_JSON_B64 }}" | base64 --decode > android/app/google-services.json
+
       - name: Install Dependencies
         run: flutter pub get
 
