@@ -142,7 +142,7 @@ class _AppLoaderState extends State<_AppLoader> {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
-        unawaited(NotificationService.instance.init());
+        if (!kIsWeb) unawaited(NotificationService.instance.init());
       } catch (_) {
         // Firebase not configured yet — skip silently.
       }
