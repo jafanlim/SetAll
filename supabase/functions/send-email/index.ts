@@ -25,7 +25,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const RESEND_API_KEY    = Deno.env.get('RESEND_API_KEY') ?? ''
-const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
 const FROM_ADDRESS      = 'SetAll <noreply@setall.app>'
 const APP_URL           = 'https://setall.app'
 
@@ -258,9 +257,9 @@ serve(async (req) => {
     const finalRedirect = redirectTo ?? `${APP_URL}/login`
     let actionUrl: string
     if (tokenHash) {
-      actionUrl = `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+      actionUrl = `${SUPABASE_URL}/auth/v1/verify?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
     } else if (token) {
-      actionUrl = `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token=${encodeURIComponent(token)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+      actionUrl = `${SUPABASE_URL}/auth/v1/verify?token=${encodeURIComponent(token)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
     } else {
       console.error('send-email: no token or token_hash in payload', JSON.stringify(emailData))
       actionUrl = finalRedirect
