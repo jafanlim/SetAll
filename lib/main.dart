@@ -199,9 +199,13 @@ class _AppLoaderState extends State<_AppLoader> {
           uri.fragment.contains('error') ||
           uri.queryParameters.containsKey('code');
       if (hasAuthParams) {
+        debugPrint('[Auth] Recovering session from URL: $uri');
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
+        debugPrint('[Auth] Session recovered successfully');
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('[Auth] getSessionFromUrl failed: $e');
+    }
   }
 
   @override

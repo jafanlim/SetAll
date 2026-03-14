@@ -83,7 +83,7 @@ final class AppRouter {
           if (user != null && isLogin) {
             final useBio = await bio.getUseBiometric();
             if (useBio) return biometricGate;
-            return kIsWeb ? '/dashboard' : dashboard;
+            return dashboard;
           }
           if (user != null && isBiometricGate) return null;
           if (user != null) {
@@ -160,6 +160,12 @@ final class AppRouter {
               child: const BiometricGateScreen(),
             ),
           ),
+        ),
+
+        // /dashboard is a web-friendly alias that redirects to / (dashboard)
+        GoRoute(
+          path: '/dashboard',
+          redirect: (context, state) => dashboard,
         ),
 
         // ── Shell: AdaptiveShell wraps Dashboard, Wallet, Groups, Activity, Settings ──
