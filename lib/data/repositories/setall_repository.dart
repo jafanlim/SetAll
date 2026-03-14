@@ -943,7 +943,7 @@ class SetAllRepository {
           format: CompressFormat.jpeg, keepExif: false,
         );
       }
-      final uploadBytes = bytes ?? await _io.File(localPath).readAsBytes();
+      final uploadBytes = bytes ?? (kIsWeb ? Uint8List(0) : await _io.File(localPath).readAsBytes());
       final storagePath = '$uid/$groupId/avatar.$ext';
       await _client.storage
           .from('group-avatars')
