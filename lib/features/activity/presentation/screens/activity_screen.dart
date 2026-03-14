@@ -797,11 +797,14 @@ Widget _lookbookCard({
     border  = theme.colorScheme.outlineVariant.withAlpha(50);
     shadows = null;
   } else if (isDesktop) {
-    cardBg  = const Color(0xFFE2E8F0); // Slate-200 — close to Slate-300 scaffold
-    border  = const Color(0xFFCBD5E1).withValues(alpha: 0.6); // Slate-300 60%
-    shadows = [BoxShadow(color: const Color(0xFF64748B).withValues(alpha: 0.10), blurRadius: 8, offset: const Offset(0, 2))];
+    cardBg  = const Color(0xFFFFFFFF); // white — macOS-native lift on grey scaffold
+    border  = const Color(0xFFE2E8F0).withValues(alpha: 0.5);
+    shadows = [
+      BoxShadow(color: const Color(0xFF475569).withValues(alpha: 0.08), blurRadius: 12, spreadRadius: 0, offset: const Offset(0, 2)),
+      BoxShadow(color: const Color(0xFF475569).withValues(alpha: 0.04), blurRadius: 4, offset: const Offset(0, 1)),
+    ];
   } else {
-    cardBg  = const Color(0xFFF8FAFC); // Slate-50 — near-white on mobile
+    cardBg  = const Color(0xFFF8FAFC); // Slate-50 on mobile
     border  = const Color(0xFFE2E8F0); // Slate-200
     shadows = null;
   }
