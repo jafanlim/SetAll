@@ -22,7 +22,8 @@ class BiometricService {
   void resetSession() => _sessionUnlocked = false;
 
   static const _keyUseBiometric = 'setall_use_biometric';
-  final LocalAuthentication _auth = LocalAuthentication();
+  LocalAuthentication? _auth;
+  LocalAuthentication get _la => _auth ??= LocalAuthentication();
   final FlutterSecureStorage _storage = const FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
     iOptions: IOSOptions(accessibility: KeychainAccessibility.first_unlock_this_device),
@@ -34,7 +35,7 @@ class BiometricService {
   Future<bool> canUseBiometrics() async {
     if (!_isMobile) return false;
     try {
-      return await _auth.canCheckBiometrics && await _auth.isDeviceSupported();
+      return await _la.canCheckBiometrics && await _la.isDeviceSupported();
     } catch (_) {
       return false;
     }
@@ -67,7 +68,7 @@ class BiometricService {
   Future<bool> authenticate({String? reason}) async {
     if (!_isMobile) return false;
     try {
-      return await _auth.authenticate(
+      return await _la.authenticate(
         localizedReason: reason ?? 'Unlock SetAll',
         options: const AuthenticationOptions(
           stickyAuth: true,
@@ -83,7 +84,7 @@ class BiometricService {
   Future<List<BiometricType>> getAvailableBiometrics() async {
     if (!_isMobile) return [];
     try {
-      return await _auth.getAvailableBiometrics();
+      return await _la.getAvailableBiometrics();
     } catch (_) {
       return [];
     }
