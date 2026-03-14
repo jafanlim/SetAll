@@ -12,7 +12,9 @@
 --   Function:  hook_send_email
 -- ─────────────────────────────────────────────────────────────────────────────
 
-CREATE OR REPLACE FUNCTION public.hook_send_email(event jsonb)
+DROP FUNCTION IF EXISTS public.hook_send_email(jsonb);
+
+CREATE FUNCTION public.hook_send_email(event jsonb)
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
