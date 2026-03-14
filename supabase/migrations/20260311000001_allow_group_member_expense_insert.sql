@@ -25,6 +25,7 @@ CREATE POLICY "Payer can insert personal expense" ON public.expenses
 -- Previously required expense payer = auth.uid(). Now any group member can
 -- insert splits for any expense in their group.
 DROP POLICY IF EXISTS "Expense payer can insert splits" ON public.splits;
+DROP POLICY IF EXISTS "Group members can insert splits" ON public.splits;
 
 CREATE POLICY "Group members can insert splits" ON public.splits
   FOR INSERT
