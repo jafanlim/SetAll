@@ -20,6 +20,20 @@
             "args": ["-d", "chrome", "--web-port", "8080"]
         },
         {
+            "name": "SetAll (Web — Safari / any browser)",
+            "request": "launch",
+            "type": "dart",
+            "args": ["-d", "web-server", "--web-port", "8080", "--web-hostname", "localhost"],
+            "flutterMode": "debug"
+        },
+        {
+            "name": "SetAll (Web — Chrome profile)",
+            "request": "launch",
+            "type": "dart",
+            "args": ["-d", "chrome", "--web-port", "8080"],
+            "flutterMode": "profile"
+        },
+        {
             "name": "SetAll (Android Emulator)",
             "request": "launch",
             "type": "dart",
