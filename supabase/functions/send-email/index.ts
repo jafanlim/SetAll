@@ -219,9 +219,13 @@ serve(async (req) => {
   }
 
   try {
+    const payload = await req.json()
+
+    // Log full payload so we can inspect it in Dashboard → Edge Function logs
+    console.log('send-email hook payload:', JSON.stringify(payload))
+
     // Supabase Auth Hook payload shape:
     // { user: { email }, email_data: { email_action_type, token, token_hash, redirect_to, site_url } }
-    const payload = await req.json()
     const user       = payload?.user       ?? {}
     const emailData  = payload?.email_data ?? {}
 
@@ -231,18 +235,23 @@ serve(async (req) => {
     const redirectTo = emailData.redirect_to as string | undefined
     const siteUrl    = emailData.site_url   as string | undefined ?? APP_URL
 
+    console.log(`send-email: toEmail=${toEmail} actionType=${actionType} tokenHash=${tokenHash?.slice(0,8)}...`)
+
     if (!toEmail || !actionType) {
+      console.error('send-email: missing required fields', { toEmail, actionType, payloadKeys: Object.keys(payload) })
       return new Response(JSON.stringify({ error: 'Missing user.email or email_action_type' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       })
     }
 
-    // Build the confirmation/action URL from token_hash (PKCE flow)
-    const base = siteUrl.endsWith('/') ? siteUrl.slice(0, -1) : siteUrl
+    // Build the confirmation URL using the Supabase project verify endpoint.
+    // Always redirect back to the app after verification.
+    const SUPABASE_URL = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co'
+    const finalRedirect = redirectTo ?? `${APP_URL}/login`
     const actionUrl = tokenHash
-      ? `${base}/auth/v1/verify?token_hash=${tokenHash}&type=${encodeURIComponent(actionType)}${redirectTo ? `&redirect_to=${encodeURIComponent(redirectTo)}` : ''}`
-      : (redirectTo ?? `${APP_URL}/login`)
+      ? `${SUPABASE_URL}/auth/v1/verify?token_hash=${tokenHash}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+      : finalRedirect
 
     // Select HTML template
     let html: string
