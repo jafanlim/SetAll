@@ -111,8 +111,13 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _authRedirectUrl() {
     if (kAuthRedirectBaseUrl.isNotEmpty) {
       // Custom scheme deep links (e.g. com.jafa.setall://login-callback) must
-      // not have a trailing slash added — return them verbatim.
+      // not have a trailing slash added — return them verbatim on native.
+      // On web, the custom scheme is invalid; use the browser origin instead.
       if (!kAuthRedirectBaseUrl.startsWith('http')) {
+        if (kIsWeb) {
+          final origin = Uri.base.origin;
+          return origin.endsWith('/') ? origin : '$origin/';
+        }
         return kAuthRedirectBaseUrl;
       }
       return kAuthRedirectBaseUrl.endsWith('/') ? kAuthRedirectBaseUrl : '$kAuthRedirectBaseUrl/';
