@@ -11,7 +11,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 1. Enable pg_net (idempotent)
 -- ─────────────────────────────────────────────────────────────────────────────
-CREATE EXTENSION IF NOT EXISTS pg_net SCHEMA net;
+CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 2. Trigger function on public.profiles INSERT
