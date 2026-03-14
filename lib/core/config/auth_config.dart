@@ -25,5 +25,5 @@ class AuthConfig {
   static const String googleWebClientId = '454096661669-qrko5vmk5gk4pels4n0k1o0lnuehubnj.apps.googleusercontent.com';
   
   /// iOS Client ID (Required for iOS Google Sign-in)
-  static const String googleIosClientId = 'YOUR_GOOGLE_IOS_CLIENT_ID_HERE';
+  static const String googleIosClientId = '454096661669-2lmum0pt14jvtj8jq6b3hn8fm2qilcuh.apps.googleusercontent.com';
 }
