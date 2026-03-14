@@ -13,7 +13,7 @@
 -- ─────────────────────────────────────────────────────────────────────────────
 
 CREATE OR REPLACE FUNCTION public.hook_send_email(event jsonb)
-RETURNS void
+RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
@@ -35,6 +35,9 @@ BEGIN
     -- Never raise — Auth must not be blocked by email delivery failures.
     RAISE WARNING 'hook_send_email: pg_net call failed: %', SQLERRM;
   END;
+
+  -- Supabase Send Email hooks must return a jsonb object.
+  RETURN jsonb_build_object('success', true);
 END;
 $$;
 
