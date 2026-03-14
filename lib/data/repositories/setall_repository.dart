@@ -1272,7 +1272,6 @@ class SetAllRepository {
               'id':                 s['id'],
               'expense_id':         expenseId,
               'user_id':            s['user_id'],
-              'amount_owed':        s['amount_owed'],
               'universal_usd_owed': s['universal_usd_owed'],
             },
             conflictAlgorithm: ConflictAlgorithm.ignore,

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<!--
+  SetAll — Confirm Email template
+  ────────────────────────────────
+  Copy this HTML into:
+  Supabase Dashboard → Authentication → Email Templates → Confirm signup
+
+  Subject line to use:
+    Confirm your SetAll email address
+
+  Supabase template variables used:
+    {{ .ConfirmationURL }}  — full one-click confirmation link
+    {{ .Email }}            — user's email address
+    {{ .SiteURL }}          — your project's Site URL setting
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Confirm your SetAll email</title>
+</head>
+<body style="margin:0;padding:0;background:#0F172A;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0F172A;padding:48px 16px;">
+    <tr><td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1E293B;border:1px solid #334155;border-radius:16px;overflow:hidden;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#0F172A 0%,#1a2744 100%);padding:40px 40px 32px;text-align:center;border-bottom:1px solid #334155;">
+            <div style="font-size:36px;margin-bottom:8px;">⚖️</div>
+            <div style="font-size:24px;font-weight:800;color:#F1F5F9;letter-spacing:-0.5px;">SetAll</div>
+            <div style="font-size:12px;color:#64748B;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">Premium Expense Sharing</div>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:40px;">
+            <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:#F1F5F9;line-height:1.3;">
+              Confirm your email address
+            </h1>
+            <p style="margin:0 0 8px;font-size:15px;color:#CBD5E1;line-height:1.7;">
+              Almost there! Click the button below to confirm <strong style="color:#F1F5F9;">{{ .Email }}</strong> and activate your SetAll account.
+            </p>
+            <p style="margin:0 0 32px;font-size:13px;color:#64748B;">
+              This link expires in 24 hours.
+            </p>
+
+            <!-- CTA -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
+              <tr>
+                <td align="center">
+                  <a href="{{ .ConfirmationURL }}"
+                     style="display:inline-block;background:#14B8A6;color:#0F172A;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
+                    Confirm email address
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <!-- Fallback link -->
+            <p style="margin:0;font-size:12px;color:#64748B;line-height:1.8;">
+              Or copy and paste this URL into your browser:<br>
+              <a href="{{ .ConfirmationURL }}" style="color:#14B8A6;word-break:break-all;">{{ .ConfirmationURL }}</a>
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="padding:24px 40px;border-top:1px solid #334155;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">
+              Sent to {{ .Email }} · If you didn't create a SetAll account, you can safely ignore this email.<br>
+              <a href="https://setall.app" style="color:#475569;text-decoration:underline;">setall.app</a>
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

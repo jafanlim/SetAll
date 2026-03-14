@@ -19,9 +19,9 @@ test:
 local-db:
 	supabase start
 
-# 5. Build Flutter web (release, CanvasKit renderer for best fidelity)
+# 5. Build Flutter web (release, HTML renderer — avoids CanvasKit WASM hang on macOS Safari/Chrome)
 build-web:
-	flutter build web --release --no-tree-shake-icons
+	flutter build web --release --no-tree-shake-icons --web-renderer html
 	cp build/web/index.html build/web/app.html
 	cp web/landing.html build/web/index.html
 	cp web/robots.txt build/web/robots.txt

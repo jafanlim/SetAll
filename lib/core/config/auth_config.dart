@@ -22,7 +22,7 @@ class AuthConfig {
   // You will need these from the Google Cloud Console later when setting up Google Auth.
   
   /// Web Client ID (Required for Android & Web Google Sign-in)
-  static const String googleWebClientId = 'YOUR_GOOGLE_WEB_CLIENT_ID_HERE';
+  static const String googleWebClientId = '454096661669-qrko5vmk5gk4pels4n0k1o0lnuehubnj.apps.googleusercontent.com';
   
   /// iOS Client ID (Required for iOS Google Sign-in)
   static const String googleIosClientId = 'YOUR_GOOGLE_IOS_CLIENT_ID_HERE';

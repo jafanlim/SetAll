@@ -114,6 +114,26 @@ class LocalDatabase {
 
   static Database? get dbOrNull => _db;
 
+  /// Injects a pre-built [Database] for unit tests. Bypasses [_open] so tests
+  /// can supply an in-memory SQLite database without touching the filesystem
+  /// or [path_provider]. Must be called before any repository method.
+  // ignore: invalid_use_of_visible_for_testing_member
+  static void injectForTesting(Database testDb) {
+    _db = testDb;
+    _webMode = false;
+    _instance ??= LocalDatabase._();
+    _initFuture = Future.value(_instance!);
+  }
+
+  /// Resets all static singleton state between tests.
+  // ignore: invalid_use_of_visible_for_testing_member
+  static void resetForTesting() {
+    _db = null;
+    _instance = null;
+    _initFuture = null;
+    _webMode = false;
+  }
+
   Future<Database> _open() async {
     final dir = await getApplicationDocumentsDirectory();
     final path = join(dir.path, _dbName);
