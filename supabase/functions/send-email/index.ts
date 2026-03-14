@@ -236,7 +236,11 @@ serve(async (req) => {
     const redirectTo = emailData.redirect_to as string | undefined
     const siteUrl    = emailData.site_url   as string | undefined ?? APP_URL
 
-    console.log(`send-email: toEmail=${toEmail} actionType=${actionType} tokenHash=${tokenHash?.slice(0,8)}...`)
+    // Also try the 'token' field as fallback (OTP flow)
+    const token      = emailData.token as string | undefined
+
+    console.log('send-email emailData:', JSON.stringify(emailData))
+    console.log(`send-email: toEmail=${toEmail} actionType=${actionType} token_hash=${tokenHash} token=${token}`)
 
     if (!toEmail || !actionType) {
       console.error('send-email: missing required fields', { toEmail, actionType, payloadKeys: Object.keys(payload) })
@@ -246,13 +250,20 @@ serve(async (req) => {
       })
     }
 
-    // Build the confirmation URL using the Supabase project verify endpoint.
-    // apikey is required by the /auth/v1/verify endpoint.
+    // Build the confirmation URL.
+    // token_hash must be URL-encoded (may contain base64 chars like +/=).
+    // Fall back to OTP token if token_hash is absent.
     const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co'
     const finalRedirect = redirectTo ?? `${APP_URL}/login`
-    const actionUrl = tokenHash
-      ? `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token_hash=${tokenHash}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
-      : finalRedirect
+    let actionUrl: string
+    if (tokenHash) {
+      actionUrl = `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+    } else if (token) {
+      actionUrl = `${SUPABASE_URL}/auth/v1/verify?apikey=${SUPABASE_ANON_KEY}&token=${encodeURIComponent(token)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
+    } else {
+      console.error('send-email: no token or token_hash in payload', JSON.stringify(emailData))
+      actionUrl = finalRedirect
+    }
 
     // Select HTML template
     let html: string
