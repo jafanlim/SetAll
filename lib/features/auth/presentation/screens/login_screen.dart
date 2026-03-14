@@ -167,7 +167,8 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) setState(() => _loading = false);
       // Web: redirect happens in browser; app will reload with session.
-      // Mobile: may return here after in-app browser.
+      // Mobile: check profile existence after OAuth returns.
+      if (!kIsWeb && mounted) await _checkProfileExistsOrSignOut();
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
@@ -183,6 +184,67 @@ class _LoginScreenState extends State<LoginScreen> {
         });
       }
     }
+  }
+
+  /// Called after OAuth returns on native platforms.
+  /// If Google created a brand-new auth user with no profile row, sign them
+  /// out immediately and offer to navigate to the register screen.
+  Future<void> _checkProfileExistsOrSignOut() async {
+    final user = Supabase.instance.client.auth.currentUser;
+    if (user == null) return;
+    try {
+      final rows = await Supabase.instance.client
+          .from('profiles')
+          .select('id')
+          .eq('id', user.id)
+          .limit(1);
+      final exists = (rows as List).isNotEmpty;
+      if (!exists && mounted) {
+        await Supabase.instance.client.auth.signOut();
+        if (!mounted) return;
+        _showNoAccountDialog();
+      }
+    } catch (_) {
+      // If the check fails, allow through — Supabase trigger will create profile.
+    }
+  }
+
+  void _showNoAccountDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E293B),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'No account found',
+          style: TextStyle(color: Color(0xFFF1F5F9), fontWeight: FontWeight.w700),
+        ),
+        content: const Text(
+          'There\'s no SetAll account linked to that Google address.\nWould you like to create one?',
+          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            style: TextButton.styleFrom(foregroundColor: const Color(0xFF94A3B8)),
+            child: const Text('Stay on Login'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.go(AppRouter.register);
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF14B8A6),
+              foregroundColor: const Color(0xFF0F172A),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: const Text('Create Account', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
   }
 
   String _friendlyAuthMessage(String raw) {
