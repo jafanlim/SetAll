@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:window_manager/window_manager.dart';
+import 'package:window_manager/window_manager.dart' if (dart.library.html) 'core/stubs/window_manager_stub.dart';
 
 import 'core/theme/setall_theme.dart';
 import 'core/router/app_router.dart';
