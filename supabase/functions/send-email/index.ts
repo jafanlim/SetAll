@@ -74,14 +74,10 @@ function emailShell(title: string, body: string): string {
 }
 
 function ctaButton(label: string, url: string): string {
-  // Escape & as &amp; in href — HTML spec requirement.
-  // Without this, email clients strip everything after the first bare &,
-  // which removes token_hash from the Supabase verify URL.
-  const href = url.replace(/&/g, '&amp;')
   return `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:32px;">
     <tr>
       <td align="center">
-        <a href="${href}"
+        <a href="${url}"
            style="display:inline-block;background:#14B8A6;color:#0F172A;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
           ${label}
         </a>
@@ -91,10 +87,9 @@ function ctaButton(label: string, url: string): string {
 }
 
 function fallbackLink(url: string): string {
-  const href = url.replace(/&/g, '&amp;')
   return `<p style="margin:0;font-size:12px;color:#64748B;line-height:1.8;">
     Or copy and paste this URL into your browser:<br>
-    <a href="${href}" style="color:#14B8A6;word-break:break-all;">${url}</a>
+    <a href="${url}" style="color:#14B8A6;word-break:break-all;">${url}</a>
   </p>`
 }
 
@@ -246,6 +241,7 @@ serve(async (req) => {
 
     console.log('send-email emailData:', JSON.stringify(emailData))
     console.log(`send-email: toEmail=${toEmail} actionType=${actionType} token_hash=${tokenHash} token=${token}`)
+    // actionUrl logged below after construction
 
     if (!toEmail || !actionType) {
       console.error('send-email: missing required fields', { toEmail, actionType, payloadKeys: Object.keys(payload) })
@@ -269,6 +265,8 @@ serve(async (req) => {
       console.error('send-email: no token or token_hash in payload', JSON.stringify(emailData))
       actionUrl = finalRedirect
     }
+
+    console.log('send-email actionUrl:', actionUrl)
 
     // Select HTML template
     let html: string

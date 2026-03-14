@@ -81,6 +81,14 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         password: password,
       );
+      // Mark registration complete for email/password users — idempotent.
+      final uid = Supabase.instance.client.auth.currentUser?.id;
+      if (uid != null) {
+        Supabase.instance.client.from('profiles')
+            .update({'registration_complete': true})
+            .eq('id', uid)
+            .then((_) {}, onError: (_) {});
+      }
       if (mounted) {
         final bio    = BiometricService.instance;
         final canUse = await bio.canUseBiometrics();
@@ -208,26 +216,28 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// Called after OAuth returns on native platforms.
-  /// If Google created a brand-new auth user with no profile row, sign them
-  /// out immediately and offer to navigate to the register screen.
+  /// Called after OAuth returns on native and web.
+  /// Blocks new Google users who haven't gone through the register screen.
+  /// The handle_new_user trigger creates a profile for all OAuth users with
+  /// registration_complete=false; only the register screen sets it to true.
   Future<void> _checkProfileExistsOrSignOut() async {
     final user = Supabase.instance.client.auth.currentUser;
     if (user == null) return;
     try {
       final rows = await Supabase.instance.client
           .from('profiles')
-          .select('id')
+          .select('id, registration_complete')
           .eq('id', user.id)
           .limit(1);
-      final exists = (rows as List).isNotEmpty;
-      if (!exists && mounted) {
+      final profile = (rows as List).isNotEmpty ? rows.first as Map : null;
+      final isComplete = profile != null && profile['registration_complete'] == true;
+      if (!isComplete && mounted) {
         await Supabase.instance.client.auth.signOut();
         if (!mounted) return;
         _showNoAccountDialog();
       }
     } catch (_) {
-      // If the check fails, allow through — Supabase trigger will create profile.
+      // If the check fails, allow through — safer than locking out valid users.
     }
   }
 
