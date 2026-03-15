@@ -33,6 +33,7 @@ class SyncService {
   bool _syncPending = false;
   RealtimeChannel? _channel;
   Timer? _periodicTimer;
+  Timer? _resubscribeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   bool get _isWeb => LocalDatabase.isWeb;
@@ -189,6 +190,16 @@ class SyncService {
         )
         .subscribe((status, [error]) {
           debugPrint('[SyncService] realtime status=$status error=$error');
+          if (status == RealtimeSubscribeStatus.channelError) {
+            // JWT likely expired — resubscribe after a short delay.
+            _resubscribeTimer?.cancel();
+            _resubscribeTimer = Timer(const Duration(seconds: 5), () {
+              if (_channel != null) {
+                debugPrint('[SyncService] resubscribing after channelError');
+                subscribeToRealtime();
+              }
+            });
+          }
         });
   }
 
@@ -196,6 +207,8 @@ class SyncService {
   void unsubscribeFromRealtime() {
     _periodicTimer?.cancel();
     _periodicTimer = null;
+    _resubscribeTimer?.cancel();
+    _resubscribeTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
     if (_channel != null) {
@@ -392,6 +405,24 @@ class SyncService {
               await _client.from('group_members').delete()
                   .eq('group_id', gid).eq('user_id', uid);
               debugPrint('[SyncService] removed stale group_members row for $gid');
+              // If the group is also gone from Supabase groups table, the
+              // left_groups entry is permanently dead — purge it so we stop
+              // retrying on every sync tick.
+              if (rows.isEmpty) {
+                try {
+                  final cloudGroup = await _client
+                      .from('groups')
+                      .select('id')
+                      .eq('id', gid)
+                      .maybeSingle();
+                  if (cloudGroup == null) {
+                    debugPrint('[SyncService] purging dead left_groups entry for $gid (not in Supabase)');
+                    await LocalDatabase.db.delete(
+                      'left_groups', where: 'group_id = ?', whereArgs: [gid]);
+                    leftGroupIds.remove(gid);
+                  }
+                } catch (_) {}
+              }
             } catch (e) {
               debugPrint('[SyncService] group_members cleanup failed for $gid: $e');
             }
