@@ -74,28 +74,42 @@ final class AppRouter {
         try {
           final user = Supabase.instance.client.auth.currentUser;
           final loc = state.matchedLocation;
-          final isLogin    = loc == login;
-          final isRegister = loc == register;
+          final isLogin         = loc == login;
+          final isRegister      = loc == register;
           final isBiometricGate = loc == biometricGate;
-          final isPublic = loc == download || loc == privacy || loc == terms;
-          // /dashboard is a web browser-friendly alias — treat it as dashboard.
+          final isPublic        = loc == download || loc == privacy || loc == terms;
           if (loc == '/dashboard') {
             if (user == null) return login;
             return dashboard;
           }
           if (user == null && !isLogin && !isRegister && !isPublic) return login;
           if (user != null && isLogin) {
+            // Guard: only users who completed registration may proceed.
+            // handle_new_user trigger creates a profile for every OAuth user
+            // with registration_complete=false; only the register screen or
+            // email confirmation sets it to true.
+            try {
+              final rows = await Supabase.instance.client
+                  .from('profiles')
+                  .select('registration_complete')
+                  .eq('id', user.id)
+                  .limit(1);
+              final isComplete = (rows as List).isNotEmpty &&
+                  rows.first['registration_complete'] == true;
+              if (!isComplete) {
+                LoginScreen.pendingNoAccountDialog = true;
+                await Supabase.instance.client.auth.signOut();
+                return login;
+              }
+            } catch (_) {
+              // Allow through if the check fails — safer than locking out real users.
+            }
             final useBio = await bio.getUseBiometric();
             if (useBio) return biometricGate;
             return dashboard;
           }
           if (user != null && isBiometricGate) return null;
           if (user != null) {
-            // Only gate if biometric is enabled AND the session hasn't been
-            // unlocked yet in this process. Without this guard, every in-app
-            // navigation push (e.g. /group/:id/invite) triggers a redirect
-            // back to the biometric gate, silently discarding the intended
-            // destination.
             if (!bio.sessionUnlocked) {
               final useBio = await bio.getUseBiometric();
               if (useBio) return biometricGate;

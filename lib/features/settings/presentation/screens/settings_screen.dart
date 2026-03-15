@@ -493,15 +493,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final messenger  = ScaffoldMessenger.of(context);
     final errorColor = Theme.of(context).colorScheme.error;
     try {
-      final uid    = Supabase.instance.client.auth.currentUser?.id;
       final client = Supabase.instance.client;
-      if (uid != null) {
-        // Soft-delete: mark profile with is_deleted + scheduled_deletion_at
-        final deletionAt = DateTime.now().toUtc().add(const Duration(days: 30)).toIso8601String();
-        await client.from('profiles').update({
-          'is_deleted': true,
-          'scheduled_deletion_at': deletionAt,
-        }).eq('id', uid);
+      final result = await client.rpc('delete_user_data') as Map<String, dynamic>?;
+      if (result != null && result['success'] != true) {
+        throw Exception(result['error'] ?? 'Deletion failed');
       }
       // Wipe local cache
       await LocalDatabase.db.delete('splits');

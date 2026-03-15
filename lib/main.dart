@@ -190,18 +190,32 @@ class _AppLoaderState extends State<_AppLoader> {
     });
   }
 
-  /// On web, recover auth session when user lands from email confirmation or OAuth redirect (e.g. opening link on iPhone).
+  /// On web, recover auth session when user lands from email confirmation or OAuth redirect.
   Future<void> _recoverSessionFromUrlIfNeeded() async {
     if (!kIsWeb) return;
     try {
       final uri = Uri.base;
-      final hasAuthParams = uri.fragment.contains('access_token') ||
-          uri.fragment.contains('error') ||
-          uri.queryParameters.containsKey('code');
-      if (hasAuthParams) {
-        debugPrint('[Auth] Recovering session from URL: $uri');
-        await Supabase.instance.client.auth.getSessionFromUrl(uri);
-        debugPrint('[Auth] Session recovered successfully');
+      final hasCode        = uri.queryParameters.containsKey('code');
+      final hasAccessToken = uri.fragment.contains('access_token');
+      final hasError       = uri.fragment.contains('error');
+      if (!hasCode && !hasAccessToken && !hasError) return;
+
+      debugPrint('[Auth] Recovering session from URL: $uri');
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      debugPrint('[Auth] Session recovered');
+
+      // Email confirmation via PKCE code: mark registration complete so the
+      // router doesn't block the user after they verify their email.
+      final isEmailConfirm = hasCode && uri.queryParameters['type'] == 'signup';
+      if (isEmailConfirm) {
+        final uid = Supabase.instance.client.auth.currentUser?.id;
+        if (uid != null) {
+          await Supabase.instance.client
+              .from('profiles')
+              .update({'registration_complete': true})
+              .eq('id', uid);
+          debugPrint('[Auth] registration_complete set for $uid');
+        }
       }
     } catch (e) {
       debugPrint('[Auth] getSessionFromUrl failed: $e');

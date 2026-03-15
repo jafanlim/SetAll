@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -13,6 +11,10 @@ import '../../../../core/services/biometric_service.dart';
 /// Mirrors the premium dark aesthetic of [RegisterScreen].
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
+
+  /// Set to true by the router when it signs out an unregistered OAuth user.
+  /// The login screen shows the "no account" dialog on next mount.
+  static bool pendingNoAccountDialog = false;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -41,28 +43,21 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _message;
   bool _isSuccess    = false;
 
-  StreamSubscription<AuthState>? _authSub;
-
   @override
   void initState() {
     super.initState();
-    // On web, Google OAuth uses a redirect flow — the page reloads after
-    // the user authenticates. Listen for the resulting SIGNED_IN event and
-    // run the check-before-create guard so new Google users are blocked.
-    if (kIsWeb) {
-      _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
-        (data) {
-          if (data.event == AuthChangeEvent.signedIn && mounted) {
-            _checkProfileExistsOrSignOut();
-          }
-        },
-      );
+    // If the router signed out an unregistered OAuth user before navigating
+    // here, show the "no account" dialog on the next frame.
+    if (LoginScreen.pendingNoAccountDialog) {
+      LoginScreen.pendingNoAccountDialog = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _showNoAccountDialog();
+      });
     }
   }
 
   @override
   void dispose() {
-    _authSub?.cancel();
     _emailController.dispose();
     _passwordController.dispose();
     _emailFocus.dispose();
