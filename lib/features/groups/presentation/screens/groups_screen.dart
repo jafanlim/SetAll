@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -271,9 +272,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Groups',
-          style: TextStyle(
+        title: Text(
+          'groups.title'.tr(),
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 20,
             letterSpacing: -0.3,
@@ -597,7 +598,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
                         child: Center(
                           child: Text(
-                            'No groups yet. Tap New group to create one.',
+                            'groups.no_groups'.tr(),
                             style: theme.textTheme.bodyMedium?.copyWith(
                                 color: theme.colorScheme.onSurfaceVariant),
                             textAlign: TextAlign.center,
