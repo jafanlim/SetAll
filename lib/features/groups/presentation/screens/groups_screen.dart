@@ -1166,6 +1166,15 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     if (result == 'force_delete') _delete(force: true);
   }
 
+  static const _kStorageBase =
+      'https://vrsmsgyxeyzyrdonsnrk.supabase.co/storage/v1/object/public/group-avatars/';
+
+  static String? _resolveAvatarUrl(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    if (raw.startsWith('http')) return raw;
+    return '$_kStorageBase$raw';
+  }
+
   // Map icon name -> IconData for the group card avatar.
   static IconData _iconForName(String? name) {
     const _map = {
@@ -1240,9 +1249,9 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: group.avatarUrl != null
+                        child: _resolveAvatarUrl(group.avatarUrl) != null
                             ? Image.network(
-                                group.avatarUrl!,
+                                _resolveAvatarUrl(group.avatarUrl)!,
                                 width: 40,
                                 height: 40,
                                 fit: BoxFit.cover,

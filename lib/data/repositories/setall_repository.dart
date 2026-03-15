@@ -951,7 +951,7 @@ class SetAllRepository {
           .from('group-avatars')
           .uploadBinary(storagePath, uploadBytes,
               fileOptions: const FileOptions(upsert: true));
-      return storagePath;
+      return _client.storage.from('group-avatars').getPublicUrl(storagePath);
     } catch (e) {
       debugPrint('[uploadGroupAvatar] failed: $e');
       return null;

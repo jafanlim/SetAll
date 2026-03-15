@@ -15,6 +15,18 @@ const _teal        = Color(0xFF00D9B0);
 const _orange      = Color(0xFFFF8C42);
 const _brandOrange = Color(0xFFF97316);
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+const _kStorageBase =
+    'https://vrsmsgyxeyzyrdonsnrk.supabase.co/storage/v1/object/public/group-avatars/';
+
+String? _resolveAvatarUrl(String? raw) {
+  if (raw == null || raw.isEmpty) return null;
+  if (raw.startsWith('http')) return raw;
+  return '$_kStorageBase$raw';
+}
+
+// ---------------------------------------------------------------------------
 // Icon map (mirrors create_group_screen)
 // ---------------------------------------------------------------------------
 const Map<String, IconData> _kGroupIcons = {
@@ -247,9 +259,9 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(18),
-                        child: group.avatarUrl != null
+                        child: _resolveAvatarUrl(group.avatarUrl) != null
                             ? Image.network(
-                                group.avatarUrl!,
+                                _resolveAvatarUrl(group.avatarUrl)!,
                                 width: 64,
                                 height: 64,
                                 fit: BoxFit.cover,
