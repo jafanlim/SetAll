@@ -122,7 +122,10 @@ class _AppLoaderState extends State<_AppLoader> {
         // Web: Supabase only. No anonymous sign-in; user signs in with Email or Google.
         LocalDatabase.setWebMode();
         if (hasSupabase) {
-          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce));
+          // Implicit flow on web: email confirmation links work cross-device
+          // because GoTrue returns tokens in #fragment (no client-side
+          // PKCE verifier required). Mobile uses PKCE via _initSupabase().
+          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
           // Recover session when user lands from email confirmation or OAuth (e.g. on iPhone opening link).
           await _recoverSessionFromUrlIfNeeded();
         }
@@ -190,18 +193,32 @@ class _AppLoaderState extends State<_AppLoader> {
     });
   }
 
-  /// On web, recover auth session when user lands from email confirmation or OAuth redirect (e.g. opening link on iPhone).
+  /// On web, recover auth session when user lands from email confirmation or OAuth redirect.
   Future<void> _recoverSessionFromUrlIfNeeded() async {
     if (!kIsWeb) return;
     try {
       final uri = Uri.base;
-      final hasAuthParams = uri.fragment.contains('access_token') ||
-          uri.fragment.contains('error') ||
-          uri.queryParameters.containsKey('code');
-      if (hasAuthParams) {
-        debugPrint('[Auth] Recovering session from URL: $uri');
-        await Supabase.instance.client.auth.getSessionFromUrl(uri);
-        debugPrint('[Auth] Session recovered successfully');
+      final hasCode        = uri.queryParameters.containsKey('code');
+      final hasAccessToken = uri.fragment.contains('access_token');
+      final hasError       = uri.fragment.contains('error');
+      if (!hasCode && !hasAccessToken && !hasError) return;
+
+      debugPrint('[Auth] Recovering session from URL: $uri');
+      await Supabase.instance.client.auth.getSessionFromUrl(uri);
+      debugPrint('[Auth] Session recovered');
+
+      // After email confirmation, mark registration_complete so the router
+      // doesn't block the user. Only do this for email/password users
+      // (provider == 'email') — Google OAuth users must go through the
+      // register screen instead.
+      final user = Supabase.instance.client.auth.currentUser;
+      final isEmailUser = user?.appMetadata['provider'] == 'email';
+      if (user != null && isEmailUser) {
+        await Supabase.instance.client
+            .from('profiles')
+            .update({'registration_complete': true})
+            .eq('id', user.id);
+        debugPrint('[Auth] registration_complete set for email user ${user.id}');
       }
     } catch (e) {
       debugPrint('[Auth] getSessionFromUrl failed: $e');
