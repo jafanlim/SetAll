@@ -150,6 +150,23 @@
                         <p id="password-match-error" class="hidden text-xs text-brand-orange mt-2 ml-1">Passwords do not match.</p>
                     </div>
 
+                    <!-- T&C Acceptance (signup only) -->
+                    <div id="terms-acceptance" class="hidden items-start gap-3 mt-4">
+                        <div class="relative flex-shrink-0 mt-0.5">
+                            <input type="checkbox" id="terms-checkbox" class="peer sr-only">
+                            <div onclick="document.getElementById('terms-checkbox').click()" class="w-5 h-5 rounded border-2 border-brand-border bg-[#020617]/50 cursor-pointer flex items-center justify-center peer-checked:bg-brand-teal peer-checked:border-brand-teal transition-all">
+                                <svg id="terms-check-icon" class="hidden w-3 h-3 text-brand-deep" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                        </div>
+                        <label for="terms-checkbox" class="text-sm text-slate-400 leading-relaxed cursor-pointer select-none">
+                            I agree to the
+                            <a href="/terms" target="_blank" class="font-semibold text-white hover:text-brand-teal transition-colors">Terms of Service</a>
+                            and
+                            <a href="/privacy" target="_blank" class="font-semibold text-white hover:text-brand-teal transition-colors">Privacy Policy</a>.
+                        </label>
+                    </div>
+                    <p id="terms-error" class="hidden text-xs text-brand-orange mt-1 ml-1">You must accept the Terms of Service to create an account.</p>
+
                     <!-- Submit Button -->
                     <button type="submit" id="submit-btn" class="w-full bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-base font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.4)] mt-4 flex items-center justify-center gap-2">
                         <span id="submit-text">Sign In</span>
@@ -201,6 +218,10 @@
         let currentMode = 'login';
 
         // ── DOM References ───────────────────────────────────────────────────────
+        const termsAcceptance = document.getElementById('terms-acceptance');
+        const termsCheckbox   = document.getElementById('terms-checkbox');
+        const termsCheckIcon  = document.getElementById('terms-check-icon');
+        const termsError      = document.getElementById('terms-error');
         const title        = document.getElementById('auth-title');
         const subtitle     = document.getElementById('auth-subtitle');
         const oauthSection = document.getElementById('oauth-section');
@@ -310,6 +331,8 @@
                 toggleText.textContent    = "Don't have an account?";
                 toggleBtn.textContent     = 'Sign up for free';
                 toggleBtn.onclick = () => setMode('signup');
+                termsAcceptance.classList.add('hidden');
+                termsAcceptance.classList.remove('flex');
 
             } else if (mode === 'signup') {
                 document.title = 'Sign Up | SetAll';
@@ -323,6 +346,8 @@
                 forgotLink.style.display = 'none';
                 strengthIndicators.classList.remove('hidden');
                 showConfirmPassword();
+                termsAcceptance.classList.remove('hidden');
+                termsAcceptance.classList.add('flex');
 
             } else if (mode === 'forgot') {
                 document.title = 'Reset Password | SetAll';
@@ -332,6 +357,8 @@
                 toggleText.textContent = 'Remembered your password?';
                 toggleBtn.textContent  = 'Back to Sign In';
                 toggleBtn.onclick = () => setMode('login');
+                termsAcceptance.classList.add('hidden');
+                termsAcceptance.classList.remove('flex');
                 oauthSection.classList.add('hidden', 'h-0', 'opacity-0', 'mb-0');
                 passwordContainer.classList.add('hidden', 'h-0', 'opacity-0');
                 passwordInput.required = false;
@@ -349,6 +376,8 @@
                 emailInput.required = false;
                 strengthIndicators.classList.remove('hidden');
                 showConfirmPassword();
+                termsAcceptance.classList.add('hidden');
+                termsAcceptance.classList.remove('flex');
             }
         }
 
@@ -393,6 +422,16 @@
             });
         });
 
+        // ── Checkbox visual toggle ───────────────────────────────────────────────
+        termsCheckbox.addEventListener('change', () => {
+            if (termsCheckbox.checked) {
+                termsCheckIcon.classList.remove('hidden');
+                termsError.classList.add('hidden');
+            } else {
+                termsCheckIcon.classList.add('hidden');
+            }
+        });
+
         // ── Toggle Button Setup ──────────────────────────────────────────────────
         toggleBtn.onclick = () => setMode('signup');
 
@@ -406,13 +445,18 @@
                     matchError.classList.remove('hidden');
                     return;
                 }
-                matchError.classList.add('hidden');
-                if (passwordInput.value.length < 8) {
-                    showError('Password must be at least 8 characters.');
-                    return;
-                }
             }
-
+            if (currentMode === 'signup' && !termsCheckbox.checked) {
+                termsError.classList.remove('hidden');
+                termsAcceptance.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                return;
+            }
+            termsError.classList.add('hidden');    
+            matchError.classList.add('hidden');
+            if (passwordInput.value.length < 8) {
+                showError('Password must be at least 8 characters.');
+                return;
+            }
             setSubmitting(true);
 
             if (currentMode === 'login') {
