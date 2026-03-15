@@ -122,7 +122,10 @@ class _AppLoaderState extends State<_AppLoader> {
         // Web: Supabase only. No anonymous sign-in; user signs in with Email or Google.
         LocalDatabase.setWebMode();
         if (hasSupabase) {
-          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.pkce));
+          // Implicit flow on web: email confirmation links work cross-device
+          // because GoTrue returns tokens in #fragment (no client-side
+          // PKCE verifier required). Mobile uses PKCE via _initSupabase().
+          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
           // Recover session when user lands from email confirmation or OAuth (e.g. on iPhone opening link).
           await _recoverSessionFromUrlIfNeeded();
         }
