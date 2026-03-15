@@ -66,6 +66,15 @@
                     <p id="auth-subtitle" class="text-slate-400 text-sm">Enter your credentials to access your ledger.</p>
                 </div>
 
+                <!-- Recovery Mode Banner (shown only when arriving from reset email) -->
+                <div id="recovery-banner" class="hidden mb-6 p-4 rounded-2xl flex items-start gap-3" style="background:rgba(20,184,166,0.07);border:1px solid rgba(20,184,166,0.2)">
+                    <i data-lucide="shield-check" class="w-5 h-5 text-brand-teal flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <p class="text-sm font-semibold text-white">Email verified — set your new password</p>
+                        <p class="text-xs text-slate-400 mt-0.5">Both fields below must match. Your other sessions will remain active.</p>
+                    </div>
+                </div>
+
                 <!-- OAuth Buttons & Divider -->
                 <div id="oauth-section" class="anim-container opacity-100">
                     <div class="space-y-3 mb-8">
@@ -200,6 +209,9 @@
             <h3 id="modal-title" class="text-2xl font-bold text-white mb-2">Done!</h3>
             <p id="modal-desc" class="text-slate-400 text-sm mb-8 leading-relaxed"></p>
             <button id="modal-action-btn" class="w-full bg-brand-teal hover:bg-brand-tealHover text-brand-deep font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.4)]">
+                Go to Account
+            </button>
+            <button id="modal-secondary-btn" class="hidden w-full mt-3 bg-transparent border border-brand-border hover:border-slate-500 text-slate-300 hover:text-white font-bold py-3.5 px-4 rounded-xl transition-all">
                 Open App
             </button>
         </div>
@@ -260,12 +272,12 @@
             submitBtn.classList.toggle('opacity-70', loading);
         }
 
-        function showModal(titleText, descText, showAppBtn = true) {
+        function showModal(titleText, descText, showAppBtn = true, secondaryAction = null) {
             document.getElementById('modal-title').textContent = titleText;
             document.getElementById('modal-desc').textContent  = descText;
             const actionBtn = document.getElementById('modal-action-btn');
             if (showAppBtn) {
-                actionBtn.textContent = 'Go to Portal';
+                actionBtn.textContent = 'Go to Account';
                 actionBtn.onclick = () => window.location.href = '/portal';
             } else {
                 actionBtn.textContent = 'Back to Sign In';
@@ -273,6 +285,14 @@
                     document.getElementById('success-modal').classList.add('hidden');
                     setMode('login');
                 };
+            }
+            const secBtn = document.getElementById('modal-secondary-btn');
+            if (secondaryAction) {
+                secBtn.textContent = secondaryAction.label;
+                secBtn.onclick     = secondaryAction.fn;
+                secBtn.classList.remove('hidden');
+            } else {
+                secBtn.classList.add('hidden');
             }
             const modal = document.getElementById('success-modal');
             modal.classList.remove('hidden');
@@ -317,6 +337,7 @@
             });
             confirmContainer.classList.add('hidden', 'h-0', 'opacity-0');
             strengthIndicators.classList.add('hidden');
+            document.getElementById('recovery-banner').classList.add('hidden');
             forgotLink.style.display = 'block';
             passwordInput.required = true;
             emailInput.required    = true;
@@ -378,6 +399,7 @@
                 showConfirmPassword();
                 termsAcceptance.classList.add('hidden');
                 termsAcceptance.classList.remove('flex');
+                document.getElementById('recovery-banner').classList.remove('hidden');
             }
         }
 
@@ -499,7 +521,12 @@
                 const { error } = await _supabase.auth.updateUser({ password: passwordInput.value });
                 setSubmitting(false);
                 if (error) showError(error.message);
-                else showModal('Password Saved!', 'Your password has been successfully updated.', true);
+                else showModal(
+                    'Password Updated!',
+                    'Your password has been changed successfully. A confirmation email has been sent to your inbox.',
+                    true,
+                    { label: 'Open App', fn: () => window.location.href = '/app' }
+                );
             }
         });
 
