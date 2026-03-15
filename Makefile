@@ -22,14 +22,19 @@ local-db:
 # 5. Build Flutter web (release, JS renderer default in Flutter 3.22+)
 build-web:
 	flutter build web --release --no-tree-shake-icons
-	cp build/web/index.html build/web/app.html
-	cp web/landing.html build/web/index.html
+	cp web/app.html      build/web/app.html
+	cp web/index.html    build/web/index.html
+	cp web/login.html    build/web/login.html
+	cp web/portal.html   build/web/portal.html
 	cp web/download.html build/web/download.html
-	cp web/robots.txt build/web/robots.txt
-	cp web/sitemap.xml build/web/sitemap.xml
+	cp web/support.html  build/web/support.html
+	cp web/privacy.html  build/web/privacy.html
+	cp web/terms.html    build/web/terms.html
+	cp web/robots.txt    build/web/robots.txt
+	cp web/sitemap.xml   build/web/sitemap.xml
 	@grep -q 'flutter_bootstrap' build/web/app.html || (echo "ERROR: app.html missing flutter_bootstrap — build step order is wrong!" && exit 1)
 	@grep -q 'flutter_bootstrap' build/web/index.html && (echo "ERROR: index.html has flutter_bootstrap — landing page copy failed!" && exit 1) || true
-	@echo "✓ build/web: app.html=Flutter, index.html=Landing"
+	@echo "✓ build/web ready: app.html=Flutter, index.html=Landing, portal/login/support/privacy/terms=Static"
 
 # 6. Build and deploy to Firebase Hosting (production channel)
 deploy-web: build-web
