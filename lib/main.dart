@@ -46,7 +46,7 @@ void main() async {
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
     return Directionality(
-      textDirection: TextDirection.ltr,
+      textDirection: ui.TextDirection.ltr,
       child: Material(
         child: Container(
           color: const Color(0xFF0F0F12),
@@ -241,7 +241,7 @@ class _AppLoaderState extends State<_AppLoader> {
   Widget build(BuildContext context) {
     if (_error != null) {
       return Directionality(
-        textDirection: TextDirection.ltr,
+        textDirection: ui.TextDirection.ltr,
         child: Material(
           child: Container(
             color: const Color(0xFF0F0F12),
@@ -265,7 +265,7 @@ class _AppLoaderState extends State<_AppLoader> {
     }
     if (!_ready) {
       return Directionality(
-        textDirection: TextDirection.ltr,
+        textDirection: ui.TextDirection.ltr,
         child: Material(
           child: Container(
             color: const Color(0xFF0F0F12),
