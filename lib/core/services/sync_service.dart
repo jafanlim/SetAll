@@ -33,6 +33,7 @@ class SyncService {
   bool _syncPending = false;
   RealtimeChannel? _channel;
   Timer? _periodicTimer;
+  Timer? _resubscribeTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   bool get _isWeb => LocalDatabase.isWeb;
@@ -189,6 +190,16 @@ class SyncService {
         )
         .subscribe((status, [error]) {
           debugPrint('[SyncService] realtime status=$status error=$error');
+          if (status == RealtimeSubscribeStatus.channelError) {
+            // JWT likely expired — resubscribe after a short delay.
+            _resubscribeTimer?.cancel();
+            _resubscribeTimer = Timer(const Duration(seconds: 5), () {
+              if (_channel != null) {
+                debugPrint('[SyncService] resubscribing after channelError');
+                subscribeToRealtime();
+              }
+            });
+          }
         });
   }
 
@@ -196,6 +207,8 @@ class SyncService {
   void unsubscribeFromRealtime() {
     _periodicTimer?.cancel();
     _periodicTimer = null;
+    _resubscribeTimer?.cancel();
+    _resubscribeTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
     if (_channel != null) {
@@ -392,6 +405,27 @@ class SyncService {
               await _client.from('group_members').delete()
                   .eq('group_id', gid).eq('user_id', uid);
               debugPrint('[SyncService] removed stale group_members row for $gid');
+              // Verify the delete actually stuck by re-querying group_members.
+              // Supabase may silently no-op the DELETE if an RLS policy blocks it.
+              // Once confirmed gone, purge left_groups so we stop retrying.
+              if (rows.isEmpty) {
+                try {
+                  final stillMember = await _client
+                      .from('group_members')
+                      .select('group_id')
+                      .eq('group_id', gid)
+                      .eq('user_id', uid)
+                      .maybeSingle();
+                  if (stillMember == null) {
+                    debugPrint('[SyncService] purging left_groups for $gid '
+                        '(confirmed removed from group_members)');
+                    await LocalDatabase.db.delete(
+                      'left_groups', where: 'group_id = ?', whereArgs: [gid]);
+                    leftGroupIds.remove(gid);
+                  }
+                  // else: delete silently failed (RLS?); keep retrying next tick.
+                } catch (_) {}
+              }
             } catch (e) {
               debugPrint('[SyncService] group_members cleanup failed for $gid: $e');
             }

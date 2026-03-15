@@ -1044,13 +1044,23 @@ class SetAllRepository {
           }
         } catch (_) {}
 
-        if (creatorId != uid) {
+        if (creatorId == uid) {
+          // Owner: hard-delete all data from Supabase (web has no local SQLite).
+          final expRows = await _client
+              .from('expenses').select('id').eq('group_id', groupId) as List;
+          final expIds = expRows
+              .map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+          if (expIds.isNotEmpty) {
+            await _client.from('splits').delete().inFilter('expense_id', expIds);
+            await _client.from('expenses').delete().eq('group_id', groupId);
+          }
+          await _client.from('group_members').delete().eq('group_id', groupId);
+          await _client.from('groups').delete().eq('id', groupId);
+        } else {
           // Non-owner: leave — remove this user from group_members.
           await _client.from('group_members').delete()
               .eq('group_id', groupId).eq('user_id', uid);
         }
-        // Owner soft-delete: Supabase groups has no is_deleted column.
-        // The group is hidden locally; sync reconciler will prune it.
         _logGroupDeletedEvents(uid, {groupId: (webGroupName, creatorId ?? uid)});
         _notify();
         return true;
@@ -1165,7 +1175,15 @@ class SetAllRepository {
           'expenses', where: 'id = ?', whereArgs: [ex['id']]);
       }
     } else {
-      // ── Non-owner: fully remove local data ────────────────────────────────
+      // ── Non-owner: soft-delete the group row FIRST so any concurrent sync
+      // tick sees is_deleted=1 and does not strip the left_groups entry,
+      // then purge live expense/split/member data from local tables.
+      await LocalDatabase.db.update(
+        'groups',
+        {'is_deleted': 1, 'deleted_at': deletedAt},
+        where: 'id = ?',
+        whereArgs: [groupId],
+      );
       final expenseRows = await LocalDatabase.db.query(
         'expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [groupId]);
       for (final row in expenseRows) {
@@ -1175,7 +1193,6 @@ class SetAllRepository {
       await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
       await LocalDatabase.db.delete('group_members',
           where: 'group_id = ?', whereArgs: [groupId]);
-      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
     }
 
     _logGroupDeletedEvents(uid, {groupId: (groupName, creatorId ?? uid)});

@@ -28,6 +28,8 @@ class File {
   File(this.path);
   final String path;
   dynamic openWrite() => _NullSink();
+  Future<String> readAsString() async => '';
+  Future<List<int>> readAsBytes() async => [];
 }
 
 class _NullSink {
