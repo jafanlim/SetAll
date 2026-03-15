@@ -1,9 +1,11 @@
 import 'dart:async';
-import 'dart:io' as _io;
 import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'dart:io' as _io
+    if (dart.library.html) '../../core/stubs/io_stub.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart'
+    if (dart.library.html) '../../core/stubs/image_compress_stub.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/attachment_processor.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;

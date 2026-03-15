@@ -1,10 +1,15 @@
-import 'dart:io' as io;
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import 'package:path/path.dart' as p;
-import 'package:pdfx/pdfx.dart';
+
+// Native-only imports — excluded on web to avoid MissingPluginException.
+import 'dart:io' as io
+    if (dart.library.html) '../stubs/io_stub.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart'
+    if (dart.library.html) '../stubs/image_compress_stub.dart';
+import 'package:pdfx/pdfx.dart'
+    if (dart.library.html) '../stubs/pdfx_stub.dart';
 
 /// Result of processing a local attachment file before upload.
 class ProcessedAttachment {
@@ -53,6 +58,7 @@ class AttachmentProcessor {
   /// Process [localPath]. Returns null if the extension is not allowed or
   /// processing fails.
   static Future<ProcessedAttachment?> process(String localPath) async {
+    if (kIsWeb) return null;
     final ext = _ext(localPath);
     if (!_allowed.contains(ext)) return null;
 
