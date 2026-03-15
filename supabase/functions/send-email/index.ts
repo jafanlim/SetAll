@@ -213,16 +213,13 @@ function subjectFor(actionType: string): string {
 }
 
 // ── URL builder ────────────────────────────────────────────────────────────────
-// PKCE tokens (pkce_ prefix) CANNOT be verified at /auth/v1/verify — GoTrue
-// silently rejects them.  Instead, send the user to the app with ?code=<hash>;
-// the Flutter SDK exchanges the code via getSessionFromUrl() on startup.
+// token_hash (including pkce_ prefixed) is sent to /auth/v1/verify.
+// GoTrue verifies it and redirects to redirect_to with a real ?code= param.
+// The Flutter SDK exchanges that code via getSessionFromUrl() on load.
+// NOTE: apikey must NOT be in this URL — it strips subsequent query params.
 
 function buildActionUrl(tokenHash: string | undefined, token: string | undefined, actionType: string, finalRedirect: string): string {
   if (tokenHash) {
-    if (tokenHash.startsWith('pkce_')) {
-      const sep = finalRedirect.includes('?') ? '&' : '?'
-      return `${finalRedirect}${sep}code=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(actionType)}`
-    }
     return `${SUPABASE_URL}/auth/v1/verify?token_hash=${encodeURIComponent(tokenHash)}&type=${encodeURIComponent(actionType)}&redirect_to=${encodeURIComponent(finalRedirect)}`
   }
   if (token) {

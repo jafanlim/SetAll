@@ -204,18 +204,18 @@ class _AppLoaderState extends State<_AppLoader> {
       await Supabase.instance.client.auth.getSessionFromUrl(uri);
       debugPrint('[Auth] Session recovered');
 
-      // Email confirmation via PKCE code: mark registration complete so the
-      // router doesn't block the user after they verify their email.
-      final isEmailConfirm = hasCode && uri.queryParameters['type'] == 'signup';
-      if (isEmailConfirm) {
-        final uid = Supabase.instance.client.auth.currentUser?.id;
-        if (uid != null) {
-          await Supabase.instance.client
-              .from('profiles')
-              .update({'registration_complete': true})
-              .eq('id', uid);
-          debugPrint('[Auth] registration_complete set for $uid');
-        }
+      // After email confirmation, mark registration_complete so the router
+      // doesn't block the user. Only do this for email/password users
+      // (provider == 'email') — Google OAuth users must go through the
+      // register screen instead.
+      final user = Supabase.instance.client.auth.currentUser;
+      final isEmailUser = user?.appMetadata['provider'] == 'email';
+      if (user != null && isEmailUser) {
+        await Supabase.instance.client
+            .from('profiles')
+            .update({'registration_complete': true})
+            .eq('id', user.id);
+        debugPrint('[Auth] registration_complete set for email user ${user.id}');
       }
     } catch (e) {
       debugPrint('[Auth] getSessionFromUrl failed: $e');
