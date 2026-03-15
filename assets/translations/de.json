@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "wallet": "Geldbörse",
+    "groups": "Gruppen",
+    "activity": "Aktivität",
+    "analytics": "Analyse",
+    "settings": "Einstellungen"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "net_worth": "Nettovermögen",
+    "wallet_cash": "Bargeld",
+    "you_are_owed": "Dir wird geschuldet",
+    "you_owe": "Du schuldest",
+    "overall_owed": "Gesamt dir geschuldet",
+    "overall_balanced": "Alles beglichen",
+    "recent_activity": "Letzte Aktivität",
+    "no_expenses": "Noch keine Ausgaben",
+    "start_tracking": "Tracking starten",
+    "items": "{count} Einträge"
+  },
+  "wallet": {
+    "title": "Geldbörse",
+    "income": "Einnahmen",
+    "expenses": "Ausgaben",
+    "net": "Netto",
+    "no_entries": "Keine Einträge in der Geldbörse",
+    "start_tracking": "Tracking starten"
+  },
+  "groups": {
+    "title": "Gruppen",
+    "your_groups": "Deine Gruppen",
+    "no_groups": "Noch keine Gruppen",
+    "members": "{count} Mitglieder",
+    "member": "1 Mitglied",
+    "create": "Neue Gruppe"
+  },
+  "analytics": {
+    "title": "Analyse",
+    "spending_by_category": "Ausgaben nach Kategorie",
+    "net_position_trend": "Nettoposition — 30 Tage",
+    "no_data": "Noch keine Ausgabendaten",
+    "start_tracking": "Tracking starten",
+    "total": "Gesamt",
+    "other": "Sonstiges",
+    "wallet": "Geldbörse",
+    "groups": "Gruppen"
+  },
+  "activity": {
+    "title": "Aktivität",
+    "no_activity": "Noch keine Aktivität",
+    "start_tracking": "Tracking starten",
+    "all": "Alle",
+    "income": "Einnahme",
+    "expense": "Ausgabe",
+    "items": "{count} Einträge"
+  },
+  "settings": {
+    "title": "Einstellungen",
+    "language": "Sprache",
+    "language_subtitle": "Bevorzugte Sprache wählen",
+    "appearance": "Erscheinungsbild",
+    "preferences": "Einstellungen",
+    "account": "Konto",
+    "about": "Über die App",
+    "sign_out": "Abmelden",
+    "currency": "Basiswährung"
+  },
+  "common": {
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Löschen",
+    "edit": "Bearbeiten",
+    "rename": "Umbenennen",
+    "loading": "Lädt…",
+    "error": "Etwas ist schiefgelaufen",
+    "settled_up": "Alles beglichen"
+  }
+}

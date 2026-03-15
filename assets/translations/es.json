@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "Panel",
+    "wallet": "Cartera",
+    "groups": "Grupos",
+    "activity": "Actividad",
+    "analytics": "Análisis",
+    "settings": "Ajustes"
+  },
+  "dashboard": {
+    "title": "Panel",
+    "net_worth": "Patrimonio neto",
+    "wallet_cash": "Efectivo",
+    "you_are_owed": "Te deben",
+    "you_owe": "Debes",
+    "overall_owed": "Total que te deben",
+    "overall_balanced": "Todo saldado",
+    "recent_activity": "Actividad reciente",
+    "no_expenses": "Aún no hay gastos",
+    "start_tracking": "Empezar a registrar",
+    "items": "{count} registros"
+  },
+  "wallet": {
+    "title": "Cartera",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "net": "Neto",
+    "no_entries": "Sin entradas en la cartera",
+    "start_tracking": "Empezar a registrar"
+  },
+  "groups": {
+    "title": "Grupos",
+    "your_groups": "Tus grupos",
+    "no_groups": "Aún no hay grupos",
+    "members": "{count} miembros",
+    "member": "1 miembro",
+    "create": "Nuevo grupo"
+  },
+  "analytics": {
+    "title": "Análisis",
+    "spending_by_category": "Gastos por categoría",
+    "net_position_trend": "Posición neta — 30 días",
+    "no_data": "Aún no hay datos de gastos",
+    "start_tracking": "Empezar a registrar",
+    "total": "Total",
+    "other": "Otros",
+    "wallet": "Cartera",
+    "groups": "Grupos"
+  },
+  "activity": {
+    "title": "Actividad",
+    "no_activity": "Aún no hay actividad",
+    "start_tracking": "Empezar a registrar",
+    "all": "Todo",
+    "income": "Ingreso",
+    "expense": "Gasto",
+    "items": "{count} registros"
+  },
+  "settings": {
+    "title": "Ajustes",
+    "language": "Idioma",
+    "language_subtitle": "Elige tu idioma preferido",
+    "appearance": "Apariencia",
+    "preferences": "Preferencias",
+    "account": "Cuenta",
+    "about": "Acerca de",
+    "sign_out": "Cerrar sesión",
+    "currency": "Moneda base"
+  },
+  "common": {
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "rename": "Renombrar",
+    "loading": "Cargando…",
+    "error": "Algo salió mal",
+    "settled_up": "Todo saldado"
+  }
+}

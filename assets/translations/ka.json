@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "მთავარი",
+    "wallet": "საფულე",
+    "groups": "ჯგუფები",
+    "activity": "აქტივობა",
+    "analytics": "ანალიტიკა",
+    "settings": "პარამეტრები"
+  },
+  "dashboard": {
+    "title": "მთავარი",
+    "net_worth": "წმინდა ღირებულება",
+    "wallet_cash": "საფულის ნაშთი",
+    "you_are_owed": "გეკუთვნით",
+    "you_owe": "თქვენ გეკუთვნის",
+    "overall_owed": "სულ გეკუთვნით",
+    "overall_balanced": "ყველაფერი ანაზღაურებულია",
+    "recent_activity": "ბოლო ოპერაციები",
+    "no_expenses": "ხარჯები ჯერ არ არის",
+    "start_tracking": "დაიწყეთ აღრიცხვა",
+    "items": "{count} ჩანაწერი"
+  },
+  "wallet": {
+    "title": "საფულე",
+    "income": "შემოსავალი",
+    "expenses": "ხარჯები",
+    "net": "სულ",
+    "no_entries": "საფულეში ჩანაწერი არ არის",
+    "start_tracking": "დაიწყეთ აღრიცხვა"
+  },
+  "groups": {
+    "title": "ჯგუფები",
+    "your_groups": "თქვენი ჯგუფები",
+    "no_groups": "ჯგუფები ჯერ არ არის",
+    "members": "{count} წევრი",
+    "member": "1 წევრი",
+    "create": "ახალი ჯგუფი"
+  },
+  "analytics": {
+    "title": "ანალიტიკა",
+    "spending_by_category": "ხარჯები კატეგორიის მიხედვით",
+    "net_position_trend": "წმინდა პოზიცია — 30 დღე",
+    "no_data": "ხარჯების მონაცემები ჯერ არ არის",
+    "start_tracking": "დაიწყეთ აღრიცხვა",
+    "total": "სულ",
+    "other": "სხვა",
+    "wallet": "საფულე",
+    "groups": "ჯგუფები"
+  },
+  "activity": {
+    "title": "აქტივობა",
+    "no_activity": "აქტივობა ჯერ არ არის",
+    "start_tracking": "დაიწყეთ აღრიცხვა",
+    "all": "ყველა",
+    "income": "შემოსავალი",
+    "expense": "ხარჯი",
+    "items": "{count} ჩანაწერი"
+  },
+  "settings": {
+    "title": "პარამეტრები",
+    "language": "ენა",
+    "language_subtitle": "აირჩიეთ სასურველი ენა",
+    "appearance": "გარეგნობა",
+    "preferences": "პარამეტრები",
+    "account": "ანგარიში",
+    "about": "აპლიკაციის შესახებ",
+    "sign_out": "გასვლა",
+    "currency": "ძირითადი ვალუტა"
+  },
+  "common": {
+    "save": "შენახვა",
+    "cancel": "გაუქმება",
+    "delete": "წაშლა",
+    "edit": "რედაქტირება",
+    "rename": "გადარქმევა",
+    "loading": "იტვირთება…",
+    "error": "შეცდომა მოხდა",
+    "settled_up": "ყველაფერი ანაზღაურებულია"
+  }
+}

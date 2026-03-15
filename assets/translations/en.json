@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "Dashboard",
+    "wallet": "Wallet",
+    "groups": "Groups",
+    "activity": "Activity",
+    "analytics": "Analytics",
+    "settings": "Settings"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "net_worth": "Net Worth",
+    "wallet_cash": "Wallet Cash",
+    "you_are_owed": "Owed to you",
+    "you_owe": "You owe",
+    "overall_owed": "Overall you are owed",
+    "overall_balanced": "All settled up",
+    "recent_activity": "Recent activity",
+    "no_expenses": "No expenses yet",
+    "start_tracking": "Start Tracking",
+    "items": "{count} items"
+  },
+  "wallet": {
+    "title": "Wallet",
+    "income": "Income",
+    "expenses": "Expenses",
+    "net": "Net",
+    "no_entries": "No wallet entries yet",
+    "start_tracking": "Start Tracking"
+  },
+  "groups": {
+    "title": "Groups",
+    "your_groups": "Your groups",
+    "no_groups": "No groups yet",
+    "members": "{count} members",
+    "member": "1 member",
+    "create": "New Group"
+  },
+  "analytics": {
+    "title": "Analytics",
+    "spending_by_category": "Spending by Category",
+    "net_position_trend": "Net Position — 30 Days",
+    "no_data": "No spending data yet",
+    "start_tracking": "Start Tracking",
+    "total": "Total",
+    "other": "Other",
+    "wallet": "Wallet",
+    "groups": "Groups"
+  },
+  "activity": {
+    "title": "Activity",
+    "no_activity": "No activity yet",
+    "start_tracking": "Start Tracking",
+    "all": "All",
+    "income": "Income",
+    "expense": "Expense",
+    "items": "{count} items"
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "language_subtitle": "Choose your preferred language",
+    "appearance": "Appearance",
+    "preferences": "Preferences",
+    "account": "Account",
+    "about": "About",
+    "sign_out": "Sign out",
+    "currency": "Base Currency"
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "rename": "Rename",
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "settled_up": "All settled up"
+  }
+}

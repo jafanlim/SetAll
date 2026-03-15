@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -83,14 +84,22 @@ void main() async {
     return true;
   };
 
+  await EasyLocalization.ensureInitialized();
+
   runApp(
-    Directionality(
-      textDirection: TextDirection.ltr,
-      child: Material(
-        color: const Color(0xFF0F0F12),
-        child: const ProviderScope(
-          child: _AppLoader(),
-        ),
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ru'),
+        Locale('ka'),
+        Locale('de'),
+        Locale('es'),
+        Locale('fr'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: const ProviderScope(
+        child: _AppLoader(),
       ),
     ),
   );

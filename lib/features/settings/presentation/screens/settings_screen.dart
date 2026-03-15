@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -626,6 +628,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: 'Date & time format',
                   onTap: () => context.push(AppRouter.settingsRegional),
                 ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _LanguageRow(),
               ],
             ),
           ),
@@ -1523,6 +1527,102 @@ class _SectionHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nav row: icon + label + subtitle + chevron
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Language row — inline selector that updates locale instantly
+// ---------------------------------------------------------------------------
+class _LanguageRow extends StatelessWidget {
+  static const _langs = [
+    (code: 'en', label: 'English'),
+    (code: 'ru', label: 'Русский'),
+    (code: 'ka', label: 'ქართული'),
+    (code: 'de', label: 'Deutsch'),
+    (code: 'es', label: 'Español'),
+    (code: 'fr', label: 'Français'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = context.locale.languageCode;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: _teal.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.language_outlined, color: _teal, size: 18),
+      ),
+      title: const Text('Language',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        _langs.firstWhere((l) => l.code == current,
+            orElse: () => _langs.first).label,
+        style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right,
+          size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      onTap: () => _showPicker(context, current),
+    );
+  }
+
+  void _showPicker(BuildContext context, String current) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('Language',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              ..._langs.map((l) => ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                title: Text(l.label,
+                    style: TextStyle(
+                      fontWeight: l.code == current
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    )),
+                trailing: l.code == current
+                    ? const Icon(Icons.check_rounded, color: _teal, size: 20)
+                    : null,
+                onTap: () {
+                  ctx.setLocale(Locale(l.code));
+                  Navigator.of(ctx).pop();
+                },
+              )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:decimal/decimal.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -743,32 +744,74 @@ class _EmptyActivityState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        Icon(
-          hasSearch ? Icons.search_off_rounded : Icons.history_rounded,
-          size: 52,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          hasSearch ? 'No results' : 'No activity yet',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            hasSearch
-                ? 'Try a different search term or filter.'
-                : 'Your complete financial history — group expenses, wallet entries, and settlements — will appear here.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+    if (hasSearch) {
+      return ListView(
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.28),
+          Icon(Icons.search_off_rounded, size: 52,
+              color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(height: 16),
+          Text('No results', textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text('Try a different search term or filter.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ),
+        ],
+      );
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Opacity(
+          opacity: 0.05,
+          child: SvgPicture.asset(
+            'assets/icon_no_back.svg',
+            width: 280,
+          ),
+        ),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.history_rounded, size: 52, color: _teal),
+            const SizedBox(height: 16),
+            Text(
+              'No activity yet',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: Text(
+                'Your complete financial history will appear here.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: () => context.push(AppRouter.addExpense),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Start Tracking'),
+              style: FilledButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ),
       ],
     );

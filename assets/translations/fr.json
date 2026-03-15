@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "Tableau de bord",
+    "wallet": "Portefeuille",
+    "groups": "Groupes",
+    "activity": "Activité",
+    "analytics": "Analyses",
+    "settings": "Paramètres"
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "net_worth": "Patrimoine net",
+    "wallet_cash": "Trésorerie",
+    "you_are_owed": "On vous doit",
+    "you_owe": "Vous devez",
+    "overall_owed": "Total dû à vous",
+    "overall_balanced": "Tout est soldé",
+    "recent_activity": "Activité récente",
+    "no_expenses": "Pas encore de dépenses",
+    "start_tracking": "Commencer le suivi",
+    "items": "{count} entrées"
+  },
+  "wallet": {
+    "title": "Portefeuille",
+    "income": "Revenus",
+    "expenses": "Dépenses",
+    "net": "Net",
+    "no_entries": "Aucune entrée dans le portefeuille",
+    "start_tracking": "Commencer le suivi"
+  },
+  "groups": {
+    "title": "Groupes",
+    "your_groups": "Vos groupes",
+    "no_groups": "Pas encore de groupes",
+    "members": "{count} membres",
+    "member": "1 membre",
+    "create": "Nouveau groupe"
+  },
+  "analytics": {
+    "title": "Analyses",
+    "spending_by_category": "Dépenses par catégorie",
+    "net_position_trend": "Position nette — 30 jours",
+    "no_data": "Pas encore de données de dépenses",
+    "start_tracking": "Commencer le suivi",
+    "total": "Total",
+    "other": "Autres",
+    "wallet": "Portefeuille",
+    "groups": "Groupes"
+  },
+  "activity": {
+    "title": "Activité",
+    "no_activity": "Pas encore d'activité",
+    "start_tracking": "Commencer le suivi",
+    "all": "Tout",
+    "income": "Revenu",
+    "expense": "Dépense",
+    "items": "{count} entrées"
+  },
+  "settings": {
+    "title": "Paramètres",
+    "language": "Langue",
+    "language_subtitle": "Choisissez votre langue préférée",
+    "appearance": "Apparence",
+    "preferences": "Préférences",
+    "account": "Compte",
+    "about": "À propos",
+    "sign_out": "Se déconnecter",
+    "currency": "Devise de base"
+  },
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "delete": "Supprimer",
+    "edit": "Modifier",
+    "rename": "Renommer",
+    "loading": "Chargement…",
+    "error": "Une erreur est survenue",
+    "settled_up": "Tout est soldé"
+  }
+}

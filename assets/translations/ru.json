@@ -1,0 +1,80 @@
+{
+  "nav": {
+    "dashboard": "Главная",
+    "wallet": "Кошелёк",
+    "groups": "Группы",
+    "activity": "Активность",
+    "analytics": "Аналитика",
+    "settings": "Настройки"
+  },
+  "dashboard": {
+    "title": "Главная",
+    "net_worth": "Чистый капитал",
+    "wallet_cash": "Кошелёк",
+    "you_are_owed": "Вам должны",
+    "you_owe": "Вы должны",
+    "overall_owed": "Всего вам должны",
+    "overall_balanced": "Все расчёты выполнены",
+    "recent_activity": "Последние операции",
+    "no_expenses": "Расходов ещё нет",
+    "start_tracking": "Начать учёт",
+    "items": "{count} записей"
+  },
+  "wallet": {
+    "title": "Кошелёк",
+    "income": "Доходы",
+    "expenses": "Расходы",
+    "net": "Итого",
+    "no_entries": "Записей в кошельке нет",
+    "start_tracking": "Начать учёт"
+  },
+  "groups": {
+    "title": "Группы",
+    "your_groups": "Ваши группы",
+    "no_groups": "Групп ещё нет",
+    "members": "{count} участников",
+    "member": "1 участник",
+    "create": "Новая группа"
+  },
+  "analytics": {
+    "title": "Аналитика",
+    "spending_by_category": "Расходы по категориям",
+    "net_position_trend": "Чистая позиция — 30 дней",
+    "no_data": "Данных о расходах пока нет",
+    "start_tracking": "Начать учёт",
+    "total": "Итого",
+    "other": "Другое",
+    "wallet": "Кошелёк",
+    "groups": "Группы"
+  },
+  "activity": {
+    "title": "Активность",
+    "no_activity": "Активности пока нет",
+    "start_tracking": "Начать учёт",
+    "all": "Все",
+    "income": "Доход",
+    "expense": "Расход",
+    "items": "{count} записей"
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "language_subtitle": "Выберите предпочитаемый язык",
+    "appearance": "Внешний вид",
+    "preferences": "Параметры",
+    "account": "Аккаунт",
+    "about": "О приложении",
+    "sign_out": "Выйти",
+    "currency": "Валюта по умолчанию"
+  },
+  "common": {
+    "save": "Сохранить",
+    "cancel": "Отмена",
+    "delete": "Удалить",
+    "edit": "Изменить",
+    "rename": "Переименовать",
+    "loading": "Загрузка…",
+    "error": "Что-то пошло не так",
+    "settled_up": "Все расчёты выполнены"
+  }
+}

@@ -51,10 +51,11 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   }
 
   int _indexForPath(String path) {
-    if (path.startsWith('/wallet'))   return 1;
-    if (path.startsWith('/groups'))   return 2;
-    if (path.startsWith('/activity')) return 3;
-    if (path.startsWith('/settings')) return 4;
+    if (path.startsWith('/wallet'))    return 1;
+    if (path.startsWith('/groups'))    return 2;
+    if (path.startsWith('/analytics')) return 3;
+    if (path.startsWith('/activity'))  return 4;
+    if (path.startsWith('/settings'))  return 5;
     return 0;
   }
 
@@ -73,9 +74,12 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
         context.go(AppRouter.groups);
       case 3:
         setState(() => _selectedIndex = 3);
-        context.go(AppRouter.activity);
+        context.go(AppRouter.analytics);
       case 4:
         setState(() => _selectedIndex = 4);
+        context.go(AppRouter.activity);
+      case 5:
+        setState(() => _selectedIndex = 5);
         context.go(AppRouter.settings);
     }
   }
@@ -158,7 +162,8 @@ class _PremiumSidebar extends StatelessWidget {
     (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'Dashboard', index: 0),
     (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'Wallet',    index: 1),
     (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'Groups',    index: 2),
-    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'Activity',  index: 3),
+    (icon: Icons.bar_chart_outlined,               selectedIcon: Icons.bar_chart,               label: 'Analytics', index: 3),
+    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'Activity',  index: 4),
   ];
 
   @override
@@ -186,6 +191,7 @@ class _PremiumSidebar extends StatelessWidget {
                     'assets/icon_no_back.svg',
                     width: 32,
                     height: 32,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 12),
                   const Flexible(
@@ -226,8 +232,8 @@ class _PremiumSidebar extends StatelessWidget {
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
             label: 'Settings',
-            isSelected: selectedIndex == 4,
-            onTap: () => onTap(4),
+            isSelected: selectedIndex == 5,
+            onTap: () => onTap(5),
             unselectedColor: unselectedFg,
           ),
 
@@ -369,6 +375,11 @@ class _MobileLayout extends StatelessWidget {
           label: Text('Groups'),
         ),
         NavigationRailDestination(
+          icon: Icon(Icons.bar_chart_outlined),
+          selectedIcon: Icon(Icons.bar_chart),
+          label: Text('Analytics'),
+        ),
+        NavigationRailDestination(
           icon: Icon(Icons.history),
           selectedIcon: Icon(Icons.history),
           label: Text('Activity'),
@@ -401,6 +412,11 @@ class _MobileLayout extends StatelessWidget {
           icon: Icon(Icons.group_outlined),
           selectedIcon: Icon(Icons.group),
           label: 'Groups',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.bar_chart_outlined),
+          selectedIcon: Icon(Icons.bar_chart),
+          label: 'Analytics',
         ),
         NavigationDestination(
           icon: Icon(Icons.history),
