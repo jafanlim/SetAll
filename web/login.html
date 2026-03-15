@@ -281,6 +281,8 @@
         });
 
         document.getElementById('google-btn').addEventListener('click', async () => {
+            const nextParam = new URLSearchParams(window.location.search).get('next');
+            if (nextParam) sessionStorage.setItem('login_next', nextParam);
             const { error } = await sb.auth.signInWithOAuth({
                 provider: 'google',
                 options: { redirectTo: window.location.origin + '/login' }
@@ -322,11 +324,13 @@
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Sign In';
                 if (error) { showBanner(error.message, true); return; }
-                window.location.href = '/app';
+                const next = new URLSearchParams(window.location.search).get('next') || sessionStorage.getItem('login_next') || '/portal';
+                sessionStorage.removeItem('login_next');
+                window.location.href = next;
 
             } else if (currentMode === 'forgot') {
                 const { error } = await sb.auth.resetPasswordForEmail(email, {
-                    redirectTo: window.location.origin + '/login'
+                    redirectTo: window.location.origin + '/reset-password'
                 });
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Send Recovery Link';
@@ -348,27 +352,26 @@
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Update Password';
                 if (error) { showBanner(error.message, true); return; }
-                document.getElementById('modal-title').textContent = 'Password Updated';
-                document.getElementById('modal-desc').textContent = 'Your password has been successfully updated.';
-                const modal = document.getElementById('success-modal');
-                modal.querySelector('button').onclick = () => window.location.href = '/app';
-                modal.querySelector('button').textContent = 'Open App';
-                modal.classList.remove('hidden');
-                setTimeout(() => modal.firstElementChild.classList.remove('scale-95'), 10);
+                await sb.auth.refreshSession();
+                window.location.replace('/portal');
             }
         });
 
-        // Handle Supabase auth state on load (OAuth redirect + recovery link)
+        // Handle Supabase auth state on load (OAuth redirect + recovery link + mode param)
         window.addEventListener('DOMContentLoaded', async () => {
             const hash = window.location.hash;
             if (hash.includes('type=recovery')) {
                 setMode('recovery');
                 return;
             }
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('mode') === 'signup') setMode('signup');
             // Check for active session (OAuth redirect lands here)
             const { data: { session } } = await sb.auth.getSession();
             if (session) {
-                window.location.href = '/app';
+                const next = params.get('next') || sessionStorage.getItem('login_next') || '/portal';
+                sessionStorage.removeItem('login_next');
+                window.location.href = next;
             }
         });
     </script>

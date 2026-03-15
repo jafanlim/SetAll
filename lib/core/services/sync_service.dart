@@ -405,22 +405,25 @@ class SyncService {
               await _client.from('group_members').delete()
                   .eq('group_id', gid).eq('user_id', uid);
               debugPrint('[SyncService] removed stale group_members row for $gid');
-              // If the group is also gone from Supabase groups table, the
-              // left_groups entry is permanently dead — purge it so we stop
-              // retrying on every sync tick.
+              // Verify the delete actually stuck by re-querying group_members.
+              // Supabase may silently no-op the DELETE if an RLS policy blocks it.
+              // Once confirmed gone, purge left_groups so we stop retrying.
               if (rows.isEmpty) {
                 try {
-                  final cloudGroup = await _client
-                      .from('groups')
-                      .select('id')
-                      .eq('id', gid)
+                  final stillMember = await _client
+                      .from('group_members')
+                      .select('group_id')
+                      .eq('group_id', gid)
+                      .eq('user_id', uid)
                       .maybeSingle();
-                  if (cloudGroup == null) {
-                    debugPrint('[SyncService] purging dead left_groups entry for $gid (not in Supabase)');
+                  if (stillMember == null) {
+                    debugPrint('[SyncService] purging left_groups for $gid '
+                        '(confirmed removed from group_members)');
                     await LocalDatabase.db.delete(
                       'left_groups', where: 'group_id = ?', whereArgs: [gid]);
                     leftGroupIds.remove(gid);
                   }
+                  // else: delete silently failed (RLS?); keep retrying next tick.
                 } catch (_) {}
               }
             } catch (e) {
