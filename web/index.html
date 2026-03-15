@@ -1,45 +1,197 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" class="scroll-smooth">
 <head>
-  <base href="/">
-  <meta charset="UTF-8">
-  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="SetAll — Premium Multi-Currency Expense Sharing">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-touch-icon" href="icons/Icon-192.png">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
-  <title>SetAll</title>
-  <link rel="manifest" href="manifest.json">
-  <style>
-    html, body { margin: 0; padding: 0; background: #0F172A; min-height: 100vh; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SetAll | The Multi-Currency Ledger</title>
+    <meta name="description" content="Algorithmically minimize shared debt. Support for 150+ currencies.">
+
+    <!-- OpenGraph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://setall.app/">
+    <meta property="og:title" content="SetAll | The Multi-Currency Ledger for the Modern World">
+    <meta property="og:description" content="Algorithmically minimize shared debt with the Greedy Flow engine. Support for 150+ currencies. Native apps for every platform.">
+    <meta property="og:image" content="https://setall.app/icons/Icon-512.png">
+    <meta property="og:site_name" content="SetAll">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="SetAll | The Multi-Currency Ledger">
+    <meta name="twitter:description" content="Algorithmically minimize shared debt. Support for 150+ currencies.">
+    <meta name="twitter:image" content="https://setall.app/icons/Icon-512.png">
+
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+    <link rel="apple-touch-icon" href="icons/Icon-192.png">
+    <link rel="manifest" href="manifest.json">
+
+    <!-- Tailwind CSS (CDN for static hosting) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- SetAll Brand Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            deep: '#020617',
+                            slate: '#0F172A',
+                            border: '#1E293B',
+                            teal: '#14B8A6',
+                            tealHover: '#0D9488',
+                            orange: '#F97316'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-nav { background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glow-effect { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(20,184,166,0.15) 0%, rgba(2,6,23,0) 70%); top: -200px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+    </style>
 </head>
-<body>
-  <!-- pdf.js: loaded non-blocking; guarded so a CDN miss never hangs the app -->
-  <script>
-    (function () {
-      var s = document.createElement('script');
-      s.src = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.min.mjs';
-      s.type = 'module';
-      s.onload = function () {
-        try {
-          var lib = globalThis['pdfjsLib'] || (globalThis['pdfjs-dist'] && globalThis['pdfjs-dist'].getDocument ? globalThis['pdfjs-dist'] : null);
-          if (lib) {
-            lib.GlobalWorkerOptions.workerSrc =
-              'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/build/pdf.worker.mjs';
-            window.pdfRenderOptions = {
-              cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@4.6.82/cmaps/',
-              cMapPacked: true,
-            };
-          }
-        } catch (e) { /* pdf.js optional — Flutter PDF viewer degrades gracefully */ }
-      };
-      s.onerror = function () { /* CDN unreachable — Flutter PDF viewer degrades gracefully */ };
-      document.head.appendChild(s);
-    })();
-  </script>
-  <script src="flutter_bootstrap.js" defer></script>
+<body class="bg-brand-deep text-slate-300 font-sans antialiased overflow-x-hidden relative selection:bg-brand-teal selection:text-brand-deep">
+
+    <!-- Ambient Glow -->
+    <div class="glow-effect"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full top-0 z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <div class="flex items-center gap-3 cursor-pointer">
+                <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
+                <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
+            </div>
+
+            <div class="hidden md:flex items-center gap-8 text-sm font-medium">
+                <a href="/download" class="hover:text-white transition-colors">Downloads</a>
+                <a href="/support" class="hover:text-white transition-colors">Support</a>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <a href="/login" class="text-sm font-semibold text-white hover:text-brand-teal transition-colors hidden sm:block">Sign In</a>
+                <a href="/login" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-sm font-bold py-2.5 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.3)] hover:shadow-[0_0_25px_rgba(20,184,166,0.5)]">
+                    Sign Up
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <main class="pt-40 pb-24 px-6 relative z-10">
+        <div class="max-w-5xl mx-auto text-center">
+            <div class="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-card text-xs font-semibold text-brand-teal mb-8 border-brand-teal/20">
+                <span class="relative flex h-2 w-2">
+                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-brand-teal opacity-75"></span>
+                  <span class="relative inline-flex rounded-full h-2 w-2 bg-brand-teal"></span>
+                </span>
+                SetAll Engine v2.0 is now live in beta testing
+            </div>
+
+            <h1 class="text-5xl md:text-7xl font-extrabold text-white tracking-tight leading-[1.1] mb-8">
+                The Multi-Currency Ledger <br class="hidden md:block">
+                <span class="text-transparent bg-clip-text bg-gradient-to-r from-brand-teal to-emerald-300">for the Modern World.</span>
+            </h1>
+
+            <p class="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed">
+                Settle shared expenses, optimize debt with Greedy Flow algorithms, and manage your global wealth in one premium interface. Zero spreadsheets required.
+            </p>
+
+            <div class="flex flex-col sm:flex-row items-center justify-center gap-4 mb-20">
+                <a href="/login" class="w-full sm:w-auto bg-brand-teal text-brand-deep text-lg font-bold py-4 px-8 rounded-2xl hover:bg-brand-tealHover transition-all flex items-center justify-center gap-2">
+                    Open Web Portal <i data-lucide="arrow-right" class="w-5 h-5"></i>
+                </a>
+                <a href="/download" class="w-full sm:w-auto glass-card text-white text-lg font-bold py-4 px-8 rounded-2xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2">
+                    <i data-lucide="monitor-down" class="w-5 h-5"></i> Download App
+                </a>
+            </div>
+
+            <!-- Trust Banner -->
+            <div class="pt-10 border-t border-brand-border flex flex-col md:flex-row items-center justify-center gap-8 md:gap-16 opacity-60 grayscale hover:grayscale-0 transition-all duration-500">
+                <div class="flex items-center gap-3">
+                    <i data-lucide="shield-check" class="w-6 h-6"></i>
+                    <span class="text-sm font-semibold tracking-wide">Bank-Grade 256-bit Encryption</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <i data-lucide="database" class="w-6 h-6"></i>
+                    <span class="text-sm font-semibold tracking-wide">Non-Custodial Infrastructure</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    <i data-lucide="wifi-off" class="w-6 h-6"></i>
+                    <span class="text-sm font-semibold tracking-wide">Offline-First Architecture</span>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Features Grid -->
+    <section id="features" class="py-24 px-6 bg-brand-slate/30 border-y border-brand-border relative">
+        <div class="max-w-7xl mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-4xl font-bold text-white tracking-tight mb-4">Fintech-grade capabilities.</h2>
+                <p class="text-slate-400 max-w-xl mx-auto">Everything you need to manage complex group trips, shared apartments, and international expenses.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div class="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform duration-300 group border-t-2 border-t-transparent hover:border-t-brand-teal">
+                    <div class="w-14 h-14 bg-brand-deep rounded-2xl flex items-center justify-center border border-brand-border mb-6 group-hover:scale-110 transition-transform">
+                        <i data-lucide="git-merge" class="w-6 h-6 text-brand-teal"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Greedy Flow Engine</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Algorithmically minimize transactions. If Alice owes Bob, and Bob owes Charlie, SetAll tells Alice to pay Charlie directly. Perfect debt resolution.
+                    </p>
+                </div>
+
+                <div class="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform duration-300 group border-t-2 border-t-transparent hover:border-t-brand-teal">
+                    <div class="w-14 h-14 bg-brand-deep rounded-2xl flex items-center justify-center border border-brand-border mb-6 group-hover:scale-110 transition-transform">
+                        <i data-lucide="globe-2" class="w-6 h-6 text-brand-teal"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Universal Anchor</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Support for 150+ currencies including RSD, VND, and GEL. Spend in Japanese Yen, split the bill in Euros, and settle your debts in US Dollars.
+                    </p>
+                </div>
+
+                <div class="glass-card p-8 rounded-3xl hover:-translate-y-1 transition-transform duration-300 group border-t-2 border-t-transparent hover:border-t-brand-teal">
+                    <div class="w-14 h-14 bg-brand-deep rounded-2xl flex items-center justify-center border border-brand-border mb-6 group-hover:scale-110 transition-transform">
+                        <i data-lucide="smartphone" class="w-6 h-6 text-brand-teal"></i>
+                    </div>
+                    <h3 class="text-xl font-bold text-white mb-3">Omni-Channel Sync</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Native apps for macOS, Windows, iOS, and Android. Built with a local-first SQLite engine that works perfectly without an internet connection.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 bg-brand-deep border-t border-brand-border">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-2">
+                <i data-lucide="scale" class="text-slate-500 w-5 h-5"></i>
+                <span class="text-slate-400 font-semibold tracking-tight">SetAll &copy; 2026</span>
+            </div>
+
+            <div class="flex gap-6 text-sm font-medium text-slate-500">
+                <a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
+                <a href="/support" class="hover:text-white transition-colors">Help &amp; Support</a>
+                <a href="mailto:contact@setall.app" class="hover:text-white transition-colors">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Initialize Icons -->
+    <script>
+        lucide.createIcons();
+    </script>
 </body>
 </html>

@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support | SetAll</title>
+    <meta name="description" content="Get help with SetAll, read FAQs, or contact our support team.">
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- SetAll Brand Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            deep: '#020617',
+                            slate: '#0F172A',
+                            border: '#1E293B',
+                            teal: '#14B8A6',
+                            tealHover: '#0D9488',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-nav { background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glow-effect { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(20,184,166,0.1) 0%, rgba(2,6,23,0) 70%); top: -100px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+    </style>
+</head>
+<body class="bg-brand-deep text-slate-300 font-sans antialiased overflow-x-hidden relative selection:bg-brand-teal selection:text-brand-deep">
+
+    <div class="glow-effect"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full top-0 z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+                <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
+                <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
+            </a>
+
+            <div class="hidden md:flex items-center gap-8 text-sm font-medium">
+                <a href="/download" class="hover:text-white transition-colors">Downloads</a>
+                <a href="/support" class="text-white transition-colors">Support</a>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <a href="/login" class="text-sm font-semibold text-white hover:text-brand-teal transition-colors hidden sm:block">Sign In</a>
+                <a href="/login" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-sm font-bold py-2.5 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.3)]">
+                    Sign Up
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <main class="pt-40 pb-16 px-6 relative z-10">
+        <div class="max-w-3xl mx-auto text-center">
+            <h1 class="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6">
+                How can we <span class="text-brand-teal">help?</span>
+            </h1>
+            <p class="text-lg text-slate-400 mb-8">
+                Find answers to common questions or reach out to us directly.
+            </p>
+        </div>
+    </main>
+
+    <!-- Contact & Bug Report Cards -->
+    <section class="pb-16 px-6 relative z-10">
+        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Email Support -->
+            <div class="glass-card p-8 rounded-3xl transition-all duration-300 hover:border-brand-teal/50">
+                <div class="w-12 h-12 bg-brand-deep rounded-xl flex items-center justify-center border border-brand-border mb-6">
+                    <i data-lucide="mail" class="w-6 h-6 text-brand-teal"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Email Support</h3>
+                <p class="text-slate-400 text-sm mb-6">Need help with your account or have a specific question? We're here to help.</p>
+                <a href="mailto:contact@setall.app?subject=SetAll%20Support%20Request" class="inline-flex items-center gap-2 text-brand-teal font-bold hover:text-brand-tealHover transition-colors">
+                    contact@setall.app <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </a>
+            </div>
+
+            <!-- GitHub Issues -->
+            <div class="glass-card p-8 rounded-3xl transition-all duration-300 hover:border-brand-teal/50">
+                <div class="w-12 h-12 bg-brand-deep rounded-xl flex items-center justify-center border border-brand-border mb-6">
+                    <i data-lucide="bug" class="w-6 h-6 text-brand-teal"></i>
+                </div>
+                <h3 class="text-xl font-bold text-white mb-2">Report a Bug</h3>
+                <p class="text-slate-400 text-sm mb-6">Found a glitch or have a feature request? Let us know on our public tracker.</p>
+                <a href="https://github.com/jafanlim/SetAll/issues/new" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-brand-teal font-bold hover:text-brand-tealHover transition-colors">
+                    Open an Issue <i data-lucide="external-link" class="w-4 h-4"></i>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section class="pb-32 px-6 relative z-10">
+        <div class="max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold text-white mb-8">Frequently Asked Questions</h2>
+
+            <div class="space-y-4">
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-lg font-bold text-white mb-2">Is SetAll free to use?</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Yes, the core SetAll engine is completely free. We believe managing shared expenses shouldn't cost you extra money.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-lg font-bold text-white mb-2">How does the "Greedy Flow" engine work?</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Our engine algorithmically simplifies group debts. Instead of tracking dozens of complex IOUs, SetAll calculates the absolute minimum number of transfers required to settle the entire group, saving everyone time and bank fees.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-lg font-bold text-white mb-2">Does SetAll connect to my bank account?</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        No. SetAll is a non-custodial ledger. We track the math, but we never touch your money. When it's time to settle up, you transfer the funds using your preferred method (Cash, Bank Transfer, PayPal) and mark it as settled in the app.
+                    </p>
+                </div>
+
+                <div class="glass-card p-6 rounded-2xl">
+                    <h3 class="text-lg font-bold text-white mb-2">Can I use the app without an internet connection?</h3>
+                    <p class="text-slate-400 text-sm leading-relaxed">
+                        Yes! SetAll uses a "Local-First" architecture. You can add expenses and create groups while entirely offline. The moment your device reconnects to the internet, it seamlessly syncs with the cloud in the background.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 bg-brand-deep border-t border-brand-border">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-2">
+                <i data-lucide="scale" class="text-slate-500 w-5 h-5"></i>
+                <span class="text-slate-400 font-semibold tracking-tight">SetAll &copy; 2026</span>
+            </div>
+            <div class="flex gap-6 text-sm font-medium text-slate-500">
+                <a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a>
+                <a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
+                <a href="/support" class="text-white transition-colors">Help &amp; Support</a>
+                <a href="mailto:contact@setall.app" class="hover:text-white transition-colors">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
