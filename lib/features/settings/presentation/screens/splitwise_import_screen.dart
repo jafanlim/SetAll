@@ -9,7 +9,6 @@ import 'package:intl/intl.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
-import '../../../../core/utils/split_engine.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/profile_model.dart';
@@ -32,14 +31,18 @@ class _SplitwiseRow {
     required this.cost,
     required this.currency,
     required this.csvNames,
+    required this.payerCsvName,
+    required this.personAmounts,
   });
 
-  final DateTime     date;
-  final String       description;
-  final String       category;
-  final Decimal      cost;
-  final String       currency;
-  final List<String> csvNames;
+  final DateTime             date;
+  final String               description;
+  final String               category;
+  final Decimal              cost;
+  final String               currency;
+  final List<String>         csvNames;      // all participants (non-zero amount)
+  final String?              payerCsvName;  // CSV column name of whoever paid (positive value)
+  final Map<String, Decimal> personAmounts; // csvName → signed amount (+payer credit, -owes)
 }
 
 // ---------------------------------------------------------------------------
@@ -221,22 +224,30 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       final category    = catIdx >= 0 ? _col(cols, catIdx) : 'General';
       final currency    = _col(cols, currencyIdx).isEmpty ? 'USD' : _col(cols, currencyIdx).toUpperCase();
 
-      // Names that have a non-zero value in this row
-      final rowNames = <String>[];
+      // Collect per-person amounts; detect payer (positive value).
+      final rowNames     = <String>[];
+      final personAmounts = <String, Decimal>{};
+      String? payerCsvName;
       for (final entry in personCols.entries) {
-        final val = _col(cols, entry.key).replaceAll(RegExp(r'[,\s]'), '');
-        if (val.isNotEmpty && val != '0' && val != '0.00') {
-          rowNames.add(entry.value);
-        }
+        final rawVal = _col(cols, entry.key).replaceAll(RegExp(r'[,\s]'), '');
+        if (rawVal.isEmpty || rawVal == '0' || rawVal == '0.00') continue;
+        Decimal? parsed;
+        try { parsed = Decimal.parse(rawVal); } catch (_) { continue; }
+        final name = entry.value;
+        rowNames.add(name);
+        personAmounts[name] = parsed;
+        if (parsed > Decimal.zero) payerCsvName = name;
       }
 
       rows.add(_SplitwiseRow(
-        date:        date,
-        description: description,
-        category:    category.isEmpty ? 'General' : category,
-        cost:        cost.abs(),
-        currency:    currency,
-        csvNames:    rowNames,
+        date:          date,
+        description:   description,
+        category:      category.isEmpty ? 'General' : category,
+        cost:          cost.abs(),
+        currency:      currency,
+        csvNames:      rowNames,
+        payerCsvName:  payerCsvName,
+        personAmounts: personAmounts,
       ));
     }
 
@@ -312,32 +323,45 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
     } else {
       final groupId = _selectedGroup!.id;
       for (final row in _rows) {
-        // Build participant list: mapped members + always include payer
-        final participantIds = <String>{};
-        participantIds.add(uid);
-        for (final csvName in row.csvNames) {
-          final profile = _nameMap[csvName];
-          if (profile != null) participantIds.add(profile.id);
+        // ── Determine payer ──────────────────────────────────────────────────
+        // Positive CSV column = that person paid the full cost.
+        // If payer maps to a known member use their id, else fall back to uid.
+        String payerId = uid;
+        if (row.payerCsvName != null) {
+          final p = _nameMap[row.payerCsvName!];
+          if (p != null) payerId = p.id;
         }
-        final ids = participantIds.toList();
 
-        // Use SplitEngine for precise even splits with remainder on payer
-        final splitResults = SplitEngine.splitEven(
-          total:          row.cost,
-          participantIds: ids,
-          payerId:        uid,
-        );
-        final splits = splitResults
-            .map((s) => SplitInsert(userId: s.userId, universalUsdOwed: s.amountOwed))
-            .toList();
+        // ── Build exact splits from CSV amounts ──────────────────────────────
+        // |negative amount| = that person's share (what they owe the payer).
+        // Payer's share = cost − Σ|negative amounts|.
+        final splits = <SplitInsert>[];
+        Decimal sumOwed = Decimal.zero;
+        for (final entry in row.personAmounts.entries) {
+          if (entry.value >= Decimal.zero) continue; // skip payer column here
+          final profile = _nameMap[entry.key];
+          if (profile == null) continue;
+          final share = entry.value.abs();
+          splits.add(SplitInsert(userId: profile.id, universalUsdOwed: share));
+          sumOwed += share;
+        }
+        // Add payer's own share (remainder after others' shares).
+        final payerShare = row.cost - sumOwed;
+        if (payerShare > Decimal.zero) {
+          splits.add(SplitInsert(userId: payerId, universalUsdOwed: payerShare));
+        }
+        // Fall back to full cost on payer if no splits were produced.
+        if (splits.isEmpty) {
+          splits.add(SplitInsert(userId: payerId, universalUsdOwed: row.cost));
+        }
 
         await repo.addExpense(
           groupId:     groupId,
-          payerId:     uid,
+          payerId:     payerId,
           amount:      row.cost,
           description: row.description,
           currency:    row.currency,
-          splitType:   SplitType.even,
+          splitType:   SplitType.manual,
           splits:      splits,
           category:    _mapCategory(row.category),
           isIncome:    false,
