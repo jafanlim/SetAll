@@ -95,6 +95,8 @@ dependencies:
 
   # OS-level permission request (notifications, etc.)
   permission_handler: ^11.3.1
+  flutter_svg: ^2.2.4
+  google_fonts: ^8.0.2
 
 dev_dependencies:
   flutter_test:

@@ -245,23 +245,36 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                           width: 1.5,
                         ),
                       ),
-                      child: Center(
-                        child: group.iconName != null
-                            ? Icon(
-                                _kGroupIcons[group.iconName] ??
-                                    Icons.groups_outlined,
-                                size: 30,
-                                color: accentColor,
-                              )
-                            : Text(
-                                group.name.isNotEmpty
-                                    ? group.name[0].toUpperCase()
-                                    : 'G',
-                                style: TextStyle(
-                                  fontSize: 26,
-                                  fontWeight: FontWeight.w800,
-                                  color: accentColor,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(18),
+                        child: group.avatarUrl != null
+                            ? Image.network(
+                                group.avatarUrl!,
+                                width: 64,
+                                height: 64,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(Icons.groups_outlined, size: 30, color: accentColor),
                                 ),
+                              )
+                            : Center(
+                                child: group.iconName != null
+                                    ? Icon(
+                                        _kGroupIcons[group.iconName] ??
+                                            Icons.groups_outlined,
+                                        size: 30,
+                                        color: accentColor,
+                                      )
+                                    : Text(
+                                        group.name.isNotEmpty
+                                            ? group.name[0].toUpperCase()
+                                            : 'G',
+                                        style: TextStyle(
+                                          fontSize: 26,
+                                          fontWeight: FontWeight.w800,
+                                          color: accentColor,
+                                        ),
+                                      ),
                               ),
                       ),
                     ),
@@ -480,9 +493,28 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
               ),
               const SizedBox(height: 10),
 
-              // ── Secondary actions row ──────────────────────────────────
+              // ── Secondary actions row ──────────────────────────
               Row(
                 children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.push(
+                        '/group/${group.id}/edit',
+                        extra: group,
+                      ),
+                      icon: const Icon(Icons.palette_outlined, size: 16),
+                      label: const Text('Edit',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: _teal,
+                        side: const BorderSide(color: _teal, width: 1),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _rename,

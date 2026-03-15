@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 /// SetAll branded dark theme — Material 3, premium cost-sharing aesthetic.
 class SetAllTheme {
   SetAllTheme._();
 
-  static const String _fontFamily = 'Roboto';
+  static String get _fontFamily => GoogleFonts.inter().fontFamily!;
 
   // Brand palette: deep charcoal, gold accent, clean neutrals
   static const Color _surfaceDark = Color(0xFF0F0F12);
@@ -17,24 +18,31 @@ class SetAllTheme {
   static const Color _onSurfaceVariant = Color(0xFFB0B0B8);
   static const Color _onGold = Color(0xFF0F0F12);
 
-  // ── Compact TextTheme for desktop (M3 defaults scaled down ~15%) ──────────
-  static const TextTheme _compactTextTheme = TextTheme(
-    displayLarge:  TextStyle(fontSize: 45, fontWeight: FontWeight.w300, letterSpacing: -0.5),
-    displayMedium: TextStyle(fontSize: 36, fontWeight: FontWeight.w300),
-    displaySmall:  TextStyle(fontSize: 28, fontWeight: FontWeight.w400),
-    headlineLarge: TextStyle(fontSize: 24, fontWeight: FontWeight.w400),
-    headlineMedium:TextStyle(fontSize: 22, fontWeight: FontWeight.w400),
-    headlineSmall: TextStyle(fontSize: 20, fontWeight: FontWeight.w400),
-    titleLarge:    TextStyle(fontSize: 18, fontWeight: FontWeight.w500),
-    titleMedium:   TextStyle(fontSize: 14, fontWeight: FontWeight.w500, letterSpacing: 0.1),
-    titleSmall:    TextStyle(fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.1),
-    bodyLarge:     TextStyle(fontSize: 14, fontWeight: FontWeight.w400, letterSpacing: 0.5),
-    bodyMedium:    TextStyle(fontSize: 13, fontWeight: FontWeight.w400, letterSpacing: 0.25),
-    bodySmall:     TextStyle(fontSize: 11, fontWeight: FontWeight.w400, letterSpacing: 0.4),
-    labelLarge:    TextStyle(fontSize: 13, fontWeight: FontWeight.w500, letterSpacing: 0.1),
-    labelMedium:   TextStyle(fontSize: 11, fontWeight: FontWeight.w500, letterSpacing: 0.5),
-    labelSmall:    TextStyle(fontSize: 10, fontWeight: FontWeight.w500, letterSpacing: 0.5),
+  // ── TextTheme enforcing Inter with brand-specified sizes ──────────────────
+  // Headings: 24pt Bold, -0.5 letter-spacing
+  // Body:     14pt Medium
+  // Labels:   11pt Bold, Slate-500 (#64748B)
+  static const Color _slate500 = Color(0xFF64748B);
+
+  static TextTheme get _interTextTheme => GoogleFonts.interTextTheme().copyWith(
+    displayLarge:  GoogleFonts.inter(fontSize: 45, fontWeight: FontWeight.w300, letterSpacing: -0.5),
+    displayMedium: GoogleFonts.inter(fontSize: 36, fontWeight: FontWeight.w300),
+    displaySmall:  GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w400),
+    headlineLarge: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    headlineMedium:GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    headlineSmall: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    titleLarge:    GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600),
+    titleMedium:   GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+    titleSmall:    GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+    bodyLarge:     GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
+    bodyMedium:    GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
+    bodySmall:     GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+    labelLarge:    GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _slate500),
+    labelMedium:   GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _slate500),
+    labelSmall:    GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: _slate500),
   );
+
+  static TextTheme get _compactTextTheme => _interTextTheme;
 
   static ThemeData get desktopDark  => dark.copyWith(
     scaffoldBackgroundColor: const Color(0xFF020617),
@@ -88,13 +96,12 @@ class SetAllTheme {
         onSurfaceVariant: _onSurfaceVariant,
       ),
       scaffoldBackgroundColor: _surfaceDark,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: _surfaceDark,
         foregroundColor: _onSurface,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: _fontFamily,
+        titleTextStyle: GoogleFonts.inter(
           fontSize: 20,
           fontWeight: FontWeight.w600,
           color: _onSurface,
@@ -159,16 +166,15 @@ class SetAllTheme {
         onSurfaceVariant: Color(0xFF48484A),
       ),
       scaffoldBackgroundColor: surfaceLight,
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: surfaceLight,  // matches scaffold
         foregroundColor: _onGold,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: TextStyle(
-          fontFamily: _fontFamily,
+        titleTextStyle: GoogleFonts.inter(
           fontSize: 20,
           fontWeight: FontWeight.w600,
-          color: Color(0xFF0F0F12),
+          color: const Color(0xFF0F0F12),
         ),
       ),
       cardTheme: CardThemeData(

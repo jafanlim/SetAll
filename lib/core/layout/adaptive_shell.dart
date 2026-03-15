@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 import 'package:window_manager/window_manager.dart' if (dart.library.html) '../stubs/window_manager_stub.dart';
 
@@ -181,14 +182,10 @@ class _PremiumSidebar extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
               child: Row(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.asset(
-                      'assets/icon.png',
-                      width: 32,
-                      height: 32,
-                      fit: BoxFit.cover,
-                    ),
+                  SvgPicture.asset(
+                    'assets/icon_no_back.svg',
+                    width: 32,
+                    height: 32,
                   ),
                   const SizedBox(width: 12),
                   const Flexible(

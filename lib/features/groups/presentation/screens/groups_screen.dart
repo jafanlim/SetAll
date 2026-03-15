@@ -1238,16 +1238,29 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                         color: bgColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Center(
-                        child: group.iconName != null
-                            ? Icon(_iconForName(group.iconName), size: 20, color: accentColor)
-                            : Text(
-                                group.name.isNotEmpty ? group.name[0].toUpperCase() : 'G',
-                                style: TextStyle(
-                                  color: accentColor,
-                                  fontWeight: FontWeight.w800,
-                                  fontSize: 16,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: group.avatarUrl != null
+                            ? Image.network(
+                                group.avatarUrl!,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Center(
+                                  child: Icon(Icons.groups_outlined, size: 20, color: accentColor),
                                 ),
+                              )
+                            : Center(
+                                child: group.iconName != null
+                                    ? Icon(_iconForName(group.iconName), size: 20, color: accentColor)
+                                    : Text(
+                                        group.name.isNotEmpty ? group.name[0].toUpperCase() : 'G',
+                                        style: TextStyle(
+                                          color: accentColor,
+                                          fontWeight: FontWeight.w800,
+                                          fontSize: 16,
+                                        ),
+                                      ),
                               ),
                       ),
                     ),
