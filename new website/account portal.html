@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In | SetAll</title>
+    <meta name="description" content="Sign in or create your SetAll account.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SetAll Brand Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            deep: '#020617',
+                            slate: '#0F172A',
+                            border: '#1E293B',
+                            teal: '#14B8A6',
+                            tealHover: '#0D9488',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glow-effect { position: absolute; width: 800px; height: 800px; background: radial-gradient(circle, rgba(20,184,166,0.12) 0%, rgba(2,6,23,0) 60%); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; pointer-events: none; }
+        
+        /* Smooth height transitions */
+        .anim-container { transition: all 0.3s ease-in-out; overflow: hidden; }
+    </style>
+</head>
+<body class="bg-brand-deep text-slate-300 font-sans antialiased min-h-screen flex flex-col relative selection:bg-brand-teal selection:text-brand-deep">
+
+    <div class="glow-effect"></div>
+
+    <!-- Minimal Header -->
+    <header class="w-full p-6 absolute top-0 left-0 z-10 flex justify-between items-center">
+        <a href="/" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+            <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
+            <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
+        </a>
+    </header>
+
+    <!-- Main Auth Container -->
+    <main class="flex-grow flex items-center justify-center p-6 z-10 mt-12">
+        <div class="w-full max-w-md">
+            
+            <!-- The Glass Auth Card -->
+            <div class="glass-card rounded-[32px] p-8 sm:p-10 shadow-2xl">
+                
+                <!-- Header -->
+                <div class="text-center mb-8">
+                    <h1 id="auth-title" class="text-3xl font-extrabold text-white tracking-tight mb-2">Welcome back</h1>
+                    <p id="auth-subtitle" class="text-slate-400 text-sm">Enter your credentials to access your ledger.</p>
+                </div>
+
+                <!-- OAuth Buttons & Divider -->
+                <div id="oauth-section" class="anim-container opacity-100">
+                    <div class="space-y-3 mb-8">
+                        <button class="w-full flex items-center justify-center gap-3 bg-[#020617]/50 border border-brand-border hover:bg-brand-border text-white font-semibold py-3 px-4 rounded-xl transition-colors">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                                <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                                <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+                                <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                            </svg>
+                            Continue with Google
+                        </button>
+                        <button class="w-full flex items-center justify-center gap-3 bg-[#020617]/50 border border-brand-border hover:bg-brand-border text-white font-semibold py-3 px-4 rounded-xl transition-colors">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M17.05 20.28c-.98.95-2.05.8-3.08.35-1.09-.46-2.09-.48-3.24 0-1.44.62-2.2.44-3.06-.35C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.19 2.24-.92 3.98-.73 1.07.13 2.55.51 3.52 1.69-2.92 1.83-2.45 5.56.55 6.64-1.02 2.06-2.02 3.63-3.13 4.57zm-3.98-13.6c.21-1.92-1.25-3.69-3.09-3.85-.36 2.03 1.51 3.73 3.09 3.85z"/>
+                            </svg>
+                            Continue with Apple
+                        </button>
+                    </div>
+
+                    <div class="relative flex items-center py-5">
+                        <div class="flex-grow border-t border-brand-border"></div>
+                        <span class="flex-shrink-0 mx-4 text-slate-500 text-sm font-medium">or continue with email</span>
+                        <div class="flex-grow border-t border-brand-border"></div>
+                    </div>
+                </div>
+
+                <!-- Form -->
+                <form id="auth-form" class="space-y-4">
+                    
+                    <!-- Email -->
+                    <div id="email-container" class="anim-container opacity-100">
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1">Email address</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="mail" class="w-5 h-5 text-slate-500"></i>
+                            </div>
+                            <input type="email" id="email" required placeholder="you@example.com" class="w-full bg-[#020617]/50 border border-brand-border rounded-xl pl-11 pr-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                        </div>
+                    </div>
+
+                    <!-- Password -->
+                    <div id="password-container" class="anim-container opacity-100">
+                        <div class="flex justify-between items-end mb-1.5 ml-1 mr-1">
+                            <label id="password-label" class="block text-sm font-medium text-slate-400">Password</label>
+                            <button type="button" id="forgot-password-link" onclick="setMode('forgot')" class="text-xs font-semibold text-brand-teal hover:text-brand-tealHover transition-colors focus:outline-none">Forgot password?</button>
+                        </div>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="lock" class="w-5 h-5 text-slate-500"></i>
+                            </div>
+                            <input type="password" id="password" required placeholder="••••••••" class="w-full bg-[#020617]/50 border border-brand-border rounded-xl pl-11 pr-11 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                            <button type="button" onclick="togglePasswordVisibility('password', 'eye-icon-1')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-300 transition-colors">
+                                <i id="eye-icon-1" data-lucide="eye" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        
+                        <!-- Password Strength Indicators (Hidden by default) -->
+                        <div id="password-strength" class="hidden mt-3 ml-1 space-y-1.5">
+                            <div class="flex items-center gap-2 text-xs text-slate-500 transition-colors" id="req-length"><i data-lucide="check" class="w-3 h-3"></i> 8+ characters</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500 transition-colors" id="req-upper"><i data-lucide="check" class="w-3 h-3"></i> 1 Uppercase letter</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500 transition-colors" id="req-number"><i data-lucide="check" class="w-3 h-3"></i> 1 Number</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500 transition-colors" id="req-special"><i data-lucide="check" class="w-3 h-3"></i> 1 Special character</div>
+                        </div>
+                    </div>
+
+                    <!-- Confirm Password -->
+                    <div id="confirm-password-container" class="hidden anim-container opacity-0 h-0">
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1 mt-1">Confirm Password</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i data-lucide="shield-check" class="w-5 h-5 text-slate-500"></i>
+                            </div>
+                            <input type="password" id="confirm-password" placeholder="••••••••" class="w-full bg-[#020617]/50 border border-brand-border rounded-xl pl-11 pr-11 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                            <button type="button" onclick="togglePasswordVisibility('confirm-password', 'eye-icon-2')" class="absolute inset-y-0 right-0 pr-4 flex items-center text-slate-500 hover:text-slate-300 transition-colors">
+                                <i id="eye-icon-2" data-lucide="eye" class="w-5 h-5"></i>
+                            </button>
+                        </div>
+                        <p id="password-match-error" class="hidden text-xs text-brand-orange mt-2 ml-1">Passwords do not match.</p>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <button type="submit" id="submit-btn" class="w-full bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-base font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.4)] mt-4">
+                        Sign In
+                    </button>
+                </form>
+
+                <!-- Footer Toggle -->
+                <div id="footer-toggle" class="mt-8 text-center anim-container opacity-100">
+                    <p class="text-sm text-slate-400">
+                        <span id="toggle-text">Don't have an account?</span> 
+                        <button onclick="toggleAuthMode()" id="toggle-btn" class="font-bold text-white hover:text-brand-teal transition-colors ml-1 focus:outline-none">
+                            Sign up for free
+                        </button>
+                    </p>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Success Modal (Hidden by default) -->
+    <div id="success-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-deep/80 backdrop-blur-md">
+        <div class="glass-card rounded-[32px] p-8 sm:p-10 max-w-sm w-full text-center shadow-2xl border border-brand-teal/30 transform scale-95 transition-transform duration-300">
+            <div class="w-16 h-16 bg-brand-teal/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="check-circle" class="w-8 h-8 text-brand-teal"></i>
+            </div>
+            <h3 id="modal-title" class="text-2xl font-bold text-white mb-2">Password Saved!</h3>
+            <p id="modal-desc" class="text-slate-400 text-sm mb-8 leading-relaxed">
+                Your password has been successfully updated. We have also sent a confirmation to your email.
+            </p>
+            <button onclick="window.location.href='/app'" class="w-full bg-brand-teal hover:bg-brand-tealHover text-brand-deep font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.4)]">
+                Open App
+            </button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        let currentMode = 'login'; // login, signup, forgot, recovery
+
+        // UI Elements
+        const title = document.getElementById('auth-title');
+        const subtitle = document.getElementById('auth-subtitle');
+        const oauthSection = document.getElementById('oauth-section');
+        const emailContainer = document.getElementById('email-container');
+        const emailInput = document.getElementById('email');
+        const passwordContainer = document.getElementById('password-container');
+        const passwordLabel = document.getElementById('password-label');
+        const passwordInput = document.getElementById('password');
+        const forgotLink = document.getElementById('forgot-password-link');
+        const strengthIndicators = document.getElementById('password-strength');
+        const confirmContainer = document.getElementById('confirm-password-container');
+        const confirmInput = document.getElementById('confirm-password');
+        const matchError = document.getElementById('password-match-error');
+        const submitBtn = document.getElementById('submit-btn');
+        const footerToggle = document.getElementById('footer-toggle');
+        const toggleText = document.getElementById('toggle-text');
+        const toggleBtn = document.getElementById('toggle-btn');
+
+        // State Machine for Auth Modes
+        function setMode(mode) {
+            currentMode = mode;
+            
+            // Reset visibility classes
+            [oauthSection, emailContainer, passwordContainer, footerToggle].forEach(el => {
+                el.classList.remove('hidden', 'h-0', 'opacity-0', 'mb-0');
+            });
+            confirmContainer.classList.add('hidden', 'h-0', 'opacity-0');
+            strengthIndicators.classList.add('hidden');
+            forgotLink.style.display = 'block';
+            passwordInput.required = true;
+            emailInput.required = true;
+            confirmInput.required = false;
+
+            if (mode === 'login') {
+                document.title = "Sign In | SetAll";
+                title.textContent = "Welcome back";
+                subtitle.textContent = "Enter your credentials to access your ledger.";
+                passwordLabel.textContent = "Password";
+                submitBtn.textContent = "Sign In";
+                toggleText.textContent = "Don't have an account?";
+                toggleBtn.textContent = "Sign up for free";
+                toggleBtn.onclick = () => setMode('signup');
+                
+            } else if (mode === 'signup') {
+                document.title = "Sign Up | SetAll";
+                title.textContent = "Create account";
+                subtitle.textContent = "Join SetAll and start settling expenses seamlessly.";
+                passwordLabel.textContent = "Password";
+                submitBtn.textContent = "Create Account";
+                toggleText.textContent = "Already have an account?";
+                toggleBtn.textContent = "Sign in here";
+                toggleBtn.onclick = () => setMode('login');
+                forgotLink.style.display = "none";
+                strengthIndicators.classList.remove('hidden');
+                
+                showConfirmPassword();
+
+            } else if (mode === 'forgot') {
+                document.title = "Reset Password | SetAll";
+                title.textContent = "Recover account";
+                subtitle.textContent = "Enter your email to receive a reset link.";
+                submitBtn.textContent = "Send Recovery Link";
+                toggleText.textContent = "Remembered your password?";
+                toggleBtn.textContent = "Back to Sign In";
+                toggleBtn.onclick = () => setMode('login');
+                
+                oauthSection.classList.add('hidden', 'h-0', 'opacity-0', 'mb-0');
+                passwordContainer.classList.add('hidden', 'h-0', 'opacity-0');
+                passwordInput.required = false;
+
+            } else if (mode === 'recovery') {
+                document.title = "Set New Password | SetAll";
+                title.textContent = "Set new password";
+                subtitle.textContent = "Please secure your account with a new password.";
+                passwordLabel.textContent = "New Password";
+                submitBtn.textContent = "Update Password";
+                
+                oauthSection.classList.add('hidden', 'h-0', 'opacity-0', 'mb-0');
+                emailContainer.classList.add('hidden', 'h-0', 'opacity-0');
+                footerToggle.classList.add('hidden', 'h-0', 'opacity-0');
+                forgotLink.style.display = "none";
+                emailInput.required = false;
+                strengthIndicators.classList.remove('hidden');
+                
+                showConfirmPassword();
+            }
+        }
+
+        function toggleAuthMode() {
+            if (currentMode === 'login') setMode('signup');
+            else setMode('login');
+        }
+
+        function showConfirmPassword() {
+            confirmContainer.classList.remove('hidden');
+            setTimeout(() => confirmContainer.classList.remove('h-0', 'opacity-0'), 10);
+            confirmInput.required = true;
+        }
+
+        function togglePasswordVisibility(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") {
+                input.type = "text";
+                icon.setAttribute("data-lucide", "eye-off");
+            } else {
+                input.type = "password";
+                icon.setAttribute("data-lucide", "eye");
+            }
+            lucide.createIcons();
+        }
+
+        // Password Strength Validation
+        passwordInput.addEventListener('input', (e) => {
+            if (currentMode !== 'signup' && currentMode !== 'recovery') return;
+            
+            const val = e.target.value;
+            const checks = [
+                { id: 'req-length', passed: val.length >= 8 },
+                { id: 'req-upper', passed: /[A-Z]/.test(val) },
+                { id: 'req-number', passed: /[0-9]/.test(val) },
+                { id: 'req-special', passed: /[^A-Za-z0-9]/.test(val) }
+            ];
+
+            checks.forEach(check => {
+                const el = document.getElementById(check.id);
+                if (check.passed) {
+                    el.classList.replace('text-slate-500', 'text-brand-teal');
+                } else {
+                    el.classList.replace('text-brand-teal', 'text-slate-500');
+                }
+            });
+        });
+
+        // Form Submission Logic
+        document.getElementById('auth-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            
+            if (currentMode === 'recovery' || currentMode === 'signup') {
+                if (passwordInput.value !== confirmInput.value) {
+                    matchError.classList.remove('hidden');
+                    return;
+                }
+                matchError.classList.add('hidden');
+                
+                // Enforce Strength (mock check for demo)
+                if (passwordInput.value.length < 8) return alert("Password too weak.");
+            }
+
+            if (currentMode === 'recovery') {
+                // MOCK SUPABASE LOGIC: supabase.auth.updateUser({ password: newPassword })
+                
+                // Show Success Modal
+                const modal = document.getElementById('success-modal');
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.firstElementChild.classList.remove('scale-95'), 10);
+
+            } else if (currentMode === 'forgot') {
+                // MOCK SUPABASE LOGIC: supabase.auth.resetPasswordForEmail()
+                
+                const modal = document.getElementById('success-modal');
+                document.getElementById('modal-title').textContent = "Recovery Email Sent";
+                document.getElementById('modal-desc').textContent = "Check your inbox for a link to securely reset your password.";
+                modal.classList.remove('hidden');
+                setTimeout(() => modal.firstElementChild.classList.remove('scale-95'), 10);
+
+            } else {
+                alert(`Auth logic triggered for: ${currentMode}`);
+            }
+        });
+
+        // Detect Supabase Password Recovery Hash
+        window.addEventListener('DOMContentLoaded', () => {
+            if (window.location.hash.includes('type=recovery')) {
+                setMode('recovery');
+            }
+        });
+
+    </script>
+</body>
+</html>

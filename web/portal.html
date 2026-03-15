@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Portal | SetAll</title>
+    <meta name="description" content="Manage your SetAll account.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            deep: '#020617',
+                            slate: '#0F172A',
+                            border: '#1E293B',
+                            teal: '#14B8A6',
+                            tealHover: '#0D9488',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-nav  { background: rgba(2,6,23,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(15,23,42,0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
+        .glow-effect { position: absolute; width: 700px; height: 700px; background: radial-gradient(circle, rgba(20,184,166,0.10) 0%, rgba(2,6,23,0) 65%); top: -150px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+    </style>
+</head>
+<body class="bg-brand-deep text-slate-300 font-sans antialiased min-h-screen flex flex-col relative selection:bg-brand-teal selection:text-brand-deep">
+    <div class="glow-effect"></div>
+
+    <nav class="fixed w-full top-0 z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 hover:opacity-80 transition-opacity">
+                <i data-lucide="scale" class="text-brand-teal w-7 h-7"></i>
+                <span class="text-white text-xl font-extrabold tracking-tight">SetAll</span>
+            </a>
+            <div class="flex items-center gap-4">
+                <a href="/app" class="hidden sm:inline-flex items-center gap-2 text-sm font-semibold text-white hover:text-brand-teal transition-colors">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Open App
+                </a>
+                <button id="signout-btn" class="text-sm font-semibold text-slate-400 hover:text-white transition-colors flex items-center gap-2">
+                    <i data-lucide="log-out" class="w-4 h-4"></i> Sign Out
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div id="loading-view" class="flex-grow flex items-center justify-center">
+        <div class="flex flex-col items-center gap-4">
+            <div class="w-8 h-8 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin"></div>
+            <p class="text-slate-500 text-sm">Loading your account…</p>
+        </div>
+    </div>
+
+    <main id="portal-view" class="hidden flex-grow pt-28 pb-16 px-6 relative z-10">
+        <div class="max-w-3xl mx-auto space-y-6">
+
+            <div class="glass-card rounded-3xl p-8 flex flex-col sm:flex-row items-center gap-6">
+                <div id="avatar-circle" class="w-20 h-20 rounded-full bg-brand-teal/20 border-2 border-brand-teal/40 flex items-center justify-center text-3xl font-bold text-brand-teal flex-shrink-0">?</div>
+                <div class="text-center sm:text-left">
+                    <h1 id="user-name" class="text-2xl font-extrabold text-white tracking-tight">Loading…</h1>
+                    <p id="user-email" class="text-slate-400 text-sm mt-1">—</p>
+                    <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/25 text-xs font-semibold text-brand-teal">
+                        <span class="w-1.5 h-1.5 rounded-full bg-brand-teal inline-block"></span>Active Account
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <a href="/app" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
+                    <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i data-lucide="layout-dashboard" class="w-5 h-5 text-brand-teal"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm">Open App</p>
+                        <p class="text-slate-500 text-xs mt-0.5">Launch the full SetAll experience</p>
+                    </div>
+                </a>
+                <a href="/download" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
+                    <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                        <i data-lucide="monitor-down" class="w-5 h-5 text-brand-teal"></i>
+                    </div>
+                    <div>
+                        <p class="text-white font-bold text-sm">Download App</p>
+                        <p class="text-slate-500 text-xs mt-0.5">Get native apps for all platforms</p>
+                    </div>
+                </a>
+            </div>
+
+            <div class="glass-card rounded-3xl p-8">
+                <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <i data-lucide="user" class="w-5 h-5 text-brand-teal"></i> Account Details
+                </h2>
+                <div class="space-y-0">
+                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                        <span class="text-slate-400 text-sm">Email</span>
+                        <span id="detail-email" class="text-white text-sm font-medium">—</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                        <span class="text-slate-400 text-sm">User ID</span>
+                        <span id="detail-uid" class="text-slate-500 text-xs font-mono truncate max-w-[200px]">—</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                        <span class="text-slate-400 text-sm">Account Created</span>
+                        <span id="detail-created" class="text-white text-sm font-medium">—</span>
+                    </div>
+                    <div class="flex justify-between items-center py-3">
+                        <span class="text-slate-400 text-sm">Last Sign In</span>
+                        <span id="detail-lastsign" class="text-white text-sm font-medium">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-3xl p-8">
+                <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                    <i data-lucide="key" class="w-5 h-5 text-brand-teal"></i> Change Password
+                </h2>
+                <div id="pw-banner" class="hidden mb-4 p-3 rounded-xl text-sm font-medium text-center"></div>
+                <form id="pw-form" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5">New Password</label>
+                        <input type="password" id="new-password" placeholder="••••••••" minlength="8" required
+                            class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5">Confirm New Password</label>
+                        <input type="password" id="confirm-new-password" placeholder="••••••••" required
+                            class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                    </div>
+                    <button type="submit" id="pw-submit" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep font-bold py-3 px-6 rounded-xl transition-all text-sm">
+                        Update Password
+                    </button>
+                </form>
+            </div>
+
+            <div class="glass-card rounded-3xl p-8 border border-red-900/30">
+                <h2 class="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
+                    <i data-lucide="triangle-alert" class="w-5 h-5"></i> Danger Zone
+                </h2>
+                <p class="text-slate-500 text-sm mb-5">Permanently delete your account and all associated data. This cannot be undone after the 30-day cooling-off period.</p>
+                <button id="delete-btn" class="text-sm font-bold text-red-400 border border-red-900/50 hover:bg-red-900/20 px-5 py-2.5 rounded-xl transition-colors">
+                    Delete My Account
+                </button>
+            </div>
+
+        </div>
+    </main>
+
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-brand-deep/80 backdrop-blur-md">
+        <div class="glass-card rounded-[32px] p-8 max-w-sm w-full text-center shadow-2xl border border-red-900/40">
+            <div class="w-16 h-16 bg-red-900/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i data-lucide="triangle-alert" class="w-8 h-8 text-red-400"></i>
+            </div>
+            <h3 class="text-xl font-bold text-white mb-2">Delete Account?</h3>
+            <p class="text-slate-400 text-sm mb-8 leading-relaxed">Your data will be scheduled for permanent deletion. You have 30 days to restore it by signing back in.</p>
+            <div class="flex gap-3">
+                <button onclick="document.getElementById('delete-modal').classList.add('hidden')" class="flex-1 glass-card text-white font-bold py-3 rounded-xl transition-colors hover:bg-brand-border text-sm">Cancel</button>
+                <button id="confirm-delete-btn" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl transition-colors text-sm">Yes, Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
+        const SUPABASE_ANON = 'REDACTED_JWT';
+        const { createClient } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        lucide.createIcons();
+
+        function fmtDate(s) {
+            if (!s) return '—';
+            return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function showPwBanner(msg, isError) {
+            const b = document.getElementById('pw-banner');
+            b.textContent = msg;
+            b.className = 'mb-4 p-3 rounded-xl text-sm font-medium text-center ' +
+                (isError ? 'bg-red-900/40 text-red-300 border border-red-700/40'
+                         : 'bg-brand-teal/10 text-brand-teal border border-brand-teal/30');
+            b.classList.remove('hidden');
+        }
+
+        function loadPortal(user) {
+            document.getElementById('loading-view').classList.add('hidden');
+            document.getElementById('portal-view').classList.remove('hidden');
+
+            const email = user.email || '—';
+            const name  = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
+            const initials = name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
+
+            document.getElementById('avatar-circle').textContent  = initials;
+            document.getElementById('user-name').textContent      = name;
+            document.getElementById('user-email').textContent     = email;
+            document.getElementById('detail-email').textContent   = email;
+            document.getElementById('detail-uid').textContent     = user.id;
+            document.getElementById('detail-created').textContent = fmtDate(user.created_at);
+            document.getElementById('detail-lastsign').textContent = fmtDate(user.last_sign_in_at);
+        }
+
+        // Auth gate
+        (async () => {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) {
+                window.location.href = '/login';
+                return;
+            }
+            loadPortal(session.user);
+        })();
+
+        // Sign out
+        document.getElementById('signout-btn').addEventListener('click', async () => {
+            await sb.auth.signOut();
+            window.location.href = '/';
+        });
+
+        // Change password
+        document.getElementById('pw-form').addEventListener('submit', async e => {
+            e.preventDefault();
+            const pw  = document.getElementById('new-password').value;
+            const cpw = document.getElementById('confirm-new-password').value;
+            if (pw !== cpw) { showPwBanner('Passwords do not match.', true); return; }
+            const btn = document.getElementById('pw-submit');
+            btn.disabled = true; btn.textContent = 'Updating…';
+            const { error } = await sb.auth.updateUser({ password: pw });
+            btn.disabled = false; btn.textContent = 'Update Password';
+            if (error) { showPwBanner(error.message, true); return; }
+            showPwBanner('Password updated successfully!', false);
+            document.getElementById('pw-form').reset();
+        });
+
+        // Delete account
+        document.getElementById('delete-btn').addEventListener('click', () => {
+            document.getElementById('delete-modal').classList.remove('hidden');
+        });
+        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+            const btn = document.getElementById('confirm-delete-btn');
+            btn.disabled = true; btn.textContent = 'Deleting…';
+            const { error } = await sb.auth.admin?.deleteUser
+                ? (() => ({ error: new Error('Use in-app deletion via Settings → Delete Account.') }))()
+                : { error: new Error('Please use Settings → Delete Account inside the app.') };
+            btn.disabled = false; btn.textContent = 'Yes, Delete';
+            document.getElementById('delete-modal').classList.add('hidden');
+            alert('To permanently delete your account, please open the SetAll app and go to Settings → Delete Account.');
+        });
+    </script>
+</body>
+</html>

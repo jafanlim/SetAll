@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy | SetAll</title>
+    <meta name="description" content="SetAll Privacy Policy and Data Handling Practices.">
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- SetAll Brand Configuration -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            deep: '#020617',
+                            slate: '#0F172A',
+                            border: '#1E293B',
+                            teal: '#14B8A6',
+                            tealHover: '#0D9488',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-nav { background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .glass-card { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .glow-effect { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(20,184,166,0.1) 0%, rgba(2,6,23,0) 70%); top: -100px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+    </style>
+</head>
+<body class="bg-brand-deep text-slate-300 font-sans antialiased overflow-x-hidden relative selection:bg-brand-teal selection:text-brand-deep">
+
+    <div class="glow-effect"></div>
+
+    <!-- Navigation -->
+    <nav class="fixed w-full top-0 z-50 glass-nav">
+        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+            <a href="/" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+                <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
+                <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
+            </a>
+            
+            <div class="hidden md:flex items-center gap-8 text-sm font-medium">
+                <a href="/download" class="hover:text-white transition-colors">Downloads</a>
+                <a href="/support" class="hover:text-white transition-colors">Support</a>
+            </div>
+
+            <div class="flex items-center gap-4">
+                <a href="/login" class="text-sm font-semibold text-white hover:text-brand-teal transition-colors hidden sm:block">Sign In</a>
+                <a href="/login" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-sm font-bold py-2.5 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.3)]">
+                    Sign Up
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Header Section -->
+    <main class="pt-40 pb-12 px-6 relative z-10">
+        <div class="max-w-3xl mx-auto text-center">
+            <h1 class="text-4xl md:text-5xl font-extrabold text-white tracking-tight mb-4">
+                Privacy Policy
+            </h1>
+            <p class="text-slate-400">Effective Date: March 2026</p>
+        </div>
+    </main>
+
+    <!-- Content Section -->
+    <section class="pb-32 px-6 relative z-10">
+        <div class="max-w-3xl mx-auto glass-card p-8 md:p-12 rounded-3xl text-slate-400 space-y-8 leading-relaxed">
+            
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">1. Introduction</h2>
+                <p>At SetAll ("Company", "we", "our", "us"), we respect your privacy and are strongly committed to keeping your personal data secure. This Privacy Policy describes how we collect, use, process, and disclose your information across our website, mobile applications, and desktop applications (collectively, the "Service").</p>
+                <p class="mt-2 font-semibold text-brand-teal">SetAll operates a non-custodial ledger system. We do not ask for, process, or store your bank account details, credit card numbers, or social security numbers.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">2. Information We Collect</h2>
+                <p>We only collect the information absolutely necessary to provide the Service to you and your groups. This includes:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-2">
+                    <li><strong class="text-white">Account Information:</strong> When you register, we collect your email address, a chosen display name, and an optional profile picture. If you use Single Sign-On (e.g., Google or Apple), we collect your email and public profile data authorized by those providers.</li>
+                    <li><strong class="text-white">Ledger & Transaction Data:</strong> To calculate debts, we store the metadata of expenses you input, including descriptions, amounts, currencies, dates, and the internal user IDs of the group members involved.</li>
+                    <li><strong class="text-white">Device & Usage Information:</strong> We collect non-personally identifiable technical information, such as device type, operating system version, app version, IP addresses, and crash logs to improve the stability of our multi-platform syncing engine.</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">3. How We Use Your Information</h2>
+                <p>We use your data strictly to operate, maintain, and improve the SetAll Service. Specifically, we use your information to:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-2">
+                    <li>Sync your ledger across your personal devices via our cloud infrastructure.</li>
+                    <li>Calculate optimized debt settlements (using the "Greedy Flow" algorithm) and securely display these balances to other authenticated members of your groups.</li>
+                    <li>Send you critical transactional emails, such as password resets, login links, and group invitations.</li>
+                    <li>Diagnose app crashes, monitor server load, and perform security audits.</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">4. How We Share Your Information</h2>
+                <p>We do <strong class="text-white">not</strong> sell, rent, or trade your personal data to data brokers, marketing agencies, or any other third party. We only share information in the following limited circumstances:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-2">
+                    <li><strong class="text-white">With Other Users:</strong> When you join a shared group, your display name, avatar, and the expense records you participate in are visible to other members of that specific group.</li>
+                    <li><strong class="text-white">With Service Providers (Sub-processors):</strong> We share encrypted data with trusted cloud infrastructure providers strictly to operate the app. This includes Supabase (database and authentication hosting), Google/Firebase (crashlytics and app hosting), and Resend (transactional email delivery).</li>
+                    <li><strong class="text-white">For Legal Reasons:</strong> We may disclose your information if required to do so by law or in response to valid requests by public authorities (e.g., a court or a government agency).</li>
+                </ul>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">5. Data Security</h2>
+                <p>We take security seriously. SetAll employs industry-standard measures to protect your data, including:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-2">
+                    <li><strong class="text-white">Encryption:</strong> All data is encrypted in transit (using TLS/SSL) and at rest on our database servers.</li>
+                    <li><strong class="text-white">Row Level Security (RLS):</strong> Database policies are strictly enforced so that a user can only query and retrieve expenses and group data they are explicitly authorized to view.</li>
+                </ul>
+                <p class="mt-2">However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">6. Data Retention and Deletion</h2>
+                <p>We retain your personal data only for as long as your account is active or as needed to provide you the Service. You have the right to delete your data at any time.</p>
+                <p class="mt-2"><strong class="text-white">Account Deletion:</strong> You can initiate a permanent deletion of your account and all associated personal data directly within the SetAll application under <em>Settings > Delete Account</em>. This process triggers a cascading wipe of your records from our active servers.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">7. Your Privacy Rights (GDPR & CCPA)</h2>
+                <p>Depending on your location, you may have specific rights regarding your personal information, including:</p>
+                <ul class="list-disc pl-5 mt-2 space-y-2">
+                    <li>The right to access the personal data we hold about you.</li>
+                    <li>The right to request the correction of inaccurate personal data.</li>
+                    <li>The right to request the erasure of your personal data ("Right to be Forgotten").</li>
+                    <li>The right to object to or restrict our processing of your data.</li>
+                    <li>The right to request a digital export of your data (Data Portability).</li>
+                </ul>
+                <p class="mt-2">To exercise any of these rights, please contact us using the email provided below. We will respond to your request within the timeframe required by applicable law.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">8. Children's Privacy</h2>
+                <p>Our Service is not directed to anyone under the age of 13 (or 16 in the European Economic Area). We do not knowingly collect personal identifiable information from children. If we discover that a child has provided us with personal data, we will immediately delete that information from our servers.</p>
+            </div>
+
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">9. Changes to this Privacy Policy</h2>
+                <p>We may update our Privacy Policy from time to time. We will notify you of any material changes by posting the new Privacy Policy on this page and updating the "Effective Date" at the top. You are advised to review this Privacy Policy periodically for any changes.</p>
+            </div>
+            
+            <div>
+                <h2 class="text-xl font-bold text-white mb-3">10. Contact Us</h2>
+                <p>If you have any questions, concerns, or requests regarding this Privacy Policy or how we handle your data, please contact our Data Protection Officer at:</p>
+                <a href="mailto:contact@setall.app" class="inline-flex items-center gap-2 text-brand-teal font-bold hover:text-brand-tealHover mt-2 transition-colors">
+                    contact@setall.app <i data-lucide="arrow-right" class="w-4 h-4"></i>
+                </a>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="py-12 px-6 bg-brand-deep border-t border-brand-border">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+            <div class="flex items-center gap-2">
+                <i data-lucide="scale" class="text-slate-500 w-5 h-5"></i>
+                <span class="text-slate-400 font-semibold tracking-tight">SetAll &copy; <script>document.write(new Date().getFullYear())</script></span>
+            </div>
+            <div class="flex gap-6 text-sm font-medium text-slate-500">
+                <a href="/privacy" class="text-white transition-colors">Privacy Policy</a>
+                <a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
+                <a href="/support" class="hover:text-white transition-colors">Help & Support</a>
+                <a href="mailto:contact@setall.app" class="hover:text-white transition-colors">Contact</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
