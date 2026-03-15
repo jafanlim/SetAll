@@ -10,7 +10,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../../app.dart' show updateResultProvider;
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/providers/theme_mode_provider.dart';
 import '../../../../core/router/app_router.dart';
@@ -46,7 +45,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
   // ── Update check ────────────────────────────────────────────────────────
   bool _checkingUpdate = false;
-  String? _updateMessage;
+  UpdateCheckResult? _updateResult;
 
   // ── Email ────────────────────────────────────────────────────────────────
   String? _currentEmail;
@@ -404,6 +403,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _launchUpdateUrl() async {
+    HapticUtils.primaryTap();
+    String url;
+    if (kIsWeb) {
+      url = 'https://setall.app/download';
+    } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+      url = 'https://apps.apple.com/app/setall/id6744063602';
+    } else if (defaultTargetPlatform == TargetPlatform.android) {
+      url = 'https://setall.app/download';
+    } else {
+      url = 'https://setall.app/download';
+    }
+    await UpdateService.instance.openReleasePage(url);
   }
 
   Future<void> _saveCurrency(String code) async {
@@ -854,101 +868,96 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
                         const SizedBox(height: 24),
 
-                        // ── About ──────────────────────────────────────────
+                        // ── About / Version ────────────────────────────────
                         _SectionHeader(label: 'About'),
                         const SizedBox(height: 8),
                         GlassCard(
                           padding: EdgeInsets.zero,
                           child: Column(
                             children: [
+                              // Version tile with update badge
                               ListTile(
                                 leading: const Icon(Icons.info_outline),
-                                title: const Text(
-                                  'SetAll',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                title: Row(
+                                  children: [
+                                    const Text(
+                                      'SetAll',
+                                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ),
+                                    if (_updateResult != null && _updateResult!.hasUpdate) ...
+                                      [
+                                        const SizedBox(width: 8),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: _teal.withValues(alpha: 0.15),
+                                            borderRadius: BorderRadius.circular(20),
+                                            border: Border.all(color: _teal.withValues(alpha: 0.5)),
+                                          ),
+                                          child: Text(
+                                            '${_updateResult!.latestTag} available',
+                                            style: const TextStyle(fontSize: 10, color: _teal, fontWeight: FontWeight.w700),
+                                          ),
+                                        ),
+                                      ],
+                                  ],
                                 ),
                                 subtitle: Text(
-                                  _appVersion.isEmpty
-                                      ? 'Loading…'
-                                      : 'SetAll $_appVersion',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: theme.colorScheme.onSurfaceVariant,
-                                  ),
+                                  _appVersion.isEmpty ? 'Loading…' : 'Version $_appVersion',
+                                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ),
                               const Divider(height: 1, indent: 16, endIndent: 16),
+                              // Check for updates tile
                               ListTile(
                                 leading: _checkingUpdate
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: _teal,
-                                        ),
-                                      )
-                                    : const Icon(Icons.system_update_alt_rounded,
-                                        color: _teal),
-                                title: const Text(
-                                  'Check for Updates',
-                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                    ? const SizedBox(width: 20, height: 20,
+                                        child: CircularProgressIndicator(strokeWidth: 2, color: _teal))
+                                    : const Icon(Icons.system_update_alt_rounded, color: _teal),
+                                title: Text(
+                                  _updateResult != null && _updateResult!.hasUpdate
+                                      ? 'Update Available'
+                                      : 'Check for Updates',
+                                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                 ),
-                                subtitle: _updateMessage != null
-                                    ? Text(
-                                        _updateMessage!,
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: theme.colorScheme.onSurfaceVariant,
-                                        ),
-                                      )
-                                    : null,
+                                subtitle: Text(
+                                  _updateResult != null
+                                      ? (_updateResult!.hasUpdate
+                                          ? 'Tap "Update Now" to get ${_updateResult!.latestTag}'
+                                          : 'You\'re up to date ✓')
+                                      : 'Tap to check for a new version',
+                                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                                ),
                                 onTap: _checkingUpdate ? null : () async {
                                   HapticUtils.lightTap();
-                                  setState(() {
-                                    _checkingUpdate = true;
-                                    _updateMessage  = null;
-                                  });
-                                  final result =
-                                      await UpdateService.instance.checkForUpdate();
+                                  setState(() { _checkingUpdate = true; });
+                                  final result = await UpdateService.instance.checkForUpdate();
                                   if (!mounted) return;
-                                  if (result.error != null) {
-                                    setState(() {
-                                      _checkingUpdate = false;
-                                      _updateMessage  = 'Could not check (${result.error})';
-                                    });
-                                    return;
-                                  }
-                                  if (result.hasUpdate) {
-                                    ref
-                                        .read(updateResultProvider.notifier)
-                                        .state = result;
-                                    setState(() {
-                                      _checkingUpdate = false;
-                                      _updateMessage  = result.hasDirectDownload
-                                          ? 'Downloading ${result.latestTag}…'
-                                          : '${result.latestTag} available — see banner at top';
-                                    });
-                                    // Kick off background download immediately.
-                                    if (result.hasDirectDownload) {
-                                      unawaited(
-                                        UpdateService.instance
-                                            .downloadUpdate(result)
-                                            .then((_) {
-                                          if (!mounted) return;
-                                          setState(() => _updateMessage =
-                                              'Ready — tap "Install Now & Quit" in banner');
-                                        }),
-                                      );
-                                    }
-                                  } else {
-                                    setState(() {
-                                      _checkingUpdate = false;
-                                      _updateMessage  = 'You\'re up to date ✓';
-                                    });
-                                  }
+                                  setState(() { _checkingUpdate = false; _updateResult = result; });
                                 },
                               ),
+                              // Update Now button — only shown when update is available
+                              if (_updateResult != null && _updateResult!.hasUpdate) ...
+                                [
+                                  const Divider(height: 1, indent: 16, endIndent: 16),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                                    child: SizedBox(
+                                      width: double.infinity,
+                                      child: FilledButton.icon(
+                                        onPressed: () => _launchUpdateUrl(),
+                                        icon: const Icon(Icons.open_in_new, size: 16),
+                                        label: const Text('Update Now', style: TextStyle(fontWeight: FontWeight.w700)),
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: _teal,
+                                          foregroundColor: Colors.black,
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
                             ],
                           ),
                         ),

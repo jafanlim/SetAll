@@ -1,1 +1,43 @@
-{"hosting":{"public":"build/web","ignore":["firebase.json","**/.*","**/node_modules/**"],"rewrites":[{"source":"/login","destination":"/login.html"},{"source":"/portal","destination":"/portal.html"},{"source":"/download","destination":"/download.html"},{"source":"/support","destination":"/support.html"},{"source":"/privacy","destination":"/privacy.html"},{"source":"/terms","destination":"/terms.html"},{"source":"/app/**","destination":"/app.html"},{"source":"/app","destination":"/app.html"},{"source":"**","destination":"/index.html"}],"headers":[{"source":"/**","headers":[{"key":"Cache-Control","value":"no-cache, no-store, must-revalidate"}]},{"source":"/app.html","headers":[{"key":"Cross-Origin-Opener-Policy","value":"same-origin"},{"key":"Cross-Origin-Embedder-Policy","value":"credentialless"}]}]},"flutter":{"platforms":{"android":{"default":{"projectId":"setall-c899a","appId":"1:454096661669:android:704781cd8cd9ef825ab14c","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"setall-c899a","appId":"1:454096661669:ios:16e6a711874f61445ab14c","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"setall-c899a","appId":"1:454096661669:ios:5481e839680ae0ef5ab14c","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"setall-c899a","configurations":{"android":"1:454096661669:android:704781cd8cd9ef825ab14c","ios":"1:454096661669:ios:16e6a711874f61445ab14c","macos":"1:454096661669:ios:5481e839680ae0ef5ab14c","web":"1:454096661669:web:81e03534573eeead5ab14c"}}}}}}
+{
+  "hosting": {
+    "site": "setall",
+    "public": "build/web",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "/login", "destination": "/login.html" },
+      { "source": "/portal", "destination": "/portal.html" },
+      { "source": "/download", "destination": "/download.html" },
+      { "source": "/support", "destination": "/support.html" },
+      { "source": "/privacy", "destination": "/privacy.html" },
+      { "source": "/terms", "destination": "/terms.html" },
+      { "source": "/app/**", "destination": "/app.html" },
+      { "source": "/app", "destination": "/app.html" },
+      { "source": "**", "destination": "/index.html" }
+    ],
+    "headers": [
+      {
+        "source": "/**",
+        "headers": [{"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}]
+      },
+      {
+        "source": "/app.html",
+        "headers": [
+          {"key": "Cross-Origin-Opener-Policy", "value": "same-origin"},
+          {"key": "Cross-Origin-Embedder-Policy", "value": "credentialless"}
+        ]
+      }
+    ]
+  },
+  "flutter": {
+    "platforms": {
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "setall-c899a",
+          "configurations": {
+            "web": "1:454096661669:web:81e03534573eeead5ab14c"
+          }
+        }
+      }
+    }
+  }
+}

@@ -34,7 +34,6 @@ class SetAllApp extends ConsumerStatefulWidget {
 class _SetAllAppState extends ConsumerState<SetAllApp> {
   StreamSubscription<AuthState>? _authSub;
   String? _lastUserId;
-  bool _updateBannerDismissed = false;
 
   @override
   void initState() {
@@ -102,8 +101,6 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       );
       // Sync FCM token to Supabase on first login so push notifications work.
       if (isFirstLogin) unawaited(NotificationService.instance.syncToSupabase());
-      // Check for updates once per session (first login / initial session).
-      if (isFirstLogin) unawaited(_checkForUpdates());
     }
 
     // On sign-out always invalidate so the login screen starts clean.
@@ -185,15 +182,6 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
     }
   }
 
-  Future<void> _checkForUpdates() async {
-    final result = await UpdateService.instance.checkForUpdate();
-    if (!mounted) return;
-    if (result.hasUpdate) {
-      ref.read(updateResultProvider.notifier).state = result;
-      setState(() => _updateBannerDismissed = false);
-    }
-  }
-
   void _invalidateAllProviders() {
     // Do NOT invalidate setAllRepositoryProvider — it owns the StreamController
     // that backs watchGroups()/watchGroupExpenses(). Destroying it kills all
@@ -244,39 +232,13 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
             final isMac = defaultTargetPlatform == TargetPlatform.macOS;
             final isWin = defaultTargetPlatform == TargetPlatform.windows;
 
-            // ── Update banner ─────────────────────────────────────────
-            final updateResult = ref.watch(updateResultProvider);
-            final showBanner   = updateResult != null &&
-                updateResult.hasUpdate &&
-                !_updateBannerDismissed;
-
-            final banner = showBanner
-                ? _UpdateBanner(
-                    result: updateResult,
-                    onDismiss: () => setState(() => _updateBannerDismissed = true),
-                  )
-                : null;
-
             // ── Full-width title-bar fringe (desktop only) ────────────────
-            // Sits above every screen — shell tabs AND push routes — so
-            // nothing ever collides with window controls / traffic lights.
-            // The update banner is placed BELOW the title bar so it never
-            // overlaps the traffic lights / window controls.
             Widget root = inner;
             if (isMac || isWin) {
               root = Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   _AppTitleBar(isMac: isMac),
-                  ?banner,
-                  Expanded(child: inner),
-                ],
-              );
-            } else if (banner != null) {
-              root = Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  banner,
                   Expanded(child: inner),
                 ],
               );
@@ -290,191 +252,6 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
         );
       },
     );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Update available banner — three phases:
-//   idle          → "Update available  [Download & Install]  [✕]"
-//   downloading   → progress bar + percentage
-//   readyToInstall→ "Ready  [Install Now & Quit]  [✕]"
-//   error         → error text + [Retry]
-// ---------------------------------------------------------------------------
-
-class _UpdateBanner extends StatefulWidget {
-  const _UpdateBanner({required this.result, required this.onDismiss});
-
-  final UpdateCheckResult result;
-  final VoidCallback onDismiss;
-
-  @override
-  State<_UpdateBanner> createState() => _UpdateBannerState();
-}
-
-class _UpdateBannerState extends State<_UpdateBanner> {
-  static const _kBg     = Color(0xFF1E3A5F);
-  static const _kAccent = Color(0xFF38BDF8);
-  static const _kGreen  = Color(0xFF4ADE80);
-  static const _kRed    = Color(0xFFF87171);
-  static const _kText   = Color(0xFFE0F2FE);
-
-  late UpdateDownloadProgress _prog;
-
-  @override
-  void initState() {
-    super.initState();
-    _prog = UpdateService.instance.downloadProgress;
-    UpdateService.instance.addProgressListener(_onProgress);
-  }
-
-  @override
-  void dispose() {
-    UpdateService.instance.removeProgressListener(_onProgress);
-    super.dispose();
-  }
-
-  void _onProgress(UpdateDownloadProgress p) {
-    if (!mounted) return;
-    setState(() => _prog = p);
-    // On macOS, auto-open the DMG as soon as it finishes downloading —
-    // no extra click needed. The DMG will mount and Finder will show it.
-    if (p.state == UpdateDownloadState.readyToInstall &&
-        p.localPath != null &&
-        defaultTargetPlatform == TargetPlatform.macOS) {
-      UpdateService.instance.launchInstaller(p.localPath!);
-    }
-  }
-
-  void _startDownload() =>
-      UpdateService.instance.downloadUpdate(widget.result);
-
-  void _installNow() {
-    final path = _prog.localPath;
-    if (path != null) UpdateService.instance.launchInstaller(path);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: _kBg,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              children: [
-                Icon(
-                  _prog.state == UpdateDownloadState.readyToInstall
-                      ? Icons.check_circle_outline
-                      : Icons.system_update_alt_rounded,
-                  size: 16,
-                  color: _prog.state == UpdateDownloadState.readyToInstall
-                      ? _kGreen
-                      : _kAccent,
-                ),
-                const SizedBox(width: 8),
-                Expanded(child: _buildLabel()),
-                const SizedBox(width: 8),
-                _buildAction(),
-                // Dismiss — hidden while downloading
-                if (_prog.state != UpdateDownloadState.downloading)
-                  GestureDetector(
-                    onTap: () {
-                      UpdateService.instance.resetDownload();
-                      widget.onDismiss();
-                    },
-                    child: const Padding(
-                      padding: EdgeInsets.only(left: 6),
-                      child: Icon(Icons.close, size: 16, color: _kText),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          // Progress bar — only shown while downloading
-          if (_prog.state == UpdateDownloadState.downloading)
-            LinearProgressIndicator(
-              value: _prog.total > 0 ? _prog.fraction : null,
-              backgroundColor: _kBg,
-              color: _kAccent,
-              minHeight: 2,
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLabel() {
-    switch (_prog.state) {
-      case UpdateDownloadState.idle:
-        return Text(
-          'Update available: ${widget.result.latestTag}',
-          style: const TextStyle(color: _kText, fontSize: 12,
-              fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        );
-      case UpdateDownloadState.downloading:
-        final pct = _prog.total > 0
-            ? ' ${(_prog.fraction * 100).toStringAsFixed(0)}%'
-            : '';
-        return Text(
-          'Downloading$pct…',
-          style: const TextStyle(color: _kText, fontSize: 12,
-              fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        );
-      case UpdateDownloadState.readyToInstall:
-        return const Text(
-          'Opening installer…',
-          style: TextStyle(color: _kGreen, fontSize: 12,
-              fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        );
-      case UpdateDownloadState.error:
-        return Text(
-          'Download failed: ${_prog.errorMessage ?? 'unknown error'}',
-          style: const TextStyle(color: _kRed, fontSize: 12,
-              fontWeight: FontWeight.w600),
-          overflow: TextOverflow.ellipsis,
-        );
-    }
-  }
-
-  Widget _buildAction() {
-    final btnStyle = TextButton.styleFrom(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      minimumSize: Size.zero,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-    switch (_prog.state) {
-      case UpdateDownloadState.idle:
-        return TextButton(
-          onPressed: _startDownload,
-          style: btnStyle.copyWith(
-              foregroundColor: WidgetStatePropertyAll(_kAccent)),
-          child: const Text('Download & Install',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-        );
-      case UpdateDownloadState.downloading:
-        return const SizedBox.shrink();
-      case UpdateDownloadState.readyToInstall:
-        return TextButton(
-          onPressed: _installNow,
-          style: btnStyle.copyWith(
-              foregroundColor: WidgetStatePropertyAll(_kGreen)),
-          child: const Text('Install Now & Quit',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-        );
-      case UpdateDownloadState.error:
-        return TextButton(
-          onPressed: _startDownload,
-          style: btnStyle.copyWith(
-              foregroundColor: WidgetStatePropertyAll(_kAccent)),
-          child: const Text('Retry',
-              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12)),
-        );
-    }
   }
 }
 
