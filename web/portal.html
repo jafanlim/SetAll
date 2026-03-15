@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Account Portal | SetAll</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 16px; -webkit-text-size-adjust: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: #020617;
+      color: #cbd5e1;
+      min-height: 100vh;
+      -webkit-font-smoothing: antialiased;
+    }
+    a { color: inherit; text-decoration: none; }
+    ::selection { background: #14B8A6; color: #020617; }
+    input, button, textarea { font-family: inherit; }
+
+    /* ── Loading screen ── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 100;
+      background: #020617;
+      display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem;
+    }
+    .load-spinner {
+      width: 2.5rem; height: 2.5rem;
+      border: 3px solid rgba(20,184,166,0.2);
+      border-top-color: #14B8A6;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Top Nav ── */
+    .top-nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 50; height: 64px;
+      background: rgba(2,6,23,0.85); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: center; justify-content: space-between; padding: 0 1.5rem;
+    }
+    .nav-brand { display: flex; align-items: center; gap: 0.5rem; font-size: 1.125rem; font-weight: 700; color: #fff; }
+    .nav-brand i { color: #14B8A6; }
+    .nav-right { display: flex; align-items: center; gap: 0.75rem; }
+    .btn-launch {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      background: #14B8A6; color: #020617;
+      padding: 0.5rem 1rem; border-radius: 0.625rem;
+      font-size: 0.8125rem; font-weight: 700;
+      border: none; cursor: pointer;
+      transition: background .15s;
+    }
+    .btn-launch:hover { background: #0D9488; }
+    .btn-signout {
+      display: inline-flex; align-items: center; gap: 0.375rem;
+      color: #64748b; background: transparent; border: 1px solid #1e293b;
+      padding: 0.5rem 0.875rem; border-radius: 0.625rem;
+      font-size: 0.8125rem; font-weight: 600;
+      cursor: pointer; transition: color .15s, border-color .15s;
+    }
+    .btn-signout:hover { color: #fff; border-color: #334155; }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex; min-height: 100vh; padding-top: 64px;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 240px; flex-shrink: 0;
+      background: rgba(15,23,42,0.5); border-right: 1px solid rgba(255,255,255,0.05);
+      padding: 1.75rem 1rem;
+      position: sticky; top: 64px; height: calc(100vh - 64px); overflow-y: auto;
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .layout { flex-direction: column; }
+      .main-content { padding: 1.25rem; }
+    }
+    .sidebar-section { margin-bottom: 0.25rem; }
+    .sidebar-label {
+      font-size: 0.625rem; font-weight: 700; letter-spacing: 0.1em;
+      text-transform: uppercase; color: #334155;
+      padding: 0.5rem 0.75rem; display: block;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 0.625rem;
+      padding: 0.625rem 0.75rem; border-radius: 0.625rem;
+      font-size: 0.875rem; font-weight: 500; color: #64748b;
+      cursor: pointer; transition: color .15s, background .15s;
+      border: none; background: transparent; width: 100%; text-align: left;
+    }
+    .nav-item i { width: 1rem; height: 1rem; flex-shrink: 0; }
+    .nav-item:hover { color: #fff; background: rgba(255,255,255,0.04); }
+    .nav-item.active { color: #14B8A6; background: rgba(20,184,166,0.08); }
+    .nav-divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0.75rem 0; }
+
+    /* ── Mobile tab bar ── */
+    .mobile-tabs {
+      display: none; overflow-x: auto; gap: 0.25rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      scrollbar-width: none;
+    }
+    .mobile-tabs::-webkit-scrollbar { display: none; }
+    @media (max-width: 768px) { .mobile-tabs { display: flex; } }
+    .mobile-tab {
+      display: inline-flex; align-items: center; gap: 0.375rem; white-space: nowrap;
+      padding: 0.5rem 0.875rem; border-radius: 9999px;
+      font-size: 0.8125rem; font-weight: 500; color: #64748b;
+      border: 1px solid transparent; background: transparent; cursor: pointer;
+      transition: all .15s;
+    }
+    .mobile-tab.active { color: #14B8A6; border-color: rgba(20,184,166,0.3); background: rgba(20,184,166,0.08); }
+
+    /* ── Main content ── */
+    .main-content { flex: 1; padding: 2.5rem 2rem; max-width: 760px; }
+
+    /* ── Section panels ── */
+    .section-panel { display: none; }
+    .section-panel.active { display: block; }
+
+    /* ── Page heading ── */
+    .page-heading { margin-bottom: 2rem; }
+    .page-heading h1 { font-size: 1.5rem; font-weight: 700; color: #fff; letter-spacing: -0.02em; margin-bottom: 0.25rem; }
+    .page-heading p { font-size: 0.875rem; color: #64748b; }
+
+    /* ── Cards ── */
+    .card {
+      background: rgba(15,23,42,0.6);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 1rem; overflow: hidden; margin-bottom: 1.25rem;
+    }
+    .card-header {
+      padding: 1.25rem 1.5rem; border-bottom: 1px solid rgba(255,255,255,0.05);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card-header h2 { font-size: 0.9375rem; font-weight: 600; color: #fff; }
+    .card-header p { font-size: 0.8125rem; color: #64748b; margin-top: 0.125rem; }
+    .card-body { padding: 1.5rem; }
+    .card-footer {
+      padding: 1rem 1.5rem; border-top: 1px solid rgba(255,255,255,0.05);
+      display: flex; justify-content: flex-end; gap: 0.75rem;
+    }
+
+    /* ── Avatar ── */
+    .avatar-row { display: flex; align-items: center; gap: 1.25rem; }
+    .avatar {
+      width: 5rem; height: 5rem; border-radius: 50%;
+      background: linear-gradient(135deg, #14B8A6, #3B82F6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.75rem; font-weight: 700; color: #fff; flex-shrink: 0;
+      letter-spacing: -0.02em;
+    }
+    .avatar-info h3 { font-size: 1.0625rem; font-weight: 600; color: #fff; }
+    .avatar-info p { font-size: 0.8125rem; color: #64748b; margin-top: 0.25rem; }
+    .badge {
+      display: inline-flex; align-items: center; gap: 0.25rem;
+      padding: 0.125rem 0.5rem; border-radius: 9999px;
+      font-size: 0.6875rem; font-weight: 600;
+    }
+    .badge-teal { background: rgba(20,184,166,0.12); color: #14B8A6; border: 1px solid rgba(20,184,166,0.2); }
+    .badge-slate { background: rgba(100,116,139,0.12); color: #94a3b8; border: 1px solid rgba(100,116,139,0.2); }
+
+    /* ── Form fields ── */
+    .field { margin-bottom: 1.25rem; }
+    .field:last-child { margin-bottom: 0; }
+    .field label { display: block; font-size: 0.8125rem; font-weight: 500; color: #94a3b8; margin-bottom: 0.5rem; }
+    .field-row { display: grid; gap: 1rem; grid-template-columns: 1fr; }
+    @media (min-width: 520px) { .field-row { grid-template-columns: 1fr 1fr; } }
+    .input {
+      width: 100%; background: rgba(2,6,23,0.6);
+      border: 1px solid #1e293b; border-radius: 0.625rem;
+      padding: 0.625rem 0.875rem;
+      color: #fff; font-size: 0.9375rem;
+      transition: border-color .15s, box-shadow .15s;
+      outline: none;
+    }
+    .input:focus { border-color: #14B8A6; box-shadow: 0 0 0 3px rgba(20,184,166,0.12); }
+    .input:disabled { opacity: 0.45; cursor: not-allowed; }
+    .input-wrap { position: relative; }
+    .input-wrap .input { padding-right: 2.75rem; }
+    .input-toggle {
+      position: absolute; right: 0.625rem; top: 50%; transform: translateY(-50%);
+      background: none; border: none; cursor: pointer;
+      color: #475569; padding: 0.25rem; line-height: 0;
+      transition: color .15s;
+    }
+    .input-toggle:hover { color: #94a3b8; }
+    .input-hint { font-size: 0.75rem; color: #475569; margin-top: 0.375rem; }
+    .input-error { font-size: 0.75rem; color: #F97316; margin-top: 0.375rem; display: none; }
+
+    /* ── Strength bars ── */
+    .strength-bars { display: flex; gap: 3px; margin-top: 0.5rem; }
+    .s-bar { flex: 1; height: 3px; border-radius: 9999px; background: #1e293b; transition: background .2s; }
+    .s-bar.weak   { background: #ef4444; }
+    .s-bar.medium { background: #f59e0b; }
+    .s-bar.strong { background: #14B8A6; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+      padding: 0.625rem 1.25rem; border-radius: 0.625rem;
+      font-size: 0.875rem; font-weight: 600; cursor: pointer;
+      transition: all .15s; border: 1px solid transparent;
+    }
+    .btn-primary { background: #14B8A6; color: #020617; border-color: transparent; }
+    .btn-primary:hover { background: #0D9488; }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost { background: transparent; color: #94a3b8; border-color: #1e293b; }
+    .btn-ghost:hover { color: #fff; border-color: #334155; }
+    .btn-danger { background: transparent; color: #f87171; border-color: rgba(239,68,68,0.3); }
+    .btn-danger:hover { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.5); }
+    .btn-full { width: 100%; }
+    .btn-sm { padding: 0.4375rem 0.875rem; font-size: 0.8125rem; }
+    .btn i { width: 0.9375rem; height: 0.9375rem; }
+    .spin-inline { display: none; width: 0.875rem; height: 0.875rem; border: 2px solid rgba(2,6,23,0.3); border-top-color: #020617; border-radius: 50%; animation: spin 0.7s linear infinite; }
+    .btn-primary .spin-inline { border-color: rgba(2,6,23,0.3); border-top-color: #020617; }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 200;
+      display: flex; align-items: center; gap: 0.625rem;
+      padding: 0.75rem 1.25rem; border-radius: 0.75rem;
+      font-size: 0.875rem; font-weight: 500; color: #fff;
+      pointer-events: none; opacity: 0;
+      transition: opacity .25s, transform .25s;
+      transform: translateY(0.5rem);
+    }
+    #toast.show { opacity: 1; transform: translateY(0); }
+    #toast.success { background: rgba(20,184,166,0.95); color: #020617; }
+    #toast.error   { background: rgba(239,68,68,0.95); }
+
+    /* ── Overview stats ── */
+    .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem; }
+    @media (min-width: 520px) { .stat-grid { grid-template-columns: repeat(3, 1fr); } }
+    .stat-card {
+      background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 0.875rem; padding: 1.125rem; text-align: center;
+    }
+    .stat-icon { width: 2.25rem; height: 2.25rem; border-radius: 0.5rem; display: flex; align-items: center; justify-content: center; margin: 0 auto 0.625rem; }
+    .stat-icon.teal { background: rgba(20,184,166,0.1); color: #14B8A6; }
+    .stat-icon.blue { background: rgba(59,130,246,0.1); color: #3B82F6; }
+    .stat-icon.orange { background: rgba(249,115,22,0.1); color: #F97316; }
+    .stat-icon i { width: 1.125rem; height: 1.125rem; }
+    .stat-value { font-size: 0.8125rem; font-weight: 600; color: #fff; }
+    .stat-label { font-size: 0.6875rem; color: #475569; margin-top: 0.125rem; }
+
+    /* ── Danger zone ── */
+    .danger-section { border: 1px solid rgba(239,68,68,0.2); border-radius: 1rem; padding: 1.5rem; background: rgba(239,68,68,0.03); }
+    .danger-section h2 { font-size: 0.9375rem; font-weight: 600; color: #f87171; margin-bottom: 0.375rem; }
+    .danger-section p { font-size: 0.8125rem; color: #64748b; margin-bottom: 1.25rem; line-height: 1.6; }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 1.5rem 0; }
+
+    /* ── Session item ── */
+    .session-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+      padding: 1rem 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .session-item:last-child { border-bottom: none; padding-bottom: 0; }
+    .session-info { display: flex; align-items: center; gap: 0.75rem; }
+    .session-icon {
+      width: 2.5rem; height: 2.5rem; border-radius: 0.5rem; flex-shrink: 0;
+      background: rgba(20,184,166,0.1); display: flex; align-items: center; justify-content: center; color: #14B8A6;
+    }
+    .session-icon i { width: 1.125rem; height: 1.125rem; }
+    .session-name { font-size: 0.875rem; font-weight: 500; color: #fff; }
+    .session-detail { font-size: 0.75rem; color: #475569; margin-top: 0.125rem; }
+
+    /* ── Confirm modal ── */
+    #confirm-modal {
+      display: none; position: fixed; inset: 0; z-index: 150;
+      background: rgba(2,6,23,0.8); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center; padding: 1rem;
+    }
+    #confirm-modal.open { display: flex; }
+    .modal-box {
+      background: #0F172A; border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 1.25rem; padding: 2rem; max-width: 380px; width: 100%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+    }
+    .modal-icon {
+      width: 3rem; height: 3rem; border-radius: 50%; background: rgba(239,68,68,0.1);
+      display: flex; align-items: center; justify-content: center; color: #f87171; margin-bottom: 1.25rem;
+    }
+    .modal-icon i { width: 1.375rem; height: 1.375rem; }
+    .modal-box h3 { font-size: 1.125rem; font-weight: 700; color: #fff; margin-bottom: 0.5rem; }
+    .modal-box p { font-size: 0.875rem; color: #64748b; line-height: 1.6; margin-bottom: 1.5rem; }
+    .modal-actions { display: flex; gap: 0.75rem; }
+    .modal-actions .btn { flex: 1; }
+  </style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+  <div class="load-spinner"></div>
+  <p style="font-size:.875rem;color:#475569">Verifying session…</p>
+</div>
+
+<!-- Top Nav -->
+<nav class="top-nav">
+  <a href="/" class="nav-brand">
+    <i data-lucide="scale" style="width:1.25rem;height:1.25rem"></i>
+    <span>SetAll</span>
+    <span style="font-size:.75rem;font-weight:500;color:#475569;margin-left:.25rem">/ Account</span>
+  </a>
+  <div class="nav-right">
+    <button class="btn-launch" onclick="window.location.href='/app'">
+      <i data-lucide="monitor" style="width:.875rem;height:.875rem"></i>
+      Open App
+    </button>
+    <button class="btn-signout" id="nav-signout-btn">
+      <i data-lucide="log-out" style="width:.875rem;height:.875rem"></i>
+      Sign Out
+    </button>
+  </div>
+</nav>
+
+<!-- Layout -->
+<div class="layout" id="portal-layout" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <span class="sidebar-label">Account</span>
+    <div class="sidebar-section">
+      <button class="nav-item active" data-section="overview" onclick="switchSection('overview', this)">
+        <i data-lucide="layout-dashboard"></i> Overview
+      </button>
+      <button class="nav-item" data-section="profile" onclick="switchSection('profile', this)">
+        <i data-lucide="user"></i> Profile
+      </button>
+    </div>
+    <hr class="nav-divider">
+    <span class="sidebar-label">Security</span>
+    <div class="sidebar-section">
+      <button class="nav-item" data-section="email" onclick="switchSection('email', this)">
+        <i data-lucide="mail"></i> Email Address
+      </button>
+      <button class="nav-item" data-section="password" onclick="switchSection('password', this)">
+        <i data-lucide="key-round"></i> Password
+      </button>
+    </div>
+    <hr class="nav-divider">
+    <span class="sidebar-label">Sessions</span>
+    <div class="sidebar-section">
+      <button class="nav-item" data-section="sessions" onclick="switchSection('sessions', this)">
+        <i data-lucide="monitor-smartphone"></i> Devices
+      </button>
+    </div>
+    <hr class="nav-divider">
+    <span class="sidebar-label">Danger</span>
+    <div class="sidebar-section">
+      <button class="nav-item" data-section="danger" onclick="switchSection('danger', this)" style="color:#f87171">
+        <i data-lucide="trash-2"></i> Delete Account
+      </button>
+    </div>
+  </aside>
+
+  <!-- Mobile Tab Bar -->
+  <div class="mobile-tabs">
+    <button class="mobile-tab active" data-section="overview" onclick="switchSection('overview', this)">Overview</button>
+    <button class="mobile-tab" data-section="profile" onclick="switchSection('profile', this)">Profile</button>
+    <button class="mobile-tab" data-section="email" onclick="switchSection('email', this)">Email</button>
+    <button class="mobile-tab" data-section="password" onclick="switchSection('password', this)">Password</button>
+    <button class="mobile-tab" data-section="sessions" onclick="switchSection('sessions', this)">Sessions</button>
+    <button class="mobile-tab" data-section="danger" onclick="switchSection('danger', this)">Delete</button>
+  </div>
+
+  <!-- Main Content -->
+  <main class="main-content">
+
+    <!-- ── OVERVIEW ── -->
+    <div class="section-panel active" id="panel-overview">
+      <div class="page-heading">
+        <h1 id="welcome-heading">Welcome back</h1>
+        <p id="welcome-sub">Here's a summary of your SetAll account.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-body">
+          <div class="avatar-row">
+            <div class="avatar" id="overview-avatar">?</div>
+            <div class="avatar-info">
+              <h3 id="overview-name">—</h3>
+              <p id="overview-email">—</p>
+              <div style="margin-top:.5rem;display:flex;gap:.5rem;flex-wrap:wrap">
+                <span class="badge badge-teal" id="provider-badge">Email</span>
+                <span class="badge badge-slate" id="verified-badge">Verifying…</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="stat-grid">
+        <div class="stat-card">
+          <div class="stat-icon teal"><i data-lucide="calendar"></i></div>
+          <div class="stat-value" id="stat-joined">—</div>
+          <div class="stat-label">Member Since</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon blue"><i data-lucide="clock"></i></div>
+          <div class="stat-value" id="stat-last-login">—</div>
+          <div class="stat-label">Last Sign-In</div>
+        </div>
+        <div class="stat-card" style="grid-column:span 2" id="stat-provider-card">
+          <div class="stat-icon orange"><i data-lucide="shield-check"></i></div>
+          <div class="stat-value" id="stat-provider">—</div>
+          <div class="stat-label">Auth Provider</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:.75rem;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="window.location.href='/app'">
+          <i data-lucide="monitor"></i> Open App
+        </button>
+        <button class="btn btn-ghost" onclick="switchSection('profile', document.querySelector('[data-section=profile]'))">
+          <i data-lucide="user"></i> Edit Profile
+        </button>
+        <button class="btn btn-ghost" onclick="switchSection('password', document.querySelector('[data-section=password]'))">
+          <i data-lucide="key-round"></i> Change Password
+        </button>
+      </div>
+    </div>
+
+    <!-- ── PROFILE ── -->
+    <div class="section-panel" id="panel-profile">
+      <div class="page-heading">
+        <h1>Profile</h1>
+        <p>Update your display name and personal details.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <h2>Display Name</h2>
+            <p>This name appears in groups and shared ledgers.</p>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="field-row">
+            <div class="field">
+              <label for="first-name">First name</label>
+              <input type="text" id="first-name" class="input" placeholder="Jane" autocomplete="given-name">
+            </div>
+            <div class="field">
+              <label for="last-name">Last name</label>
+              <input type="text" id="last-name" class="input" placeholder="Smith" autocomplete="family-name">
+            </div>
+          </div>
+          <div class="field">
+            <label for="display-name">Display name</label>
+            <input type="text" id="display-name" class="input" placeholder="Jane S." autocomplete="nickname">
+            <p class="input-hint">Shown to other users in group expenses.</p>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-ghost btn-sm" onclick="loadProfile()">Cancel</button>
+          <button class="btn btn-primary btn-sm" id="save-profile-btn" onclick="saveProfile()">
+            <span>Save Changes</span>
+            <div class="spin-inline" id="profile-spin"></div>
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Account Info</h2><p>Read-only account identifiers.</p></div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>User ID</label>
+            <input type="text" id="profile-uid" class="input" disabled readonly>
+          </div>
+          <div class="field">
+            <label>Email Address</label>
+            <input type="text" id="profile-email-display" class="input" disabled readonly>
+            <p class="input-hint">To change your email, go to the <button onclick="switchSection('email', document.querySelector('[data-section=email]'))" style="background:none;border:none;color:#14B8A6;cursor:pointer;font-size:inherit;font-family:inherit;padding:0">Email Address</button> section.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── EMAIL ── -->
+    <div class="section-panel" id="panel-email">
+      <div class="page-heading">
+        <h1>Email Address</h1>
+        <p>Update the email used to sign in and receive notifications.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Change Email</h2><p>A confirmation link will be sent to your new address.</p></div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label>Current email</label>
+            <input type="email" id="current-email-display" class="input" disabled readonly>
+          </div>
+          <div class="field">
+            <label for="new-email">New email address</label>
+            <input type="email" id="new-email" class="input" placeholder="newemail@example.com" autocomplete="email">
+            <p class="input-error" id="email-error"></p>
+          </div>
+          <div style="background:rgba(59,130,246,0.05);border:1px solid rgba(59,130,246,0.15);border-radius:.625rem;padding:1rem;display:flex;gap:.625rem;align-items:flex-start">
+            <i data-lucide="info" style="width:1rem;height:1rem;color:#3B82F6;flex-shrink:0;margin-top:.125rem"></i>
+            <p style="font-size:.8125rem;color:#64748b;line-height:1.6">You'll need to confirm the change by clicking a link sent to your new email. Your current email stays active until confirmed.</p>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-sm" id="update-email-btn" onclick="updateEmail()">
+            <span>Send Confirmation</span>
+            <div class="spin-inline" id="email-spin"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── PASSWORD ── -->
+    <div class="section-panel" id="panel-password">
+      <div class="page-heading">
+        <h1>Password</h1>
+        <p>Keep your account secure with a strong password.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Change Password</h2><p>Must be at least 8 characters with a number and symbol.</p></div>
+        </div>
+        <div class="card-body">
+          <div class="field">
+            <label for="new-password">New password</label>
+            <div class="input-wrap">
+              <input type="password" id="new-password" class="input" placeholder="••••••••" autocomplete="new-password" oninput="checkPasswordStrength(this.value)">
+              <button type="button" class="input-toggle" onclick="toggleVis('new-password', this)">
+                <i data-lucide="eye" style="width:1rem;height:1rem"></i>
+              </button>
+            </div>
+            <div class="strength-bars" id="strength-bars">
+              <div class="s-bar" id="sb1"></div>
+              <div class="s-bar" id="sb2"></div>
+              <div class="s-bar" id="sb3"></div>
+              <div class="s-bar" id="sb4"></div>
+            </div>
+            <p class="input-hint" id="strength-hint" style="margin-top:.375rem"></p>
+          </div>
+          <div class="field">
+            <label for="confirm-new-password">Confirm new password</label>
+            <div class="input-wrap">
+              <input type="password" id="confirm-new-password" class="input" placeholder="••••••••" autocomplete="new-password">
+              <button type="button" class="input-toggle" onclick="toggleVis('confirm-new-password', this)">
+                <i data-lucide="eye" style="width:1rem;height:1rem"></i>
+              </button>
+            </div>
+            <p class="input-error" id="password-error"></p>
+          </div>
+          <!-- OAuth user notice (hidden by default) -->
+          <div id="oauth-notice" style="display:none;background:rgba(249,115,22,0.05);border:1px solid rgba(249,115,22,0.2);border-radius:.625rem;padding:1rem;display:flex;gap:.625rem;align-items:flex-start">
+            <i data-lucide="alert-triangle" style="width:1rem;height:1rem;color:#F97316;flex-shrink:0;margin-top:.125rem"></i>
+            <p style="font-size:.8125rem;color:#64748b;line-height:1.6">Your account uses Google or Apple sign-in. To set a password, you'll need to use the forgot password flow from the <a href="/login" style="color:#14B8A6">sign-in page</a>.</p>
+          </div>
+        </div>
+        <div class="card-footer">
+          <button class="btn btn-primary btn-sm" id="update-password-btn" onclick="updatePassword()">
+            <span>Update Password</span>
+            <div class="spin-inline" id="password-spin"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── SESSIONS / DEVICES ── -->
+    <div class="section-panel" id="panel-sessions">
+      <div class="page-heading">
+        <h1>Devices & Sessions</h1>
+        <p>Manage where you are currently signed in.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div><h2>Active Sessions</h2><p>Sign out from this device or all devices at once.</p></div>
+        </div>
+        <div class="card-body">
+          <div class="session-item">
+            <div class="session-info">
+              <div class="session-icon"><i data-lucide="monitor"></i></div>
+              <div>
+                <div class="session-name">Current Browser Session</div>
+                <div class="session-detail" id="current-session-detail">Signed in now</div>
+              </div>
+            </div>
+            <span class="badge badge-teal">Active</span>
+          </div>
+        </div>
+        <div class="card-footer" style="justify-content:space-between;flex-wrap:wrap;gap:.75rem">
+          <button class="btn btn-ghost btn-sm" id="signout-all-btn" onclick="signOutAll()">
+            <i data-lucide="monitor-x"></i>
+            <span>Sign Out All Devices</span>
+            <div class="spin-inline" id="signout-all-spin" style="border-color:rgba(148,163,184,0.3);border-top-color:#94a3b8"></div>
+          </button>
+          <button class="btn btn-danger btn-sm" id="signout-btn" onclick="signOutCurrent()">
+            <i data-lucide="log-out"></i>
+            <span>Sign Out This Device</span>
+            <div class="spin-inline" id="signout-spin" style="border-color:rgba(248,113,113,0.3);border-top-color:#f87171"></div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── DANGER ZONE ── -->
+    <div class="section-panel" id="panel-danger">
+      <div class="page-heading">
+        <h1>Delete Account</h1>
+        <p>Permanently remove your account and all associated data.</p>
+      </div>
+
+      <div class="danger-section">
+        <h2>Permanently Delete Account</h2>
+        <p>
+          Deleting your account will permanently erase your profile, all groups you own, all expense records, and your balance history. This action <strong style="color:#f87171">cannot be undone</strong>.<br><br>
+          Active groups where you are the sole owner will be disbanded. Other members will lose access to shared data.
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:.75rem">
+          <button class="btn btn-danger" onclick="openDeleteConfirm()">
+            <i data-lucide="trash-2"></i> Delete My Account
+          </button>
+          <a href="mailto:contact@setall.app?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20account.%20My%20registered%20email%20is%3A%20" id="delete-mailto" class="btn btn-ghost">
+            <i data-lucide="mail"></i> Request via Email
+          </a>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="confirm-modal">
+  <div class="modal-box">
+    <div class="modal-icon"><i data-lucide="alert-triangle"></i></div>
+    <h3>Delete account?</h3>
+    <p>This will permanently delete all your data. There is no way to recover your account after this.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeDeleteConfirm()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete-btn" onclick="deleteAccount()">
+        <span>Yes, Delete</span>
+        <div class="spin-inline" id="delete-spin" style="border-color:rgba(248,113,113,0.3);border-top-color:#f87171"></div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+  lucide.createIcons();
+
+  // ── Supabase ─────────────────────────────────────────────────────────────────
+  const { createClient } = supabase;
+  const _sb = createClient(
+    'https://vrsmsgyxeyzyrdonsnrk.supabase.co',
+    'REDACTED_JWT'
+  );
+
+  let _user = null;
+
+  // ── Auth Guard ───────────────────────────────────────────────────────────────
+  async function init() {
+    const { data: { session } } = await _sb.auth.getSession();
+    if (!session) {
+      window.location.replace('/login');
+      return;
+    }
+    _user = session.user;
+    populateAll();
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('portal-layout').style.display  = 'flex';
+
+    // Listen for auth changes (e.g. sign-out in another tab)
+    _sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') window.location.replace('/login');
+    });
+  }
+
+  // ── Populate ─────────────────────────────────────────────────────────────────
+  function populateAll() {
+    const meta      = _user.user_metadata || {};
+    const email     = _user.email || '';
+    const fullName  = meta.full_name || meta.name || '';
+    const firstName = meta.first_name || (fullName.split(' ')[0] || '');
+    const lastName  = meta.last_name  || (fullName.split(' ').slice(1).join(' ') || '');
+    const displayName = meta.display_name || fullName;
+    const initials  = getInitials(displayName || email);
+    const provider  = (_user.app_metadata?.provider || 'email').replace(/^./, c => c.toUpperCase());
+    const createdAt = new Date(_user.created_at);
+    const lastLogin = _user.last_sign_in_at ? new Date(_user.last_sign_in_at) : null;
+    const isVerified = _user.email_confirmed_at != null;
+
+    // Overview
+    document.getElementById('overview-avatar').textContent     = initials;
+    document.getElementById('overview-name').textContent       = displayName || email.split('@')[0];
+    document.getElementById('overview-email').textContent      = email;
+    document.getElementById('welcome-heading').textContent     = `Welcome back, ${firstName || email.split('@')[0]}`;
+    document.getElementById('provider-badge').textContent      = provider;
+    document.getElementById('verified-badge').textContent      = isVerified ? 'Verified' : 'Unverified';
+    document.getElementById('verified-badge').className        = 'badge ' + (isVerified ? 'badge-teal' : 'badge-slate');
+    document.getElementById('stat-joined').textContent         = createdAt.toLocaleDateString(undefined, { month:'short', year:'numeric' });
+    document.getElementById('stat-last-login').textContent     = lastLogin ? timeAgo(lastLogin) : 'Now';
+    document.getElementById('stat-provider').textContent       = provider;
+
+    // Profile
+    document.getElementById('first-name').value         = firstName;
+    document.getElementById('last-name').value          = lastName;
+    document.getElementById('display-name').value       = displayName;
+    document.getElementById('profile-uid').value        = _user.id;
+    document.getElementById('profile-email-display').value = email;
+
+    // Email
+    document.getElementById('current-email-display').value = email;
+
+    // Sessions
+    document.getElementById('current-session-detail').textContent =
+      `${provider} · ${navigator.platform || 'Web'} · ${lastLogin ? lastLogin.toLocaleString() : 'Just now'}`;
+
+    // Mailto for deletion
+    document.getElementById('delete-mailto').href =
+      `mailto:contact@setall.app?subject=Account%20Deletion%20Request&body=Please%20delete%20my%20account.%20My%20registered%20email%20is%3A%20${encodeURIComponent(email)}`;
+
+    // OAuth notice for password section
+    if (provider !== 'Email') {
+      const notice = document.getElementById('oauth-notice');
+      if (notice) { notice.style.display = 'flex'; }
+    }
+  }
+
+  function getInitials(str) {
+    if (!str) return '?';
+    const parts = str.trim().split(/\s+/);
+    if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return str.substring(0, 2).toUpperCase();
+  }
+
+  function timeAgo(date) {
+    const s = Math.floor((Date.now() - date) / 1000);
+    if (s < 60) return 'Just now';
+    if (s < 3600) return Math.floor(s/60) + 'm ago';
+    if (s < 86400) return Math.floor(s/3600) + 'h ago';
+    return Math.floor(s/86400) + 'd ago';
+  }
+
+  // ── Section switching ─────────────────────────────────────────────────────────
+  function switchSection(id, triggerEl) {
+    document.querySelectorAll('.section-panel').forEach(p => p.classList.remove('active'));
+    document.getElementById('panel-' + id).classList.add('active');
+
+    document.querySelectorAll('.nav-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.section === id);
+    });
+    document.querySelectorAll('.mobile-tab').forEach(el => {
+      el.classList.toggle('active', el.dataset.section === id);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Profile save ─────────────────────────────────────────────────────────────
+  async function saveProfile() {
+    const btn   = document.getElementById('save-profile-btn');
+    const spin  = document.getElementById('profile-spin');
+    const first = document.getElementById('first-name').value.trim();
+    const last  = document.getElementById('last-name').value.trim();
+    const disp  = document.getElementById('display-name').value.trim() || [first, last].filter(Boolean).join(' ');
+
+    setLoading(btn, spin, true);
+    const { error } = await _sb.auth.updateUser({
+      data: {
+        first_name:   first,
+        last_name:    last,
+        full_name:    [first, last].filter(Boolean).join(' '),
+        display_name: disp,
+        name:         [first, last].filter(Boolean).join(' ')
+      }
+    });
+    setLoading(btn, spin, false);
+
+    if (error) { toast(error.message, 'error'); return; }
+
+    _user.user_metadata = { ..._user.user_metadata, first_name: first, last_name: last, full_name: [first,last].filter(Boolean).join(' '), display_name: disp, name: [first,last].filter(Boolean).join(' ') };
+    populateAll();
+    toast('Profile updated', 'success');
+  }
+
+  function loadProfile() {
+    document.getElementById('first-name').value   = _user.user_metadata?.first_name || '';
+    document.getElementById('last-name').value    = _user.user_metadata?.last_name  || '';
+    document.getElementById('display-name').value = _user.user_metadata?.display_name || _user.user_metadata?.full_name || '';
+  }
+
+  // ── Email update ─────────────────────────────────────────────────────────────
+  async function updateEmail() {
+    const btn   = document.getElementById('update-email-btn');
+    const spin  = document.getElementById('email-spin');
+    const errEl = document.getElementById('email-error');
+    const val   = document.getElementById('new-email').value.trim();
+
+    errEl.style.display = 'none';
+    if (!val || !val.includes('@')) { errEl.textContent = 'Enter a valid email address.'; errEl.style.display = 'block'; return; }
+    if (val === _user.email) { errEl.textContent = 'That is already your current email.'; errEl.style.display = 'block'; return; }
+
+    setLoading(btn, spin, true);
+    const { error } = await _sb.auth.updateUser({ email: val });
+    setLoading(btn, spin, false);
+
+    if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+    document.getElementById('new-email').value = '';
+    toast('Confirmation sent — check ' + val, 'success');
+  }
+
+  // ── Password update ───────────────────────────────────────────────────────────
+  async function updatePassword() {
+    const btn    = document.getElementById('update-password-btn');
+    const spin   = document.getElementById('password-spin');
+    const errEl  = document.getElementById('password-error');
+    const newPw  = document.getElementById('new-password').value;
+    const confPw = document.getElementById('confirm-new-password').value;
+
+    errEl.style.display = 'none';
+    if (newPw.length < 8)     { errEl.textContent = 'Password must be at least 8 characters.'; errEl.style.display = 'block'; return; }
+    if (newPw !== confPw)      { errEl.textContent = 'Passwords do not match.'; errEl.style.display = 'block'; return; }
+
+    setLoading(btn, spin, true);
+    const { error } = await _sb.auth.updateUser({ password: newPw });
+    setLoading(btn, spin, false);
+
+    if (error) { errEl.textContent = error.message; errEl.style.display = 'block'; return; }
+    document.getElementById('new-password').value = '';
+    document.getElementById('confirm-new-password').value = '';
+    checkPasswordStrength('');
+    toast('Password updated', 'success');
+  }
+
+  // ── Password strength ─────────────────────────────────────────────────────────
+  function checkPasswordStrength(val) {
+    const bars  = [document.getElementById('sb1'), document.getElementById('sb2'), document.getElementById('sb3'), document.getElementById('sb4')];
+    const hint  = document.getElementById('strength-hint');
+    bars.forEach(b => { b.className = 's-bar'; });
+    if (!val) { hint.textContent = ''; return; }
+    let score = 0;
+    if (val.length >= 8)          score++;
+    if (/[A-Z]/.test(val))        score++;
+    if (/[0-9]/.test(val))        score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const cls   = score <= 1 ? 'weak' : score <= 2 ? 'medium' : 'strong';
+    const label = score <= 1 ? 'Weak' : score <= 2 ? 'Fair' : score === 3 ? 'Good' : 'Strong';
+    for (let i = 0; i < score; i++) bars[i].classList.add(cls);
+    hint.textContent = label; hint.style.color = cls === 'weak' ? '#ef4444' : cls === 'medium' ? '#f59e0b' : '#14B8A6';
+  }
+
+  // ── Sign-out ─────────────────────────────────────────────────────────────────
+  document.getElementById('nav-signout-btn').onclick = signOutCurrent;
+
+  async function signOutCurrent() {
+    const btn  = document.getElementById('signout-btn');
+    const spin = document.getElementById('signout-spin');
+    if (btn) setLoading(btn, spin, true);
+    await _sb.auth.signOut({ scope: 'local' });
+    window.location.replace('/login');
+  }
+
+  async function signOutAll() {
+    const btn  = document.getElementById('signout-all-btn');
+    const spin = document.getElementById('signout-all-spin');
+    setLoading(btn, spin, true);
+    await _sb.auth.signOut({ scope: 'global' });
+    window.location.replace('/login');
+  }
+
+  // ── Delete account ────────────────────────────────────────────────────────────
+  function openDeleteConfirm()  { document.getElementById('confirm-modal').classList.add('open'); }
+  function closeDeleteConfirm() { document.getElementById('confirm-modal').classList.remove('open'); }
+
+  async function deleteAccount() {
+    const btn  = document.getElementById('confirm-delete-btn');
+    const spin = document.getElementById('delete-spin');
+    setLoading(btn, spin, true);
+
+    const { error } = await _sb.rpc('delete_user');
+    if (error) {
+      setLoading(btn, spin, false);
+      closeDeleteConfirm();
+      toast('Could not delete automatically — email contact@setall.app', 'error');
+      return;
+    }
+    await _sb.auth.signOut();
+    window.location.replace('/?deleted=1');
+  }
+
+  // ── Password visibility toggle ────────────────────────────────────────────────
+  function toggleVis(inputId, btn) {
+    const input = document.getElementById(inputId);
+    const isHidden = input.type === 'password';
+    input.type = isHidden ? 'text' : 'password';
+    btn.innerHTML = isHidden
+      ? '<i data-lucide="eye-off" style="width:1rem;height:1rem"></i>'
+      : '<i data-lucide="eye"     style="width:1rem;height:1rem"></i>';
+    lucide.createIcons();
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────────────────
+  function setLoading(btn, spin, on) {
+    btn.disabled = on;
+    const spans = btn.querySelectorAll('span');
+    spans.forEach(s => s.style.opacity = on ? '0.4' : '1');
+    if (spin) spin.style.display = on ? 'block' : 'none';
+  }
+
+  let _toastTimer;
+  function toast(msg, type = 'success') {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.className   = `show ${type}`;
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => { el.classList.remove('show'); }, 3200);
+  }
+
+  init();
+</script>
+</body>
+</html>

@@ -265,8 +265,8 @@
             document.getElementById('modal-desc').textContent  = descText;
             const actionBtn = document.getElementById('modal-action-btn');
             if (showAppBtn) {
-                actionBtn.textContent = 'Open App';
-                actionBtn.onclick = () => window.location.href = '/app';
+                actionBtn.textContent = 'Go to Portal';
+                actionBtn.onclick = () => window.location.href = '/portal';
             } else {
                 actionBtn.textContent = 'Back to Sign In';
                 actionBtn.onclick = () => {
@@ -284,7 +284,7 @@
             if (event === 'PASSWORD_RECOVERY') {
                 setMode('recovery');
             } else if (event === 'SIGNED_IN' && session && currentMode === 'login') {
-                window.location.href = '/app';
+                window.location.href = '/portal';
             }
         });
 
@@ -468,7 +468,7 @@
                     showError(error.message);
                     setSubmitting(false);
                 }
-                // On success: onAuthStateChange SIGNED_IN fires → redirects to /app
+                // On success: onAuthStateChange SIGNED_IN fires → redirects to /portal
 
             } else if (currentMode === 'signup') {
                 const { error } = await _supabase.auth.signUp({
@@ -511,7 +511,7 @@
             }
             const { data } = await _supabase.auth.getSession();
             if (data.session) {
-                window.location.href = '/app';
+                window.location.href = '/portal';
             }
         });
     </script>
