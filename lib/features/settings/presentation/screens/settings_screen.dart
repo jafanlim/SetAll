@@ -266,7 +266,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('common.cancel'.tr()),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -278,7 +278,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Save'),
+              child: Text('common.save'.tr()),
             ),
           ],
         ),
@@ -357,7 +357,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
@@ -372,7 +372,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !mounted) return;
     if (newEmail.isEmpty || !newEmail.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email address.')),
+        SnackBar(content: Text('settings_ext.enter_valid_email'.tr())),
       );
       return;
     }
@@ -391,7 +391,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Confirmation sent to $newEmail. Check your inbox.'),
+          content: Text('settings_ext.confirmation_sent'.tr(namedArgs: {'email': newEmail})),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
       );
@@ -438,7 +438,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not save currency: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text('settings_ext.could_not_save_currency'.tr(namedArgs: {'error': e.toString().replaceFirst('Exception: ', '')})),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -492,7 +492,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
@@ -521,7 +521,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await client.auth.signOut();
     } catch (e) {
       messenger.showSnackBar(SnackBar(
-        content: Text('Error: ${e.toString()}'),
+        content: Text('settings_ext.error_generic'.tr(namedArgs: {'error': e.toString()})),
         backgroundColor: errorColor,
       ));
     }
@@ -1265,11 +1265,11 @@ class _ProfileSection extends StatelessWidget {
           ],
           if (saved) ...[
             const SizedBox(height: 8),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.check_circle_outline, color: _teal, size: 14),
-                SizedBox(width: 6),
-                Text('Saved', style: TextStyle(color: _teal, fontSize: 12)),
+                const Icon(Icons.check_circle_outline, color: _teal, size: 14),
+                const SizedBox(width: 6),
+                Text('settings_ext.saved'.tr(), style: const TextStyle(color: _teal, fontSize: 12)),
               ],
             ),
           ],

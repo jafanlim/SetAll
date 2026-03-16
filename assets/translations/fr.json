@@ -346,6 +346,21 @@
     "dialog_reset_cache_body": "Toutes les données locales seront effacées et retéléchargées depuis le cloud.",
     "dialog_reset_sync": "Réinitialiser et synchroniser",
     "cache_reset_success": "Cache réinitialisé et synchronisé depuis le cloud",
-    "expenses_cleared": "Toutes les dépenses effacées"
+    "expenses_cleared": "Toutes les dépenses effacées",
+    "enter_valid_email": "Entrez une adresse e-mail valide.",
+    "confirmation_sent": "Confirmation envoyée à {email}. Vérifiez votre boîte de réception.",
+    "could_not_save_currency": "Impossible de sauvegarder la devise : {error}",
+    "error_generic": "Erreur : {error}",
+    "saved": "Sauvegardé"
+  },
+  "wallet_entry": {
+    "title": "Ajouter une entrée de portefeuille",
+    "what_type": "Quel type d'entrée ?",
+    "choose_direction": "Choisissez la direction de cette entrée de portefeuille.",
+    "add_income": "AJOUTER UN REVENU",
+    "income_subtitle": "Salaire, freelance, cadeau, rendement d'investissement\u2026",
+    "add_expense": "AJOUTER UNE DÉPENSE",
+    "expense_subtitle": "Nourriture, transport, factures, shopping, voyages\u2026",
+    "group_hint": "Vous pouvez également ajouter des dépenses de groupe depuis l'onglet Groupes."
   }
 }

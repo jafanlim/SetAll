@@ -346,6 +346,21 @@
     "dialog_reset_cache_body": "Alle lokalen Daten werden gelöscht und erneut aus der Cloud heruntergeladen.",
     "dialog_reset_sync": "Zurücksetzen & Synchronisieren",
     "cache_reset_success": "Cache zurückgesetzt und aus Cloud synchronisiert",
-    "expenses_cleared": "Alle Ausgaben gelöscht"
+    "expenses_cleared": "Alle Ausgaben gelöscht",
+    "enter_valid_email": "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+    "confirmation_sent": "Bestätigung gesendet an {email}. Bitte überprüfen Sie Ihren Posteingang.",
+    "could_not_save_currency": "Währung konnte nicht gespeichert werden: {error}",
+    "error_generic": "Fehler: {error}",
+    "saved": "Gespeichert"
+  },
+  "wallet_entry": {
+    "title": "Wallet-Eintrag hinzufügen",
+    "what_type": "Welche Art von Eintrag?",
+    "choose_direction": "Wählen Sie die Richtung dieses Wallet-Eintrags.",
+    "add_income": "EINNAHME HINZUFÜGEN",
+    "income_subtitle": "Gehalt, Freiberuf, Geschenk, Investitionsrendite\u2026",
+    "add_expense": "AUSGABE HINZUFÜGEN",
+    "expense_subtitle": "Essen, Transport, Rechnungen, Einkaufen, Reisen\u2026",
+    "group_hint": "Sie können auch Gruppenausgaben aus dem Gruppen-Tab hinzufügen."
   }
 }

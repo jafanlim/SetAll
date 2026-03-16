@@ -343,9 +343,24 @@
     "dialog_clear_expenses_body": "Esto eliminará permanentemente todos los gastos y divisiones. Los grupos y miembros se conservan.",
     "dialog_clear_expenses_confirm": "Limpiar gastos",
     "dialog_reset_cache_title": "¿Restablecer caché local?",
-    "dialog_reset_cache_body": "Todos los datos locales se borrarán y se descargarán de la nube.",
+    "dialog_reset_cache_body": "Todos los datos locales se eliminarán y se volverán a descargar desde la nube.",
     "dialog_reset_sync": "Restablecer y sincronizar",
-    "cache_reset_success": "Caché restablecida y sincronizada desde la nube",
-    "expenses_cleared": "Todos los gastos limpiados"
+    "cache_reset_success": "Caché restablecido y sincronizado desde la nube",
+    "expenses_cleared": "Todos los gastos borrados",
+    "enter_valid_email": "Ingrese una dirección de correo electrónico válida.",
+    "confirmation_sent": "Confirmación enviada a {email}. Revise su bandeja de entrada.",
+    "could_not_save_currency": "No se pudo guardar la moneda: {error}",
+    "error_generic": "Error: {error}",
+    "saved": "Guardado"
+  },
+  "wallet_entry": {
+    "title": "Agregar entrada de cartera",
+    "what_type": "¿Qué tipo de entrada?",
+    "choose_direction": "Elija la dirección de esta entrada de cartera.",
+    "add_income": "AGREGAR UN INGRESO",
+    "income_subtitle": "Salario, autónomo, regalo, rendimiento de inversión\u2026",
+    "add_expense": "AGREGAR UN GASTO",
+    "expense_subtitle": "Comida, transporte, facturas, compras, viajes\u2026",
+    "group_hint": "También puede agregar gastos de grupo desde la pestaña Grupos."
   }
 }

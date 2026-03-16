@@ -346,6 +346,21 @@
     "dialog_reset_cache_body": "All local data will be wiped and re-downloaded from the cloud. Use this to fix ghost groups or missing expenses.",
     "dialog_reset_sync": "Reset & Sync",
     "cache_reset_success": "Cache reset and synced from cloud",
-    "expenses_cleared": "All expenses cleared"
+    "expenses_cleared": "All expenses cleared",
+    "enter_valid_email": "Enter a valid email address.",
+    "confirmation_sent": "Confirmation sent to {email}. Check your inbox.",
+    "could_not_save_currency": "Could not save currency: {error}",
+    "error_generic": "Error: {error}",
+    "saved": "Saved"
+  },
+  "wallet_entry": {
+    "title": "Add Wallet Entry",
+    "what_type": "What type of entry?",
+    "choose_direction": "Choose the direction of this wallet entry.",
+    "add_income": "ADD AN INCOME",
+    "income_subtitle": "Salary, freelance, gift, investment return\u2026",
+    "add_expense": "ADD AN EXPENSE",
+    "expense_subtitle": "Food, transport, bills, shopping, travel\u2026",
+    "group_hint": "You can also add group expenses from the Groups tab."
   }
 }

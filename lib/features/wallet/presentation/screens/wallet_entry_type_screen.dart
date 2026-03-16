@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -25,9 +26,9 @@ class WalletEntryTypeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Add Wallet Entry',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
+        title: Text(
+          'wallet_entry.title'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18, letterSpacing: -0.3),
         ),
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
@@ -48,7 +49,7 @@ class WalletEntryTypeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'What type of entry?',
+                'wallet_entry.what_type'.tr(),
                 style: theme.textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   fontSize: 22,
@@ -57,7 +58,7 @@ class WalletEntryTypeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 6),
               Text(
-                'Choose the direction of this wallet entry.',
+                'wallet_entry.choose_direction'.tr(),
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 13,
@@ -70,8 +71,8 @@ class WalletEntryTypeScreen extends StatelessWidget {
                 icon: Icons.arrow_downward_rounded,
                 iconColor: _green,
                 iconBg: _greenDim,
-                title: 'ADD AN INCOME',
-                subtitle: 'Salary, freelance, gift, investment return…',
+                title: 'wallet_entry.add_income'.tr(),
+                subtitle: 'wallet_entry.income_subtitle'.tr(),
                 accentColor: _green,
                 onTap: () {
                   HapticUtils.primaryTap();
@@ -93,8 +94,8 @@ class WalletEntryTypeScreen extends StatelessWidget {
                 icon: Icons.arrow_upward_rounded,
                 iconColor: _purple,
                 iconBg: _purpleDim,
-                title: 'ADD AN EXPENSE',
-                subtitle: 'Food, transport, bills, shopping, travel…',
+                title: 'wallet_entry.add_expense'.tr(),
+                subtitle: 'wallet_entry.expense_subtitle'.tr(),
                 accentColor: _purple,
                 onTap: () {
                   HapticUtils.primaryTap();
@@ -114,7 +115,7 @@ class WalletEntryTypeScreen extends StatelessWidget {
               // ── Hint ─────────────────────────────────────────────────────
               Center(
                 child: Text(
-                  'You can also add group expenses from the Groups tab.',
+                  'wallet_entry.group_hint'.tr(),
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 11,

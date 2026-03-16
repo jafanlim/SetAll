@@ -22,8 +22,6 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
         body { font-family: 'Outfit', sans-serif; background-color: #020617; color: #F8FAFC; overflow-x: hidden; }
-        .wiggle { animation: wiggle 0.5s ease-in-out infinite; }
-        @keyframes wiggle { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
         .brand-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 25vw; font-weight: 900; color: rgba(255,255,255,0.02); pointer-events: none; z-index: 0; user-select: none; }
         .donut-segment { transition: stroke-dashoffset 1s ease-out, stroke-width 0.2s; cursor: pointer; }
         .donut-segment:hover { stroke-width: 10; filter: brightness(1.2); }
@@ -64,8 +62,8 @@
         const InteractiveDonut = ({ data, total, onSliceClick }) => {
             let currentOffset = 0;
             return (
-                <div className="relative w-64 h-64 mx-auto flex items-center justify-center mt-4 mb-6">
-                    <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90 drop-shadow-2xl">
+                <div className="relative w-full h-64 mx-auto flex items-center justify-center mt-4 mb-6">
+                    <svg viewBox="0 0 100 100" className="w-full h-full max-w-[250px] transform -rotate-90 drop-shadow-2xl">
                         <circle cx="50" cy="50" r="15.9" fill="transparent" stroke="#1E293B" strokeWidth="6" />
                         {data.map((d, i) => {
                             const pct = (d.value / (total || 1)) * 100;
@@ -77,7 +75,7 @@
                                     stroke={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} 
                                     strokeWidth="6" strokeDasharray={`${pct} 100`} strokeDashoffset={-offset} 
                                     className="donut-segment"
-                                    onClick={() => onSliceClick(d.name, d.value, pct)}
+                                    onClick={() => onSliceClick && onSliceClick(d.name, d.value, pct)}
                                 />
                             )
                         })}
@@ -101,11 +99,11 @@
                                 <div className="flex justify-between gap-4 text-brand-teal"><span>In:</span> <span>${d.income}</span></div>
                                 <div className="flex justify-between gap-4 text-brand-purple"><span>Out:</span> <span>${d.expense}</span></div>
                             </div>
-                            <div className="flex items-end gap-1.5 w-full h-full justify-center">
-                                <div onClick={() => onBarClick('Income', d.income, d.day)} style={{ height: `${(d.income/max)*100}%` }} className="w-full max-w-[16px] bg-brand-teal rounded-t-md opacity-90 bar-grow" />
-                                <div onClick={() => onBarClick('Expense', d.expense, d.day)} style={{ height: `${(d.expense/max)*100}%` }} className="w-full max-w-[16px] bg-brand-purple rounded-t-md opacity-90 bar-grow" />
+                            <div className="flex items-end gap-1.5 w-full h-full justify-center min-w-[8px]">
+                                <div onClick={() => onBarClick && onBarClick('Income', d.income, d.day)} style={{ height: `${(d.income/max)*100}%` }} className="w-full max-w-[24px] bg-brand-teal rounded-t-md opacity-90 bar-grow" />
+                                <div onClick={() => onBarClick && onBarClick('Expense', d.expense, d.day)} style={{ height: `${(d.expense/max)*100}%` }} className="w-full max-w-[24px] bg-brand-purple rounded-t-md opacity-90 bar-grow" />
                             </div>
-                            <span className="text-xs text-slate-500 mt-3 font-semibold">{d.day}</span>
+                            <span className="text-[10px] text-slate-500 mt-3 font-semibold">{d.day}</span>
                         </div>
                     ))}
                 </div>
@@ -114,19 +112,20 @@
 
         // --- Main App ---
         function App() {
-            const [data] = useState(INITIAL_DATA);
+            const [data, setData] = useState(INITIAL_DATA);
             const [isEditMode, setIsEditMode] = useState(false);
             const [widgets, setWidgets] = useState([
-                { id: 'w1', type: 'stat', title: 'Net Worth', metric: 'net' },
-                { id: 'w2', type: 'stat', title: 'Daily Burn', metric: 'burn' },
-                { id: 'w3', type: 'trend', title: 'Cash Flow Timeline' },
-                { id: 'w4', type: 'donut', title: 'SetAll Category Split' },
+                { id: 'w1', type: 'stat', title: 'Net Worth', metric: 'net', width: 'normal' },
+                { id: 'w2', type: 'stat', title: 'Daily Burn', metric: 'burn', width: 'normal' },
+                { id: 'w3', type: 'trend', title: 'Cash Flow Timeline', width: 'wide' },
+                { id: 'w4', type: 'donut', title: 'SetAll Category Split', width: 'normal' },
             ]);
             
             const [messages, setMessages] = useState([]);
             const [input, setInput] = useState("");
             const [isThinking, setIsThinking] = useState(false);
             const chatEndRef = useRef(null);
+            const fileInputRef = useRef(null);
 
             const stats = useMemo(() => {
                 const inc = data.filter(d => d.type === 'income').reduce((s, d) => s + d.amount, 0);
@@ -141,13 +140,19 @@
                     acc[day][curr.type] += curr.amount;
                     return acc;
                 }, {});
-                return { inc, exp, net: inc - exp, burn: (exp / 30).toFixed(2), cats: Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value), trend: Object.values(trendMap).sort((a,b) => a.day - b.day) };
+                return { 
+                    income: inc, 
+                    exp, 
+                    net: inc - exp, 
+                    burn: (exp / 30).toFixed(2), 
+                    cats: Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value), 
+                    trend: Object.values(trendMap).sort((a,b) => a.day - b.day) 
+                };
             }, [data]);
 
-            // AI Initialization Effect
             useEffect(() => {
                 setTimeout(() => {
-                    setMessages([{ role: 'ai', text: "Welcome to the SetAll Neural Engine. I'm actively monitoring your dashboard. Click on any chart element to see my analysis, or ask me a question." }]);
+                    setMessages([{ role: 'ai', text: "Welcome to the SetAll Neural Engine. I'm actively monitoring your dashboard. Upload a CSV/PDF, click on any chart, or ask me a question." }]);
                 }, 800);
             }, []);
 
@@ -156,29 +161,44 @@
             };
             useEffect(scrollToBottom, [messages, isThinking]);
 
-            // --- AI Interaction Logic ---
             const triggerAiResponse = (userPrompt, simulatedAiResponse) => {
                 setMessages(p => [...p, { role: 'user', text: userPrompt }]);
                 setIsThinking(true);
-                
-                // If apiKey exists, call Gemini here. Otherwise, simulate "Alive" response.
                 setTimeout(() => {
                     setMessages(p => [...p, { role: 'ai', text: simulatedAiResponse }]);
                     setIsThinking(false);
                 }, 1500);
             };
 
+            // --- AI Actions ---
+            const handleFileUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                
+                triggerAiResponse(
+                    `I uploaded a file: ${file.name}`, 
+                    `I've successfully parsed ${file.name}. I found 12 new transactions. I've updated your timeline and Net Worth. Would you like me to build a custom widget to highlight the anomalies?`
+                );
+                
+                // Simulate adding data
+                setTimeout(() => {
+                    setData(prev => [...prev, 
+                        { date: '2024-03-28', category: 'Shopping', amount: 350, type: 'expense' },
+                        { date: '2024-03-29', category: 'Salary', amount: 1500, type: 'income' }
+                    ]);
+                }, 1500);
+                
+                if(fileInputRef.current) fileInputRef.current.value = "";
+            };
+
             const handleSliceClick = (name, value, pct) => {
-                const prompt = `I clicked on ${name}.`;
-                const response = `Ah, ${name}. You've spent $${value} here, which is ${pct.toFixed(1)}% of your total expenses. Compared to SetAll averages, this is well within a healthy budget limit!`;
-                triggerAiResponse(prompt, response);
+                if (isEditMode) return;
+                triggerAiResponse(`I clicked on ${name}.`, `Ah, ${name}. You've spent $${value} here, which is ${pct.toFixed(1)}% of your total expenses. Compared to SetAll averages, this is well within a healthy budget limit!`);
             };
 
             const handleBarClick = (type, value, day) => {
-                if (value === 0) return;
-                const prompt = `What happened on March ${day} regarding my ${type}?`;
-                const response = `On March ${day}, you recorded a total ${type} of $${value}. I've logged this in your SetAll timeline. Do you want me to forecast next month's projection based on this?`;
-                triggerAiResponse(prompt, response);
+                if (isEditMode || value === 0) return;
+                triggerAiResponse(`What happened on March ${day} regarding my ${type}?`, `On March ${day}, you recorded a total ${type} of $${value}. I've logged this in your SetAll timeline. Do you want me to forecast next month's projection based on this?`);
             };
 
             const sendMsg = (e) => {
@@ -186,18 +206,63 @@
                 if (!input.trim()) return;
                 const userText = input;
                 setInput("");
-                triggerAiResponse(userText, "I am processing your financial request through the SetAll engine. (Add a Gemini API key in the source code to enable real-time deep analysis).");
+                triggerAiResponse(userText, "I am processing your request. I can add widgets or analyze trends automatically based on your prompt.");
+            };
+
+            // --- Widget Editor Logic ---
+            const moveWidget = (index, direction) => {
+                const newWidgets = [...widgets];
+                if (direction === 'left' && index > 0) {
+                    [newWidgets[index], newWidgets[index - 1]] = [newWidgets[index - 1], newWidgets[index]];
+                } else if (direction === 'right' && index < newWidgets.length - 1) {
+                    [newWidgets[index], newWidgets[index + 1]] = [newWidgets[index + 1], newWidgets[index]];
+                }
+                setWidgets(newWidgets);
             };
 
             const removeWidget = (id) => setWidgets(widgets.filter(w => w.id !== id));
 
+            const resizeWidget = (index) => {
+                const newWidgets = [...widgets];
+                const widths = ['normal', 'wide', 'full'];
+                const currentIdx = widths.indexOf(newWidgets[index].width || 'normal');
+                newWidgets[index].width = widths[(currentIdx + 1) % widths.length];
+                setWidgets(newWidgets);
+            };
+
+            const changeWidgetType = (index, newType) => {
+                const newWidgets = [...widgets];
+                newWidgets[index].type = newType;
+                if (newType === 'stat') newWidgets[index].metric = 'net'; // Reset metric
+                setWidgets(newWidgets);
+            };
+
+            const changeWidgetMetric = (index, newMetric) => {
+                const newWidgets = [...widgets];
+                newWidgets[index].metric = newMetric;
+                
+                // Auto-update title
+                const titles = { net: 'Net Worth', burn: 'Daily Burn', income: 'Total Income', exp: 'Total Expense' };
+                newWidgets[index].title = titles[newMetric] || 'Statistic';
+                setWidgets(newWidgets);
+            };
+
+            const getColSpan = (w) => {
+                if (w.width === 'full') return 'xl:col-span-12 md:col-span-2';
+                if (w.width === 'wide') return 'xl:col-span-8 md:col-span-2';
+                return 'xl:col-span-4 md:col-span-1';
+            };
+
             const renderWidget = (w) => {
-                if (w.type === 'stat') return (
-                    <div className="flex flex-col justify-center h-full pt-2">
-                        <Icon name={w.metric === 'burn' ? 'flame' : 'activity'} className={w.metric === 'expense' || w.metric === 'burn' ? 'text-brand-purple' : 'text-brand-teal'} size={28} />
-                        <p className="text-4xl font-extrabold mt-4 tracking-tight">${stats[w.metric]}</p>
-                    </div>
-                );
+                if (w.type === 'stat') {
+                    const val = stats[w.metric];
+                    return (
+                        <div className="flex flex-col justify-center h-full pt-2">
+                            <Icon name={w.metric === 'burn' ? 'flame' : 'activity'} className={w.metric === 'exp' || w.metric === 'burn' ? 'text-brand-purple' : 'text-brand-teal'} size={28} />
+                            <p className="text-4xl font-extrabold mt-4 tracking-tight">${val}</p>
+                        </div>
+                    );
+                }
                 if (w.type === 'donut') return (
                     <div className="flex flex-col h-full justify-between">
                         <InteractiveDonut data={stats.cats} total={stats.exp} onSliceClick={handleSliceClick} />
@@ -214,7 +279,7 @@
                         </div>
                     </div>
                 );
-                if (w.type === 'trend') return <div className="h-[280px] w-full"><InteractiveBarChart data={stats.trend} onBarClick={handleBarClick} /></div>;
+                if (w.type === 'trend') return <div className="min-h-[280px] h-full w-full"><InteractiveBarChart data={stats.trend} onBarClick={handleBarClick} /></div>;
             };
 
             return (
@@ -233,25 +298,77 @@
                                 </div>
                             </div>
                             <button onClick={() => setIsEditMode(!isEditMode)} className={`px-5 py-3 font-bold rounded-xl flex items-center gap-2 transition-all ${isEditMode ? 'bg-brand-orange text-white shadow-lg shadow-orange-500/20' : 'bg-[#0F172A] border border-slate-700 text-slate-300 hover:bg-slate-800'}`}>
-                                <Icon name="settings-2" size={18}/> {isEditMode ? "Done Editing" : "Edit Layout"}
+                                <Icon name={isEditMode ? "check" : "layout-dashboard"} size={18}/> {isEditMode ? "Save Layout" : "Edit Canvas"}
                             </button>
                         </header>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 pb-20">
-                            {widgets.map(w => (
-                                <div key={w.id} className={`bg-[#0F172A]/80 backdrop-blur-xl border border-slate-800 rounded-[32px] p-8 relative shadow-xl ${isEditMode ? 'wiggle ring-2 ring-brand-orange/50' : 'hover:border-brand-teal/30 transition-colors'} 
-                                    ${w.type === 'trend' ? 'xl:col-span-8' : w.type === 'donut' ? 'xl:col-span-4' : 'xl:col-span-4'}`}>
+                            {widgets.map((w, index) => (
+                                <div key={w.id} className={`bg-[#0F172A]/80 backdrop-blur-xl border border-slate-800 rounded-[32px] p-8 relative shadow-xl hover:border-brand-teal/30 transition-colors flex flex-col ${getColSpan(w)}`}>
                                     
-                                    {isEditMode && <button onClick={() => removeWidget(w.id)} className="absolute -top-3 -right-3 p-2.5 bg-red-500 hover:bg-red-400 transition-colors text-white rounded-full z-10 shadow-lg"><Icon name="x" size={16}/></button>}
+                                    {/* Edit Mode Overlay */}
+                                    {isEditMode && (
+                                        <div className="absolute inset-0 bg-[#020617]/90 backdrop-blur-md z-20 rounded-[32px] flex flex-col items-center justify-center gap-4 border-2 border-brand-orange/50">
+                                            <div className="text-brand-orange font-bold text-xs uppercase tracking-widest mb-2">Edit Widget</div>
+                                            
+                                            <div className="flex gap-2">
+                                                <button onClick={() => moveWidget(index, 'left')} className="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-brand-deep text-white transition-colors" title="Move Left"><Icon name="arrow-left" size={18}/></button>
+                                                <button onClick={() => resizeWidget(index)} className="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-brand-deep text-white transition-colors" title="Resize"><Icon name="maximize-2" size={18}/></button>
+                                                <button onClick={() => moveWidget(index, 'right')} className="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-brand-deep text-white transition-colors" title="Move Right"><Icon name="arrow-right" size={18}/></button>
+                                            </div>
+
+                                            <div className="flex gap-2">
+                                                <select 
+                                                    value={w.type} 
+                                                    onChange={(e) => changeWidgetType(index, e.target.value)}
+                                                    className="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer"
+                                                >
+                                                    <option value="stat">Statistic Card</option>
+                                                    <option value="donut">Category Donut</option>
+                                                    <option value="trend">Trend Graph</option>
+                                                </select>
+
+                                                {w.type === 'stat' && (
+                                                    <select 
+                                                        value={w.metric} 
+                                                        onChange={(e) => changeWidgetMetric(index, e.target.value)}
+                                                        className="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer"
+                                                    >
+                                                        <option value="net">Net Worth</option>
+                                                        <option value="income">Total Income</option>
+                                                        <option value="exp">Total Expense</option>
+                                                        <option value="burn">Daily Burn</option>
+                                                    </select>
+                                                )}
+                                            </div>
+
+                                            <button onClick={() => removeWidget(w.id)} className="mt-2 p-2 px-4 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold">
+                                                <Icon name="trash-2" size={16}/> Remove Widget
+                                            </button>
+                                        </div>
+                                    )}
                                     
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="text-brand-teal text-xs font-black uppercase tracking-widest">{w.title}</h3>
                                         <Icon name={w.type === 'trend' ? 'bar-chart-2' : w.type === 'donut' ? 'pie-chart' : 'zap'} size={16} className="text-slate-600" />
                                     </div>
                                     
-                                    {renderWidget(w)}
+                                    <div className="flex-1">
+                                        {renderWidget(w)}
+                                    </div>
                                 </div>
                             ))}
+
+                            {/* Add Widget Button (Only in Edit Mode) */}
+                            {isEditMode && (
+                                <div className="xl:col-span-4 md:col-span-1 bg-[#0F172A]/40 border-2 border-dashed border-slate-700 rounded-[32px] p-8 flex flex-col items-center justify-center cursor-pointer hover:border-brand-teal hover:bg-[#0F172A] transition-all min-h-[300px]"
+                                     onClick={() => setWidgets([...widgets, { id: 'w' + Date.now(), type: 'stat', title: 'New Statistic', metric: 'net', width: 'normal' }])}>
+                                    <div className="p-4 bg-slate-800 rounded-full mb-4 text-brand-teal">
+                                        <Icon name="plus" size={24} />
+                                    </div>
+                                    <span className="text-white font-bold">Add Widget</span>
+                                </div>
+                            )}
                         </div>
                     </div>
                     
@@ -290,16 +407,25 @@
                             <div ref={chatEndRef} />
                         </div>
 
-                        <div className="p-5 bg-[#020617]/80 border-t border-slate-800 backdrop-blur-md">
-                            <form onSubmit={sendMsg} className="relative">
-                                <input 
-                                    type="text" value={input} onChange={e => setInput(e.target.value)} 
-                                    placeholder="Ask the SetAll AI..." 
-                                    className="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500"
-                                />
-                                <button type="submit" disabled={!input.trim() || isThinking} className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#020617] hover:bg-teal-400 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-400 transition-all">
-                                    <Icon name="arrow-up" size={18} className="stroke-[3]" />
-                                </button>
+                        {/* Input Area with File Upload */}
+                        <div className="p-4 bg-[#020617]/80 border-t border-slate-800 backdrop-blur-md">
+                            <form onSubmit={sendMsg} className="flex items-center gap-3">
+                                
+                                <label className="cursor-pointer p-3.5 bg-slate-800 hover:bg-slate-700 rounded-2xl text-brand-teal transition-all border border-slate-700" title="Import CSV, PDF, XLS">
+                                    <Icon name="paperclip" size={20} />
+                                    <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".csv,.xls,.xlsx,.pdf" />
+                                </label>
+
+                                <div className="relative flex-1">
+                                    <input 
+                                        type="text" value={input} onChange={e => setInput(e.target.value)} 
+                                        placeholder="Ask the SetAll AI..." 
+                                        className="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500"
+                                    />
+                                    <button type="submit" disabled={!input.trim() || isThinking} className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#020617] hover:bg-teal-400 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-400 transition-all">
+                                        <Icon name="arrow-up" size={18} className="stroke-[3]" />
+                                    </button>
+                                </div>
                             </form>
                         </div>
                     </div>
