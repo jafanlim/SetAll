@@ -1,16 +1,17 @@
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/attachment_processor.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
@@ -192,8 +193,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final path = result.files.first.path;
     if (path == null) return;
     if (!AttachmentProcessor.isAllowed(path)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Unsupported file type. Allowed: images, PDF, TXT, MD.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('add_expense.unsupported_file'.tr()),
       ));
       return;
     }
@@ -242,7 +243,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final d = Decimal.tryParse(v);
     if (d == null || d <= Decimal.zero) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
+        SnackBar(content: Text('add_expense.enter_valid_amount'.tr())),
       );
       return false;
     }
@@ -259,7 +260,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final amount = Decimal.tryParse(amountStr);
     if (amount == null || amount <= Decimal.zero) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
+        SnackBar(content: Text('add_expense.enter_valid_amount'.tr())),
       );
       return;
     }
@@ -271,7 +272,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     if (payerId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not get user. Try again.')),
+          SnackBar(content: Text('add_expense.could_not_get_user'.tr())),
         );
       }
       return;
@@ -281,7 +282,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     if (!isPersonal && _memberIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No members in this group. Add members first.')),
+        SnackBar(content: Text('add_expense.no_members'.tr())),
       );
       return;
     }
@@ -316,7 +317,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           ref.invalidate(recentExpensesProvider);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(_isIncome ? 'Income recorded' : 'Personal expense saved'),
+              content: Text(_isIncome ? 'add_expense.income_recorded'.tr() : 'add_expense.expense_saved'.tr()),
               backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
             ),
           );
@@ -325,7 +326,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           context.go('/wallet');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not save entry')),
+            SnackBar(content: Text('add_expense.could_not_save'.tr())),
           );
         }
       }
@@ -353,7 +354,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           if (mounted) {
             setState(() => _isSubmitting = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Percentages must sum to 100')),
+              SnackBar(content: Text('add_expense.percentages_must_sum'.tr())),
             );
           }
           return;
@@ -372,7 +373,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           if (mounted) {
             setState(() => _isSubmitting = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Enter at least one share')),
+              SnackBar(content: Text('add_expense.enter_share'.tr())),
             );
           }
           return;
@@ -396,7 +397,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text(
-                  'Amounts must sum to $amount (got $totalManual)',
+                  'add_expense.amounts_must_sum'.tr(namedArgs: {'amount': amount.toString(), 'total': totalManual.toString()}),
                 ),
               ),
             );
@@ -443,7 +444,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Expense saved'),
+            content: Text('add_expense.group_expense_saved'.tr()),
             backgroundColor: _teal.withValues(alpha: 0.9),
           ),
         );
@@ -451,7 +452,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       } else {
         HapticUtils.lightTap();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not save expense')),
+          SnackBar(content: Text('add_expense.could_not_save_expense'.tr())),
         );
       }
     }
@@ -475,7 +476,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       resizeToAvoidBottomInset: false,
       appBar: AppBar(
         title: Text(
-          '${_isIncome ? 'Add income' : 'Add expense'} · ${_step + 1}/$_effectiveTotalSteps',
+          '${_isIncome ? 'add_expense.title_income'.tr() : 'add_expense.title_expense'.tr()} · ${_step + 1}/$_effectiveTotalSteps',
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -525,7 +526,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   TextButton.icon(
                     onPressed: _prevStep,
                     icon: const Icon(Icons.arrow_back),
-                    label: const Text('Back'),
+                    label: Text('add_expense.back'.tr()),
                   ),
                 const Spacer(),
                 if (_step < _effectiveTotalSteps - 1)
@@ -536,7 +537,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       foregroundColor: Colors.black,
                     ),
                     icon: const Icon(Icons.arrow_forward),
-                    label: const Text('Next'),
+                    label: Text('add_expense.next'.tr()),
                   )
                 else
                   FilledButton.icon(
@@ -555,7 +556,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                             ),
                           )
                         : const Icon(Icons.check),
-                    label: Text(_isSubmitting ? 'Saving…' : (_isIncome ? 'Save income' : 'Save expense')),
+                    label: Text(_isSubmitting ? 'add_expense.saving'.tr() : (_isIncome ? 'add_expense.save_income'.tr() : 'add_expense.save_expense'.tr())),
                   ),
               ],
             ),
@@ -630,7 +631,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Amount & currency',
+            'add_expense.amount_currency'.tr(),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 15,
@@ -650,7 +651,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               color: _teal,
             ),
             decoration: InputDecoration(
-              labelText: 'Amount',
+              labelText: 'add_expense.amount_label'.tr(),
               labelStyle: const TextStyle(fontSize: 13),
               prefixIcon: _CurrencySymbolIcon(currency: _currency),
               filled: true,
@@ -706,7 +707,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               rateCtrl: _rateOverrideCtrl,
               fromCurrency: _currency,
               toCurrency: base,
-              labelOverride: 'Manual Rate (Optional)',
+              labelOverride: 'add_expense.manual_rate_optional'.tr(),
               onApply: () async {
                 final v = _rateOverrideCtrl.text.trim();
                 final svc = ref.read(currencyServiceProvider);
@@ -748,7 +749,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'How to split',
+            'add_expense.how_to_split'.tr(),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 15,
@@ -759,22 +760,22 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             segments: [
               ButtonSegment(
                 value: SplitMode.even,
-                label: Text('Even', style: const TextStyle(fontSize: 11)),
+                label: Text('add_expense.split_even'.tr(), style: const TextStyle(fontSize: 11)),
                 icon: const Icon(Icons.equalizer, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.percentage,
-                label: Text('%', style: const TextStyle(fontSize: 11)),
+                label: Text('add_expense.split_percent'.tr(), style: const TextStyle(fontSize: 11)),
                 icon: const Icon(Icons.percent, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.shares,
-                label: Text('Shares', style: const TextStyle(fontSize: 11)),
+                label: Text('add_expense.split_shares'.tr(), style: const TextStyle(fontSize: 11)),
                 icon: const Icon(Icons.pie_chart_outline, size: 14),
               ),
               ButtonSegment(
                 value: SplitMode.manual,
-                label: Text('Manual', style: const TextStyle(fontSize: 11)),
+                label: Text('add_expense.split_manual'.tr(), style: const TextStyle(fontSize: 11)),
                 icon: const Icon(Icons.edit, size: 14),
               ),
             ],
@@ -803,10 +804,10 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             const SizedBox(height: 16),
             Text(
               _splitMode == SplitMode.percentage
-                  ? 'Percentage per person (total = 100)'
+                  ? 'add_expense.split_hint_percent'.tr()
                   : _splitMode == SplitMode.shares
-                      ? 'Relative shares per person'
-                      : 'Exact amount per person',
+                      ? 'add_expense.split_hint_shares'.tr()
+                      : 'add_expense.split_hint_manual'.tr(),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontSize: 11,
@@ -824,7 +825,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                       child: Text(
                         _memberNames.length > i
                             ? _memberNames[i]
-                            : 'Member ${i + 1}',
+                            : 'add_expense.member_n'.tr(namedArgs: {'n': '${i + 1}'}),
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(fontSize: 13),
                         overflow: TextOverflow.ellipsis,
@@ -890,7 +891,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                   const Icon(Icons.equalizer, color: _teal, size: 16),
                   const SizedBox(width: 8),
                   Text(
-                    'Split evenly among ${_memberIds.length} members',
+                    'add_expense.split_evenly_members'.tr(namedArgs: {'count': '${_memberIds.length}'}),
                     style: const TextStyle(color: _teal, fontSize: 12),
                   ),
                 ],
@@ -913,7 +914,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('New category'),
+          title: Text('add_expense.category_label'.tr()),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -921,16 +922,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 controller: ctrl,
                 autofocus: true,
                 textCapitalization: TextCapitalization.words,
-                decoration: const InputDecoration(
-                  labelText: 'Category name',
+                decoration: InputDecoration(
+                  labelText: 'add_expense.category_label'.tr(),
                   hintText: 'e.g. Gym, Salary…',
                 ),
               ),
               const SizedBox(height: 12),
               SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'expense', label: Text('Expense', style: TextStyle(fontSize: 12))),
-                  ButtonSegment(value: 'income',  label: Text('Income',  style: TextStyle(fontSize: 12))),
+                segments: [
+                  ButtonSegment(value: 'expense', label: Text('add_expense.title_expense'.tr(), style: const TextStyle(fontSize: 12))),
+                  ButtonSegment(value: 'income',  label: Text('add_expense.title_income'.tr(),  style: const TextStyle(fontSize: 12))),
                 ],
                 selected: {catType},
                 onSelectionChanged: (s) => setDlg(() => catType = s.first),
@@ -938,14 +939,14 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('common.cancel'.tr())),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
               onPressed: () {
                 final name = ctrl.text.trim();
                 if (name.isNotEmpty) Navigator.of(ctx).pop({'name': name, 'type': catType});
               },
-              child: const Text('Save'),
+              child: Text('common.save'.tr()),
             ),
           ],
         ),
@@ -962,7 +963,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       setState(() => _category = result['name']!);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not save category')),
+        SnackBar(content: Text('add_expense.could_not_save'.tr())),
       );
     }
   }
@@ -975,7 +976,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Details',
+            'add_expense.details'.tr(),
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 15,
@@ -1004,7 +1005,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Icon & Colour',
+                    Text('add_expense.icon_colour'.tr(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                           fontSize: 10,
@@ -1014,8 +1015,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     TextButton.icon(
                       onPressed: _showIconPicker,
                       icon: const Icon(Icons.palette_outlined, size: 14),
-                      label: const Text('Change icon & colour',
-                          style: TextStyle(fontSize: 12)),
+                      label: Text('add_expense.change_icon'.tr(),
+                          style: const TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(
                         foregroundColor: _teal,
                         padding: EdgeInsets.zero,
@@ -1034,7 +1035,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           Row(
             children: [
               Text(
-                'Category',
+                'add_expense.category_label'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
@@ -1051,7 +1052,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                     children: [
                       const Icon(Icons.add, size: 14, color: _teal),
                       const SizedBox(width: 4),
-                      Text('New', style: const TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w600)),
+                      Text('add_expense.new_category_btn'.tr(), style: const TextStyle(color: _teal, fontSize: 11, fontWeight: FontWeight.w600)),
                     ],
                   ),
                 ),
@@ -1061,7 +1062,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           const SizedBox(height: 8),
           // Standard categories
           Text(
-            'Standard',
+            'add_expense.standard_categories'.tr(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               fontSize: 10,
@@ -1075,7 +1076,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             children: kExpenseCategories.map((cat) {
               final selected = _category == cat;
               return FilterChip(
-                label: Text(cat, style: const TextStyle(fontSize: 11)),
+                label: Text(categoryTr(cat), style: const TextStyle(fontSize: 11)),
                 selected: selected,
                 selectedColor: _teal.withValues(alpha: 0.15),
                 checkmarkColor: _teal,
@@ -1099,7 +1100,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 children: [
                   const SizedBox(height: 12),
                   Text(
-                    'Your Categories',
+                    'add_expense.your_categories'.tr(),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                       fontSize: 10,
@@ -1155,7 +1156,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           if (_memberIds.length > 1) ...
             [
               Text(
-                'Paid by',
+                'add_expense.payer_label'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
@@ -1189,7 +1190,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           TextFormField(
             controller: _descriptionCtrl,
             decoration: InputDecoration(
-              labelText: 'Description (optional)',
+              labelText: 'add_expense.description_label'.tr(),
               labelStyle: const TextStyle(fontSize: 13),
               prefixIcon: const Icon(Icons.notes_outlined),
               filled: true,
@@ -1208,7 +1209,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           Row(
             children: [
               Text(
-                'Attachments',
+                'common.attachments'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontSize: 11,
@@ -1218,20 +1219,20 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
               if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) ...[
                 AttachButton(
                   icon: Icons.photo_camera_outlined,
-                  label: 'Camera',
+                  label: 'common.camera'.tr(),
                   onTap: () => _pickImage(ImageSource.camera),
                 ),
                 const SizedBox(width: 8),
               ],
               AttachButton(
                 icon: Icons.photo_library_outlined,
-                label: 'Gallery',
+                label: 'common.gallery'.tr(),
                 onTap: () => _pickImage(ImageSource.gallery),
               ),
               const SizedBox(width: 8),
               AttachButton(
                 icon: Icons.attach_file_outlined,
-                label: 'File',
+                label: 'common.file'.tr(),
                 onTap: _pickFile,
               ),
             ],
@@ -1242,7 +1243,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           TextFormField(
             controller: _notesCtrl,
             decoration: InputDecoration(
-              labelText: 'Notes (optional)',
+              labelText: 'add_expense.notes_label'.tr(),
               hintText: 'Additional details, or import a .txt / .md file above',
               prefixIcon: const Icon(Icons.notes_outlined),
               filled: true,
@@ -1862,12 +1863,12 @@ class _ManualSumIndicator extends StatelessWidget {
     final isExact = total > Decimal.zero && sum == total;
     final color = isExact ? _teal : _orange;
     final label = total == Decimal.zero
-        ? 'Enter total amount first'
+        ? 'add_expense.manual_enter_total'.tr()
         : isExact
-            ? 'Sum: $currency $sum — matches total'
+            ? 'add_expense.manual_sum_matches'.tr(namedArgs: {'currency': currency, 'sum': sum.toString()})
             : sum < total
-                ? 'Sum: $currency $sum — ${total - sum} remaining'
-                : 'Sum: $currency $sum — ${sum - total} over total';
+                ? 'add_expense.manual_sum_remaining'.tr(namedArgs: {'currency': currency, 'sum': sum.toString(), 'diff': (total - sum).toString()})
+                : 'add_expense.manual_sum_over'.tr(namedArgs: {'currency': currency, 'sum': sum.toString(), 'diff': (sum - total).toString()});
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -1925,7 +1926,7 @@ class _ManualRateRow extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontSize: 12),
             decoration: InputDecoration(
-              labelText: labelOverride ?? 'Manual rate (bank / cash)',
+              labelText: labelOverride ?? 'add_expense.manual_rate_label'.tr(),
               hintText: '1 $fromCurrency = ? $toCurrency',
               labelStyle: const TextStyle(fontSize: 11),
               isDense: true,
@@ -1947,7 +1948,7 @@ class _ManualRateRow extends StatelessWidget {
             foregroundColor: _teal,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
-          child: const Text('Apply', style: TextStyle(fontSize: 12)),
+          child: Text('add_expense.apply'.tr(), style: const TextStyle(fontSize: 12)),
         ),
       ],
     );
@@ -2011,7 +2012,7 @@ class _DatePickerField extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isToday ? 'Today · $label' : label,
+                isToday ? '${'common.today_prefix'.tr()} · $label' : label,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -2153,7 +2154,7 @@ class _EntryIconColorPickerState extends State<_EntryIconColorPicker> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Colour', style: theme.textTheme.labelMedium?.copyWith(
+            Text('add_expense.colour_label'.tr(), style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700, fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant,
             )),
@@ -2183,7 +2184,7 @@ class _EntryIconColorPickerState extends State<_EntryIconColorPicker> {
               }).toList(),
             ),
             const SizedBox(height: 20),
-            Text('Icon', style: theme.textTheme.labelMedium?.copyWith(
+            Text('add_expense.icon_label'.tr(), style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700, fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant,
             )),

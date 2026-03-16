@@ -16,7 +16,6 @@ import 'package:setall/data/models/split_model.dart';
 import 'package:setall/data/repositories/setall_repository.dart';
 import 'package:setall/domain/services/settlement_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sqflite/sqflite.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────

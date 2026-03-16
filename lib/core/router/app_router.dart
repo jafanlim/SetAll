@@ -15,6 +15,7 @@ import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/activity/presentation/screens/activity_screen.dart';
+import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
@@ -41,7 +42,8 @@ final class AppRouter {
   static const String register = '/register';
   static const String biometricGate = '/biometric-gate';
   static const String dashboard = '/';
-  static const String activity = '/activity';
+  static const String activity   = '/activity';
+  static const String analytics  = '/analytics';
   static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
@@ -204,6 +206,16 @@ final class AppRouter {
                 child: Material(
                   color: Theme.of(context).colorScheme.surface,
                   child: const WalletScreen(),
+                ),
+              ),
+            ),
+            GoRoute(
+              path: analytics,
+              name: 'analytics',
+              pageBuilder: (context, state) => NoTransitionPage(
+                child: Material(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: const AnalyticsScreen(),
                 ),
               ),
             ),

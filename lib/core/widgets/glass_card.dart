@@ -31,9 +31,9 @@ class GlassCard extends StatelessWidget {
     // Detect desktop light: scaffold overridden to Slate-300 in desktopLight.
     final scaffold = theme.scaffoldBackgroundColor;
     final isDesktopLight = !isDark &&
-        scaffold.red   < 215 &&
-        scaffold.green < 225 &&
-        scaffold.blue  < 235;
+        (scaffold.r * 255.0).round() < 215 &&
+        (scaffold.g * 255.0).round() < 225 &&
+        (scaffold.b * 255.0).round() < 235;
     final radius = borderRadius ?? BorderRadius.circular(16);
 
     Color surfaceColor;

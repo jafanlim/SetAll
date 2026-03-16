@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,15 +32,14 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
     final theme  = Theme.of(context);
     final uid    = ref.watch(currentUserIdProvider) ?? '';
     final link   = 'https://setall.app/join/$uid';
-    final shareText =
-        'Join me on SetAll to track our shared expenses: $link';
+    final shareText = 'invite_friend.share_text'.tr(namedArgs: {'link': link});
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Invite a Friend',
-          style: TextStyle(
+        title: Text(
+          'invite_friend.title'.tr(),
+          style: const TextStyle(
             fontWeight: FontWeight.w800,
             fontSize: 20,
             letterSpacing: -0.3,
@@ -71,7 +71,7 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
 
             // ── Headline ───────────────────────────────────────────────────
             Text(
-              'Share your personal link',
+              'invite_friend.headline'.tr(),
               textAlign: TextAlign.center,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
@@ -80,7 +80,7 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Anyone who joins via your link will be automatically connected to you on SetAll.',
+              'invite_friend.subtitle'.tr(),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: _slate,
@@ -138,7 +138,7 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
                               color: Colors.black, size: 18),
                           const SizedBox(width: 10),
                           Text(
-                            'Link copied!',
+                            'invite_friend.link_copied'.tr(),
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: Colors.black,
                               fontWeight: FontWeight.w700,
@@ -150,7 +150,7 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
                   );
               },
               icon: const Icon(Icons.copy_rounded, size: 18),
-              label: const Text('Copy link'),
+              label: Text('invite_friend.copy_link'.tr()),
               style: OutlinedButton.styleFrom(
                 foregroundColor: _teal,
                 side: const BorderSide(color: _teal, width: 1.5),
@@ -171,12 +171,12 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
                 final rect = _shareButtonRect();
                 Share.share(
                   shareText,
-                  subject: 'Join me on SetAll',
+                  subject: 'invite_friend.share_subject'.tr(),
                   sharePositionOrigin: rect ?? const Rect.fromLTWH(0, 0, 1, 1),
                 );
               },
               icon: const Icon(Icons.ios_share_rounded, size: 18),
-              label: const Text('Share via…'),
+              label: Text('invite_friend.share_via'.tr()),
               style: FilledButton.styleFrom(
                 backgroundColor: _teal,
                 foregroundColor: Colors.black,
@@ -192,7 +192,7 @@ class _InviteFriendScreenState extends ConsumerState<InviteFriendScreen> {
 
             // ── Footer note ────────────────────────────────────────────────
             Text(
-              'Your link is unique to your account and never expires.',
+              'invite_friend.footer'.tr(),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: _slate, fontSize: 11),

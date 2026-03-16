@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -38,15 +39,15 @@ class GroupPickerScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Add expense'),
+        title: Text('group_picker.title'.tr()),
         leading: IconButton(
             icon: const Icon(Icons.close), onPressed: () => context.pop()),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCreateGroup(context),
         icon: const Icon(Icons.group_add_outlined),
-        label: const Text('New group',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+        label: Text('group_picker.new_group'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
       ),
       body: groupsAsync.when(
         data: (groups) {
@@ -58,7 +59,7 @@ class GroupPickerScreen extends ConsumerWidget {
             children: [
               // ── Existing groups ───────────────────────────────────────────────
               Text(
-                'Choose a group',
+                'group_picker.choose_group'.tr(),
                 style: theme.textTheme.titleMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w600,
@@ -69,7 +70,7 @@ class GroupPickerScreen extends ConsumerWidget {
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   child: Text(
-                    'No groups yet. Tap "New group" to create one.',
+                    'group_picker.no_groups'.tr(),
                     style: theme.textTheme.bodyMedium?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant),
                   ),
@@ -92,12 +93,12 @@ class GroupPickerScreen extends ConsumerWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text('Could not load groups',
+                Text('group_picker.could_not_load'.tr(),
                     style: TextStyle(color: theme.colorScheme.error)),
                 const SizedBox(height: 16),
                 TextButton(
                   onPressed: () => ref.invalidate(myGroupsProvider),
-                  child: const Text('Retry'),
+                  child: Text('common.retry'.tr()),
                 ),
               ],
             ),

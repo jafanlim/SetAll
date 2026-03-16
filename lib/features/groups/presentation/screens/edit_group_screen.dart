@@ -1,5 +1,6 @@
 import 'dart:io' as io;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -97,6 +98,7 @@ class _EditGroupScreenState extends ConsumerState<EditGroupScreen> {
   String? _avatarLocalPath;
   bool? _removeAvatar;
   bool _saving = false;
+  String? _defaultCurrency;
 
   @override
   void initState() {
@@ -121,6 +123,9 @@ class _EditGroupScreenState extends ConsumerState<EditGroupScreen> {
       final idx = _kGroupIcons.indexWhere((i) => i.name == iname);
       if (idx >= 0) _iconIdx = idx;
     }
+
+    // Pre-fill group currency
+    _defaultCurrency = widget.group.defaultCurrency;
   }
 
   @override
@@ -234,6 +239,7 @@ class _EditGroupScreenState extends ConsumerState<EditGroupScreen> {
       colorValue: colorVal,
       avatarUrl: avatarUrl,
       clearAvatarUrl: _removeAvatar == true && _avatarLocalPath == null,
+      defaultCurrency: _defaultCurrency,
     );
 
     if (!mounted) return;
@@ -467,6 +473,25 @@ class _EditGroupScreenState extends ConsumerState<EditGroupScreen> {
                   ),
                 ),
 
+                const SizedBox(height: 16),
+
+                // ── Group currency ────────────────────────────────────────────
+                _SectionLabel('Group Currency', theme),
+                const SizedBox(height: 6),
+                Text(
+                  'Expenses in this group will display totals in this currency.',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _GroupCurrencyPickerButton(
+                  value: _defaultCurrency,
+                  accent: accent,
+                  onChanged: (v) => setState(() => _defaultCurrency = v),
+                ),
+
                 const SizedBox(height: 100),
               ],
             ),
@@ -544,7 +569,7 @@ class _NetworkAvatar extends ConsumerWidget {
               borderRadius: BorderRadius.circular(18),
               child: Image.network(url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorBuilder: (_, _, _) => Icon(
                       Icons.groups_outlined,
                       size: 36,
                       color: accent)),
@@ -555,7 +580,7 @@ class _NetworkAvatar extends ConsumerWidget {
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2))),
-      error: (_, __) => Icon(Icons.groups_outlined, size: 36, color: accent),
+      error: (_, _) => Icon(Icons.groups_outlined, size: 36, color: accent),
     );
   }
 }
@@ -658,11 +683,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('common.cancel'.tr()),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _selected),
-          child: const Text('Apply'),
+          child: Text('common.apply'.tr()),
         ),
       ],
     );
@@ -686,6 +711,177 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: theme.colorScheme.onSurfaceVariant,
         letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Currency picker (Edit group screen)
+// ---------------------------------------------------------------------------
+const _kEditCurrencies = [
+  'USD', 'EUR', 'GBP', 'JPY', 'CNY', 'INR', 'AUD', 'CAD', 'CHF', 'KRW',
+  'SGD', 'HKD', 'SEK', 'NOK', 'DKK', 'NZD', 'MXN', 'BRL', 'ZAR', 'RUB',
+  'TRY', 'AED', 'SAR', 'THB', 'IDR', 'MYR', 'PHP', 'VND', 'PLN', 'HUF',
+  'CZK', 'ILS', 'CLP', 'PKR', 'EGP', 'NGN', 'UAH', 'GEL', 'RON', 'ARS',
+];
+
+class _GroupCurrencyPickerButton extends StatelessWidget {
+  const _GroupCurrencyPickerButton({
+    required this.value,
+    required this.accent,
+    required this.onChanged,
+  });
+  final String?  value;
+  final Color    accent;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () => _openPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: value != null
+                ? accent.withValues(alpha: 0.6)
+                : theme.colorScheme.outlineVariant,
+            width: value != null ? 1.2 : 0.8,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.currency_exchange_outlined,
+              size: 18,
+              color: value != null ? accent : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                value ?? 'Use my default currency',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: value != null ? FontWeight.w700 : FontWeight.w400,
+                  color: value != null
+                      ? theme.colorScheme.onSurface
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (value != null)
+              GestureDetector(
+                onTap: () => onChanged(null),
+                child: Icon(Icons.close, size: 16,
+                    color: theme.colorScheme.onSurfaceVariant),
+              )
+            else
+              Icon(Icons.chevron_right, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _GroupCurrencyPickerSheet(current: value),
+    );
+    if (picked != null) onChanged(picked);
+  }
+}
+
+class _GroupCurrencyPickerSheet extends StatefulWidget {
+  const _GroupCurrencyPickerSheet({required this.current});
+  final String? current;
+
+  @override
+  State<_GroupCurrencyPickerSheet> createState() =>
+      _GroupCurrencyPickerSheetState();
+}
+
+class _GroupCurrencyPickerSheetState
+    extends State<_GroupCurrencyPickerSheet> {
+  final _ctrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme    = Theme.of(context);
+    final filtered = _kEditCurrencies
+        .where((c) => c.contains(_query.toUpperCase()))
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (ctx, scroll) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: const InputDecoration(
+                  hintText: 'Search currency (e.g. EUR, GEL…)',
+                  prefixIcon: Icon(Icons.search, size: 18),
+                ),
+                onChanged: (v) => setState(() => _query = v.trim()),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: scroll,
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final c = filtered[i];
+                  final selected = c == widget.current;
+                  return ListTile(
+                    title: Text(c,
+                        style: TextStyle(
+                          fontWeight: selected
+                              ? FontWeight.w700 : FontWeight.w500,
+                          color: selected
+                              ? const Color(0xFF00D9B0)
+                              : theme.colorScheme.onSurface,
+                        )),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle,
+                            color: Color(0xFF00D9B0), size: 20)
+                        : null,
+                    onTap: () => Navigator.pop(context, c),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

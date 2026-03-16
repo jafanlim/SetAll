@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
-import 'dart:io' as _io
+import 'dart:io' as io_lib
     if (dart.library.html) '../../core/stubs/io_stub.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart'
     if (dart.library.html) '../../core/stubs/image_compress_stub.dart';
@@ -617,7 +617,7 @@ class SetAllRepository {
           a[i].name != b[i].name ||
           a[i].iconName != b[i].iconName ||
           a[i].colorValue != b[i].colorValue ||
-          a[i].avatarUrl != b[i].avatarUrl) return true;
+          a[i].avatarUrl != b[i].avatarUrl) { return true; }
     }
     return false;
   }
@@ -759,6 +759,7 @@ class SetAllRepository {
     String? iconName,
     int? colorValue,
     String? avatarUrl,
+    String? defaultCurrency,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -777,15 +778,17 @@ class SetAllRepository {
       }
       await _client.from('groups').insert({
         'id': id, 'name': name, 'creator_id': uid, 'type': 'normal',
-        if (iconName != null) 'icon_name': iconName,
-        if (colorValue != null) 'color_value': colorValue,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
+        'icon_name': ?iconName,
+        'color_value': ?colorValue,
+        'avatar_url': ?avatarUrl,
+        'default_currency': ?defaultCurrency,
       });
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
       return GroupModel(id: id, name: name, creatorId: uid,
-          iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+          iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+          defaultCurrency: defaultCurrency);
     }
 
     // Non-web: ensure DB is ready before any SQLite access.
@@ -812,9 +815,10 @@ class SetAllRepository {
       'created_at': now,
       'updated_at': now,
       'synced_at': -1,
-      if (iconName != null) 'icon_name': iconName,
-      if (colorValue != null) 'color_value': colorValue,
-      if (avatarUrl != null) 'avatar_url': avatarUrl,
+      'icon_name': ?iconName,
+      'color_value': ?colorValue,
+      'avatar_url': ?avatarUrl,
+      'default_currency': ?defaultCurrency,
     });
     await db.insert('group_members', {
       'group_id': id,
@@ -830,12 +834,14 @@ class SetAllRepository {
         final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
         final finalId = remoteId != id ? remoteId : id;
         // Patch identity columns on Supabase if provided.
-        if (iconName != null || colorValue != null || avatarUrl != null) {
+        if (iconName != null || colorValue != null || avatarUrl != null ||
+            defaultCurrency != null) {
           try {
             await _client.from('groups').update({
-              if (iconName != null) 'icon_name': iconName,
-              if (colorValue != null) 'color_value': colorValue,
-              if (avatarUrl != null) 'avatar_url': avatarUrl,
+              'icon_name': ?iconName,
+              'color_value': ?colorValue,
+              'avatar_url': ?avatarUrl,
+              'default_currency': ?defaultCurrency,
             }).eq('id', finalId);
           } catch (_) {}
         }
@@ -844,7 +850,8 @@ class SetAllRepository {
           await db.update('groups', {'id': remoteId, 'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
           await db.update('group_members', {'group_id': remoteId, 'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
           return GroupModel(id: remoteId, name: name, creatorId: uid,
-              iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+              iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+              defaultCurrency: defaultCurrency);
         }
         await db.update('groups', {'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
         await db.update('group_members', {'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
@@ -861,7 +868,8 @@ class SetAllRepository {
     }
     _notify();
     return GroupModel(id: id, name: name, creatorId: uid,
-        iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+        iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+        defaultCurrency: defaultCurrency);
   }
 
   /// Update a group's visual identity (icon, colour, avatar). Only the creator
@@ -872,14 +880,16 @@ class SetAllRepository {
     int? colorValue,
     String? avatarUrl,
     bool clearAvatarUrl = false,
+    String? defaultCurrency,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return false;
     final updates = <String, dynamic>{};
-    if (iconName != null)   updates['icon_name']   = iconName;
-    if (colorValue != null) updates['color_value'] = colorValue;
-    if (avatarUrl != null)  updates['avatar_url']  = avatarUrl;
-    if (clearAvatarUrl)     updates['avatar_url']  = null;
+    if (iconName != null)        updates['icon_name']        = iconName;
+    if (colorValue != null)      updates['color_value']      = colorValue;
+    if (avatarUrl != null)       updates['avatar_url']       = avatarUrl;
+    if (clearAvatarUrl)          updates['avatar_url']       = null;
+    if (defaultCurrency != null) updates['default_currency'] = defaultCurrency;
     if (updates.isEmpty) return true;
 
     if (_isWeb && _client != null) {
@@ -945,7 +955,7 @@ class SetAllRepository {
           format: CompressFormat.jpeg, keepExif: false,
         );
       }
-      final uploadBytes = bytes ?? (kIsWeb ? Uint8List(0) : await _io.File(localPath).readAsBytes());
+      final uploadBytes = bytes ?? (kIsWeb ? Uint8List(0) : await io_lib.File(localPath).readAsBytes());
       final storagePath = '$uid/$groupId/avatar.$ext';
       await _client.storage
           .from('group-avatars')

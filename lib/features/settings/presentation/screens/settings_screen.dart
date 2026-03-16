@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -103,7 +105,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final name     = _nameCtrl.text.trim();
     final nickname = _nicknameCtrl.text.trim();
     if (name.isEmpty) {
-      setState(() => _profileError = 'Name cannot be empty');
+      setState(() => _profileError = 'settings_ext.name_empty'.tr());
       return;
     }
     setState(() { _profileSaving = true; _profileError = null; _profileSaved = false; });
@@ -175,7 +177,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Could not upload photo: ${e.toString()}'),
+          content: Text('${'settings_ext.upload_photo_error'.tr()}: ${e.toString()}'),
           backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
@@ -203,7 +205,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: Text(_hasPasswordIdentity ? 'Change Password' : 'Set Password'),
+          title: Text(_hasPasswordIdentity ? 'settings_ext.dialog_change_password_title'.tr() : 'settings_ext.dialog_set_password_title'.tr()),
           content: Form(
             key: formKey,
             child: SingleChildScrollView(
@@ -214,7 +216,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: Text(
-                      'Add a password so you can also sign in with email + password.',
+                      'settings_ext.dialog_add_password_body'.tr(),
                       style: TextStyle(
                         fontSize: 12,
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
@@ -225,7 +227,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   controller: newPwCtrl,
                   obscureText: obscureNew,
                   decoration: InputDecoration(
-                    labelText: 'New password (min 8 characters)',
+                    labelText: 'settings_ext.dialog_new_password_label'.tr(),
                     suffixIcon: IconButton(
                       icon: Icon(obscureNew
                           ? Icons.visibility_outlined
@@ -244,7 +246,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   controller: confirmCtrl,
                   obscureText: obscureConf,
                   decoration: InputDecoration(
-                    labelText: 'Confirm password',
+                    labelText: 'settings_ext.dialog_confirm_password_label'.tr(),
                     suffixIcon: IconButton(
                       icon: Icon(obscureConf
                           ? Icons.visibility_outlined
@@ -264,7 +266,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(false),
-              child: const Text('Cancel'),
+              child: Text('common.cancel'.tr()),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -276,7 +278,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   Navigator.of(ctx).pop(true);
                 }
               },
-              child: const Text('Save'),
+              child: Text('common.save'.tr()),
             ),
           ],
         ),
@@ -305,8 +307,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SnackBar(
           content: Text(
             isPasswordUser
-                ? 'Password updated successfully.'
-                : 'Password set! You can now sign in with email + password.',
+                ? 'settings_ext.password_updated'.tr()
+                : 'settings_ext.password_set'.tr(),
           ),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
@@ -315,7 +317,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final msg = e.toString().replaceFirst('Exception: ', '');
       messenger.showSnackBar(
         SnackBar(
-          content: Text(msg.isNotEmpty ? msg : 'Could not update password.'),
+          content: Text(msg.isNotEmpty ? msg : 'settings_ext.could_not_update_password'.tr()),
           backgroundColor: errorColor,
         ),
       );
@@ -329,7 +331,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Change Email'),
+        title: Text('settings_ext.dialog_change_email_title'.tr()),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -344,9 +346,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 controller: ctrl,
                 autofocus: true,
                 keyboardType: TextInputType.emailAddress,
-                decoration: const InputDecoration(
-                  hintText: 'New email address',
-                  prefixIcon: Icon(Icons.email_outlined),
+                decoration: InputDecoration(
+                  hintText: 'settings_ext.dialog_new_email_hint'.tr(),
+                  prefixIcon: const Icon(Icons.email_outlined),
                 ),
               ),
             ],
@@ -355,12 +357,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Send confirmation'),
+            child: Text('settings_ext.dialog_send_confirm'.tr()),
           ),
         ],
       ),
@@ -370,7 +372,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (confirmed != true || !mounted) return;
     if (newEmail.isEmpty || !newEmail.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid email address.')),
+        SnackBar(content: Text('settings_ext.enter_valid_email'.tr())),
       );
       return;
     }
@@ -389,7 +391,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
       messenger.showSnackBar(
         SnackBar(
-          content: Text('Confirmation sent to $newEmail. Check your inbox.'),
+          content: Text('settings_ext.confirmation_sent'.tr(namedArgs: {'email': newEmail})),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
       );
@@ -398,7 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final msg = e.toString().replaceFirst('Exception: ', '');
       messenger.showSnackBar(
         SnackBar(
-          content: Text(msg.isNotEmpty ? msg : 'Could not update email.'),
+          content: Text(msg.isNotEmpty ? msg : 'settings_ext.could_not_update_email'.tr()),
           backgroundColor: errorColor,
         ),
       );
@@ -436,7 +438,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Could not save currency: ${e.toString().replaceFirst('Exception: ', '')}'),
+            content: Text('settings_ext.could_not_save_currency'.tr(namedArgs: {'error': e.toString().replaceFirst('Exception: ', '')})),
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
@@ -455,7 +457,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete Account?'),
+        title: Text('settings_ext.dialog_delete_account_title'.tr()),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -467,37 +469,35 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
-                  SizedBox(width: 8),
+                  const Icon(Icons.warning_amber_rounded, color: Colors.redAccent, size: 20),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '30-day cooling-off period',
-                      style: TextStyle(fontWeight: FontWeight.w700, color: Colors.redAccent, fontSize: 13),
+                      'settings_ext.dialog_cooling_period'.tr(),
+                      style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.redAccent, fontSize: 13),
                     ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 12),
-            const Text(
-              'Your account will be marked for deletion but all data is retained for 30 days.\n\n'
-              'Log back in within 30 days to restore everything.\n\n'
-              'After 30 days your account and all data are permanently deleted.',
-              style: TextStyle(fontSize: 13),
+            Text(
+              'settings_ext.dialog_delete_account_body'.tr(),
+              style: const TextStyle(fontSize: 13),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete My Account'),
+            child: Text('settings_ext.dialog_delete_my_account'.tr()),
           ),
         ],
       ),
@@ -521,7 +521,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await client.auth.signOut();
     } catch (e) {
       messenger.showSnackBar(SnackBar(
-        content: Text('Error: ${e.toString()}'),
+        content: Text('settings_ext.error_generic'.tr(namedArgs: {'error': e.toString()})),
         backgroundColor: errorColor,
       ));
     }
@@ -538,9 +538,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        title: Text(
+          'settings.title'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -551,7 +551,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           // ── Profile ─────────────────────────────────────────────────────
-          _SectionHeader(label: 'Profile'),
+          _SectionHeader(label: 'settings_ext.profile'.tr()),
           const SizedBox(height: 8),
           profileAsync.when(
             data: (profile) => _ProfileSection(
@@ -571,7 +571,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               child: CircularProgressIndicator(),
             )),
             error: (_, _) => Text(
-              'Could not load profile',
+              'settings_ext.could_not_load_profile'.tr(),
               style: TextStyle(color: theme.colorScheme.error),
             ),
           ),
@@ -579,9 +579,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── Base Currency ────────────────────────────────────────────────
-          _SectionHeader(label: 'Base Currency'),
+          _SectionHeader(label: 'settings.currency'.tr()),
           Text(
-            'All dashboard totals are displayed in this currency.',
+            'settings_ext.base_currency_subtitle'.tr(),
             style: TextStyle(
               fontSize: 12,
               color: theme.colorScheme.onSurfaceVariant,
@@ -597,7 +597,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── Sub-menus ─────────────────────────────────────────────────────
-          _SectionHeader(label: 'Preferences'),
+          _SectionHeader(label: 'settings.preferences'.tr()),
           const SizedBox(height: 8),
           GlassCard(
             padding: EdgeInsets.zero,
@@ -606,26 +606,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _NavRow(
                   icon: LucideIcons.shieldCheck,
                   iconColor: _teal,
-                  label: 'Security',
-                  subtitle: 'Biometrics, PIN, fallback auth',
+                  label: 'settings_ext.security'.tr(),
+                  subtitle: 'settings_ext.security_subtitle'.tr(),
                   onTap: () => context.push(AppRouter.settingsSecurity),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
                   icon: LucideIcons.bell,
                   iconColor: _teal,
-                  label: 'Notifications',
-                  subtitle: 'Push and email alerts',
+                  label: 'settings_ext.notifications'.tr(),
+                  subtitle: 'settings_ext.notifications_subtitle'.tr(),
                   onTap: () => context.push(AppRouter.settingsNotifications),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _NavRow(
                   icon: LucideIcons.globe,
                   iconColor: _teal,
-                  label: 'Regional Settings',
-                  subtitle: 'Date & time format',
+                  label: 'settings_ext.regional'.tr(),
+                  subtitle: 'settings_ext.regional_subtitle'.tr(),
                   onTap: () => context.push(AppRouter.settingsRegional),
                 ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _LanguageRow(),
               ],
             ),
           ),
@@ -633,15 +635,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── Splitwise Import ─────────────────────────────────────────────
-          _SectionHeader(label: 'Data'),
+          _SectionHeader(label: 'settings_ext.data'.tr()),
           const SizedBox(height: 8),
           GlassCard(
             padding: EdgeInsets.zero,
             child: _NavRow(
               icon: LucideIcons.fileUp,
               iconColor: const Color(0xFF22C55E),
-              label: 'Import from Splitwise',
-              subtitle: 'CSV import — map expenses into your Wallet',
+              label: 'settings_ext.import_splitwise'.tr(),
+              subtitle: 'settings_ext.import_splitwise_subtitle'.tr(),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const SplitwiseImportScreen()),
               ),
@@ -651,14 +653,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 24),
 
           // ── Appearance ───────────────────────────────────────────────────
-          _SectionHeader(label: 'Appearance'),
+          _SectionHeader(label: 'settings.appearance'.tr()),
           const SizedBox(height: 8),
           _ThemeSection(),
 
           const SizedBox(height: 24),
 
           // ── Account ──────────────────────────────────────────────────────
-          _SectionHeader(label: 'Account'),
+          _SectionHeader(label: 'settings.account'.tr()),
           const SizedBox(height: 8),
           GlassCard(
             padding: EdgeInsets.zero,
@@ -671,7 +673,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
-                    'Tap to change email',
+                    'settings_ext.tap_change_email'.tr(),
                     style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   trailing: _emailChanging
@@ -683,13 +685,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 ListTile(
                   leading: const Icon(Icons.lock_outline),
                   title: Text(
-                    _hasPasswordIdentity ? 'Change Password' : 'Set Password',
+                    _hasPasswordIdentity ? 'settings_ext.change_password'.tr() : 'settings_ext.set_password'.tr(),
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
                   ),
                   subtitle: Text(
                     _hasPasswordIdentity
-                        ? 'Update your sign-in password'
-                        : 'Add a password to enable email + password login',
+                        ? 'settings_ext.change_password_subtitle'.tr()
+                        : 'settings_ext.set_password_subtitle'.tr(),
                     style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   trailing: _passwordChanging
@@ -700,27 +702,26 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.delete_sweep_outlined, color: Colors.orangeAccent),
-                  title: const Text(
-                    'Clear all expenses',
-                    style: TextStyle(
+                  title: Text(
+                    'settings_ext.clear_expenses'.tr(),
+                    style: const TextStyle(
                       color: Colors.orangeAccent,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  subtitle: const Text('Wipe all expenses & splits from device and cloud'),
+                  subtitle: Text('settings_ext.clear_expenses_subtitle'.tr()),
                   onTap: () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Clear all expenses?'),
-                        content: const Text(
-                          'This will permanently delete every expense and split from your account. '
-                          'Groups and members are kept. This cannot be undone.',
+                        title: Text('settings_ext.dialog_clear_expenses_title'.tr()),
+                        content: Text(
+                          'settings_ext.dialog_clear_expenses_body'.tr(),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancel'),
+                            child: Text('common.cancel'.tr()),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -728,7 +729,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               foregroundColor: Colors.black,
                             ),
                             onPressed: () => Navigator.of(ctx).pop(true),
-                            child: const Text('Clear expenses'),
+                            child: Text('settings_ext.dialog_clear_expenses_confirm'.tr()),
                           ),
                         ],
                       ),
@@ -740,7 +741,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ref.invalidate(myGroupsProvider);
                     if (context.mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('All expenses cleared')),
+                        SnackBar(content: Text('settings_ext.expenses_cleared'.tr())),
                       );
                     }
                   },
@@ -748,30 +749,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.refresh, color: Colors.orangeAccent),
-                  title: const Text(
-                    'Reset Local Cache',
-                    style: TextStyle(
+                  title: Text(
+                    'settings_ext.reset_cache'.tr(),
+                    style: const TextStyle(
                       color: Colors.orangeAccent,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  subtitle: const Text(
-                    'Wipes local DB and re-syncs from cloud. Fixes ghost data.',
-                    style: TextStyle(fontSize: 11),
+                  subtitle: Text(
+                    'settings_ext.reset_cache_subtitle'.tr(),
+                    style: const TextStyle(fontSize: 11),
                   ),
                   onTap: () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
                       builder: (ctx) => AlertDialog(
-                        title: const Text('Reset local cache?'),
-                        content: const Text(
-                          'All local data will be wiped and re-downloaded from '
-                          'the cloud. Use this to fix ghost groups or missing expenses.',
+                        title: Text('settings_ext.dialog_reset_cache_title'.tr()),
+                        content: Text(
+                          'settings_ext.dialog_reset_cache_body'.tr(),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(ctx).pop(false),
-                            child: const Text('Cancel'),
+                            child: Text('common.cancel'.tr()),
                           ),
                           FilledButton(
                             style: FilledButton.styleFrom(
@@ -779,7 +779,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                               foregroundColor: Colors.black,
                             ),
                             onPressed: () => Navigator.of(ctx).pop(true),
-                            child: const Text('Reset & Sync'),
+                            child: Text('settings_ext.dialog_reset_sync'.tr()),
                           ),
                         ],
                       ),
@@ -797,7 +797,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       ref.invalidate(recentExpensesProvider);
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Cache reset and synced from cloud')),
+                          SnackBar(content: Text('settings_ext.cache_reset_success'.tr())),
                         );
                       }
                     } catch (e) {
@@ -808,12 +808,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.person_remove_outlined, color: Colors.redAccent),
-                  title: const Text(
-                    'Delete Account',
-                    style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
+                  title: Text(
+                    'settings_ext.delete_account'.tr(),
+                    style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.w600),
                   ),
                   subtitle: Text(
-                    '30-day cooling-off period. Log back in within 30 days to restore.',
+                    'settings_ext.delete_account_subtitle'.tr(),
                     style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                   ),
                   onTap: _showDeleteAccountDialog,
@@ -821,9 +821,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 const Divider(height: 1, indent: 16, endIndent: 16),
                 ListTile(
                   leading: const Icon(Icons.logout, color: Colors.redAccent),
-                  title: const Text(
-                    'Sign out',
-                    style: TextStyle(
+                  title: Text(
+                    'settings.sign_out'.tr(),
+                    style: const TextStyle(
                       color: Colors.redAccent,
                       fontWeight: FontWeight.w600,
                     ),
@@ -869,7 +869,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         const SizedBox(height: 24),
 
                         // ── About / Version ────────────────────────────────
-                        _SectionHeader(label: 'About'),
+                        _SectionHeader(label: 'settings.about'.tr()),
                         const SizedBox(height: 8),
                         GlassCard(
                           padding: EdgeInsets.zero,
@@ -903,7 +903,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                   ],
                                 ),
                                 subtitle: Text(
-                                  _appVersion.isEmpty ? 'Loading…' : 'Version $_appVersion',
+                                  _appVersion.isEmpty ? 'common.loading'.tr() : '${'settings_ext.version_prefix'.tr()} $_appVersion',
                                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                                 ),
                               ),
@@ -916,8 +916,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                     : const Icon(Icons.system_update_alt_rounded, color: _teal),
                                 title: Text(
                                   _updateResult != null && _updateResult!.hasUpdate
-                                      ? 'Update Available'
-                                      : 'Check for Updates',
+                                      ? 'settings_ext.update_available'.tr()
+                                      : 'settings_ext.check_updates'.tr(),
                                   style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
                                 ),
                                 subtitle: Text(
@@ -947,7 +947,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                       child: FilledButton.icon(
                                         onPressed: () => _launchUpdateUrl(),
                                         icon: const Icon(Icons.open_in_new, size: 16),
-                                        label: const Text('Update Now', style: TextStyle(fontWeight: FontWeight.w700)),
+                                        label: Text('settings_ext.update_now'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
                                         style: FilledButton.styleFrom(
                                           backgroundColor: _teal,
                                           foregroundColor: Colors.black,
@@ -966,7 +966,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           const SizedBox(height: 24),
 
                           // ── Developer ───────────────────────────────────
-                          _SectionHeader(label: 'Developer'),
+                          _SectionHeader(label: 'settings_ext.developer'.tr()),
                           const SizedBox(height: 8),
                           GlassCard(
                             padding: EdgeInsets.zero,
@@ -1204,7 +1204,7 @@ class _ProfileSection extends StatelessWidget {
                     GestureDetector(
                       onTap: avatarUploading ? null : onPickAvatar,
                       child: Text(
-                        avatarUploading ? 'Uploading…' : 'Change photo',
+                        avatarUploading ? 'settings_ext.uploading_photo'.tr() : 'settings_ext.change_photo'.tr(),
                         style: TextStyle(
                           fontSize: 11,
                           color: avatarUploading
@@ -1221,7 +1221,7 @@ class _ProfileSection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Display Name',
+            'settings_ext.display_name'.tr(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1232,14 +1232,14 @@ class _ProfileSection extends StatelessWidget {
           TextField(
             controller: nameCtrl,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              hintText: 'Your name',
-              prefixIcon: Icon(Icons.person_outline),
+            decoration: InputDecoration(
+              hintText: 'settings_ext.name_hint'.tr(),
+              prefixIcon: const Icon(Icons.person_outline),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Nickname (optional)',
+            'settings_ext.nickname_optional'.tr(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1251,9 +1251,9 @@ class _ProfileSection extends StatelessWidget {
             controller: nicknameCtrl,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => onSave(),
-            decoration: const InputDecoration(
-              hintText: 'yourhandle (no @)',
-              prefixIcon: Icon(Icons.alternate_email),
+            decoration: InputDecoration(
+              hintText: 'settings_ext.nickname_hint'.tr(),
+              prefixIcon: const Icon(Icons.alternate_email),
             ),
           ),
           if (error != null) ...[
@@ -1265,11 +1265,11 @@ class _ProfileSection extends StatelessWidget {
           ],
           if (saved) ...[
             const SizedBox(height: 8),
-            const Row(
+            Row(
               children: [
-                Icon(Icons.check_circle_outline, color: _teal, size: 14),
-                SizedBox(width: 6),
-                Text('Saved', style: TextStyle(color: _teal, fontSize: 12)),
+                const Icon(Icons.check_circle_outline, color: _teal, size: 14),
+                const SizedBox(width: 6),
+                Text('settings_ext.saved'.tr(), style: const TextStyle(color: _teal, fontSize: 12)),
               ],
             ),
           ],
@@ -1289,9 +1289,9 @@ class _ProfileSection extends StatelessWidget {
                         color: Colors.black,
                       ),
                     )
-                  : const Text(
-                      'Save Profile',
-                      style: TextStyle(
+                  : Text(
+                      'settings_ext.save_profile'.tr(),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),
@@ -1435,7 +1435,7 @@ class _ThemeSection extends ConsumerWidget {
         children: [
           _ThemeTile(
             icon: Icons.dark_mode_outlined,
-            label: 'Dark',
+            label: 'settings_ext.theme_dark'.tr(),
             active: themeMode == ThemeMode.dark,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
@@ -1444,7 +1444,7 @@ class _ThemeSection extends ConsumerWidget {
           ),
           _ThemeTile(
             icon: Icons.light_mode_outlined,
-            label: 'Light',
+            label: 'settings_ext.theme_light'.tr(),
             active: themeMode == ThemeMode.light,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
@@ -1453,7 +1453,7 @@ class _ThemeSection extends ConsumerWidget {
           ),
           _ThemeTile(
             icon: Icons.brightness_auto_outlined,
-            label: 'System default',
+            label: 'settings_ext.theme_system'.tr(),
             active: themeMode == ThemeMode.system,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);
@@ -1523,6 +1523,102 @@ class _SectionHeader extends StatelessWidget {
           color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Nav row: icon + label + subtitle + chevron
+// ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// Language row — inline selector that updates locale instantly
+// ---------------------------------------------------------------------------
+class _LanguageRow extends StatelessWidget {
+  static const _langs = [
+    (code: 'en', label: 'English'),
+    (code: 'ru', label: 'Русский'),
+    (code: 'ka', label: 'ქართული'),
+    (code: 'de', label: 'Deutsch'),
+    (code: 'es', label: 'Español'),
+    (code: 'fr', label: 'Français'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final current = context.locale.languageCode;
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: _teal.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.language_outlined, color: _teal, size: 18),
+      ),
+      title: Text('settings.language'.tr(),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+      subtitle: Text(
+        _langs.firstWhere((l) => l.code == current,
+            orElse: () => _langs.first).label,
+        style: TextStyle(
+            fontSize: 11,
+            color: Theme.of(context).colorScheme.onSurfaceVariant),
+      ),
+      trailing: Icon(Icons.chevron_right,
+          size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+      onTap: () => _showPicker(context, current),
+    );
+  }
+
+  void _showPicker(BuildContext context, String current) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                  color: Theme.of(ctx).colorScheme.outlineVariant,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text('settings.language'.tr(),
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              ..._langs.map((l) => ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                title: Text(l.label,
+                    style: TextStyle(
+                      fontWeight: l.code == current
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    )),
+                trailing: l.code == current
+                    ? const Icon(Icons.check_rounded, color: _teal, size: 20)
+                    : null,
+                onTap: () {
+                  ctx.setLocale(Locale(l.code));
+                  Navigator.of(ctx).pop();
+                },
+              )),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 }

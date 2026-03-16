@@ -1,4 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +46,45 @@ class AdaptiveShell extends ConsumerStatefulWidget {
 class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   int _selectedIndex = 0;
 
+  static const _langs = [
+    (code: 'en', label: 'English'),
+    (code: 'ru', label: 'Русский'),
+    (code: 'ka', label: 'ქართული'),
+    (code: 'de', label: 'Deutsch'),
+    (code: 'es', label: 'Español'),
+    (code: 'fr', label: 'Français'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLangPrompt());
+  }
+
+  Future<void> _checkLangPrompt() async {
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('lang_prompt_shown') == true) return;
+    await prefs.setBool('lang_prompt_shown', true);
+    if (!mounted) return;
+    final langCode = context.locale.languageCode;
+    final langLabel = _langs
+        .firstWhere((l) => l.code == langCode, orElse: () => _langs.first)
+        .label;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _LangPromptSheet(
+        langLabel: langLabel,
+        langs: _langs,
+        currentCode: langCode,
+      ),
+    );
+  }
+
   @override
   void didUpdateWidget(AdaptiveShell oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -51,10 +92,11 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   }
 
   int _indexForPath(String path) {
-    if (path.startsWith('/wallet'))   return 1;
-    if (path.startsWith('/groups'))   return 2;
-    if (path.startsWith('/activity')) return 3;
-    if (path.startsWith('/settings')) return 4;
+    if (path.startsWith('/wallet'))    return 1;
+    if (path.startsWith('/groups'))    return 2;
+    if (path.startsWith('/analytics')) return 3;
+    if (path.startsWith('/activity'))  return 4;
+    if (path.startsWith('/settings'))  return 5;
     return 0;
   }
 
@@ -73,9 +115,12 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
         context.go(AppRouter.groups);
       case 3:
         setState(() => _selectedIndex = 3);
-        context.go(AppRouter.activity);
+        context.go(AppRouter.analytics);
       case 4:
         setState(() => _selectedIndex = 4);
+        context.go(AppRouter.activity);
+      case 5:
+        setState(() => _selectedIndex = 5);
         context.go(AppRouter.settings);
     }
   }
@@ -155,10 +200,11 @@ class _PremiumSidebar extends StatelessWidget {
   final void Function(int) onTap;
 
   static const _navItems = [
-    (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'Dashboard', index: 0),
-    (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'Wallet',    index: 1),
-    (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'Groups',    index: 2),
-    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'Activity',  index: 3),
+    (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'nav.dashboard', index: 0),
+    (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'nav.wallet',    index: 1),
+    (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'nav.groups',    index: 2),
+    (icon: Icons.bar_chart_outlined,               selectedIcon: Icons.bar_chart,               label: 'nav.analytics', index: 3),
+    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'nav.activity',  index: 4),
   ];
 
   @override
@@ -186,6 +232,7 @@ class _PremiumSidebar extends StatelessWidget {
                     'assets/icon_no_back.svg',
                     width: 32,
                     height: 32,
+                    fit: BoxFit.contain,
                   ),
                   const SizedBox(width: 12),
                   const Flexible(
@@ -225,9 +272,9 @@ class _PremiumSidebar extends StatelessWidget {
           _SidebarNavItem(
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
-            label: 'Settings',
-            isSelected: selectedIndex == 4,
-            onTap: () => onTap(4),
+            label: 'nav.settings',
+            isSelected: selectedIndex == 5,
+            onTap: () => onTap(5),
             unselectedColor: unselectedFg,
           ),
 
@@ -303,7 +350,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  widget.label,
+                  widget.label.tr(),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -352,31 +399,36 @@ class _MobileLayout extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
       labelType: NavigationRailLabelType.all,
-      destinations: const [
+      destinations: [
         NavigationRailDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: Text('Dashboard'),
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: Text('nav.dashboard'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.account_balance_wallet_outlined),
-          selectedIcon: Icon(Icons.account_balance_wallet),
-          label: Text('Wallet'),
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: const Icon(Icons.account_balance_wallet),
+          label: Text('nav.wallet'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.group_outlined),
-          selectedIcon: Icon(Icons.group),
-          label: Text('Groups'),
+          icon: const Icon(Icons.group_outlined),
+          selectedIcon: const Icon(Icons.group),
+          label: Text('nav.groups'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.history),
-          selectedIcon: Icon(Icons.history),
-          label: Text('Activity'),
+          icon: const Icon(Icons.bar_chart_outlined),
+          selectedIcon: const Icon(Icons.bar_chart),
+          label: Text('nav.analytics'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: Text('Settings'),
+          icon: const Icon(Icons.history),
+          selectedIcon: const Icon(Icons.history),
+          label: Text('nav.activity'.tr()),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text('nav.settings'.tr()),
         ),
       ],
     );
@@ -386,34 +438,180 @@ class _MobileLayout extends StatelessWidget {
     return NavigationBar(
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
-      destinations: const [
+      destinations: [
         NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: 'nav.dashboard'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.account_balance_wallet_outlined),
-          selectedIcon: Icon(Icons.account_balance_wallet),
-          label: 'Wallet',
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: const Icon(Icons.account_balance_wallet),
+          label: 'nav.wallet'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.group_outlined),
-          selectedIcon: Icon(Icons.group),
-          label: 'Groups',
+          icon: const Icon(Icons.group_outlined),
+          selectedIcon: const Icon(Icons.group),
+          label: 'nav.groups'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.history),
-          selectedIcon: Icon(Icons.history),
-          label: 'Activity',
+          icon: const Icon(Icons.bar_chart_outlined),
+          selectedIcon: const Icon(Icons.bar_chart),
+          label: 'nav.analytics'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: 'Settings',
+          icon: const Icon(Icons.history),
+          selectedIcon: const Icon(Icons.history),
+          label: 'nav.activity'.tr(),
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: 'nav.settings'.tr(),
         ),
       ],
     );
   }
 }
 
+// ---------------------------------------------------------------------------
+// First-launch language confirmation sheet
+// ---------------------------------------------------------------------------
+class _LangPromptSheet extends StatelessWidget {
+  const _LangPromptSheet({
+    required this.langLabel,
+    required this.langs,
+    required this.currentCode,
+  });
+
+  final String langLabel;
+  final List<({String code, String label})> langs;
+  final String currentCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Icon(Icons.language_outlined, color: _kTeal, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              'lang_prompt.title'.tr(),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'lang_prompt.body'.tr(namedArgs: {'language': langLabel}),
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kTeal,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'lang_prompt.keep'.tr(namedArgs: {'language': langLabel}),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showLangPicker(context);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kTeal,
+                  side: const BorderSide(color: _kTeal),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'lang_prompt.change'.tr(),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLangPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'settings.language'.tr(),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            ...langs.map((l) => ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              title: Text(l.label,
+                  style: TextStyle(
+                    fontWeight: l.code == currentCode
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  )),
+              trailing: l.code == currentCode
+                  ? const Icon(Icons.check_rounded, color: _kTeal, size: 20)
+                  : null,
+              onTap: () {
+                ctx.setLocale(Locale(l.code));
+                Navigator.of(ctx).pop();
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}

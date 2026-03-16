@@ -76,7 +76,9 @@ class LocalDatabase {
   ///   • splits.entry_amount_owed – per-person amount in the expense's entry
   ///     currency (e.g. GEL), stored alongside universal_usd_owed so the
   ///     breakdown display never needs a lossy USD back-conversion.
-  static const int _version = 24;
+  /// Schema v25 adds:
+  ///   • groups.default_currency – ISO 4217 code for the group's settlement currency
+  static const int _version = 25;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -405,6 +407,9 @@ class LocalDatabase {
     if (oldVersion < 24) {
       await _addColumnIfNotExists(db, 'splits', 'entry_amount_owed', 'TEXT');
     }
+    if (oldVersion < 25) {
+      await _addColumnIfNotExists(db, 'groups', 'default_currency', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -433,9 +438,10 @@ class LocalDatabase {
         type        TEXT NOT NULL DEFAULT 'normal',
         is_deleted  INTEGER NOT NULL DEFAULT 0, -- Schema v13
         deleted_at  TEXT,                       -- Schema v13
-        icon_name   TEXT,           -- Schema v23
-        color_value INTEGER,        -- Schema v23
-        avatar_url  TEXT,           -- Schema v23
+        icon_name        TEXT,    -- Schema v23
+        color_value      INTEGER, -- Schema v23
+        avatar_url       TEXT,    -- Schema v23
+        default_currency TEXT,    -- Schema v25
         created_at  TEXT,
         updated_at  TEXT,
         synced_at   INTEGER

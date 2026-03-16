@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -49,9 +50,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Overview',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.3),
+        title: Text(
+          'dashboard.title'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20, letterSpacing: -0.3),
         ),
         backgroundColor: theme.colorScheme.surface,
         foregroundColor: theme.colorScheme.onSurface,
@@ -60,7 +61,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         automaticallyImplyLeading: false,
         actions: [
           AppTopButton(
-            tooltip: 'Add friend',
+            tooltip: 'common.add_friend'.tr(),
             icon: Icons.person_add_outlined,
             onPressed: () {
               HapticUtils.lightTap();
@@ -95,7 +96,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
             // ── Section header ───────────────────────────────────────────────
             Text(
-              'YOUR FINANCES',
+              'dashboard.your_finances'.tr().toUpperCase(),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.2,
@@ -107,8 +108,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             // ── WIDGET 2: Wallet Preview ────────────────────────────────────
             _NavCard(
               icon: Icons.account_balance_wallet_outlined,
-              title: 'Personal Wallet',
-              subtitle: 'Cash position',
+              title: 'dashboard.personal_wallet'.tr(),
+              subtitle: 'dashboard.cash_position'.tr(),
               accentColor: _purple,
               accentDim: _purpleDim,
               valueAsync: walletAsync,
@@ -120,8 +121,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             // ── WIDGET 3: Groups Preview ─────────────────────────────────────
             _NavCard(
               icon: Icons.group_outlined,
-              title: 'Shared Expenses',
-              subtitle: 'Net group position',
+              title: 'dashboard.shared_expenses'.tr(),
+              subtitle: 'dashboard.net_group_position'.tr(),
               accentColor: _teal,
               accentDim: _tealDim,
               valueAsync: masterAsync.whenData((m) {
@@ -166,7 +167,7 @@ class _MasterNetWorthHero extends StatelessWidget {
 
     final isDark    = theme.brightness == Brightness.dark;
     final scaffold   = theme.scaffoldBackgroundColor;
-    final isDesktop  = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+    final isDesktop  = !isDark && (scaffold.r * 255.0).round() < 215 && (scaffold.g * 255.0).round() < 225 && (scaffold.b * 255.0).round() < 235;
     final gradStart  = isDark    ? theme.colorScheme.surfaceContainerHigh
                      : isDesktop ? const Color(0xFFFFFFFF)  // white — matches GlassCard
                      :             const Color(0xFFF8FAFC); // Slate-50 (mobile)
@@ -203,7 +204,7 @@ class _MasterNetWorthHero extends StatelessWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              'Net Worth',
+              'dashboard.net_worth_label'.tr(),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w600,
@@ -229,7 +230,7 @@ class _MasterNetWorthHero extends StatelessWidget {
             ),
           const SizedBox(height: 4),
           Text(
-            isPos ? 'You are in the green' : 'You are in the red',
+            isPos ? 'dashboard.in_the_green'.tr() : 'dashboard.in_the_red'.tr(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
               fontSize: 11,
@@ -239,14 +240,14 @@ class _MasterNetWorthHero extends StatelessWidget {
           if (!_loading && !_error && master != null) ...[
             Row(children: [
               Expanded(child: _StatPill(
-                label: 'Wallet cash',
+                label: 'dashboard.wallet_cash_label'.tr(),
                 value: '${master!.currency} ${master!.walletCash.toStringAsFixed(2)}',
                 color: _purple,
                 bgColor: _purpleDim,
               )),
               const SizedBox(width: 8),
               Expanded(child: _StatPill(
-                label: 'Shared balance',
+                label: 'dashboard.shared_balance'.tr(),
                 value: '${master!.sharedNet >= Decimal.zero ? '+' : ''}${master!.currency} ${master!.sharedNet.toStringAsFixed(2)}',
                 color: _teal,
                 bgColor: _tealDim,
@@ -357,7 +358,7 @@ class _NavCard extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       groupCount != null
-                          ? '$subtitle · $groupCount group${groupCount == 1 ? '' : 's'}'
+                          ? '$subtitle · ${groupCount == 1 ? 'dashboard.group_count_one'.tr(namedArgs: {'count': '1'}) : 'dashboard.group_count_other'.tr(namedArgs: {'count': groupCount.toString()})}'
                           : subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant, fontSize: 11),

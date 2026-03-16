@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:ui' as ui;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -44,29 +45,32 @@ void main() async {
   }
 
   ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Material(
-      child: Container(
-        color: const Color(0xFF0F0F12),
-        padding: const EdgeInsets.all(24),
-        child: SafeArea(
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Something went wrong',
-                  style: TextStyle(
-                    color: Colors.red.shade300,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
+    return Directionality(
+      textDirection: ui.TextDirection.ltr,
+      child: Material(
+        child: Container(
+          color: const Color(0xFF0F0F12),
+          padding: const EdgeInsets.all(24),
+          child: SafeArea(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Something went wrong',
+                    style: TextStyle(
+                      color: Colors.red.shade300,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  details.toString(),
-                  style: const TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  Text(
+                    details.toString(),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -83,14 +87,22 @@ void main() async {
     return true;
   };
 
+  await EasyLocalization.ensureInitialized();
+
   runApp(
-    Directionality(
-      textDirection: TextDirection.ltr,
-      child: Material(
-        color: const Color(0xFF0F0F12),
-        child: const ProviderScope(
-          child: _AppLoader(),
-        ),
+    EasyLocalization(
+      supportedLocales: const [
+        Locale('en'),
+        Locale('ru'),
+        Locale('ka'),
+        Locale('de'),
+        Locale('es'),
+        Locale('fr'),
+      ],
+      path: 'assets/translations',
+      fallbackLocale: const Locale('en'),
+      child: const ProviderScope(
+        child: _AppLoader(),
       ),
     ),
   );
@@ -228,20 +240,23 @@ class _AppLoaderState extends State<_AppLoader> {
   @override
   Widget build(BuildContext context) {
     if (_error != null) {
-      return Material(
-        child: Container(
-          color: const Color(0xFF0F0F12),
-          padding: const EdgeInsets.all(24),
-          alignment: Alignment.center,
-          child: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('Setup failed', style: TextStyle(color: Colors.red.shade300, fontSize: 18)),
-                  const SizedBox(height: 12),
-                  Text(_error!, style: const TextStyle(color: Colors.white70, fontSize: 12), softWrap: true),
-                ],
+      return Directionality(
+        textDirection: ui.TextDirection.ltr,
+        child: Material(
+          child: Container(
+            color: const Color(0xFF0F0F12),
+            padding: const EdgeInsets.all(24),
+            alignment: Alignment.center,
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('Setup failed', style: TextStyle(color: Colors.red.shade300, fontSize: 18)),
+                    const SizedBox(height: 12),
+                    Text(_error!, style: const TextStyle(color: Colors.white70, fontSize: 12), softWrap: true),
+                  ],
+                ),
               ),
             ),
           ),
@@ -249,17 +264,20 @@ class _AppLoaderState extends State<_AppLoader> {
       );
     }
     if (!_ready) {
-      return Material(
-        child: Container(
-          color: const Color(0xFF0F0F12),
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: Colors.white54),
-              const SizedBox(height: 16),
-              Text('Loading…', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 16)),
-            ],
+      return Directionality(
+        textDirection: ui.TextDirection.ltr,
+        child: Material(
+          child: Container(
+            color: const Color(0xFF0F0F12),
+            alignment: Alignment.center,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const CircularProgressIndicator(color: Colors.white54),
+                const SizedBox(height: 16),
+                Text('Loading…', style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 16)),
+              ],
+            ),
           ),
         ),
       );

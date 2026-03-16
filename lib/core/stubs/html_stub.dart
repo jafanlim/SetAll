@@ -4,13 +4,13 @@
 class AnchorElement {
   AnchorElement({String? href});
   // ignore: unused_element
-  final _StyleStub style = _StyleStub();
+  final StyleStub style = StyleStub();
   void setAttribute(String name, String value) {}
   void click() {}
   void remove() {}
 }
 
-class _StyleStub {
+class StyleStub {
   String display = '';
 }
 

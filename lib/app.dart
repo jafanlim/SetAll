@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -211,6 +212,9 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
       theme: isDesktop ? SetAllTheme.desktopLight : SetAllTheme.light,
       darkTheme: isDesktop ? SetAllTheme.desktopDark : SetAllTheme.dark,
       themeMode: themeMode,
+      locale: context.locale,
+      localizationsDelegates: context.localizationDelegates,
+      supportedLocales: context.supportedLocales,
       routerConfig: AppRouter.create(),
       builder: (context, child) {
         // On desktop, pass the actual window size as the design size so every

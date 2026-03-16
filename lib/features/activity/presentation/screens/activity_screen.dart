@@ -1,8 +1,10 @@
 import 'dart:ui';
 
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -99,14 +101,18 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete ${_selected.length} item${_selected.length == 1 ? '' : 's'}?'),
-        content: const Text('This cannot be undone.'),
+        title: Text(
+          _selected.length == 1
+              ? 'activity_screen.delete_items_one'.tr()
+              : 'activity_screen.delete_items_other'.tr(namedArgs: {'count': _selected.length.toString()}),
+        ),
+        content: Text('common.cannot_be_undone'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -191,31 +197,31 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   // ── Section label helpers ────────────────────────────────────────────────
   String _dateSectionLabel(String? iso) {
-    if (iso == null || iso.isEmpty) return 'Earlier';
+    if (iso == null || iso.isEmpty) return 'activity_screen.section_earlier'.tr();
     try {
       final d   = DateTime.parse(iso).toLocal();
       final now = DateTime.now();
-      if (d.year == now.year && d.month == now.month && d.day == now.day) return 'Today';
+      if (d.year == now.year && d.month == now.month && d.day == now.day) return 'activity_screen.section_today'.tr();
       final yesterday = now.subtract(const Duration(days: 1));
-      if (d.year == yesterday.year && d.month == yesterday.month && d.day == yesterday.day) return 'Yesterday';
-      if (now.difference(d).inDays < 7) return 'This Week';
+      if (d.year == yesterday.year && d.month == yesterday.month && d.day == yesterday.day) return 'activity_screen.section_yesterday'.tr();
+      if (now.difference(d).inDays < 7) return 'activity_screen.section_this_week'.tr();
       return '${d.day}/${d.month}/${d.year}';
     } catch (_) {
-      return 'Earlier';
+      return 'activity_screen.section_earlier'.tr();
     }
   }
 
   String _typeSectionLabel(ActivityEvent ev) {
     if (ev is ExpenseEvent) {
-      if (ev.expense.isIncome) return 'Income';
-      if (ev.expense.groupId == null) return 'Wallet';
-      if (ev.expense.category == 'Settlement') return 'Settlements';
-      return 'Group Expenses';
+      if (ev.expense.isIncome) return 'activity_screen.type_income'.tr();
+      if (ev.expense.groupId == null) return 'activity_screen.type_wallet'.tr();
+      if (ev.expense.category == 'Settlement') return 'activity_screen.type_settlements'.tr();
+      return 'activity_screen.type_group_expenses'.tr();
     }
-    if (ev is SettlementEvent)    return 'Settlements';
-    if (ev is GroupCreatedEvent || ev is GroupDeletedEvent || ev is MemberAddedEvent) return 'Group Events';
-    if (ev is ExpenseDeletedEvent || ev is ExpenseEditedEvent) return 'Edits & Deletes';
-    return 'Other';
+    if (ev is SettlementEvent)    return 'activity_screen.type_settlements'.tr();
+    if (ev is GroupCreatedEvent || ev is GroupDeletedEvent || ev is MemberAddedEvent) return 'activity_screen.type_group_events'.tr();
+    if (ev is ExpenseDeletedEvent || ev is ExpenseEditedEvent) return 'activity_screen.type_edits_deletes'.tr();
+    return 'activity_screen.type_other'.tr();
   }
 
   // ── Build grouped feed items ─────────────────────────────────────────────
@@ -260,10 +266,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   // ── Sort label ─────────────────────────────────────────────────────────
   String get _sortLabel => switch (_sort) {
-    _ActivitySort.newest   => 'Newest',
-    _ActivitySort.oldest   => 'Oldest',
-    _ActivitySort.largest  => 'Largest',
-    _ActivitySort.smallest => 'Smallest',
+    _ActivitySort.newest   => 'common.sort_newest'.tr(),
+    _ActivitySort.oldest   => 'common.sort_oldest'.tr(),
+    _ActivitySort.largest  => 'common.sort_largest'.tr(),
+    _ActivitySort.smallest => 'common.sort_smallest'.tr(),
   };
 
   @override
@@ -368,7 +374,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(24),
                       child: Text(
-                        'Could not load activity',
+                        'activity_screen.could_not_load'.tr(),
                         style: TextStyle(color: theme.colorScheme.error),
                       ),
                     ),
@@ -451,9 +457,9 @@ class _ControlHeader extends StatelessWidget {
                     if (editMode) ...[  
                       GestureDetector(
                         onTap: onSelectAll,
-                        child: const Text(
-                          'Select All',
-                          style: TextStyle(
+                        child: Text(
+                          'common.select_all'.tr(),
+                          style: const TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 14,
                             color: _teal,
@@ -461,9 +467,9 @@ class _ControlHeader extends StatelessWidget {
                         ),
                       ),
                     ] else
-                      const Text(
-                        'Activity',
-                        style: TextStyle(
+                      Text(
+                        'activity.title'.tr(),
+                        style: const TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 22,
                           letterSpacing: -0.4,
@@ -481,25 +487,25 @@ class _ControlHeader extends StatelessWidget {
                                 onPressed: onDeleteSelected,
                                 icon: const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
                                 label: Text(
-                                  'Delete ($selectedCount)',
+                                  'common.delete_count'.tr(namedArgs: {'count': selectedCount.toString()}),
                                   style: const TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.w700),
                                 ),
                                 style: TextButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 8)),
                               ),
                       TextButton(
                         onPressed: onExitEdit,
-                        child: const Text('Done', style: TextStyle(color: _teal, fontWeight: FontWeight.w700, fontSize: 14)),
+                        child: Text('common.done'.tr(), style: const TextStyle(color: _teal, fontWeight: FontWeight.w700, fontSize: 14)),
                       ),
                     ] else ...[  
                       AppTopButton(
                         icon: Icons.checklist_rounded,
-                        tooltip: 'Select',
+                        tooltip: 'common.select'.tr(),
                         onPressed: onEnterEdit,
                       ),
                       const SizedBox(width: 4),
                       AppTopButton(
                         icon: Icons.refresh_rounded,
-                        tooltip: 'Refresh',
+                        tooltip: 'common.refresh'.tr(),
                         onPressed: onRefresh,
                       ),
                       const SizedBox(width: 4),
@@ -529,7 +535,7 @@ class _ControlHeader extends StatelessWidget {
                     controller: searchCtrl,
                     style: const TextStyle(fontSize: 13),
                     decoration: InputDecoration(
-                      hintText: 'Search expenses, groups, people…',
+                      hintText: 'activity_screen.search_hint'.tr(),
                       hintStyle: const TextStyle(fontSize: 13, color: _slate),
                       prefixIcon: const Icon(Icons.search_rounded, size: 18, color: _slate),
                       suffixIcon: searchCtrl.text.isNotEmpty
@@ -560,10 +566,10 @@ class _ControlHeader extends StatelessWidget {
                             for (final f in _ActivityFilter.values) ...[
                               _FilterChip(
                                 label: switch (f) {
-                                  _ActivityFilter.all    => 'All',
-                                  _ActivityFilter.wallet => 'Wallet',
-                                  _ActivityFilter.groups => 'Groups',
-                                  _ActivityFilter.income => 'Income',
+                                  _ActivityFilter.all    => 'wallet_screen.filter_all'.tr(),
+                                  _ActivityFilter.wallet => 'activity_screen.filter_wallet'.tr(),
+                                  _ActivityFilter.groups => 'activity_screen.filter_groups'.tr(),
+                                  _ActivityFilter.income => 'wallet_screen.filter_income'.tr(),
                                 },
                                 selected: filter == f,
                                 onTap: () => onFilterChanged(f),
@@ -586,7 +592,7 @@ class _ControlHeader extends StatelessWidget {
                     // Group-by pill
                     _PillButton(
                       icon: Icons.layers_outlined,
-                      label: groupBy == _GroupBy.date ? 'Date' : 'Type',
+                      label: groupBy == _GroupBy.date ? 'activity.group_by_date'.tr() : 'activity.group_by_type'.tr(),
                       active: groupBy != _GroupBy.date,
                       onTap: onToggleGroupBy,
                     ),
@@ -743,32 +749,74 @@ class _EmptyActivityState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      children: [
-        SizedBox(height: MediaQuery.of(context).size.height * 0.25),
-        Icon(
-          hasSearch ? Icons.search_off_rounded : Icons.history_rounded,
-          size: 52,
-          color: theme.colorScheme.onSurfaceVariant,
-        ),
-        const SizedBox(height: 16),
-        Text(
-          hasSearch ? 'No results' : 'No activity yet',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 8),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 40),
-          child: Text(
-            hasSearch
-                ? 'Try a different search term or filter.'
-                : 'Your complete financial history — group expenses, wallet entries, and settlements — will appear here.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
+    if (hasSearch) {
+      return ListView(
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.28),
+          Icon(Icons.search_off_rounded, size: 52,
+              color: theme.colorScheme.onSurfaceVariant),
+          const SizedBox(height: 16),
+          Text('No results', textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text('Try a different search term or filter.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ),
+        ],
+      );
+    }
+
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        Opacity(
+          opacity: 0.05,
+          child: SvgPicture.asset(
+            'assets/icon_no_back.svg',
+            width: 280,
+          ),
+        ),
+        Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.history_rounded, size: 52, color: _teal),
+            const SizedBox(height: 16),
+            Text(
+              'activity.no_activity'.tr(),
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleLarge
+                  ?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 48),
+              child: Text(
+                'Your complete financial history will appear here.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            const SizedBox(height: 28),
+            FilledButton.icon(
+              onPressed: () => context.push(AppRouter.addExpense),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text('activity.start_tracking'.tr()),
+              style: FilledButton.styleFrom(
+                backgroundColor: _teal,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 28, vertical: 14),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -786,7 +834,7 @@ Widget _lookbookCard({
   final theme    = Theme.of(context);
   final isDark    = theme.brightness == Brightness.dark;
   final scaffold  = theme.scaffoldBackgroundColor;
-  final isDesktop = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+  final isDesktop = !isDark && (scaffold.r * 255.0).round() < 215 && (scaffold.g * 255.0).round() < 225 && (scaffold.b * 255.0).round() < 235;
 
   final Color cardBg;
   final Color border;
