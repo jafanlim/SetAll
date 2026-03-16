@@ -1326,6 +1326,7 @@ class _NetTrendChart extends StatelessWidget {
         : spanDays <= 180 ? 14.0
         : 30.0;
 
+    final todayLabel = 'analytics.today'.tr();
     return SizedBox(
       height: 180,
       child: LineChart(
@@ -1361,7 +1362,7 @@ class _NetTrendChart extends StatelessWidget {
                 getTitlesWidget: (v, _) {
                   final daysAgo = (spots.length - 1 - v.toInt());
                   if (daysAgo == 0) {
-                    return Text('common.today'.tr(),
+                    return Text(todayLabel,
                       style: const TextStyle(fontSize: 9, color: _kSubtitle));
                   }
                   return Text('${daysAgo}d',
@@ -1769,7 +1770,7 @@ class _DrillDownList extends StatelessWidget {
               Text(
                 drillCategory != null
                     ? drillCategory!
-                    : 'All Transactions',
+                    : 'analytics.all_transactions'.tr(),
                 style: const TextStyle(
                   fontSize: 13, fontWeight: FontWeight.w700,
                   color: _kLabel, letterSpacing: 0.3),

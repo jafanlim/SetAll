@@ -95,7 +95,9 @@
     "all": "ყველა",
     "income": "შემოსავალი",
     "expense": "ხარჯი",
-    "items": "{count} ჩანაწერი"
+    "items": "{count} ჩანაწერი",
+    "group_by_date": "თარიღი",
+    "group_by_type": "ტიპი"
   },
   "settings": {
     "title": "პარამეტრები",

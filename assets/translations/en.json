@@ -69,7 +69,9 @@
     "all": "All",
     "income": "Income",
     "expense": "Expense",
-    "items": "{count} items"
+    "items": "{count} items",
+    "group_by_date": "Date",
+    "group_by_type": "Type"
   },
   "settings": {
     "title": "Settings",

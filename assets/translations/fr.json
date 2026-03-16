@@ -95,7 +95,9 @@
     "all": "Tout",
     "income": "Revenu",
     "expense": "Dépense",
-    "items": "{count} entrées"
+    "items": "{count} entrées",
+    "group_by_date": "Date",
+    "group_by_type": "Type"
   },
   "settings": {
     "title": "Paramètres",

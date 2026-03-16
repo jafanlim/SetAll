@@ -95,7 +95,9 @@
     "all": "Todo",
     "income": "Ingreso",
     "expense": "Gasto",
-    "items": "{count} registros"
+    "items": "{count} registros",
+    "group_by_date": "Fecha",
+    "group_by_type": "Tipo"
   },
   "settings": {
     "title": "Ajustes",

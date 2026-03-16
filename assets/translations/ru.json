@@ -95,7 +95,9 @@
     "all": "Все",
     "income": "Доход",
     "expense": "Расход",
-    "items": "{count} записей"
+    "items": "{count} записей",
+    "group_by_date": "Дата",
+    "group_by_type": "Тип"
   },
   "settings": {
     "title": "Настройки",

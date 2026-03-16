@@ -592,7 +592,7 @@ class _ControlHeader extends StatelessWidget {
                     // Group-by pill
                     _PillButton(
                       icon: Icons.layers_outlined,
-                      label: groupBy == _GroupBy.date ? 'Date' : 'Type',
+                      label: groupBy == _GroupBy.date ? 'activity.group_by_date'.tr() : 'activity.group_by_type'.tr(),
                       active: groupBy != _GroupBy.date,
                       onTap: onToggleGroupBy,
                     ),

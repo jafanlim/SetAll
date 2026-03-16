@@ -95,7 +95,9 @@
     "all": "Alle",
     "income": "Einnahme",
     "expense": "Ausgabe",
-    "items": "{count} Einträge"
+    "items": "{count} Einträge",
+    "group_by_date": "Datum",
+    "group_by_type": "Typ"
   },
   "settings": {
     "title": "Einstellungen",
