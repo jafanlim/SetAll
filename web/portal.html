@@ -8,6 +8,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         tailwind.config = {
             theme: {
@@ -32,6 +33,9 @@
         .glass-nav  { background: rgba(2,6,23,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
         .glass-card { background: rgba(15,23,42,0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
         .glow-effect { position: absolute; width: 700px; height: 700px; background: radial-gradient(circle, rgba(20,184,166,0.10) 0%, rgba(2,6,23,0) 65%); top: -150px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+        .nav-link { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 12px; color: #94A3B8; font-size: 14px; font-weight: 500; transition: all 0.15s; text-decoration: none; }
+        .nav-link:hover { background: rgba(255,255,255,0.05); color: #E2E8F0; }
+        .nav-link.active { background: rgba(20,184,166,0.12); color: #14B8A6; font-weight: 600; }
     </style>
 </head>
 <body class="bg-brand-deep text-slate-300 font-sans antialiased min-h-screen flex flex-col relative selection:bg-brand-teal selection:text-brand-deep">
@@ -61,97 +65,187 @@
         </div>
     </div>
 
-    <main id="portal-view" class="hidden flex-grow pt-28 pb-16 px-6 relative z-10">
-        <div class="max-w-3xl mx-auto space-y-6">
+    <main id="portal-view" class="hidden flex-grow pt-20 relative z-10">
+        <div class="flex min-h-[calc(100vh-5rem)]">
 
-            <div class="glass-card rounded-3xl p-8 flex flex-col sm:flex-row items-center gap-6">
-                <div id="avatar-circle" class="w-20 h-20 rounded-full bg-brand-teal/20 border-2 border-brand-teal/40 flex items-center justify-center text-3xl font-bold text-brand-teal flex-shrink-0">?</div>
-                <div class="text-center sm:text-left">
-                    <h1 id="user-name" class="text-2xl font-extrabold text-white tracking-tight">Loading…</h1>
-                    <p id="user-email" class="text-slate-400 text-sm mt-1">—</p>
-                    <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/25 text-xs font-semibold text-brand-teal">
-                        <span class="w-1.5 h-1.5 rounded-full bg-brand-teal inline-block"></span>Active Account
+            <!-- Sidebar Navigation -->
+            <aside class="w-56 shrink-0 border-r border-brand-border bg-[#0A1120]/60 px-3 py-8 flex flex-col sticky top-20 self-start h-[calc(100vh-5rem)]">
+                <p class="text-xs font-bold text-slate-600 uppercase tracking-widest px-3 mb-3">Account</p>
+                <nav class="space-y-1">
+                    <a href="#" onclick="showSection('profile'); return false;" id="nav-profile" class="nav-link active">
+                        <i data-lucide="user" class="w-4 h-4 shrink-0"></i> Profile
+                    </a>
+                    <a href="#" onclick="showSection('analytics'); return false;" id="nav-analytics" class="nav-link">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 shrink-0"></i> Dashboard Stats
+                    </a>
+                    <a href="#" onclick="showSection('security'); return false;" id="nav-security" class="nav-link">
+                        <i data-lucide="key" class="w-4 h-4 shrink-0"></i> Security
+                    </a>
+                    <a href="#" onclick="showSection('danger'); return false;" id="nav-danger" class="nav-link">
+                        <i data-lucide="triangle-alert" class="w-4 h-4 shrink-0"></i> Danger Zone
+                    </a>
+                </nav>
+            </aside>
+
+            <!-- Main Content -->
+            <div class="flex-1 py-8 px-8 max-w-4xl">
+
+                <!-- Section: Profile -->
+                <section id="section-profile" class="space-y-6">
+                    <div class="glass-card rounded-3xl p-8 flex flex-col sm:flex-row items-center gap-6">
+                        <div id="avatar-circle" class="w-20 h-20 rounded-full bg-brand-teal/20 border-2 border-brand-teal/40 flex items-center justify-center text-3xl font-bold text-brand-teal flex-shrink-0">?</div>
+                        <div class="text-center sm:text-left">
+                            <h1 id="user-name" class="text-2xl font-extrabold text-white tracking-tight">Loading…</h1>
+                            <p id="user-email" class="text-slate-400 text-sm mt-1">—</p>
+                            <div class="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-teal/10 border border-brand-teal/25 text-xs font-semibold text-brand-teal">
+                                <span class="w-1.5 h-1.5 rounded-full bg-brand-teal inline-block"></span>Active Account
+                            </div>
+                        </div>
                     </div>
-                </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <a href="/app" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
+                            <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i data-lucide="layout-dashboard" class="w-5 h-5 text-brand-teal"></i>
+                            </div>
+                            <div>
+                                <p class="text-white font-bold text-sm">Open App</p>
+                                <p class="text-slate-500 text-xs mt-0.5">Launch the full SetAll experience</p>
+                            </div>
+                        </a>
+                        <a href="/download" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
+                            <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                <i data-lucide="monitor-down" class="w-5 h-5 text-brand-teal"></i>
+                            </div>
+                            <div>
+                                <p class="text-white font-bold text-sm">Download App</p>
+                                <p class="text-slate-500 text-xs mt-0.5">Get native apps for all platforms</p>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="glass-card rounded-3xl p-8">
+                        <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                            <i data-lucide="user" class="w-5 h-5 text-brand-teal"></i> Account Details
+                        </h2>
+                        <div class="space-y-0">
+                            <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                                <span class="text-slate-400 text-sm">Email</span>
+                                <span id="detail-email" class="text-white text-sm font-medium">—</span>
+                            </div>
+                            <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                                <span class="text-slate-400 text-sm">User ID</span>
+                                <span id="detail-uid" class="text-slate-500 text-xs font-mono truncate max-w-[200px]">—</span>
+                            </div>
+                            <div class="flex justify-between items-center py-3 border-b border-brand-border">
+                                <span class="text-slate-400 text-sm">Account Created</span>
+                                <span id="detail-created" class="text-white text-sm font-medium">—</span>
+                            </div>
+                            <div class="flex justify-between items-center py-3">
+                                <span class="text-slate-400 text-sm">Last Sign In</span>
+                                <span id="detail-lastsign" class="text-white text-sm font-medium">—</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Dashboard Stats -->
+                <section id="section-analytics" class="hidden space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-extrabold text-white tracking-tight">Financial Snapshot</h2>
+                        <span class="text-xs text-slate-500 font-medium">Personal · last 30 days</span>
+                    </div>
+                    <!-- Summary Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="glass-card rounded-2xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center">
+                                    <i data-lucide="wallet" class="w-4 h-4 text-brand-teal"></i>
+                                </div>
+                                <span class="text-slate-400 text-sm font-medium">Total Wallet Spending</span>
+                            </div>
+                            <p id="stat-wallet" class="text-3xl font-extrabold text-white tracking-tight">—</p>
+                            <p class="text-xs text-slate-500 mt-1">Personal expenses, no group</p>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
+                                    <i data-lucide="users" class="w-4 h-4 text-purple-400"></i>
+                                </div>
+                                <span class="text-slate-400 text-sm font-medium">Shared Group Position</span>
+                            </div>
+                            <p id="stat-group" class="text-3xl font-extrabold text-white tracking-tight">—</p>
+                            <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Net across all groups</p>
+                        </div>
+                    </div>
+                    <!-- Charts -->
+                    <div id="charts-wrapper" class="relative">
+                        <div id="charts-loading" class="absolute inset-0 flex items-center justify-center bg-[#020617]/80 backdrop-blur-sm rounded-2xl z-10 hidden">
+                            <div class="flex flex-col items-center gap-3">
+                                <div class="w-8 h-8 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin"></div>
+                                <p class="text-slate-400 text-sm">Fetching your data…</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="glass-card rounded-2xl p-6">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                    <i data-lucide="pie-chart" class="w-4 h-4 text-brand-teal"></i> Spending by Category
+                                </h3>
+                                <div class="relative h-56">
+                                    <canvas id="categoryChart"></canvas>
+                                    <p id="category-empty" class="hidden text-slate-500 text-sm text-center absolute inset-0 flex items-center justify-center">No personal expense data yet</p>
+                                </div>
+                            </div>
+                            <div class="glass-card rounded-2xl p-6">
+                                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-2">
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-brand-teal"></i> Spending Trend (30d)
+                                </h3>
+                                <div class="relative h-56">
+                                    <canvas id="trendChart"></canvas>
+                                    <p id="trend-empty" class="hidden text-slate-500 text-sm absolute inset-0 flex items-center justify-center">No trend data yet</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Section: Security -->
+                <section id="section-security" class="hidden space-y-6">
+                    <div class="glass-card rounded-3xl p-8">
+                        <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                            <i data-lucide="key" class="w-5 h-5 text-brand-teal"></i> Change Password
+                        </h2>
+                        <div id="pw-banner" class="hidden mb-4 p-3 rounded-xl text-sm font-medium text-center"></div>
+                        <form id="pw-form" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-400 mb-1.5">New Password</label>
+                                <input type="password" id="new-password" placeholder="••••••••" minlength="8" required
+                                    class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-400 mb-1.5">Confirm New Password</label>
+                                <input type="password" id="confirm-new-password" placeholder="••••••••" required
+                                    class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
+                            </div>
+                            <button type="submit" id="pw-submit" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep font-bold py-3 px-6 rounded-xl transition-all text-sm">
+                                Update Password
+                            </button>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- Section: Danger Zone -->
+                <section id="section-danger" class="hidden space-y-6">
+                    <div class="glass-card rounded-3xl p-8 border border-red-900/30">
+                        <h2 class="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
+                            <i data-lucide="triangle-alert" class="w-5 h-5"></i> Danger Zone
+                        </h2>
+                        <p class="text-slate-500 text-sm mb-5">Permanently delete your account and all associated data. This cannot be undone after the 30-day cooling-off period.</p>
+                        <button id="delete-btn" class="text-sm font-bold text-red-400 border border-red-900/50 hover:bg-red-900/20 px-5 py-2.5 rounded-xl transition-colors">
+                            Delete My Account
+                        </button>
+                    </div>
+                </section>
+
             </div>
-
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <a href="/app" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
-                    <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i data-lucide="layout-dashboard" class="w-5 h-5 text-brand-teal"></i>
-                    </div>
-                    <div>
-                        <p class="text-white font-bold text-sm">Open App</p>
-                        <p class="text-slate-500 text-xs mt-0.5">Launch the full SetAll experience</p>
-                    </div>
-                </a>
-                <a href="/download" class="glass-card rounded-2xl p-6 flex items-center gap-4 hover:border-brand-teal/40 transition-colors group">
-                    <div class="w-12 h-12 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <i data-lucide="monitor-down" class="w-5 h-5 text-brand-teal"></i>
-                    </div>
-                    <div>
-                        <p class="text-white font-bold text-sm">Download App</p>
-                        <p class="text-slate-500 text-xs mt-0.5">Get native apps for all platforms</p>
-                    </div>
-                </a>
-            </div>
-
-            <div class="glass-card rounded-3xl p-8">
-                <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                    <i data-lucide="user" class="w-5 h-5 text-brand-teal"></i> Account Details
-                </h2>
-                <div class="space-y-0">
-                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
-                        <span class="text-slate-400 text-sm">Email</span>
-                        <span id="detail-email" class="text-white text-sm font-medium">—</span>
-                    </div>
-                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
-                        <span class="text-slate-400 text-sm">User ID</span>
-                        <span id="detail-uid" class="text-slate-500 text-xs font-mono truncate max-w-[200px]">—</span>
-                    </div>
-                    <div class="flex justify-between items-center py-3 border-b border-brand-border">
-                        <span class="text-slate-400 text-sm">Account Created</span>
-                        <span id="detail-created" class="text-white text-sm font-medium">—</span>
-                    </div>
-                    <div class="flex justify-between items-center py-3">
-                        <span class="text-slate-400 text-sm">Last Sign In</span>
-                        <span id="detail-lastsign" class="text-white text-sm font-medium">—</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="glass-card rounded-3xl p-8">
-                <h2 class="text-lg font-bold text-white mb-6 flex items-center gap-2">
-                    <i data-lucide="key" class="w-5 h-5 text-brand-teal"></i> Change Password
-                </h2>
-                <div id="pw-banner" class="hidden mb-4 p-3 rounded-xl text-sm font-medium text-center"></div>
-                <form id="pw-form" class="space-y-4">
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1.5">New Password</label>
-                        <input type="password" id="new-password" placeholder="••••••••" minlength="8" required
-                            class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-slate-400 mb-1.5">Confirm New Password</label>
-                        <input type="password" id="confirm-new-password" placeholder="••••••••" required
-                            class="w-full bg-[#020617]/50 border border-brand-border rounded-xl px-4 py-3 text-white placeholder-slate-600 focus:outline-none focus:border-brand-teal focus:ring-1 focus:ring-brand-teal transition-all">
-                    </div>
-                    <button type="submit" id="pw-submit" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep font-bold py-3 px-6 rounded-xl transition-all text-sm">
-                        Update Password
-                    </button>
-                </form>
-            </div>
-
-            <div class="glass-card rounded-3xl p-8 border border-red-900/30">
-                <h2 class="text-lg font-bold text-red-400 mb-2 flex items-center gap-2">
-                    <i data-lucide="triangle-alert" class="w-5 h-5"></i> Danger Zone
-                </h2>
-                <p class="text-slate-500 text-sm mb-5">Permanently delete your account and all associated data. This cannot be undone after the 30-day cooling-off period.</p>
-                <button id="delete-btn" class="text-sm font-bold text-red-400 border border-red-900/50 hover:bg-red-900/20 px-5 py-2.5 rounded-xl transition-colors">
-                    Delete My Account
-                </button>
-            </div>
-
         </div>
     </main>
 
@@ -177,9 +271,28 @@
 
         lucide.createIcons();
 
+        let currentUser   = null;
+        let statsLoaded   = false;
+        let categoryChart = null;
+        let trendChart    = null;
+
+        const BRAND_PALETTE = ['#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
+
+        Chart.defaults.color      = '#94A3B8';
+        Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+
+        // ── Helpers ──────────────────────────────────────────────────────────
         function fmtDate(s) {
             if (!s) return '—';
             return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+
+        function fmtCurrency(n) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            const abs = Math.abs(n);
+            const sign = n < 0 ? '-' : '';
+            if (abs >= 1000) return sign + '$' + (abs / 1000).toFixed(1) + 'k';
+            return sign + '$' + abs.toFixed(2);
         }
 
         function showPwBanner(msg, isError) {
@@ -191,40 +304,219 @@
             b.classList.remove('hidden');
         }
 
+        // ── Section Navigation ───────────────────────────────────────────────
+        function showSection(id) {
+            ['profile', 'analytics', 'security', 'danger'].forEach(s => {
+                document.getElementById('section-' + s).classList.add('hidden');
+                document.getElementById('nav-' + s).classList.remove('active');
+            });
+            document.getElementById('section-' + id).classList.remove('hidden');
+            document.getElementById('nav-' + id).classList.add('active');
+            lucide.createIcons();
+            if (id === 'analytics' && !statsLoaded) fetchPortalStats();
+        }
+
+        // ── Portal Load ──────────────────────────────────────────────────────
         function loadPortal(user) {
+            currentUser = user;
             document.getElementById('loading-view').classList.add('hidden');
             document.getElementById('portal-view').classList.remove('hidden');
 
-            const email = user.email || '—';
-            const name  = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
+            const email    = user.email || '—';
+            const name     = user.user_metadata?.full_name || user.user_metadata?.name || email.split('@')[0];
             const initials = name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2);
 
-            document.getElementById('avatar-circle').textContent  = initials;
-            document.getElementById('user-name').textContent      = name;
-            document.getElementById('user-email').textContent     = email;
-            document.getElementById('detail-email').textContent   = email;
-            document.getElementById('detail-uid').textContent     = user.id;
-            document.getElementById('detail-created').textContent = fmtDate(user.created_at);
-            document.getElementById('detail-lastsign').textContent = fmtDate(user.last_sign_in_at);
+            document.getElementById('avatar-circle').textContent    = initials;
+            document.getElementById('user-name').textContent        = name;
+            document.getElementById('user-email').textContent       = email;
+            document.getElementById('detail-email').textContent     = email;
+            document.getElementById('detail-uid').textContent       = user.id;
+            document.getElementById('detail-created').textContent   = fmtDate(user.created_at);
+            document.getElementById('detail-lastsign').textContent  = fmtDate(user.last_sign_in_at);
+            lucide.createIcons();
         }
 
-        // Auth gate
+        // ── Analytics: Data Fetching ─────────────────────────────────────────
+        async function fetchPortalStats() {
+            const loading = document.getElementById('charts-loading');
+            loading.classList.remove('hidden');
+            try {
+                const userId = currentUser.id;
+                const since  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+                // 1. Personal expenses last 30d (group_id IS NULL) – category + trend
+                const { data: personalExp, error: e1 } = await sb
+                    .from('expenses')
+                    .select('category, base_amount_at_entry, created_at')
+                    .eq('payer_id', userId)
+                    .is('group_id', null)
+                    .gte('created_at', since);
+                if (e1) throw e1;
+
+                // 2. What I owe others: splits where user = me but payer != me
+                const { data: iOweSplits, error: e2 } = await sb
+                    .from('splits')
+                    .select('amount_owed, expenses!inner(payer_id)')
+                    .eq('user_id', userId)
+                    .neq('expenses.payer_id', userId);
+                if (e2) throw e2;
+
+                // 3. What others owe me: splits where user != me but payer = me
+                const { data: owedMeSplits, error: e3 } = await sb
+                    .from('splits')
+                    .select('amount_owed, expenses!inner(payer_id)')
+                    .neq('user_id', userId)
+                    .eq('expenses.payer_id', userId);
+                if (e3) throw e3;
+
+                // ── Compute summary values ───────────────────────────────────
+                const walletTotal = (personalExp   || []).reduce((s, r) => s + parseFloat(r.base_amount_at_entry || 0), 0);
+                const iOweTotal   = (iOweSplits    || []).reduce((s, r) => s + parseFloat(r.amount_owed         || 0), 0);
+                const owedMeTotal = (owedMeSplits  || []).reduce((s, r) => s + parseFloat(r.amount_owed         || 0), 0);
+                const netPosition = owedMeTotal - iOweTotal;
+
+                // ── Category map ─────────────────────────────────────────────
+                const catMap = {};
+                (personalExp || []).forEach(r => {
+                    const cat = r.category || 'Uncategorized';
+                    catMap[cat] = (catMap[cat] || 0) + parseFloat(r.base_amount_at_entry || 0);
+                });
+
+                // ── 30-day trend (fill missing days as 0) ────────────────────
+                const trendMap = {};
+                (personalExp || []).forEach(r => {
+                    const day = r.created_at ? r.created_at.slice(0, 10) : null;
+                    if (day) trendMap[day] = (trendMap[day] || 0) + parseFloat(r.base_amount_at_entry || 0);
+                });
+
+                const trendLabels = [], trendValues = [];
+                for (let i = 29; i >= 0; i--) {
+                    const d   = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
+                    const key = d.toISOString().slice(0, 10);
+                    trendLabels.push(d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+                    trendValues.push(trendMap[key] || 0);
+                }
+
+                // ── Update summary cards ─────────────────────────────────────
+                document.getElementById('stat-wallet').textContent = fmtCurrency(walletTotal);
+
+                const groupEl    = document.getElementById('stat-group');
+                const groupLabel = document.getElementById('stat-group-label');
+                groupEl.textContent = fmtCurrency(Math.abs(netPosition));
+                groupEl.className   = 'text-3xl font-extrabold tracking-tight ' +
+                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
+                groupLabel.textContent = netPosition >= 0
+                    ? 'Net owed to you across groups'
+                    : 'Net you owe across groups';
+
+                // ── Render charts ────────────────────────────────────────────
+                const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+                renderCharts(categoryData, trendLabels, trendValues);
+                statsLoaded = true;
+            } catch (err) {
+                console.error('fetchPortalStats:', err);
+                document.getElementById('stat-wallet').textContent = 'Error';
+                document.getElementById('stat-group').textContent  = 'Error';
+            } finally {
+                document.getElementById('charts-loading').classList.add('hidden');
+            }
+        }
+
+        // ── Analytics: Chart Rendering ───────────────────────────────────────
+        function renderCharts(categoryData, trendLabels, trendValues) {
+            if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
+            if (trendChart)    { trendChart.destroy();    trendChart    = null; }
+
+            const hasCategory = categoryData.length > 0;
+            const hasTrend    = trendValues.some(v => v > 0);
+
+            document.getElementById('category-empty').classList.toggle('hidden', hasCategory);
+            document.getElementById('trend-empty').classList.toggle('hidden', hasTrend);
+
+            if (hasCategory) {
+                categoryChart = new Chart(document.getElementById('categoryChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels:   categoryData.map(([k]) => k),
+                        datasets: [{
+                            data:             categoryData.map(([, v]) => v),
+                            backgroundColor:  BRAND_PALETTE,
+                            borderColor:      'rgba(2,6,23,0.8)',
+                            borderWidth:      3,
+                            hoverBorderWidth: 0,
+                        }]
+                    },
+                    options: {
+                        cutout:    '70%',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels:   { padding: 16, boxWidth: 12, font: { size: 12 } }
+                            },
+                            tooltip: {
+                                callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmtCurrency(ctx.parsed) }
+                            }
+                        }
+                    }
+                });
+            }
+
+            if (hasTrend) {
+                trendChart = new Chart(document.getElementById('trendChart'), {
+                    type: 'line',
+                    data: {
+                        labels:   trendLabels,
+                        datasets: [{
+                            label:               'Spending',
+                            data:                trendValues,
+                            borderColor:         '#14B8A6',
+                            backgroundColor:     'rgba(20, 184, 166, 0.1)',
+                            borderWidth:         2,
+                            pointRadius:         3,
+                            pointHoverRadius:    6,
+                            pointBackgroundColor: '#14B8A6',
+                            fill:                true,
+                            tension:             0.35,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: { callbacks: { label: ctx => ' ' + fmtCurrency(ctx.parsed.y) } }
+                        },
+                        scales: {
+                            x: {
+                                grid:  { display: false },
+                                ticks: { maxTicksLimit: 6, font: { size: 11 } }
+                            },
+                            y: {
+                                grid:  { color: 'rgba(30, 41, 59, 0.7)' },
+                                ticks: { font: { size: 11 }, callback: v => fmtCurrency(v) }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // ── Auth Gate ─────────────────────────────────────────────────────────
         (async () => {
             const { data: { session } } = await sb.auth.getSession();
-            if (!session) {
-                window.location.href = '/login';
-                return;
-            }
+            if (!session) { window.location.href = '/login'; return; }
             loadPortal(session.user);
         })();
 
-        // Sign out
+        // ── Sign Out ──────────────────────────────────────────────────────────
         document.getElementById('signout-btn').addEventListener('click', async () => {
             await sb.auth.signOut();
             window.location.href = '/';
         });
 
-        // Change password
+        // ── Change Password ───────────────────────────────────────────────────
         document.getElementById('pw-form').addEventListener('submit', async e => {
             e.preventDefault();
             const pw  = document.getElementById('new-password').value;
@@ -239,16 +531,13 @@
             document.getElementById('pw-form').reset();
         });
 
-        // Delete account
+        // ── Delete Account ────────────────────────────────────────────────────
         document.getElementById('delete-btn').addEventListener('click', () => {
             document.getElementById('delete-modal').classList.remove('hidden');
         });
-        document.getElementById('confirm-delete-btn').addEventListener('click', async () => {
+        document.getElementById('confirm-delete-btn').addEventListener('click', () => {
             const btn = document.getElementById('confirm-delete-btn');
             btn.disabled = true; btn.textContent = 'Deleting…';
-            const { error } = await sb.auth.admin?.deleteUser
-                ? (() => ({ error: new Error('Use in-app deletion via Settings → Delete Account.') }))()
-                : { error: new Error('Please use Settings → Delete Account inside the app.') };
             btn.disabled = false; btn.textContent = 'Yes, Delete';
             document.getElementById('delete-modal').classList.add('hidden');
             alert('To permanently delete your account, please open the SetAll app and go to Settings → Delete Account.');
