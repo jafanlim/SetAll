@@ -31,13 +31,14 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? ''
-const GEMINI_MODEL   = 'gemini-1.5-flash-latest'
+const GEMINI_MODEL   = 'gemini-1.5-flash'
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'content-type, authorization',
+  'Access-Control-Allow-Headers': 'content-type, authorization, apikey, x-client-info',
+  'Access-Control-Max-Age':       '86400',
 }
 
 function buildSystemPrompt(ctx: {

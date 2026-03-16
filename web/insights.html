@@ -145,7 +145,7 @@
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, base_amount_at_entry')
+                    .select('created_at, category, amount, base_amount_at_entry')
                     .eq('payer_id', currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
@@ -157,7 +157,7 @@
                     appData = rows.map(r => ({
                         date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
                         category: r.category || 'Uncategorized',
-                        amount:   parseFloat(r.base_amount_at_entry || 0),
+                        amount:   parseFloat(r.base_amount_at_entry ?? r.amount ?? 0),
                         type:     'expense'
                     }));
                     chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
