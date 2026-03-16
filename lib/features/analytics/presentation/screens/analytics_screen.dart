@@ -1361,8 +1361,8 @@ class _NetTrendChart extends StatelessWidget {
                 getTitlesWidget: (v, _) {
                   final daysAgo = (spots.length - 1 - v.toInt());
                   if (daysAgo == 0) {
-                    return const Text('Today',
-                      style: TextStyle(fontSize: 9, color: _kSubtitle));
+                    return Text('common.today'.tr(),
+                      style: const TextStyle(fontSize: 9, color: _kSubtitle));
                   }
                   return Text('${daysAgo}d',
                     style: const TextStyle(

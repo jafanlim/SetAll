@@ -1,5 +1,6 @@
 import 'dart:io' as io;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -682,11 +683,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('common.cancel'.tr()),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _selected),
-          child: const Text('Apply'),
+          child: Text('common.apply'.tr()),
         ),
       ],
     );

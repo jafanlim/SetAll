@@ -257,7 +257,12 @@
     "amounts_must_sum": "Beträge müssen {amount} ergeben (erhalten: {total})",
     "member_n": "Mitglied {n}",
     "split_evenly_members": "Gleichmäßig auf {count} Mitglieder aufteilen",
-    "split_label": "Aufteilen"
+    "split_label": "Aufteilen",
+    "manual_rate_label": "Manueller Kurs (Bank / Bar)",
+    "apply": "Anwenden",
+    "colour_label": "Farbe",
+    "icon_label": "Symbol",
+    "unsupported_file": "Nicht unterstützter Dateityp. Erlaubt: Bilder, PDF, TXT, MD."
   },
   "edit_expense": {
     "title": "Eintrag bearbeiten",
@@ -351,7 +356,20 @@
     "confirmation_sent": "Bestätigung gesendet an {email}. Bitte überprüfen Sie Ihren Posteingang.",
     "could_not_save_currency": "Währung konnte nicht gespeichert werden: {error}",
     "error_generic": "Fehler: {error}",
-    "saved": "Gespeichert"
+    "saved": "Gespeichert",
+    "display_name": "Anzeigename",
+    "name_hint": "Ihr Name",
+    "nickname_optional": "Spitzname (optional)",
+    "nickname_hint": "ihrname (kein @)",
+    "change_photo": "Foto ändern",
+    "uploading_photo": "Wird hochgeladen…",
+    "theme_dark": "Dunkel",
+    "theme_light": "Hell",
+    "theme_system": "Systemstandard",
+    "password_updated": "Passwort erfolgreich aktualisiert.",
+    "password_set": "Passwort gesetzt! Sie können sich jetzt mit E-Mail + Passwort anmelden.",
+    "could_not_update_email": "E-Mail konnte nicht aktualisiert werden.",
+    "could_not_update_password": "Passwort konnte nicht aktualisiert werden."
   },
   "wallet_entry": {
     "title": "Wallet-Eintrag hinzufügen",
@@ -362,5 +380,16 @@
     "add_expense": "AUSGABE HINZUFÜGEN",
     "expense_subtitle": "Essen, Transport, Rechnungen, Einkaufen, Reisen\u2026",
     "group_hint": "Sie können auch Gruppenausgaben aus dem Gruppen-Tab hinzufügen."
+  },
+  "invite_friend": {
+    "title": "Freund einladen",
+    "headline": "Deinen persönlichen Link teilen",
+    "subtitle": "Jeder, der über deinen Link beitritt, wird automatisch mit dir auf SetAll verbunden.",
+    "share_text": "Begleite mich auf SetAll zur Verfolgung unserer gemeinsamen Ausgaben: {link}",
+    "link_copied": "Link kopiert!",
+    "copy_link": "Link kopieren",
+    "share_via": "Teilen über…",
+    "share_subject": "Begleite mich auf SetAll",
+    "footer": "Dein Link ist einzigartig für dein Konto und läuft nie ab."
   }
 }

@@ -193,8 +193,8 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     final path = result.files.first.path;
     if (path == null) return;
     if (!AttachmentProcessor.isAllowed(path)) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Unsupported file type. Allowed: images, PDF, TXT, MD.'),
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('add_expense.unsupported_file'.tr()),
       ));
       return;
     }
@@ -1926,7 +1926,7 @@ class _ManualRateRow extends StatelessWidget {
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
             style: const TextStyle(fontSize: 12),
             decoration: InputDecoration(
-              labelText: labelOverride ?? 'Manual rate (bank / cash)',
+              labelText: labelOverride ?? 'add_expense.manual_rate_label'.tr(),
               hintText: '1 $fromCurrency = ? $toCurrency',
               labelStyle: const TextStyle(fontSize: 11),
               isDense: true,
@@ -1948,7 +1948,7 @@ class _ManualRateRow extends StatelessWidget {
             foregroundColor: _teal,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           ),
-          child: const Text('Apply', style: TextStyle(fontSize: 12)),
+          child: Text('add_expense.apply'.tr(), style: const TextStyle(fontSize: 12)),
         ),
       ],
     );
@@ -2012,7 +2012,7 @@ class _DatePickerField extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                isToday ? 'Today · $label' : label,
+                isToday ? '${'common.today_prefix'.tr()} · $label' : label,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -2154,7 +2154,7 @@ class _EntryIconColorPickerState extends State<_EntryIconColorPicker> {
               ),
             ),
             const SizedBox(height: 20),
-            Text('Colour', style: theme.textTheme.labelMedium?.copyWith(
+            Text('add_expense.colour_label'.tr(), style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700, fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant,
             )),
@@ -2184,7 +2184,7 @@ class _EntryIconColorPickerState extends State<_EntryIconColorPicker> {
               }).toList(),
             ),
             const SizedBox(height: 20),
-            Text('Icon', style: theme.textTheme.labelMedium?.copyWith(
+            Text('add_expense.icon_label'.tr(), style: theme.textTheme.labelMedium?.copyWith(
               fontWeight: FontWeight.w700, fontSize: 11,
               color: theme.colorScheme.onSurfaceVariant,
             )),

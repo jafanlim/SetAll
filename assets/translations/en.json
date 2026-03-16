@@ -257,7 +257,12 @@
     "amounts_must_sum": "Amounts must sum to {amount} (got {total})",
     "member_n": "Member {n}",
     "split_evenly_members": "Split evenly among {count} members",
-    "split_label": "Split"
+    "split_label": "Split",
+    "manual_rate_label": "Manual rate (bank / cash)",
+    "apply": "Apply",
+    "colour_label": "Colour",
+    "icon_label": "Icon",
+    "unsupported_file": "Unsupported file type. Allowed: images, PDF, TXT, MD."
   },
   "edit_expense": {
     "title": "Edit entry",
@@ -351,7 +356,20 @@
     "confirmation_sent": "Confirmation sent to {email}. Check your inbox.",
     "could_not_save_currency": "Could not save currency: {error}",
     "error_generic": "Error: {error}",
-    "saved": "Saved"
+    "saved": "Saved",
+    "display_name": "Display Name",
+    "name_hint": "Your name",
+    "nickname_optional": "Nickname (optional)",
+    "nickname_hint": "yourhandle (no @)",
+    "change_photo": "Change photo",
+    "uploading_photo": "Uploading…",
+    "theme_dark": "Dark",
+    "theme_light": "Light",
+    "theme_system": "System default",
+    "password_updated": "Password updated successfully.",
+    "password_set": "Password set! You can now sign in with email + password.",
+    "could_not_update_email": "Could not update email.",
+    "could_not_update_password": "Could not update password."
   },
   "wallet_entry": {
     "title": "Add Wallet Entry",
@@ -362,5 +380,16 @@
     "add_expense": "ADD AN EXPENSE",
     "expense_subtitle": "Food, transport, bills, shopping, travel\u2026",
     "group_hint": "You can also add group expenses from the Groups tab."
+  },
+  "invite_friend": {
+    "title": "Invite a Friend",
+    "headline": "Share your personal link",
+    "subtitle": "Anyone who joins via your link will be automatically connected to you on SetAll.",
+    "share_text": "Join me on SetAll to track our shared expenses: {link}",
+    "link_copied": "Link copied!",
+    "copy_link": "Copy link",
+    "share_via": "Share via…",
+    "share_subject": "Join me on SetAll",
+    "footer": "Your link is unique to your account and never expires."
   }
 }

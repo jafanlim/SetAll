@@ -307,8 +307,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         SnackBar(
           content: Text(
             isPasswordUser
-                ? 'Password updated successfully.'
-                : 'Password set! You can now sign in with email + password.',
+                ? 'settings_ext.password_updated'.tr()
+                : 'settings_ext.password_set'.tr(),
           ),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
@@ -317,7 +317,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final msg = e.toString().replaceFirst('Exception: ', '');
       messenger.showSnackBar(
         SnackBar(
-          content: Text(msg.isNotEmpty ? msg : 'Could not update password.'),
+          content: Text(msg.isNotEmpty ? msg : 'settings_ext.could_not_update_password'.tr()),
           backgroundColor: errorColor,
         ),
       );
@@ -400,7 +400,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final msg = e.toString().replaceFirst('Exception: ', '');
       messenger.showSnackBar(
         SnackBar(
-          content: Text(msg.isNotEmpty ? msg : 'Could not update email.'),
+          content: Text(msg.isNotEmpty ? msg : 'settings_ext.could_not_update_email'.tr()),
           backgroundColor: errorColor,
         ),
       );
@@ -1204,7 +1204,7 @@ class _ProfileSection extends StatelessWidget {
                     GestureDetector(
                       onTap: avatarUploading ? null : onPickAvatar,
                       child: Text(
-                        avatarUploading ? 'Uploading…' : 'Change photo',
+                        avatarUploading ? 'settings_ext.uploading_photo'.tr() : 'settings_ext.change_photo'.tr(),
                         style: TextStyle(
                           fontSize: 11,
                           color: avatarUploading
@@ -1221,7 +1221,7 @@ class _ProfileSection extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Display Name',
+            'settings_ext.display_name'.tr(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1232,14 +1232,14 @@ class _ProfileSection extends StatelessWidget {
           TextField(
             controller: nameCtrl,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              hintText: 'Your name',
-              prefixIcon: Icon(Icons.person_outline),
+            decoration: InputDecoration(
+              hintText: 'settings_ext.name_hint'.tr(),
+              prefixIcon: const Icon(Icons.person_outline),
             ),
           ),
           const SizedBox(height: 12),
           Text(
-            'Nickname (optional)',
+            'settings_ext.nickname_optional'.tr(),
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1251,9 +1251,9 @@ class _ProfileSection extends StatelessWidget {
             controller: nicknameCtrl,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => onSave(),
-            decoration: const InputDecoration(
-              hintText: 'yourhandle (no @)',
-              prefixIcon: Icon(Icons.alternate_email),
+            decoration: InputDecoration(
+              hintText: 'settings_ext.nickname_hint'.tr(),
+              prefixIcon: const Icon(Icons.alternate_email),
             ),
           ),
           if (error != null) ...[
@@ -1435,7 +1435,7 @@ class _ThemeSection extends ConsumerWidget {
         children: [
           _ThemeTile(
             icon: Icons.dark_mode_outlined,
-            label: 'Dark',
+            label: 'settings_ext.theme_dark'.tr(),
             active: themeMode == ThemeMode.dark,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.dark);
@@ -1444,7 +1444,7 @@ class _ThemeSection extends ConsumerWidget {
           ),
           _ThemeTile(
             icon: Icons.light_mode_outlined,
-            label: 'Light',
+            label: 'settings_ext.theme_light'.tr(),
             active: themeMode == ThemeMode.light,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.light);
@@ -1453,7 +1453,7 @@ class _ThemeSection extends ConsumerWidget {
           ),
           _ThemeTile(
             icon: Icons.brightness_auto_outlined,
-            label: 'System default',
+            label: 'settings_ext.theme_system'.tr(),
             active: themeMode == ThemeMode.system,
             onTap: () {
               ref.read(themeModeProvider.notifier).setThemeMode(ThemeMode.system);

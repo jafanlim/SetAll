@@ -257,7 +257,12 @@
     "amounts_must_sum": "Les montants doivent totaliser {amount} (obtenu : {total})",
     "member_n": "Membre {n}",
     "split_evenly_members": "Répartir équitablement entre {count} membres",
-    "split_label": "Répartir"
+    "split_label": "Répartir",
+    "manual_rate_label": "Taux manuel (banque / espèces)",
+    "apply": "Appliquer",
+    "colour_label": "Couleur",
+    "icon_label": "Icône",
+    "unsupported_file": "Type de fichier non pris en charge. Autorisés : images, PDF, TXT, MD."
   },
   "edit_expense": {
     "title": "Modifier l'entrée",
@@ -351,7 +356,20 @@
     "confirmation_sent": "Confirmation envoyée à {email}. Vérifiez votre boîte de réception.",
     "could_not_save_currency": "Impossible de sauvegarder la devise : {error}",
     "error_generic": "Erreur : {error}",
-    "saved": "Sauvegardé"
+    "saved": "Sauvegardé",
+    "display_name": "Nom d'affichage",
+    "name_hint": "Votre nom",
+    "nickname_optional": "Surnom (facultatif)",
+    "nickname_hint": "votrenom (sans @)",
+    "change_photo": "Changer la photo",
+    "uploading_photo": "Envoi en cours…",
+    "theme_dark": "Sombre",
+    "theme_light": "Clair",
+    "theme_system": "Défaut du système",
+    "password_updated": "Mot de passe mis à jour avec succès.",
+    "password_set": "Mot de passe défini ! Vous pouvez maintenant vous connecter avec email + mot de passe.",
+    "could_not_update_email": "Impossible de mettre à jour l'email.",
+    "could_not_update_password": "Impossible de mettre à jour le mot de passe."
   },
   "wallet_entry": {
     "title": "Ajouter une entrée de portefeuille",
@@ -362,5 +380,16 @@
     "add_expense": "AJOUTER UNE DÉPENSE",
     "expense_subtitle": "Nourriture, transport, factures, shopping, voyages\u2026",
     "group_hint": "Vous pouvez également ajouter des dépenses de groupe depuis l'onglet Groupes."
+  },
+  "invite_friend": {
+    "title": "Inviter un ami",
+    "headline": "Partagez votre lien personnel",
+    "subtitle": "Toute personne qui rejoint via votre lien sera automatiquement connectée à vous sur SetAll.",
+    "share_text": "Rejoignez-moi sur SetAll pour suivre nos dépenses partagées : {link}",
+    "link_copied": "Lien copié !",
+    "copy_link": "Copier le lien",
+    "share_via": "Partager via…",
+    "share_subject": "Rejoignez-moi sur SetAll",
+    "footer": "Votre lien est unique à votre compte et n'expire jamais."
   }
 }
