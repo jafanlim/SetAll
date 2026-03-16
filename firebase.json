@@ -1,24 +1,20 @@
 {
   "hosting": {
-    "site": "setall-c899a",
     "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "ignore": ["firebase.json", "/.*", "/node_modules/"],
     "rewrites": [
-      { "source": "/login", "destination": "/login.html" },
-      { "source": "/reset-password", "destination": "/reset-password.html" },
+      { "source": "/login",    "destination": "/login.html"    },
       { "source": "/portal",   "destination": "/portal.html"   },
       { "source": "/insights", "destination": "/insights.html" },
       { "source": "/download", "destination": "/download.html" },
-      { "source": "/support", "destination": "/support.html" },
-      { "source": "/privacy", "destination": "/privacy.html" },
-      { "source": "/terms", "destination": "/terms.html" },
-      { "source": "/app/**", "destination": "/app.html" },
-      { "source": "/app", "destination": "/app.html" },
-      { "source": "**", "destination": "/index.html" }
+      { "source": "/support",  "destination": "/support.html"  },
+      { "source": "/app/",     "destination": "/app.html"      },
+      { "source": "/app",      "destination": "/app.html"      },
+      { "source": "**",        "destination": "/index.html"    }
     ],
     "headers": [
       {
-        "source": "/**",
+        "source": "/",
         "headers": [{"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}]
       },
       {
