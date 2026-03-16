@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -159,11 +160,11 @@ class _PremiumSidebar extends StatelessWidget {
   final void Function(int) onTap;
 
   static const _navItems = [
-    (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'Dashboard', index: 0),
-    (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'Wallet',    index: 1),
-    (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'Groups',    index: 2),
-    (icon: Icons.bar_chart_outlined,               selectedIcon: Icons.bar_chart,               label: 'Analytics', index: 3),
-    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'Activity',  index: 4),
+    (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'nav.dashboard', index: 0),
+    (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'nav.wallet',    index: 1),
+    (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'nav.groups',    index: 2),
+    (icon: Icons.bar_chart_outlined,               selectedIcon: Icons.bar_chart,               label: 'nav.analytics', index: 3),
+    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'nav.activity',  index: 4),
   ];
 
   @override
@@ -231,7 +232,7 @@ class _PremiumSidebar extends StatelessWidget {
           _SidebarNavItem(
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
-            label: 'Settings',
+            label: 'nav.settings',
             isSelected: selectedIndex == 5,
             onTap: () => onTap(5),
             unselectedColor: unselectedFg,
@@ -309,7 +310,7 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  widget.label,
+                  widget.label.tr(),
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: widget.isSelected ? FontWeight.w700 : FontWeight.w500,
@@ -358,36 +359,36 @@ class _MobileLayout extends StatelessWidget {
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
       labelType: NavigationRailLabelType.all,
-      destinations: const [
+      destinations: [
         NavigationRailDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: Text('Dashboard'),
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: Text('nav.dashboard'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.account_balance_wallet_outlined),
-          selectedIcon: Icon(Icons.account_balance_wallet),
-          label: Text('Wallet'),
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: const Icon(Icons.account_balance_wallet),
+          label: Text('nav.wallet'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.group_outlined),
-          selectedIcon: Icon(Icons.group),
-          label: Text('Groups'),
+          icon: const Icon(Icons.group_outlined),
+          selectedIcon: const Icon(Icons.group),
+          label: Text('nav.groups'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.bar_chart_outlined),
-          selectedIcon: Icon(Icons.bar_chart),
-          label: Text('Analytics'),
+          icon: const Icon(Icons.bar_chart_outlined),
+          selectedIcon: const Icon(Icons.bar_chart),
+          label: Text('nav.analytics'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.history),
-          selectedIcon: Icon(Icons.history),
-          label: Text('Activity'),
+          icon: const Icon(Icons.history),
+          selectedIcon: const Icon(Icons.history),
+          label: Text('nav.activity'.tr()),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: Text('Settings'),
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text('nav.settings'.tr()),
         ),
       ],
     );
@@ -397,36 +398,36 @@ class _MobileLayout extends StatelessWidget {
     return NavigationBar(
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
-      destinations: const [
+      destinations: [
         NavigationDestination(
-          icon: Icon(Icons.dashboard_outlined),
-          selectedIcon: Icon(Icons.dashboard),
-          label: 'Dashboard',
+          icon: const Icon(Icons.dashboard_outlined),
+          selectedIcon: const Icon(Icons.dashboard),
+          label: 'nav.dashboard'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.account_balance_wallet_outlined),
-          selectedIcon: Icon(Icons.account_balance_wallet),
-          label: 'Wallet',
+          icon: const Icon(Icons.account_balance_wallet_outlined),
+          selectedIcon: const Icon(Icons.account_balance_wallet),
+          label: 'nav.wallet'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.group_outlined),
-          selectedIcon: Icon(Icons.group),
-          label: 'Groups',
+          icon: const Icon(Icons.group_outlined),
+          selectedIcon: const Icon(Icons.group),
+          label: 'nav.groups'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.bar_chart_outlined),
-          selectedIcon: Icon(Icons.bar_chart),
-          label: 'Analytics',
+          icon: const Icon(Icons.bar_chart_outlined),
+          selectedIcon: const Icon(Icons.bar_chart),
+          label: 'nav.analytics'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.history),
-          selectedIcon: Icon(Icons.history),
-          label: 'Activity',
+          icon: const Icon(Icons.history),
+          selectedIcon: const Icon(Icons.history),
+          label: 'nav.activity'.tr(),
         ),
         NavigationDestination(
-          icon: Icon(Icons.settings_outlined),
-          selectedIcon: Icon(Icons.settings),
-          label: 'Settings',
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: 'nav.settings'.tr(),
         ),
       ],
     );

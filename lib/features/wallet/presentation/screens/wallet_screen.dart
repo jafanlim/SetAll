@@ -74,14 +74,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete entries?'),
+        title: Text('wallet_screen.delete_title'.tr()),
         content: Text(
-          'Delete $count wallet entr${count == 1 ? 'y' : 'ies'}? This cannot be undone.',
+          count == 1
+              ? 'wallet_screen.delete_confirm_one'.tr()
+              : 'wallet_screen.delete_confirm'.tr(namedArgs: {'count': count.toString()}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(
@@ -89,7 +91,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text('Delete ($count)'),
+            label: Text('common.delete_count'.tr(namedArgs: {'count': count.toString()})),
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -114,14 +116,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete entry?'),
-        content: const Text('This wallet entry will be permanently removed.'),
+        title: Text('wallet_screen.delete_title'.tr()),
+        content: Text('wallet_screen.delete_confirm_one'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _brandOrange, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -216,36 +218,36 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             ? [
                 TextButton(
                   onPressed: allSelected ? _deselectAll : () => _selectAll(allIds),
-                  child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                  child: Text(allSelected ? 'common.deselect_all'.tr() : 'common.select_all'.tr()),
                 ),
                 if (_selected.isNotEmpty)
                   TextButton.icon(
                     onPressed: _deleteBatch,
                     icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
                     label: Text(
-                      'Delete (${_selected.length})',
+                      'common.delete_count'.tr(namedArgs: {'count': _selected.length.toString()}),
                       style: const TextStyle(color: _brandOrange),
                     ),
                   ),
-                TextButton(onPressed: _toggleEditMode, child: const Text('Cancel')),
+                TextButton(onPressed: _toggleEditMode, child: Text('common.cancel'.tr())),
               ]
             : [
                 AppTopPopupButton<_WalletSort>(
                   icon: Icons.sort_rounded,
-                  tooltip: 'Sort',
+                  tooltip: 'common.sort'.tr(),
                   initialValue: _sort,
                   onSelected: (s) { HapticUtils.selection(); setState(() => _sort = s); },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: _WalletSort.newest,   child: Text('Newest first')),
-                    PopupMenuItem(value: _WalletSort.oldest,   child: Text('Oldest first')),
-                    PopupMenuItem(value: _WalletSort.largest,  child: Text('Largest first')),
-                    PopupMenuItem(value: _WalletSort.smallest, child: Text('Smallest first')),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: _WalletSort.newest,   child: Text('common.newest_first'.tr())),
+                    PopupMenuItem(value: _WalletSort.oldest,   child: Text('common.oldest_first'.tr())),
+                    PopupMenuItem(value: _WalletSort.largest,  child: Text('common.largest_first'.tr())),
+                    PopupMenuItem(value: _WalletSort.smallest, child: Text('common.smallest_first'.tr())),
                   ],
                 ),
                 const SizedBox(width: 4),
                 AppTopButton(
                   icon: Icons.refresh_rounded,
-                  tooltip: 'Refresh',
+                  tooltip: 'common.refresh'.tr(),
                   onPressed: () async {
                     HapticUtils.lightTap();
                     await ref.read(syncServiceProvider).performFullSync();
@@ -257,7 +259,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   },
                 ),
                 const SizedBox(width: 4),
-                TextButton(onPressed: _toggleEditMode, child: const Text('Edit')),
+                TextButton(onPressed: _toggleEditMode, child: Text('common.edit'.tr())),
               ],
       ),
       floatingActionButton: _editMode
@@ -270,8 +272,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               backgroundColor: _purple,
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
-              label: const Text('Add wallet entry',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+              label: Text('wallet_screen.add_entry'.tr(),
+                  style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             ),
       body: RefreshIndicator(
         color: _purple,
@@ -315,20 +317,20 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   child: Row(
                     children: [
                       _FilterChip(
-                        label: 'All',
+                        label: 'wallet_screen.filter_all'.tr(),
                         selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.all,
                         onTap: () => setState(() { _filter = _WalletFilter.all; _catFilter = null; _colorFilter = null; }),
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
-                        label: 'Income',
+                        label: 'wallet_screen.filter_income'.tr(),
                         selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.income,
                         color: _teal,
                         onTap: () => setState(() { _filter = _WalletFilter.income; _catFilter = null; _colorFilter = null; }),
                       ),
                       const SizedBox(width: 8),
                       _FilterChip(
-                        label: 'Expense',
+                        label: 'wallet_screen.filter_expense'.tr(),
                         selected: _catFilter == null && _colorFilter == null && _filter == _WalletFilter.expense,
                         color: _purple,
                         onTap: () => setState(() { _filter = _WalletFilter.expense; _catFilter = null; _colorFilter = null; }),
@@ -402,7 +404,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                  child: Text('Spending breakdown',
+                  child: Text('wallet_screen.spending_breakdown'.tr(),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 13,
                         letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
@@ -453,7 +455,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                  child: Text('Income breakdown',
+                  child: Text('wallet_screen.income_breakdown'.tr(),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 13,
                         letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
@@ -506,9 +508,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     Text(
                       _catFilter != null
                           ? _catFilter!
-                          : (_filter == _WalletFilter.income ? 'Income entries'
-                              : _filter == _WalletFilter.expense ? 'Expense entries'
-                              : 'All entries'),
+                          : (_filter == _WalletFilter.income ? 'wallet_screen.income_entries'.tr()
+                              : _filter == _WalletFilter.expense ? 'wallet_screen.expense_entries'.tr()
+                              : 'wallet_screen.all_entries'.tr()),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 13,
                         letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
@@ -516,7 +518,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     ),
                     const Spacer(),
                     Text(
-                      '${expenses.length} entr${expenses.length == 1 ? 'y' : 'ies'}',
+                      expenses.length == 1
+                          ? 'wallet_screen.entry_count_one'.tr()
+                          : 'wallet_screen.entry_count_other'.tr(namedArgs: {'count': expenses.length.toString()}),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant, fontSize: 11,
                       ),
@@ -535,11 +539,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       Icon(Icons.account_balance_wallet_outlined,
                           size: 48, color: theme.colorScheme.onSurfaceVariant),
                       const SizedBox(height: 16),
-                      Text('No entries found',
+                      Text('wallet_screen.no_entries_found'.tr(),
                           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700,
                               color: theme.colorScheme.onSurface)),
                       const SizedBox(height: 8),
-                      Text('Try a different filter or add a new entry.',
+                      Text('wallet_screen.no_entries_hint'.tr(),
                           style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                           textAlign: TextAlign.center),
                     ]),
@@ -615,7 +619,7 @@ class WalletHero extends StatelessWidget {
             ),
             const SizedBox(width: 6),
             Text(
-              'Personal wallet',
+              'wallet_screen.personal_wallet'.tr(),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant, fontSize: 12,
               ),
@@ -638,14 +642,14 @@ class WalletHero extends StatelessWidget {
           const SizedBox(height: 12),
           Row(children: [
             Expanded(child: _BalancePill(
-              label: 'Income',
+              label: 'wallet.income'.tr(),
               amount: (income ?? Decimal.zero).toStringAsFixed(2),
               color: _teal,
               bgColor: _tealDim,
             )),
             const SizedBox(width: 8),
             Expanded(child: _BalancePill(
-              label: 'Expenses',
+              label: 'wallet.expenses'.tr(),
               amount: (spend ?? Decimal.zero).toStringAsFixed(2),
               color: walletIsPos ? _purple : _orange,
               bgColor: walletIsPos ? _purpleDim : _orangeDim,
@@ -760,8 +764,8 @@ class _WalletEntryRow extends ConsumerWidget {
           context: context,
           position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
           items: [
-            const PopupMenuItem(value: _EntryAction.edit,   child: _MenuRow(icon: Icons.edit_outlined,   label: 'Edit')),
-            const PopupMenuItem(value: _EntryAction.delete, child: _MenuRow(icon: Icons.delete_outlined, label: 'Delete')),
+            PopupMenuItem(value: _EntryAction.edit,   child: _MenuRow(icon: Icons.edit_outlined,   label: 'common.edit'.tr())),
+            PopupMenuItem(value: _EntryAction.delete, child: _MenuRow(icon: Icons.delete_outlined, label: 'common.delete'.tr())),
           ],
         );
         if (result == _EntryAction.edit)   onEdit();
@@ -825,7 +829,7 @@ class _WalletEntryRow extends ConsumerWidget {
                             fontWeight: FontWeight.w600, fontSize: 13),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(expense.category.isEmpty ? 'General' : expense.category,
+                    Text(expense.category.isEmpty ? 'common.general'.tr() : expense.category,
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                   ],

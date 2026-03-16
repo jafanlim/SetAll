@@ -759,6 +759,7 @@ class SetAllRepository {
     String? iconName,
     int? colorValue,
     String? avatarUrl,
+    String? defaultCurrency,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -780,12 +781,14 @@ class SetAllRepository {
         if (iconName != null) 'icon_name': iconName,
         if (colorValue != null) 'color_value': colorValue,
         if (avatarUrl != null) 'avatar_url': avatarUrl,
+        if (defaultCurrency != null) 'default_currency': defaultCurrency,
       });
       await _client
           .from('group_members')
           .insert({'group_id': id, 'user_id': uid});
       return GroupModel(id: id, name: name, creatorId: uid,
-          iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+          iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+          defaultCurrency: defaultCurrency);
     }
 
     // Non-web: ensure DB is ready before any SQLite access.
@@ -815,6 +818,7 @@ class SetAllRepository {
       if (iconName != null) 'icon_name': iconName,
       if (colorValue != null) 'color_value': colorValue,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (defaultCurrency != null) 'default_currency': defaultCurrency,
     });
     await db.insert('group_members', {
       'group_id': id,
@@ -830,12 +834,14 @@ class SetAllRepository {
         final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
         final finalId = remoteId != id ? remoteId : id;
         // Patch identity columns on Supabase if provided.
-        if (iconName != null || colorValue != null || avatarUrl != null) {
+        if (iconName != null || colorValue != null || avatarUrl != null ||
+            defaultCurrency != null) {
           try {
             await _client.from('groups').update({
               if (iconName != null) 'icon_name': iconName,
               if (colorValue != null) 'color_value': colorValue,
               if (avatarUrl != null) 'avatar_url': avatarUrl,
+              if (defaultCurrency != null) 'default_currency': defaultCurrency,
             }).eq('id', finalId);
           } catch (_) {}
         }
@@ -844,7 +850,8 @@ class SetAllRepository {
           await db.update('groups', {'id': remoteId, 'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
           await db.update('group_members', {'group_id': remoteId, 'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
           return GroupModel(id: remoteId, name: name, creatorId: uid,
-              iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+              iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+              defaultCurrency: defaultCurrency);
         }
         await db.update('groups', {'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
         await db.update('group_members', {'synced_at': millis}, where: 'group_id = ?', whereArgs: [id]);
@@ -861,7 +868,8 @@ class SetAllRepository {
     }
     _notify();
     return GroupModel(id: id, name: name, creatorId: uid,
-        iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl);
+        iconName: iconName, colorValue: colorValue, avatarUrl: avatarUrl,
+        defaultCurrency: defaultCurrency);
   }
 
   /// Update a group's visual identity (icon, colour, avatar). Only the creator
@@ -872,14 +880,16 @@ class SetAllRepository {
     int? colorValue,
     String? avatarUrl,
     bool clearAvatarUrl = false,
+    String? defaultCurrency,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return false;
     final updates = <String, dynamic>{};
-    if (iconName != null)   updates['icon_name']   = iconName;
-    if (colorValue != null) updates['color_value'] = colorValue;
-    if (avatarUrl != null)  updates['avatar_url']  = avatarUrl;
-    if (clearAvatarUrl)     updates['avatar_url']  = null;
+    if (iconName != null)        updates['icon_name']        = iconName;
+    if (colorValue != null)      updates['color_value']      = colorValue;
+    if (avatarUrl != null)       updates['avatar_url']       = avatarUrl;
+    if (clearAvatarUrl)          updates['avatar_url']       = null;
+    if (defaultCurrency != null) updates['default_currency'] = defaultCurrency;
     if (updates.isEmpty) return true;
 
     if (_isWeb && _client != null) {

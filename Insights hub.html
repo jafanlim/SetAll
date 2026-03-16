@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SetAll | Insights Hub</title>
+    
+    <!-- React & Babel for Browser Rendering -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Tailwind & Icons -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Outfit Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: { deep: '#020617', slate: '#0F172A', teal: '#14B8A6', purple: '#8B5CF6' }
+                    },
+                    fontFamily: { outfit: ['Outfit', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Outfit', sans-serif; background-color: #020617; }
+        .donut-segment { transition: stroke-dashoffset 1s ease-out; }
+        .bar-grow { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useMemo, useEffect } = React;
+
+        // --- Icons Helper ---
+        const Icon = ({ name, size = 20, className = "" }) => {
+            useEffect(() => { lucide.createIcons(); }, []);
+            return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
+        };
+
+        const CATEGORY_COLORS = ["#14B8A6", "#8B5CF6", "#F59E0B", "#EF4444", "#3B82F6", "#EC4899"];
+
+        const INITIAL_DATA = [
+            { date: '2024-03-01', category: 'Groceries', amount: 120, type: 'expense' },
+            { date: '2024-03-05', category: 'Salary', amount: 3500, type: 'income' },
+            { date: '2024-03-10', category: 'Rent', amount: 1200, type: 'expense' },
+            { date: '2024-03-15', category: 'Travel', amount: 450, type: 'expense' },
+            { date: '2024-03-18', category: 'Groceries', amount: 95, type: 'expense' },
+            { date: '2024-03-25', category: 'Utilities', amount: 150, type: 'expense' },
+        ];
+
+        // --- Charts ---
+        const DonutChart = ({ data, total }) => {
+            let currentOffset = 0;
+            return (
+                <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                    <circle cx="50" cy="50" r="15.9155" fill="transparent" stroke="#1E293B" strokeWidth="6" />
+                    {data.map((d, i) => {
+                        const percentage = (d.value / (total || 1)) * 100;
+                        const offset = currentOffset;
+                        currentOffset += percentage;
+                        return (
+                            <circle key={i} cx="50" cy="50" r="15.9155" fill="transparent" 
+                                    stroke={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} 
+                                    strokeWidth="6" strokeDasharray={`${percentage} 100`} 
+                                    strokeDashoffset={-offset} className="donut-segment" />
+                        );
+                    })}
+                </svg>
+            );
+        };
+
+        const BarChart = ({ data }) => {
+            const max = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1) * 1.1;
+            return (
+                <div className="flex items-end justify-between h-full w-full gap-2 pt-8">
+                    {data.map((d, i) => (
+                        <div key={i} className="flex flex-col justify-end items-center flex-1 h-full group relative">
+                            <div className="flex items-end gap-1 w-full h-full justify-center">
+                                <div style={{ height: `${(d.income/max)*100}%` }} className="w-full max-w-[12px] bg-brand-teal rounded-t-sm opacity-80 group-hover:opacity-100 bar-grow" />
+                                <div style={{ height: `${(d.expense/max)*100}%` }} className="w-full max-w-[12px] bg-brand-purple rounded-t-sm opacity-80 group-hover:opacity-100 bar-grow" />
+                            </div>
+                            <span className="text-[10px] text-slate-500 mt-2">{d.day}</span>
+                        </div>
+                    ))}
+                </div>
+            );
+        };
+
+        // --- Main App ---
+        function App() {
+            const [data, setData] = useState(INITIAL_DATA);
+            const [isAnalyzing, setIsAnalyzing] = useState(false);
+            const [aiResult, setAiResult] = useState("");
+
+            const stats = useMemo(() => {
+                const inc = data.filter(d => d.type === 'income').reduce((s, d) => s + d.amount, 0);
+                const exp = data.filter(d => d.type === 'expense').reduce((s, d) => s + d.amount, 0);
+                const catMap = data.reduce((acc, curr) => {
+                    if (curr.type === 'expense') acc[curr.category] = (acc[curr.category] || 0) + curr.amount;
+                    return acc;
+                }, {});
+                const trend = data.reduce((acc, curr) => {
+                    const day = curr.date.split('-')[2];
+                    if (!acc[day]) acc[day] = { day, income: 0, expense: 0 };
+                    acc[day][curr.type] += curr.amount;
+                    return acc;
+                }, {});
+                return { 
+                    inc, exp, net: inc - exp, 
+                    cats: Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value),
+                    trend: Object.values(trend).sort((a,b) => a.day - b.day)
+                };
+            }, [data]);
+
+            const runAI = async () => {
+                setIsAnalyzing(true);
+                // Simulate AI Analysis
+                setTimeout(() => {
+                    setAiResult("Your housing costs represent 65% of monthly outflow. Consider renegotiating utilities or identifying small recurring subscriptions to increase your 12% savings rate.");
+                    setIsAnalyzing(false);
+                }, 1500);
+            };
+
+            return (
+                <div className="max-w-7xl mx-auto p-4 md:p-10">
+                    <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+                        <div className="flex items-center gap-4">
+                            <div className="bg-brand-teal p-3 rounded-2xl shadow-lg shadow-teal-500/20">
+                                <Icon name="scale" size={28} className="text-slate-950" />
+                            </div>
+                            <div>
+                                <h1 className="text-3xl font-extrabold text-white tracking-tight">SetAll <span className="text-brand-teal">Insights</span></h1>
+                                <p className="text-slate-500 text-sm font-medium">Advanced intelligence for your global ledger.</p>
+                            </div>
+                        </div>
+                        <button onClick={() => window.location.reload()} className="bg-brand-teal hover:bg-teal-400 text-slate-950 px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2 shadow-lg shadow-teal-500/20 active:scale-95">
+                            <Icon name="upload" size={18} /> Import New Data
+                        </button>
+                    </header>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
+                        {[
+                            { label: "Net Worth", val: `$${stats.net.toLocaleString()}`, icon: "activity", color: "text-brand-teal" },
+                            { label: "Total Inflow", val: `$${stats.inc.toLocaleString()}`, icon: "trending-up", color: "text-emerald-400" },
+                            { label: "Total Outflow", val: `$${stats.exp.toLocaleString()}`, icon: "trending-down", color: "text-brand-purple" },
+                            { label: "Daily Burn", val: `$${(stats.exp / 30).toFixed(2)}`, icon: "flame", color: "text-orange-400" }
+                        ].map((s, i) => (
+                            <div key={i} className="bg-brand-slate border border-slate-800 p-6 rounded-3xl hover:border-brand-teal/40 transition-colors group">
+                                <div className="p-2 bg-slate-800 w-fit rounded-xl mb-4 group-hover:bg-brand-teal/10 transition-colors">
+                                    <Icon name={s.icon} className={s.color} />
+                                </div>
+                                <p className="text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">{s.label}</p>
+                                <p className="text-2xl font-bold text-white tracking-tight">{s.val}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-8 space-y-6">
+                            <div className="bg-brand-slate border border-slate-800 p-8 rounded-[32px]">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h2 className="text-xl font-bold text-white">Cash Flow Analysis</h2>
+                                    <div className="flex gap-4 items-center">
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400"><div className="w-2 h-2 rounded-full bg-brand-teal"></div> INCOME</div>
+                                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400"><div className="w-2 h-2 rounded-full bg-brand-purple"></div> EXPENSE</div>
+                                    </div>
+                                </div>
+                                <div className="h-64"><BarChart data={stats.trend} /></div>
+                            </div>
+
+                            <div className="bg-brand-slate border border-slate-800 p-8 rounded-[32px] relative overflow-hidden">
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-brand-teal/5 blur-3xl rounded-full"></div>
+                                <div className="flex justify-between items-center mb-6 relative z-10">
+                                    <div className="flex items-center gap-3">
+                                        <Icon name="sparkles" className="text-brand-teal" />
+                                        <h2 className="text-xl font-bold text-white">AI Auditor</h2>
+                                    </div>
+                                    <button onClick={runAI} disabled={isAnalyzing} className="text-xs font-bold bg-brand-teal/10 text-brand-teal px-4 py-2 rounded-lg hover:bg-brand-teal/20 transition-all active:scale-95">
+                                        {isAnalyzing ? "Processing..." : "Run Analysis"}
+                                    </button>
+                                </div>
+                                <div className="min-h-[100px] flex items-center">
+                                    {aiResult ? (
+                                        <p className="text-slate-300 italic leading-relaxed border-l-2 border-brand-teal pl-6">"{aiResult}"</p>
+                                    ) : (
+                                        <p className="text-slate-500 text-sm">Tap "Run Analysis" to have Gemini review your spending patterns.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="lg:col-span-4 space-y-6">
+                            <div className="bg-brand-slate border border-slate-800 p-8 rounded-[32px]">
+                                <h2 className="text-xl font-bold text-white mb-8">Category Split</h2>
+                                <div className="w-48 h-48 mx-auto mb-10 relative">
+                                    <DonutChart data={stats.cats} total={stats.exp} />
+                                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Spent</span>
+                                        <span className="text-xl font-bold text-white">${stats.exp.toLocaleString()}</span>
+                                    </div>
+                                </div>
+                                <div className="space-y-4">
+                                    {stats.cats.map((c, i) => (
+                                        <div key={i} className="flex justify-between items-center">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-2 h-2 rounded-full" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}></div>
+                                                <span className="text-sm font-medium text-slate-400">{c.name}</span>
+                                            </div>
+                                            <span className="text-sm font-bold text-white">${c.value}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>

@@ -109,8 +109,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       context: ctx,
       builder: (dlgCtx) => StatefulBuilder(
         builder: (dlgCtx, setLocal) => AlertDialog(
-          title: const Text('Filter by group',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+          title: Text('groups_screen.filter_by_group'.tr(),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
           contentPadding: const EdgeInsets.fromLTRB(0, 12, 0, 0),
           content: SizedBox(
             width: double.maxFinite,
@@ -139,11 +139,11 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
           actions: [
             TextButton(
               onPressed: () => setLocal(() => tempSelected.clear()),
-              child: const Text('Clear all'),
+              child: Text('common.clear_all'.tr()),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dlgCtx, true),
-              child: const Text('Apply'),
+              child: Text('common.apply'.tr()),
             ),
           ],
         ),
@@ -217,14 +217,16 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete groups?'),
+        title: Text('groups_screen.delete_title'.tr()),
         content: Text(
-          'Delete $count group${count == 1 ? '' : 's'}? As the owner you can restore them from the Activity screen within 12 months.',
+          count == 1
+              ? 'groups_screen.delete_confirm_one'.tr()
+              : 'groups_screen.delete_confirm'.tr(namedArgs: {'count': count.toString()}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(
@@ -232,7 +234,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text('Delete ($count)'),
+            label: Text('common.delete_count'.tr(namedArgs: {'count': count.toString()})),
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -255,7 +257,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete some groups.')),
+        SnackBar(content: Text('groups_screen.error_delete'.tr())),
       );
     }
   }
@@ -293,19 +295,19 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     onPressed: allSelected
                         ? _deselectAll
                         : () => _selectAll(groups.map((g) => g.id).toList()),
-                    child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                    child: Text(allSelected ? 'common.deselect_all'.tr() : 'common.select_all'.tr()),
                   );
                 }).valueOrNull ?? const SizedBox.shrink(),
                 TextButton(
                   onPressed: _toggleEditMode,
-                  child: const Text('Cancel'),
+                  child: Text('common.cancel'.tr()),
                 ),
                 if (_selected.isNotEmpty)
                   TextButton.icon(
                     onPressed: _deleteBatch,
                     icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
                     label: Text(
-                      'Delete (${_selected.length})',
+                      'common.delete_count'.tr(namedArgs: {'count': _selected.length.toString()}),
                       style: const TextStyle(color: _brandOrange),
                     ),
                   ),
@@ -313,31 +315,31 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             : [
                 AppTopPopupButton<_ActivitySort>(
                   icon: Icons.swap_vert_rounded,
-                  tooltip: 'Sort activity',
+                  tooltip: 'groups_screen.sort_activity_tooltip'.tr(),
                   initialValue: _actSort,
                   onSelected: (s) { HapticUtils.selection(); setState(() => _actSort = s); },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: _ActivitySort.newest,   child: Text('Newest first')),
-                    PopupMenuItem(value: _ActivitySort.oldest,   child: Text('Oldest first')),
-                    PopupMenuItem(value: _ActivitySort.largest,  child: Text('Largest first')),
-                    PopupMenuItem(value: _ActivitySort.smallest, child: Text('Smallest first')),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: _ActivitySort.newest,   child: Text('common.newest_first'.tr())),
+                    PopupMenuItem(value: _ActivitySort.oldest,   child: Text('common.oldest_first'.tr())),
+                    PopupMenuItem(value: _ActivitySort.largest,  child: Text('common.largest_first'.tr())),
+                    PopupMenuItem(value: _ActivitySort.smallest, child: Text('common.smallest_first'.tr())),
                   ],
                 ),
                 const SizedBox(width: 4),
                 AppTopPopupButton<_GroupSort>(
                   icon: Icons.sort_rounded,
-                  tooltip: 'Sort groups',
+                  tooltip: 'groups_screen.sort_groups_tooltip'.tr(),
                   initialValue: _groupSort,
                   onSelected: (s) { HapticUtils.selection(); setState(() => _groupSort = s); },
-                  itemBuilder: (_) => const [
-                    PopupMenuItem(value: _GroupSort.nameAZ, child: Text('Name A→Z')),
-                    PopupMenuItem(value: _GroupSort.nameZA, child: Text('Name Z→A')),
+                  itemBuilder: (_) => [
+                    PopupMenuItem(value: _GroupSort.nameAZ, child: Text('common.name_az'.tr())),
+                    PopupMenuItem(value: _GroupSort.nameZA, child: Text('common.name_za'.tr())),
                   ],
                 ),
                 const SizedBox(width: 4),
                 AppTopButton(
                   icon: Icons.refresh_rounded,
-                  tooltip: 'Refresh',
+                  tooltip: 'common.refresh'.tr(),
                   onPressed: () async {
                     HapticUtils.lightTap();
                     await ref.read(syncServiceProvider).performFullSync();
@@ -351,7 +353,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 const SizedBox(width: 4),
                 TextButton(
                   onPressed: _toggleEditMode,
-                  child: const Text('Edit'),
+                  child: Text('common.edit'.tr()),
                 ),
               ],
       ),
@@ -373,9 +375,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   foregroundColor: _teal,
                   elevation: 2,
                   icon: const Icon(Icons.group_add_outlined),
-                  label: const Text(
-                    'New Group',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  label: Text(
+                    'groups_screen.new_group'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -388,9 +390,9 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   backgroundColor: _teal,
                   foregroundColor: Colors.black,
                   icon: const Icon(Icons.add),
-                  label: const Text(
-                    'Add Expense',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  label: Text(
+                    'groups_screen.add_expense'.tr(),
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
                   ),
                 ),
               ],
@@ -437,7 +439,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
                 child: Text(
-                  'Your groups',
+                  'groups.your_groups'.tr(),
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.w700, fontSize: 13,
                     letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
@@ -489,8 +491,10 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                                   const SizedBox(width: 6),
                                   Text(
                                     _groupNameFilter.isEmpty
-                                        ? 'Groups'
-                                        : '${_groupNameFilter.length} group${_groupNameFilter.length == 1 ? '' : 's'}',
+                                        ? 'groups.title'.tr()
+                                        : _groupNameFilter.length == 1
+                                            ? 'dashboard.group_count_one'.tr(namedArgs: {'count': '1'})
+                                            : 'dashboard.group_count_other'.tr(namedArgs: {'count': _groupNameFilter.length.toString()}),
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
@@ -570,7 +574,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                                     Icon(Icons.close, size: 12,
                                         color: theme.colorScheme.onSurfaceVariant),
                                     const SizedBox(width: 4),
-                                    Text('Clear', style: TextStyle(
+                                    Text('common.clear'.tr(), style: TextStyle(
                                         fontSize: 11,
                                         color: theme.colorScheme.onSurfaceVariant)),
                                   ],
@@ -626,8 +630,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                       child: Center(child: CircularProgressIndicator()))),
               error: (_, _) => SliverToBoxAdapter(
                   child: Padding(padding: const EdgeInsets.all(24),
-                      child: Center(child: Text('Could not load groups',
-                          style: TextStyle(color: Colors.redAccent))))),
+                      child: Center(child: Text('groups_screen.could_not_load'.tr(),
+                          style: const TextStyle(color: Colors.redAccent))))),
             ),
 
             // ── Recent Activity header + filter chips ─────────────────────
@@ -639,7 +643,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          'Recent activity',
+                          'groups_screen.recent_activity'.tr(),
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700, fontSize: 13,
                             letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
@@ -669,20 +673,20 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     child: Row(
                       children: [
                         _FilterChip(
-                          label: 'All',
+                          label: 'wallet_screen.filter_all'.tr(),
                           selected: _actCatFilter == null && _actFilter == _ActivityFilter.all,
                           onTap: () => setState(() { _actFilter = _ActivityFilter.all; _actCatFilter = null; }),
                         ),
                         const SizedBox(width: 8),
                         _FilterChip(
-                          label: 'Income',
+                          label: 'wallet_screen.filter_income'.tr(),
                           selected: _actCatFilter == null && _actFilter == _ActivityFilter.income,
                           color: _teal,
                           onTap: () => setState(() { _actFilter = _ActivityFilter.income; _actCatFilter = null; }),
                         ),
                         const SizedBox(width: 8),
                         _FilterChip(
-                          label: 'Expense',
+                          label: 'wallet_screen.filter_expense'.tr(),
                           selected: _actCatFilter == null && _actFilter == _ActivityFilter.expense,
                           color: _orange,
                           onTap: () => setState(() { _actFilter = _ActivityFilter.expense; _actCatFilter = null; }),
@@ -721,8 +725,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                                 const SizedBox(height: 12),
                                 Text(
                                   allExpenses.isEmpty
-                                      ? 'No expenses yet. Tap Add expense to get started.'
-                                      : 'No expenses match the current filter.',
+                                      ? 'groups_screen.no_expenses_yet'.tr()
+                                      : 'groups_screen.no_expenses_filter'.tr(),
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                       color: theme.colorScheme.onSurfaceVariant),
                                   textAlign: TextAlign.center,
@@ -816,7 +820,7 @@ class _NetBalanceHero extends StatelessWidget {
             Container(width: 7, height: 7,
                 decoration: BoxDecoration(color: accent, shape: BoxShape.circle)),
             const SizedBox(width: 6),
-            Text(isPositive ? 'Overall you are owed' : 'Overall you owe',
+            Text(isPositive ? 'groups_screen.overall_owed'.tr() : 'groups_screen.overall_owe'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant, fontSize: 12)),
           ]),
@@ -831,10 +835,10 @@ class _NetBalanceHero extends StatelessWidget {
                 maxLines: 1, overflow: TextOverflow.ellipsis),
           const SizedBox(height: 12),
           Row(children: [
-            Expanded(child: _BalancePill(label: 'Owed to you', amount: youAreOwed,
+            Expanded(child: _BalancePill(label: 'groups_screen.owed_to_you'.tr(), amount: youAreOwed,
                 currency: currency, color: _teal, bgColor: _tealDim)),
             const SizedBox(width: 8),
-            Expanded(child: _BalancePill(label: 'You owe', amount: youOwe,
+            Expanded(child: _BalancePill(label: 'groups_screen.you_owe'.tr(), amount: youOwe,
                 currency: currency, color: _orange, bgColor: _orangeDim)),
           ]),
         ],

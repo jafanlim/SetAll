@@ -11,6 +11,7 @@ class Group {
     this.iconName,
     this.colorValue,
     this.avatarUrl,
+    this.defaultCurrency,
   });
 
   final String id;
@@ -28,6 +29,9 @@ class Group {
 
   /// Supabase Storage path for the group avatar photo. NULL = use icon/initials.
   final String? avatarUrl;
+
+  /// Default settlement currency for this group. NULL = use user's base currency.
+  final String? defaultCurrency;
 
   bool get isDirect => type == GroupType.direct;
 }

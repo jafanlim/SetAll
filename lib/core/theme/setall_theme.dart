@@ -1,56 +1,56 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-/// SetAll branded dark theme — Material 3, premium cost-sharing aesthetic.
+/// SetAll branded dark theme — Material 3, Outfit font, premium fintech aesthetic.
 class SetAllTheme {
   SetAllTheme._();
 
-  static String get _fontFamily => GoogleFonts.inter().fontFamily!;
+  static String get _fontFamily => GoogleFonts.outfit().fontFamily!;
 
-  // Brand palette: deep charcoal, gold accent, clean neutrals
-  static const Color _surfaceDark = Color(0xFF0F0F12);
-  static const Color _surfaceVariant = Color(0xFF1A1A1F);
-  static const Color _surfaceContainer = Color(0xFF242429);
+  // Brand palette
+  static const Color _surfaceDark = Color(0xFF0F172A);       // Slate-900
+  static const Color _surfaceVariant = Color(0xFF1E293B);    // Slate-800
+  static const Color _surfaceContainer = Color(0xFF334155);  // Slate-700
   static const Color _gold = Color(0xFFD4AF37);
   static const Color _goldDim = Color(0xFF9A8B2E);
-  static const Color _outline = Color(0xFF3D3D45);
-  static const Color _onSurface = Color(0xFFE8E8EC);
-  static const Color _onSurfaceVariant = Color(0xFFB0B0B8);
-  static const Color _onGold = Color(0xFF0F0F12);
+  static const Color _outline = Color(0xFF334155);           // Slate-700 border
+  static const Color _onSurface = Color(0xFFF1F5F9);         // Slate-100
+  static const Color _onSurfaceVariant = Color(0xFF94A3B8);  // Slate-400
+  static const Color _onGold = Color(0xFF0F172A);
 
-  // ── TextTheme enforcing Inter with brand-specified sizes ──────────────────
-  // Headings: 24pt Bold, -0.5 letter-spacing
-  // Body:     14pt Medium
-  // Labels:   11pt Bold, Slate-500 (#64748B)
+  // ── TextTheme: Outfit — amounts Bold/700 -1.0ls, headers Bold/700, labels Medium/500 ──
   static const Color _slate500 = Color(0xFF64748B);
 
-  static TextTheme get _interTextTheme => GoogleFonts.interTextTheme().copyWith(
-    displayLarge:  GoogleFonts.inter(fontSize: 45, fontWeight: FontWeight.w300, letterSpacing: -0.5),
-    displayMedium: GoogleFonts.inter(fontSize: 36, fontWeight: FontWeight.w300),
-    displaySmall:  GoogleFonts.inter(fontSize: 28, fontWeight: FontWeight.w400),
-    headlineLarge: GoogleFonts.inter(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-    headlineMedium:GoogleFonts.inter(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-    headlineSmall: GoogleFonts.inter(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.5),
-    titleLarge:    GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600),
-    titleMedium:   GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
-    titleSmall:    GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-    bodyLarge:     GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500),
-    bodyMedium:    GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400),
-    bodySmall:     GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
-    labelLarge:    GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _slate500),
-    labelMedium:   GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w700, color: _slate500),
-    labelSmall:    GoogleFonts.inter(fontSize: 10, fontWeight: FontWeight.w700, color: _slate500),
+  static TextTheme get _outfitTextTheme => GoogleFonts.outfitTextTheme().copyWith(
+    // Display — large amount figures
+    displayLarge:  GoogleFonts.outfit(fontSize: 45, fontWeight: FontWeight.w700, letterSpacing: -1.0),
+    displayMedium: GoogleFonts.outfit(fontSize: 36, fontWeight: FontWeight.w700, letterSpacing: -1.0),
+    displaySmall:  GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w700, letterSpacing: -1.0),
+    // Headlines — screen titles, card headers
+    headlineLarge: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    headlineMedium:GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    headlineSmall: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.5),
+    // Titles — card titles, section headers
+    titleLarge:    GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w700),
+    titleMedium:   GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500),
+    titleSmall:    GoogleFonts.outfit(fontSize: 13, fontWeight: FontWeight.w500),
+    // Body — general text
+    bodyLarge:     GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500),
+    bodyMedium:    GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w400),
+    bodySmall:     GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w400),
+    // Labels — chips, badges, captions
+    labelLarge:    GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: _slate500),
+    labelMedium:   GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: _slate500),
+    labelSmall:    GoogleFonts.outfit(fontSize: 10, fontWeight: FontWeight.w500, color: _slate500),
   );
 
-  static TextTheme get _compactTextTheme => _interTextTheme;
+  static TextTheme get _compactTextTheme => _outfitTextTheme;
 
   static ThemeData get desktopDark  => dark.copyWith(
     scaffoldBackgroundColor: const Color(0xFF020617),
     colorScheme: dark.colorScheme.copyWith(surface: const Color(0xFF020617)),
     textTheme: _compactTextTheme.apply(fontFamily: _fontFamily, bodyColor: _onSurface, displayColor: _onSurface),
   );
-  // Desktop light: Slate-300 scaffold (less blinding on large screens),
-  // cards stay Slate-100 via GlassCard/lookbookCard — clear contrast.
   static const Color _deskScaffold  = Color(0xFFCBD5E1); // Slate-300
   static const Color _deskCard      = Color(0xFFF1F5F9); // Slate-100
   static const Color _deskBorder    = Color(0xFFE2E8F0); // Slate-200
@@ -86,7 +86,7 @@ class SetAllTheme {
       colorScheme: ColorScheme.dark(
         surface: _surfaceDark,
         onSurface: _onSurface,
-        surfaceContainerHighest: _surfaceContainer,
+        surfaceContainerHighest: _surfaceVariant,
         primary: _gold,
         onPrimary: _onGold,
         primaryContainer: _goldDim,
@@ -101,16 +101,19 @@ class SetAllTheme {
         foregroundColor: _onSurface,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.outfit(
           fontSize: 20,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: _onSurface,
         ),
       ),
       cardTheme: CardThemeData(
         color: _surfaceVariant,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: _outline, width: 1),
+        ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -120,6 +123,8 @@ class SetAllTheme {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
+          textStyle: GoogleFonts.outfit(
+            fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -146,9 +151,9 @@ class SetAllTheme {
 
   /// Light theme — same brand, light surfaces.
   static ThemeData get light {
-    const Color surfaceLight = Color(0xFFF5F5F7);          // original off-white scaffold
-    const Color surfaceVariantLight = Color(0xFFE2E8F0);   // Slate-200
-    const Color surfaceContainerLight = Color(0xFFE8EDF2); // slightly darker for fills/containers
+    const Color surfaceLight = Color(0xFFF8FAFC);           // Slate-50
+    const Color surfaceVariantLight = Color(0xFFE2E8F0);    // Slate-200
+    const Color surfaceContainerLight = Color(0xFFCBD5E1);  // Slate-300
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.light,
@@ -160,27 +165,30 @@ class SetAllTheme {
         primary: _gold,
         onPrimary: _onGold,
         primaryContainer: _goldDim,
-        onPrimaryContainer: Color(0xFF1A1A1F),
-        outline: Color(0xFF8E8E93),
+        onPrimaryContainer: const Color(0xFF1A1A1F),
+        outline: const Color(0xFFCBD5E1),
         outlineVariant: surfaceVariantLight,
-        onSurfaceVariant: Color(0xFF48484A),
+        onSurfaceVariant: const Color(0xFF475569),
       ),
       scaffoldBackgroundColor: surfaceLight,
       appBarTheme: AppBarTheme(
-        backgroundColor: surfaceLight,  // matches scaffold
+        backgroundColor: surfaceLight,
         foregroundColor: _onGold,
         elevation: 0,
         centerTitle: true,
-        titleTextStyle: GoogleFonts.inter(
+        titleTextStyle: GoogleFonts.outfit(
           fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: const Color(0xFF0F0F12),
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF0F172A),
         ),
       ),
       cardTheme: CardThemeData(
-        color: surfaceVariantLight,
+        color: Colors.white,
         elevation: 0,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: surfaceVariantLight, width: 1),
+        ),
         margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -190,6 +198,8 @@ class SetAllTheme {
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           elevation: 0,
+          textStyle: GoogleFonts.outfit(
+            fontSize: 14, fontWeight: FontWeight.w700),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -198,14 +208,14 @@ class SetAllTheme {
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Color(0xFF8E8E93)),
+          borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: _gold, width: 2),
         ),
-        labelStyle: const TextStyle(color: Color(0xFF48484A)),
-        hintStyle: const TextStyle(color: Color(0xFF8E8E93)),
+        labelStyle: const TextStyle(color: Color(0xFF475569)),
+        hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
       ),
       floatingActionButtonTheme: const FloatingActionButtonThemeData(
         backgroundColor: _gold,

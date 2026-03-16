@@ -1,0 +1,104 @@
+i18n_key,screen,en,ru,de,es,fr,ka,status
+nav.dashboard,nav,Dashboard,Главная,Dashboard,Panel,Tableau de bord,მთავარი,exists
+nav.wallet,nav,Wallet,Кошелёк,Geldbörse,Cartera,Portefeuille,საფულე,exists
+nav.groups,nav,Groups,Группы,Gruppen,Grupos,Groupes,ჯგუფები,exists
+nav.activity,nav,Activity,Активность,Aktivität,Actividad,Activité,აქტივობა,exists
+nav.analytics,nav,Analytics,Аналитика,Analyse,Análisis,Analyses,ანალიტიკა,exists
+nav.settings,nav,Settings,Настройки,Einstellungen,Ajustes,Paramètres,პარამეტრები,exists
+dashboard.title,dashboard,Dashboard,Главная,Dashboard,Panel,Tableau de bord,მთავარი,exists
+dashboard.net_worth,dashboard,Net Worth,Чистый капитал,Nettovermögen,Patrimonio neto,Patrimoine net,წმინდა ღირებულება,exists
+dashboard.wallet_cash,dashboard,Wallet Cash,Кошелёк,Bargeld,Efectivo,Trésorerie,საფულის ნაშთი,exists
+dashboard.you_are_owed,dashboard,Owed to you,Вам должны,Dir wird geschuldet,Te deben,On vous doit,გეკუთვნით,exists
+dashboard.you_owe,dashboard,You owe,Вы должны,Du schuldest,Debes,Vous devez,თქვენ გეკუთვნის,exists
+dashboard.overall_owed,dashboard,Overall you are owed,Всего вам должны,Gesamt dir geschuldet,Total que te deben,Total dû à vous,სულ გეკუთვნით,exists
+dashboard.overall_balanced,dashboard,All settled up,Все расчёты выполнены,Alles beglichen,Todo saldado,Tout est soldé,ყველაფერი ანაზღაურებულია,exists
+dashboard.recent_activity,dashboard,Recent activity,Последние операции,Letzte Aktivität,Actividad reciente,Activité récente,ბოლო ოპერაციები,exists
+dashboard.no_expenses,dashboard,No expenses yet,Расходов ещё нет,Noch keine Ausgaben,Aún no hay gastos,Pas encore de dépenses,ხარჯები ჯერ არ არის,exists
+dashboard.start_tracking,dashboard,Start Tracking,Начать учёт,Tracking starten,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,exists
+dashboard.items,dashboard,"{count} items","{count} записей","{count} Einträge","{count} registros","{count} entrées","{count} ჩანაწერი",exists
+wallet.title,wallet,Wallet,Кошелёк,Geldbörse,Cartera,Portefeuille,საფულე,exists
+wallet.income,wallet,Income,Доходы,Einnahmen,Ingresos,Revenus,შემოსავალი,exists
+wallet.expenses,wallet,Expenses,Расходы,Ausgaben,Gastos,Dépenses,ხარჯები,exists
+wallet.net,wallet,Net,Итого,Netto,Neto,Net,სულ,exists
+wallet.no_entries,wallet,No wallet entries yet,Записей в кошельке нет,Keine Einträge in der Geldbörse,Sin entradas en la cartera,Aucune entrée dans le portefeuille,საფულეში ჩანაწერი არ არის,exists
+wallet.start_tracking,wallet,Start Tracking,Начать учёт,Tracking starten,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,exists
+groups.title,groups,Groups,Группы,Gruppen,Grupos,Groupes,ჯგუფები,exists
+groups.your_groups,groups,Your groups,Ваши группы,Deine Gruppen,Tus grupos,Vos groupes,თქვენი ჯგუფები,exists
+groups.no_groups,groups,No groups yet,Групп ещё нет,Noch keine Gruppen,Aún no hay grupos,Pas encore de groupes,ჯგუფები ჯერ არ არის,exists
+groups.members,groups,"{count} members","{count} участников","{count} Mitglieder","{count} miembros","{count} membres","{count} წევრი",exists
+groups.member,groups,1 member,1 участник,1 Mitglied,1 miembro,1 membre,1 წევრი,exists
+groups.create,groups,New Group,Новая группа,Neue Gruppe,Nuevo grupo,Nouveau groupe,ახალი ჯგუფი,exists
+analytics.title,analytics,Analytics,Аналитика,Analyse,Análisis,Analyses,ანალიტიკა,exists
+analytics.spending_by_category,analytics,Spending by Category,Расходы по категориям,Ausgaben nach Kategorie,Gastos por categoría,Dépenses par catégorie,ხარჯები კატეგორიის მიხედვით,exists
+analytics.net_position_trend,analytics,Net Position — 30 Days,Чистая позиция — 30 дней,Nettoposition — 30 Tage,Posición neta — 30 días,Position nette — 30 jours,წმინდა პოზიცია — 30 დღე,exists
+analytics.no_data,analytics,No spending data yet,Данных о расходах пока нет,Noch keine Ausgabendaten,Aún no hay datos de gastos,Pas encore de données de dépenses,ხარჯების მონაცემები ჯერ არ არის,exists
+analytics.start_tracking,analytics,Start Tracking,Начать учёт,Tracking starten,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,exists
+analytics.total,analytics,Total,Итого,Gesamt,Total,Total,სულ,exists
+analytics.other,analytics,Other,Другое,Sonstiges,Otros,Autres,სხვა,exists
+analytics.wallet,analytics,Wallet,Кошелёк,Geldbörse,Cartera,Portefeuille,საფულე,exists
+analytics.groups,analytics,Groups,Группы,Gruppen,Grupos,Groupes,ჯგუფები,exists
+activity.title,activity,Activity,Активность,Aktivität,Actividad,Activité,აქტივობა,exists
+activity.no_activity,activity,No activity yet,Активности пока нет,Noch keine Aktivität,Aún no hay actividad,Pas encore d'activité,აქტივობა ჯერ არ არის,exists
+activity.start_tracking,activity,Start Tracking,Начать учёт,Tracking starten,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,exists
+activity.all,activity,All,Все,Alle,Todo,Tout,ყველა,exists
+activity.income,activity,Income,Доход,Einnahme,Ingreso,Revenu,შემოსავალი,exists
+activity.expense,activity,Expense,Расход,Ausgabe,Gasto,Dépense,ხარჯი,exists
+activity.items,activity,"{count} items","{count} записей","{count} Einträge","{count} registros","{count} entrées","{count} ჩანაწერი",exists
+settings.title,settings,Settings,Настройки,Einstellungen,Ajustes,Paramètres,პარამეტრები,exists
+settings.language,settings,Language,Язык,Sprache,Idioma,Langue,ენა,exists
+settings.language_subtitle,settings,Choose your preferred language,Выберите предпочитаемый язык,Bevorzugte Sprache wählen,Elige tu idioma preferido,Choisissez votre langue préférée,აირჩიეთ სასურველი ენა,exists
+settings.appearance,settings,Appearance,Внешний вид,Erscheinungsbild,Apariencia,Apparence,გარეგნობა,exists
+settings.preferences,settings,Preferences,Параметры,Einstellungen,Preferencias,Préférences,პარამეტრები,exists
+settings.account,settings,Account,Аккаунт,Konto,Cuenta,Compte,ანგარიში,exists
+settings.about,settings,About,О приложении,Über die App,Acerca de,À propos,აპლიკაციის შესახებ,exists
+settings.sign_out,settings,Sign out,Выйти,Abmelden,Cerrar sesión,Se déconnecter,გასვლა,exists
+settings.currency,settings,Base Currency,Валюта по умолчанию,Basiswährung,Moneda base,Devise de base,ძირითადი ვალუტა,exists
+common.save,common,Save,Сохранить,Speichern,Guardar,Enregistrer,შენახვა,exists
+common.cancel,common,Cancel,Отмена,Abbrechen,Cancelar,Annuler,გაუქმება,exists
+common.delete,common,Delete,Удалить,Löschen,Eliminar,Supprimer,წაშლა,exists
+common.edit,common,Edit,Изменить,Bearbeiten,Editar,Modifier,რედაქტირება,exists
+common.rename,common,Rename,Переименовать,Umbenennen,Renombrar,Renommer,გადარქმევა,exists
+common.loading,common,Loading…,Загрузка…,Lädt…,Cargando…,Chargement…,იტვირთება…,exists
+common.error,common,Something went wrong,Что-то пошло не так,Etwas ist schiefgelaufen,Algo salió mal,Une erreur est survenue,შეცდომა მოხდა,exists
+common.settled_up,common,All settled up,Все расчёты выполнены,Alles beglichen,Todo saldado,Tout est soldé,ყველაფერი ანაზღაურებულია,exists
+analytics.filter_all,analytics,All,Все,Alle,Todo,Tout,ყველა,hardcoded_needs_key
+analytics.all_groups,analytics,All groups,Все группы,Alle Gruppen,Todos los grupos,Tous les groupes,ყველა ჯგუფი,hardcoded_needs_key
+analytics.date_custom,analytics,Custom,Пользовательский,Benutzerdefiniert,Personalizado,Personnalisé,მორგებული,hardcoded_needs_key
+analytics.chart_donut,analytics,Donut,Пончик,Donut,Dona,Donut,დონატი,hardcoded_needs_key
+analytics.chart_pie,analytics,Pie,Пирог,Kreis,Tarta,Camembert,ტორტი,hardcoded_needs_key
+analytics.chart_bar,analytics,Bar,Полоса,Balken,Barra,Barre,ბარი,hardcoded_needs_key
+analytics.currencies,analytics,Currencies,Валюты,Währungen,Divisas,Devises,ვალუტები,hardcoded_needs_key
+analytics.today,analytics,Today,Сегодня,Heute,Hoy,Aujourd'hui,დღეს,hardcoded_needs_key
+analytics.no_data_hint,analytics,Add expenses to see your spending insights.,Добавьте расходы для просмотра аналитики.,Ausgaben hinzufügen um Einblicke zu sehen.,Añade gastos para ver tus estadísticas.,Ajoutez des dépenses pour voir vos statistiques.,დაამატეთ ხარჯები სტატისტიკის სანახავად.,hardcoded_needs_key
+analytics.income_vs_expense,analytics,Income vs Expense,Доходы и расходы,Einnahmen vs. Ausgaben,Ingresos vs Gastos,Revenus vs Dépenses,შემოსავალი vs ხარჯი,hardcoded_needs_key
+analytics.income_breakdown,analytics,Income by Category,Доходы по категориям,Einnahmen nach Kategorie,Ingresos por categoría,Revenus par catégorie,შემოსავალი კატეგორიით,hardcoded_needs_key
+analytics.balance_sheet,analytics,Balance Sheet,Баланс,Bilanz,Balance,Bilan,ბალანსი,hardcoded_needs_key
+analytics.net_flow,analytics,Net Flow,Чистый поток,Nettofluss,Flujo neto,Flux net,წმინდა ნაკადი,hardcoded_needs_key
+analytics.burn_rate,analytics,Burn Rate,Темп трат,Ausgaberate,Tasa de gasto,Taux de dépense,ხარჯვის ტემპი,hardcoded_needs_key
+analytics.top_category,analytics,Top Category,Главная категория,Hauptkategorie,Categoría principal,Catégorie principale,მთავარი კატეგორია,hardcoded_needs_key
+analytics.per_day,analytics,per day,в день,pro Tag,por día,par jour,დღეში,hardcoded_needs_key
+analytics.vs_prev_period,analytics,vs prev period,vs прошлый период,vs. Vorperiode,vs período anterior,vs période précédente,წინა პერიოდთან,hardcoded_needs_key
+analytics.all_transactions,analytics,All Transactions,Все операции,Alle Transaktionen,Todas las transacciones,Toutes les transactions,ყველა ტრანზაქცია,hardcoded_needs_key
+analytics.more_transactions,analytics,+{n} more transactions,ещё {n} операций,+{n} weitere Transaktionen,+{n} transacciones más,+{n} transactions de plus,კიდევ {n} ტრანზაქცია,hardcoded_needs_key
+analytics.more_items,analytics,+{n} more,ещё {n},+{n} weitere,+{n} más,+{n} de plus,კიდევ {n},hardcoded_needs_key
+analytics.mode_spending,analytics,Spending,Расходы,Ausgaben,Gastos,Dépenses,ხარჯები,hardcoded_needs_key
+analytics.mode_income,analytics,Income,Доходы,Einnahmen,Ingresos,Revenus,შემოსავლები,hardcoded_needs_key
+analytics.mode_balance,analytics,Balance Sheet,Баланс,Bilanz,Balance,Bilan,ბალანსი,hardcoded_needs_key
+analytics.total_income,analytics,Total Income,Итого доходов,Gesamteinnahmen,Ingresos totales,Revenus totaux,სულ შემოსავალი,hardcoded_needs_key
+analytics.total_expenses,analytics,Total Expenses,Итого расходов,Gesamtausgaben,Gastos totales,Dépenses totales,სულ ხარჯები,hardcoded_needs_key
+analytics.net_position,analytics,Net Position,Чистая позиция,Nettoposition,Posición neta,Position nette,წმინდა პოზიცია,hardcoded_needs_key
+groups.default_currency,groups,Default Currency,Валюта по умолчанию,Standardwährung,Moneda predeterminada,Devise par défaut,ნაგულისხმევი ვალუტა,hardcoded_needs_key
+groups.no_currency,groups,No preference,Без предпочтений,Keine Präferenz,Sin preferencia,Pas de préférence,პრეფერენციის გარეშე,hardcoded_needs_key
+wallet.delete_entry_title,wallet,Delete entry?,Удалить запись?,Eintrag löschen?,¿Eliminar entrada?,Supprimer l'entrée ?,ჩანაწერის წაშლა?,hardcoded_needs_key
+wallet.delete_entry_body,wallet,This wallet entry will be permanently removed.,Эта запись будет удалена навсегда.,Dieser Eintrag wird dauerhaft entfernt.,Esta entrada será eliminada permanentemente.,Cette entrée sera supprimée définitivement.,ეს ჩანაწერი სამუდამოდ წაიშლება.,hardcoded_needs_key
+wallet.rate_at_entry,wallet,"Rate at entry: 1 {ccy} = {rate} {base}","Курс при вводе: 1 {ccy} = {rate} {base}","Kurs bei Eingabe: 1 {ccy} = {rate} {base}","Tasa al ingresar: 1 {ccy} = {rate} {base}","Taux à la saisie : 1 {ccy} = {rate} {base}","შეყვანის კურსი: 1 {ccy} = {rate} {base}",hardcoded_needs_key
+wallet.category_label,wallet,Category,Категория,Kategorie,Categoría,Catégorie,კატეგორია,hardcoded_needs_key
+wallet.notes_label,wallet,Notes,Заметки,Notizen,Notas,Notes,შენიშვნები,hardcoded_needs_key
+wallet.attachments_label,wallet,Attachments ({count}),Вложения ({count}),Anhänge ({count}),Adjuntos ({count}),Pièces jointes ({count}),დანართები ({count}),hardcoded_needs_key
+wallet.currency_approx_note,wallet,Figures are approximated in {ccy} using the USD anchor.,Данные приблизительны в {ccy} по курсу USD.,Werte sind in {ccy} über USD-Anker geschätzt.,Las cifras se aproximan en {ccy} usando USD.,Les chiffres sont approximés en {ccy} via USD.,მნიშვნელობები {ccy}-ში USD-ით არის,hardcoded_needs_key
+wallet.could_not_open,wallet,Could not open attachment,Не удалось открыть вложение,Anhang konnte nicht geöffnet werden,No se pudo abrir el adjunto,Impossible d'ouvrir la pièce jointe,დანართის გახსნა ვერ მოხერხდა,hardcoded_needs_key
+friends.invite_title,friends,Invite a Friend,Пригласить друга,Freund einladen,Invitar a un amigo,Inviter un ami,მეგობრის მოწვევა,hardcoded_needs_key
+friends.share_link_title,friends,Share your personal link,Поделитесь вашей ссылкой,Teile deinen persönlichen Link,Comparte tu enlace personal,Partagez votre lien personnel,გააზიარეთ პირადი ბმული,hardcoded_needs_key
+friends.link_copied,friends,Link copied!,Ссылка скопирована!,Link kopiert!,¡Enlace copiado!,Lien copié !,ბმული დაკოპირდა!,hardcoded_needs_key
+friends.copy_link,friends,Copy link,Копировать ссылку,Link kopieren,Copiar enlace,Copier le lien,ბმულის კოპირება,hardcoded_needs_key
+friends.share_via,friends,Share via…,Поделиться через…,Teilen über…,Compartir vía…,Partager via…,გაზიარება…,hardcoded_needs_key

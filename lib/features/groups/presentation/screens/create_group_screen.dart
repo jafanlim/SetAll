@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io' as _io;
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -100,10 +101,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   String? _error;
 
   // Identity customization
-  int _colorIdx      = 0; // index into _groupPalette
-  int _iconIdx       = 0; // index into _groupIcons
+  int _colorIdx        = 0; // index into _groupPalette
+  int _iconIdx         = 0; // index into _groupIcons
   Color? _customColor;
   String? _avatarLocalPath;
+  String? _defaultCurrency;
 
   // Selected members to add on creation
   final List<ProfileModel> _selected = [];
@@ -145,18 +147,18 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_library_outlined),
-              title: const Text('Choose from Gallery'),
+              title: Text('create_group.choose_gallery'.tr()),
               onTap: () => Navigator.pop(ctx, ImageSource.gallery),
             ),
             ListTile(
               leading: const Icon(Icons.camera_alt_outlined),
-              title: const Text('Take a Photo'),
+              title: Text('create_group.take_photo'.tr()),
               onTap: () => Navigator.pop(ctx, ImageSource.camera),
             ),
             if (_avatarLocalPath != null)
               ListTile(
                 leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                title: const Text('Remove Photo', style: TextStyle(color: Colors.redAccent)),
+                title: Text('create_group.remove_photo'.tr(), style: const TextStyle(color: Colors.redAccent)),
                 onTap: () {
                   Navigator.pop(ctx);
                   setState(() => _avatarLocalPath = null);
@@ -191,7 +193,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
   Future<void> _create() async {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      setState(() => _error = 'Please enter a group name.');
+      setState(() => _error = 'create_group.please_enter_name'.tr());
       return;
     }
     setState(() { _creating = true; _error = null; });
@@ -209,10 +211,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       if (_avatarLocalPath != null) {
         // We need the group id first — create without avatar, then upload.
         final tempGroup = await repo.createGroup(
-          name, iconName: iconName, colorValue: colorValue);
+          name, iconName: iconName, colorValue: colorValue,
+          defaultCurrency: _defaultCurrency);
         if (tempGroup == null) {
           setState(() {
-            _error    = 'Could not create group. Check your connection.';
+            _error    = 'create_group.could_not_create'.tr();
             _creating = false;
           });
           return;
@@ -232,10 +235,11 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
         iconName: iconName,
         colorValue: colorValue,
         avatarUrl: avatarStoragePath,
+        defaultCurrency: _defaultCurrency,
       );
       if (group == null) {
         setState(() {
-          _error    = 'Could not create group. Check your connection.';
+          _error    = 'create_group.could_not_create'.tr();
           _creating = false;
         });
         return;
@@ -244,7 +248,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error    = 'Could not create group: ${e.toString().replaceFirst('Exception: ', '')}';
+        _error    = 'create_group.could_not_create'.tr();
         _creating = false;
       });
     }
@@ -271,8 +275,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'Group created, but could not add: ${failedNames.join(', ')}. '
-            'Try adding them from the group page.',
+            'create_group.partial_add_failed'.tr(namedArgs: {'names': failedNames.join(', ')}),
           ),
           duration: const Duration(seconds: 5),
         ),
@@ -301,9 +304,9 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'New Group',
-          style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+        title: Text(
+          'create_group.title'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -321,7 +324,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
               children: [
 
                 // ── Group Appearance ─────────────────────────────────────────
-                _SectionLabel('Group Appearance', theme),
+                _SectionLabel('create_group.appearance'.tr(), theme),
                 const SizedBox(height: 10),
 
                 // Avatar preview + upload button
@@ -373,7 +376,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
                 // ── Colour picker ────────────────────────────────────────────
                 Text(
-                  'Colour',
+                  'create_group.colour'.tr(),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -452,7 +455,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
                 // ── Icon picker ──────────────────────────────────────────────
                 Text(
-                  'Icon',
+                  'create_group.icon'.tr(),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -494,17 +497,44 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   }),
                 ),
 
+                const SizedBox(height: 16),
+
+                // ── Group currency ───────────────────────────────────────────
+                Text(
+                  'create_group.group_currency'.tr(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: theme.colorScheme.onSurfaceVariant,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'create_group.group_currency_subtitle'.tr(),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _CurrencyPickerButton(
+                  value: _defaultCurrency,
+                  accent: _accentColor,
+                  onChanged: (v) => setState(() => _defaultCurrency = v),
+                ),
+
                 const SizedBox(height: 24),
 
                 // ── Group name ───────────────────────────────────────────────
-                _SectionLabel('Group Name', theme),
+                _SectionLabel('create_group.group_name'.tr(), theme),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _nameCtrl,
                   autofocus: false,
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
-                    hintText: 'e.g. Barcelona trip, Flat mates…',
+                    hintText: 'create_group.group_name_hint'.tr(),
                     prefixIcon: const Icon(Icons.group_outlined),
                     errorText: _error,
                   ),
@@ -517,7 +547,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
 
                 // ── Selected members chips ───────────────────────────────────
                 if (_selected.isNotEmpty) ...[
-                  _SectionLabel('Members (${_selected.length})', theme),
+                  _SectionLabel('create_group.members_count'.tr(namedArgs: {'count': '${_selected.length}'}), theme),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -553,7 +583,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _SectionLabel('Quick Add', theme),
+                        _SectionLabel('create_group.quick_add'.tr(), theme),
                         const SizedBox(height: 8),
                         Wrap(
                           spacing: 8,
@@ -595,14 +625,14 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 ),
 
                 // ── Add members section ──────────────────────────────────────
-                _SectionLabel('Add Members (optional)', theme),
+                _SectionLabel('create_group.add_members'.tr(), theme),
                 const SizedBox(height: 6),
                 TextField(
                   controller: _searchCtrl,
                   onChanged: _onQueryChanged,
                   keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
-                    hintText: 'Search by name, @nickname or email…',
+                    hintText: 'create_group.search_hint'.tr(),
                     prefixIcon: const Icon(Icons.person_search_outlined),
                     suffixIcon: _searchCtrl.text.isNotEmpty
                         ? IconButton(
@@ -627,14 +657,14 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                     ),
                     error: (_, _) => Padding(
                       padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: Text('Search unavailable. Check connection.',
+                      child: Text('create_group.search_unavailable'.tr(),
                           style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                     ),
                     data: (results) {
                       if (results.isEmpty) {
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text('No users found for "$_query".',
+                          child: Text('create_group.no_users_found'.tr(namedArgs: {'query': _query}),
                               style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant)),
                         );
                       }
@@ -684,7 +714,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     child: Text(
-                      'You can add members now or later from the group page.',
+                      'create_group.add_later_hint'.tr(),
                       style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                     ),
                   ),
@@ -719,10 +749,12 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                   : const Icon(Icons.check_rounded),
               label: Text(
                 _creating
-                    ? 'Creating…'
+                    ? 'create_group.creating'.tr()
                     : _selected.isEmpty
-                        ? 'Create Group'
-                        : 'Create Group with ${_selected.length} member${_selected.length == 1 ? '' : 's'}',
+                        ? 'create_group.create_btn'.tr()
+                        : _selected.length == 1
+                            ? 'create_group.create_with_members_one'.tr()
+                            : 'create_group.create_with_members_other'.tr(namedArgs: {'count': '${_selected.length}'}),
                 style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
               ),
             ),
@@ -757,7 +789,7 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return AlertDialog(
-      title: const Text('Pick a colour', style: TextStyle(fontSize: 16)),
+      title: Text('create_group.pick_colour'.tr(), style: const TextStyle(fontSize: 16)),
       content: SizedBox(
         width: 280,
         child: Column(
@@ -820,11 +852,11 @@ class _ColorPickerDialogState extends State<_ColorPickerDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: const Text('Cancel'),
+          child: Text('common.cancel'.tr()),
         ),
         FilledButton(
           onPressed: () => Navigator.pop(context, _selected),
-          child: const Text('Apply'),
+          child: Text('common.apply'.tr()),
         ),
       ],
     );
@@ -848,6 +880,175 @@ class _SectionLabel extends StatelessWidget {
         fontWeight: FontWeight.w600,
         color: theme.colorScheme.onSurfaceVariant,
         letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Currency picker button (shared by Create + Edit group screens)
+// ---------------------------------------------------------------------------
+const _kCommonCurrencies = [
+  'USD', 'EUR', 'GBP', 'JPY', 'CNY', 'INR', 'AUD', 'CAD', 'CHF', 'KRW',
+  'SGD', 'HKD', 'SEK', 'NOK', 'DKK', 'NZD', 'MXN', 'BRL', 'ZAR', 'RUB',
+  'TRY', 'AED', 'SAR', 'THB', 'IDR', 'MYR', 'PHP', 'VND', 'PLN', 'HUF',
+  'CZK', 'ILS', 'CLP', 'PKR', 'EGP', 'NGN', 'UAH', 'GEL', 'RON', 'ARS',
+];
+
+class _CurrencyPickerButton extends StatelessWidget {
+  const _CurrencyPickerButton({
+    required this.value,
+    required this.accent,
+    required this.onChanged,
+  });
+  final String?  value;
+  final Color    accent;
+  final ValueChanged<String?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return GestureDetector(
+      onTap: () => _openPicker(context),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: value != null
+                ? accent.withValues(alpha: 0.6)
+                : theme.colorScheme.outlineVariant,
+            width: value != null ? 1.2 : 0.8,
+          ),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              Icons.currency_exchange_outlined,
+              size: 18,
+              color: value != null ? accent : theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                value ?? 'create_group.use_default_currency'.tr(),
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: value != null ? FontWeight.w700 : FontWeight.w400,
+                  color: value != null
+                      ? theme.colorScheme.onSurface
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            if (value != null)
+              GestureDetector(
+                onTap: () => onChanged(null),
+                child: Icon(Icons.close, size: 16,
+                    color: theme.colorScheme.onSurfaceVariant),
+              )
+            else
+              Icon(Icons.chevron_right, size: 18,
+                  color: theme.colorScheme.onSurfaceVariant),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openPicker(BuildContext context) async {
+    final picked = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _CurrencyPickerSheet(current: value),
+    );
+    if (picked != null) onChanged(picked);
+  }
+}
+
+class _CurrencyPickerSheet extends StatefulWidget {
+  const _CurrencyPickerSheet({required this.current});
+  final String? current;
+
+  @override
+  State<_CurrencyPickerSheet> createState() => _CurrencyPickerSheetState();
+}
+
+class _CurrencyPickerSheetState extends State<_CurrencyPickerSheet> {
+  final _ctrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme    = Theme.of(context);
+    final filtered = _kCommonCurrencies
+        .where((c) => c.contains(_query.toUpperCase()))
+        .toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.6,
+      maxChildSize: 0.92,
+      minChildSize: 0.4,
+      builder: (ctx, scroll) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                textCapitalization: TextCapitalization.characters,
+                decoration: InputDecoration(
+                  hintText: 'create_group.search_currency'.tr(),
+                  prefixIcon: const Icon(Icons.search, size: 18),
+                ),
+                onChanged: (v) => setState(() => _query = v.trim()),
+              ),
+            ),
+            Expanded(
+              child: ListView.builder(
+                controller: scroll,
+                itemCount: filtered.length,
+                itemBuilder: (_, i) {
+                  final c = filtered[i];
+                  final selected = c == widget.current;
+                  return ListTile(
+                    title: Text(c,
+                        style: TextStyle(
+                          fontWeight: selected
+                              ? FontWeight.w700 : FontWeight.w500,
+                          color: selected
+                              ? const Color(0xFF00D9B0)
+                              : theme.colorScheme.onSurface,
+                        )),
+                    trailing: selected
+                        ? const Icon(Icons.check_circle,
+                            color: Color(0xFF00D9B0), size: 20)
+                        : null,
+                    onTap: () => Navigator.pop(context, c),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

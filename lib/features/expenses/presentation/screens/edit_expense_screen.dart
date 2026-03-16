@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +11,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/services/date_format_service.dart';
 import '../../../../core/utils/attachment_processor.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
@@ -342,7 +344,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         final totalManual = amounts.fold(Decimal.zero, (a, b) => a + b);
         if (totalManual != amount) {
           if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Amounts must sum to $amount (got $totalManual)'))); }
+            SnackBar(content: Text('add_expense.amounts_must_sum'.tr(namedArgs: {'amount': amount.toString(), 'total': totalManual.toString()})))); }
           return;
         }
         results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, amountsOwed: amounts);
@@ -380,11 +382,11 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         ref.invalidate(groupExpensesProvider(widget.groupId));
         ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Expense updated')));
+            .showSnackBar(SnackBar(content: Text('edit_expense.expense_updated'.tr())));
         context.pop();
       } else {
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Could not update expense')));
+            .showSnackBar(SnackBar(content: Text('edit_expense.could_not_update'.tr())));
       }
     }
   }
@@ -393,7 +395,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   List<Widget> _buildPayerSection(ThemeData theme) {
     return [
       Row(children: [
-        Text('Paid by',
+        Text('add_expense.payer_label'.tr(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
       ]),
@@ -426,11 +428,11 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
   // ── Split mode + per-member inputs ──────────────────────────────────────
   List<Widget> _buildSplitSection(ThemeData theme) {
-    const modes = [
-      (SplitMode.even,       'Even'),
-      (SplitMode.shares,     'Shares'),
-      (SplitMode.percentage, '%'),
-      (SplitMode.manual,     'Manual'),
+    final modes = [
+      (SplitMode.even,       'add_expense.split_even'.tr()),
+      (SplitMode.shares,     'add_expense.split_shares'.tr()),
+      (SplitMode.percentage, 'add_expense.split_percent'.tr()),
+      (SplitMode.manual,     'add_expense.split_manual'.tr()),
     ];
     final suffix = _splitMode == SplitMode.percentage
         ? '%'
@@ -440,7 +442,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
     return [
       Row(children: [
-        Text('Split',
+        Text('add_expense.split_label'.tr(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
       ]),
@@ -533,14 +535,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Edit expense')),
+        appBar: AppBar(title: Text('edit_expense.title'.tr())),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_expense == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Edit expense')),
-        body: const Center(child: Text('Expense not found')),
+        appBar: AppBar(title: Text('edit_expense.title'.tr())),
+        body: Center(child: Text('edit_expense.not_found'.tr())),
       );
     }
 
@@ -555,7 +557,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Edit entry'),
+        title: Text('edit_expense.title'.tr()),
         leading: IconButton(
           icon: const Icon(Icons.close),
           onPressed: () => context.pop(),
@@ -595,7 +597,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Icon & Colour',
+                      Text('add_expense.icon_colour'.tr(),
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 10, fontWeight: FontWeight.w600)),
@@ -603,8 +605,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       TextButton.icon(
                         onPressed: _showIconPicker,
                         icon: const Icon(Icons.palette_outlined, size: 14),
-                        label: const Text('Change icon & colour',
-                            style: TextStyle(fontSize: 12)),
+                        label: Text('add_expense.change_icon'.tr(),
+                            style: const TextStyle(fontSize: 12)),
                         style: TextButton.styleFrom(
                           foregroundColor: _teal,
                           padding: EdgeInsets.zero,
@@ -639,7 +641,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                     const SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        isToday ? 'Today · $dateLabel' : dateLabel,
+                        isToday ? '${'common.today_prefix'.tr()} · $dateLabel' : dateLabel,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
@@ -661,7 +663,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: _teal),
               decoration: InputDecoration(
-                labelText: 'Amount',
+                labelText: 'add_expense.amount_label'.tr(),
                 labelStyle: const TextStyle(fontSize: 13),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -672,9 +674,9 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
               ),
               onChanged: (_) => setState(() {}),
               validator: (v) {
-                if (v == null || v.trim().isEmpty) return 'Enter amount';
+                if (v == null || v.trim().isEmpty) return 'add_expense.amount_label'.tr();
                 final d = Decimal.tryParse(v.trim().replaceAll(',', '.'));
-                if (d == null || d <= Decimal.zero) return 'Enter a valid amount';
+                if (d == null || d <= Decimal.zero) return 'add_expense.enter_valid_amount'.tr();
                 return null;
               },
             ),
@@ -693,13 +695,13 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             // ── Category chips (standard + user) ─────────────────────────
             Row(
               children: [
-                Text('Category',
+                Text('add_expense.category_label'.tr(),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Standard',
+            Text('add_expense.standard_categories'.tr(),
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                   fontSize: 10, fontWeight: FontWeight.w600)),
@@ -709,7 +711,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
               children: kExpenseCategories.map((cat) {
                 final sel = _category == cat;
                 return FilterChip(
-                  label: Text(cat, style: const TextStyle(fontSize: 11)),
+                  label: Text(categoryTr(cat), style: const TextStyle(fontSize: 11)),
                   selected: sel,
                   selectedColor: _teal.withValues(alpha: 0.15),
                   checkmarkColor: _teal,
@@ -731,7 +733,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 10),
-                    Text('Your Categories',
+                    Text('add_expense.your_categories'.tr(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                           fontSize: 10, fontWeight: FontWeight.w600)),
@@ -784,7 +786,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             TextFormField(
               controller: _descriptionController,
               decoration: InputDecoration(
-                labelText: 'Description (optional)',
+                labelText: 'add_expense.description_label'.tr(),
                 prefixIcon: const Icon(Icons.notes_outlined),
                 filled: true,
                 fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
@@ -800,27 +802,27 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             // ── Attachments ─────────────────────────────────────────────
             Row(
               children: [
-                Text('Attachments',
+                Text('common.attachments'.tr(),
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                 const Spacer(),
                 if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) ...[
                   AttachButton(
                     icon: Icons.photo_camera_outlined,
-                    label: 'Camera',
+                    label: 'common.camera'.tr(),
                     onTap: () => _pickImage(ImageSource.camera),
                   ),
                   const SizedBox(width: 8),
                 ],
                 AttachButton(
                   icon: Icons.photo_library_outlined,
-                  label: 'Gallery',
+                  label: 'common.gallery'.tr(),
                   onTap: () => _pickImage(ImageSource.gallery),
                 ),
                 const SizedBox(width: 8),
                 AttachButton(
                   icon: Icons.attach_file_outlined,
-                  label: 'File',
+                  label: 'common.file'.tr(),
                   onTap: _pickFile,
                 ),
               ],
@@ -889,7 +891,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             TextFormField(
               controller: _notesController,
               decoration: InputDecoration(
-                labelText: 'Notes (optional)',
+                labelText: 'add_expense.notes_label'.tr(),
                 hintText: 'Additional details, or import a .txt / .md file above',
                 prefixIcon: const Icon(Icons.notes_outlined),
                 filled: true,
@@ -924,7 +926,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
                       height: 22, width: 22,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
                     )
-                  : const Text('Save changes', style: TextStyle(fontWeight: FontWeight.w700)),
+                  : Text('edit_expense.save_changes'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
             const SizedBox(height: 32),
           ],
