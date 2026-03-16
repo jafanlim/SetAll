@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
-import 'dart:io' as _io
+import 'dart:io' as io_lib
     if (dart.library.html) '../../core/stubs/io_stub.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart'
     if (dart.library.html) '../../core/stubs/image_compress_stub.dart';
@@ -617,7 +617,7 @@ class SetAllRepository {
           a[i].name != b[i].name ||
           a[i].iconName != b[i].iconName ||
           a[i].colorValue != b[i].colorValue ||
-          a[i].avatarUrl != b[i].avatarUrl) return true;
+          a[i].avatarUrl != b[i].avatarUrl) { return true; }
     }
     return false;
   }
@@ -778,10 +778,10 @@ class SetAllRepository {
       }
       await _client.from('groups').insert({
         'id': id, 'name': name, 'creator_id': uid, 'type': 'normal',
-        if (iconName != null) 'icon_name': iconName,
-        if (colorValue != null) 'color_value': colorValue,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
-        if (defaultCurrency != null) 'default_currency': defaultCurrency,
+        'icon_name': ?iconName,
+        'color_value': ?colorValue,
+        'avatar_url': ?avatarUrl,
+        'default_currency': ?defaultCurrency,
       });
       await _client
           .from('group_members')
@@ -815,10 +815,10 @@ class SetAllRepository {
       'created_at': now,
       'updated_at': now,
       'synced_at': -1,
-      if (iconName != null) 'icon_name': iconName,
-      if (colorValue != null) 'color_value': colorValue,
-      if (avatarUrl != null) 'avatar_url': avatarUrl,
-      if (defaultCurrency != null) 'default_currency': defaultCurrency,
+      'icon_name': ?iconName,
+      'color_value': ?colorValue,
+      'avatar_url': ?avatarUrl,
+      'default_currency': ?defaultCurrency,
     });
     await db.insert('group_members', {
       'group_id': id,
@@ -838,10 +838,10 @@ class SetAllRepository {
             defaultCurrency != null) {
           try {
             await _client.from('groups').update({
-              if (iconName != null) 'icon_name': iconName,
-              if (colorValue != null) 'color_value': colorValue,
-              if (avatarUrl != null) 'avatar_url': avatarUrl,
-              if (defaultCurrency != null) 'default_currency': defaultCurrency,
+              'icon_name': ?iconName,
+              'color_value': ?colorValue,
+              'avatar_url': ?avatarUrl,
+              'default_currency': ?defaultCurrency,
             }).eq('id', finalId);
           } catch (_) {}
         }
@@ -955,7 +955,7 @@ class SetAllRepository {
           format: CompressFormat.jpeg, keepExif: false,
         );
       }
-      final uploadBytes = bytes ?? (kIsWeb ? Uint8List(0) : await _io.File(localPath).readAsBytes());
+      final uploadBytes = bytes ?? (kIsWeb ? Uint8List(0) : await io_lib.File(localPath).readAsBytes());
       final storagePath = '$uid/$groupId/avatar.$ext';
       await _client.storage
           .from('group-avatars')

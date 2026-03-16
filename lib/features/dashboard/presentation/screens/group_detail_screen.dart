@@ -1453,7 +1453,7 @@ class _GroupAvatarImage extends ConsumerWidget {
               borderRadius: BorderRadius.circular(14),
               child: Image.network(url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) =>
+                  errorBuilder: (_, _, _) =>
                       Icon(iconData, size: 24, color: accent)),
             )
           : Icon(iconData, size: 24, color: accent),
@@ -1461,7 +1461,7 @@ class _GroupAvatarImage extends ConsumerWidget {
           child: SizedBox(
               width: 18, height: 18,
               child: CircularProgressIndicator(strokeWidth: 2))),
-      error: (_, __) => Icon(iconData, size: 24, color: accent),
+      error: (_, _) => Icon(iconData, size: 24, color: accent),
     );
   }
 }

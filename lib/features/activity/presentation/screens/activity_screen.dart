@@ -834,7 +834,7 @@ Widget _lookbookCard({
   final theme    = Theme.of(context);
   final isDark    = theme.brightness == Brightness.dark;
   final scaffold  = theme.scaffoldBackgroundColor;
-  final isDesktop = !isDark && scaffold.red < 215 && scaffold.green < 225 && scaffold.blue < 235;
+  final isDesktop = !isDark && (scaffold.r * 255.0).round() < 215 && (scaffold.g * 255.0).round() < 225 && (scaffold.b * 255.0).round() < 235;
 
   final Color cardBg;
   final Color border;

@@ -59,7 +59,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   _ActivitySort     _actSort     = _ActivitySort.newest;
   String?           _actCatFilter;
   Set<String>       _groupNameFilter  = {};
-  Set<int>          _groupColorFilter = {};
+  final Set<int>    _groupColorFilter = {};
 
   @override
   void initState() {
@@ -121,7 +121,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 return CheckboxListTile(
                   value: tempSelected.contains(g.id),
                   onChanged: (v) => setLocal(() {
-                    if (v == true) tempSelected.add(g.id); else tempSelected.remove(g.id);
+                    if (v == true) { tempSelected.add(g.id); } else { tempSelected.remove(g.id); }
                   }),
                   title: Text(g.name,
                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
@@ -1182,7 +1182,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 
   // Map icon name -> IconData for the group card avatar.
   static IconData _iconForName(String? name) {
-    const _map = {
+    const iconMap = {
       'groups':     Icons.groups_outlined,
       'home':       Icons.home_outlined,
       'flight':     Icons.flight_outlined,
@@ -1199,7 +1199,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       'health':     Icons.favorite_outline,
       'coffee':     Icons.local_cafe_outlined,
     };
-    return _map[name] ?? Icons.groups_outlined;
+    return iconMap[name] ?? Icons.groups_outlined;
   }
 
   @override
@@ -1260,7 +1260,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                                 width: 40,
                                 height: 40,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                errorBuilder: (_, _, _) => Center(
                                   child: Icon(Icons.groups_outlined, size: 20, color: accentColor),
                                 ),
                               )

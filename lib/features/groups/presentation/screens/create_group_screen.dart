@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'dart:io' as _io;
+import 'dart:io' as dart_io;
 
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
@@ -348,7 +348,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(18),
                                   child: Image.file(
-                                    _io.File(_avatarLocalPath!),
+                                    dart_io.File(_avatarLocalPath!),
                                     fit: BoxFit.cover,
                                   ),
                                 )
@@ -574,7 +574,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
                 // ── Fast-add from existing groups ────────────────────────────
                 existingMembersAsync.when(
                   loading: () => const SizedBox.shrink(),
-                  error: (_, __) => const SizedBox.shrink(),
+                  error: (_, _) => const SizedBox.shrink(),
                   data: (existing) {
                     final available = existing
                         .where((p) => !_selected.any((s) => s.id == p.id))

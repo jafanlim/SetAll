@@ -244,9 +244,9 @@ class SyncService {
         if (iconName != null || colorValue != null || avatarUrl != null) {
           try {
             await _client.from('groups').update({
-              if (iconName   != null) 'icon_name':   iconName,
-              if (colorValue != null) 'color_value': colorValue,
-              if (avatarUrl  != null) 'avatar_url':  avatarUrl,
+              'icon_name':   ?iconName,
+              'color_value': ?colorValue,
+              'avatar_url':  ?avatarUrl,
             }).eq('id', finalId);
           } catch (_) {}
         }

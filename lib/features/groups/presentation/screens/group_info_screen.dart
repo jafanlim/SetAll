@@ -265,7 +265,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                                 width: 64,
                                 height: 64,
                                 fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) => Center(
+                                errorBuilder: (_, _, _) => Center(
                                   child: Icon(Icons.groups_outlined, size: 30, color: accentColor),
                                 ),
                               )

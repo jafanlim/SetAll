@@ -568,7 +568,7 @@ class _NetworkAvatar extends ConsumerWidget {
               borderRadius: BorderRadius.circular(18),
               child: Image.network(url,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Icon(
+                  errorBuilder: (_, _, _) => Icon(
                       Icons.groups_outlined,
                       size: 36,
                       color: accent)),
@@ -579,7 +579,7 @@ class _NetworkAvatar extends ConsumerWidget {
               width: 20,
               height: 20,
               child: CircularProgressIndicator(strokeWidth: 2))),
-      error: (_, __) => Icon(Icons.groups_outlined, size: 36, color: accent),
+      error: (_, _) => Icon(Icons.groups_outlined, size: 36, color: accent),
     );
   }
 }

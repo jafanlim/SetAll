@@ -20,24 +20,38 @@
         }
     </script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap');
-        body { font-family: 'Outfit', sans-serif; background-color: #020617; color: #F8FAFC; }
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap');
+        body { font-family: 'Outfit', sans-serif; background-color: #020617; color: #F8FAFC; overflow-x: hidden; }
         .wiggle { animation: wiggle 0.5s ease-in-out infinite; }
         @keyframes wiggle { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
+        .brand-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 25vw; font-weight: 900; color: rgba(255,255,255,0.02); pointer-events: none; z-index: 0; user-select: none; }
+        .donut-segment { transition: stroke-dashoffset 1s ease-out, stroke-width 0.2s; cursor: pointer; }
+        .donut-segment:hover { stroke-width: 10; filter: brightness(1.2); }
+        .bar-grow { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .bar-grow:hover { filter: brightness(1.3); }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #14B8A6; }
     </style>
 </head>
 <body>
+    <div class="brand-watermark">SetAll</div>
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState, useMemo, useEffect, useRef } = React;
 
-        const CATEGORY_COLORS = ["#14B8A6", "#8B5CF6", "#F59E0B", "#EF4444", "#3B82F6", "#EC4899"];
+        const apiKey = ""; // Set your Gemini API key here
+        const CATEGORY_COLORS = ["#14B8A6", "#8B5CF6", "#F59E0B", "#EF4444", "#3B82F6", "#EC4899", "#8B5CF6"];
+        
         const INITIAL_DATA = [
             { date: '2024-03-01', category: 'Groceries', amount: 120, type: 'expense' },
             { date: '2024-03-05', category: 'Salary', amount: 3500, type: 'income' },
             { date: '2024-03-10', category: 'Rent', amount: 1200, type: 'expense' },
             { date: '2024-03-15', category: 'Travel', amount: 450, type: 'expense' },
+            { date: '2024-03-18', category: 'Dining', amount: 85, type: 'expense' },
             { date: '2024-03-25', category: 'Utilities', amount: 150, type: 'expense' },
         ];
 
@@ -46,54 +60,70 @@
             return <i data-lucide={name} className={className} style={{ width: size, height: size }}></i>;
         };
 
-        const DonutChart = ({ data, total }) => {
+        // --- Custom Interactive Charts ---
+        const InteractiveDonut = ({ data, total, onSliceClick }) => {
             let currentOffset = 0;
             return (
-                <div className="relative w-48 h-48 mx-auto flex items-center justify-center">
-                    <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
+                <div className="relative w-64 h-64 mx-auto flex items-center justify-center mt-4 mb-6">
+                    <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90 drop-shadow-2xl">
                         <circle cx="50" cy="50" r="15.9" fill="transparent" stroke="#1E293B" strokeWidth="6" />
                         {data.map((d, i) => {
                             const pct = (d.value / (total || 1)) * 100;
                             const offset = currentOffset;
                             currentOffset += pct;
-                            return <circle key={i} cx="50" cy="50" r="15.9" fill="transparent" stroke={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} strokeWidth="6" strokeDasharray={`${pct} 100`} strokeDashoffset={-offset} className="transition-all duration-1000" />
+                            return (
+                                <circle 
+                                    key={i} cx="50" cy="50" r="15.9" fill="transparent" 
+                                    stroke={CATEGORY_COLORS[i % CATEGORY_COLORS.length]} 
+                                    strokeWidth="6" strokeDasharray={`${pct} 100`} strokeDashoffset={-offset} 
+                                    className="donut-segment"
+                                    onClick={() => onSliceClick(d.name, d.value, pct)}
+                                />
+                            )
                         })}
                     </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold">Total</span>
-                        <span className="text-xl font-bold">${total.toLocaleString()}</span>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                        <span className="text-[12px] text-slate-500 uppercase font-bold tracking-widest">Total Spent</span>
+                        <span className="text-3xl font-extrabold text-white mt-1">${total.toLocaleString()}</span>
                     </div>
                 </div>
             );
         };
 
-        const TrendBarChart = ({ data }) => {
+        const InteractiveBarChart = ({ data, onBarClick }) => {
             const max = Math.max(...data.map(d => Math.max(d.income, d.expense)), 1) * 1.1;
             return (
                 <div className="flex items-end justify-between h-full w-full gap-2 pt-4">
                     {data.map((d, i) => (
                         <div key={i} className="flex flex-col justify-end items-center flex-1 h-full group relative">
-                            <div className="flex items-end gap-1 w-full h-full justify-center">
-                                <div style={{ height: `${(d.income/max)*100}%` }} className="w-full max-w-[12px] bg-brand-teal rounded-t-sm opacity-80" />
-                                <div style={{ height: `${(d.expense/max)*100}%` }} className="w-full max-w-[12px] bg-brand-purple rounded-t-sm opacity-80" />
+                            <div className="absolute bottom-full mb-2 bg-brand-slate text-xs p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-10 whitespace-nowrap border border-slate-700 shadow-2xl pointer-events-none">
+                                <div className="font-bold text-white mb-2 border-b border-slate-700 pb-1">Mar {d.day}</div>
+                                <div className="flex justify-between gap-4 text-brand-teal"><span>In:</span> <span>${d.income}</span></div>
+                                <div className="flex justify-between gap-4 text-brand-purple"><span>Out:</span> <span>${d.expense}</span></div>
                             </div>
-                            <span className="text-[10px] text-slate-500 mt-2">{d.day}</span>
+                            <div className="flex items-end gap-1.5 w-full h-full justify-center">
+                                <div onClick={() => onBarClick('Income', d.income, d.day)} style={{ height: `${(d.income/max)*100}%` }} className="w-full max-w-[16px] bg-brand-teal rounded-t-md opacity-90 bar-grow" />
+                                <div onClick={() => onBarClick('Expense', d.expense, d.day)} style={{ height: `${(d.expense/max)*100}%` }} className="w-full max-w-[16px] bg-brand-purple rounded-t-md opacity-90 bar-grow" />
+                            </div>
+                            <span className="text-xs text-slate-500 mt-3 font-semibold">{d.day}</span>
                         </div>
                     ))}
                 </div>
             );
         };
 
+        // --- Main App ---
         function App() {
             const [data] = useState(INITIAL_DATA);
             const [isEditMode, setIsEditMode] = useState(false);
             const [widgets, setWidgets] = useState([
                 { id: 'w1', type: 'stat', title: 'Net Worth', metric: 'net' },
                 { id: 'w2', type: 'stat', title: 'Daily Burn', metric: 'burn' },
-                { id: 'w3', type: 'trend', title: 'Cash Flow Analysis' },
-                { id: 'w4', type: 'donut', title: 'Spending Categories' },
+                { id: 'w3', type: 'trend', title: 'Cash Flow Timeline' },
+                { id: 'w4', type: 'donut', title: 'SetAll Category Split' },
             ]);
-            const [messages, setMessages] = useState([{ role: 'ai', text: "Hello! I'm the SetAll AI. Ask me to analyze your data or build new widgets." }]);
+            
+            const [messages, setMessages] = useState([]);
             const [input, setInput] = useState("");
             const [isThinking, setIsThinking] = useState(false);
             const chatEndRef = useRef(null);
@@ -114,83 +144,169 @@
                 return { inc, exp, net: inc - exp, burn: (exp / 30).toFixed(2), cats: Object.entries(catMap).map(([name, value]) => ({ name, value })).sort((a,b) => b.value - a.value), trend: Object.values(trendMap).sort((a,b) => a.day - b.day) };
             }, [data]);
 
-            const removeWidget = (id) => setWidgets(widgets.filter(w => w.id !== id));
+            // AI Initialization Effect
+            useEffect(() => {
+                setTimeout(() => {
+                    setMessages([{ role: 'ai', text: "Welcome to the SetAll Neural Engine. I'm actively monitoring your dashboard. Click on any chart element to see my analysis, or ask me a question." }]);
+                }, 800);
+            }, []);
 
-            const sendMsg = (e) => {
-                e.preventDefault();
-                if (!input.trim()) return;
-                setMessages(p => [...p, { role: 'user', text: input }]);
-                setInput("");
+            const scrollToBottom = () => {
+                chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            };
+            useEffect(scrollToBottom, [messages, isThinking]);
+
+            // --- AI Interaction Logic ---
+            const triggerAiResponse = (userPrompt, simulatedAiResponse) => {
+                setMessages(p => [...p, { role: 'user', text: userPrompt }]);
                 setIsThinking(true);
                 
-                // Simulate AI response for testing
+                // If apiKey exists, call Gemini here. Otherwise, simulate "Alive" response.
                 setTimeout(() => {
-                    setMessages(p => [...p, { role: 'ai', text: "I've analyzed your request. Based on your spending, housing is your largest expense. I've added a new visualizer for you!" }]);
+                    setMessages(p => [...p, { role: 'ai', text: simulatedAiResponse }]);
                     setIsThinking(false);
                 }, 1500);
             };
 
+            const handleSliceClick = (name, value, pct) => {
+                const prompt = `I clicked on ${name}.`;
+                const response = `Ah, ${name}. You've spent $${value} here, which is ${pct.toFixed(1)}% of your total expenses. Compared to SetAll averages, this is well within a healthy budget limit!`;
+                triggerAiResponse(prompt, response);
+            };
+
+            const handleBarClick = (type, value, day) => {
+                if (value === 0) return;
+                const prompt = `What happened on March ${day} regarding my ${type}?`;
+                const response = `On March ${day}, you recorded a total ${type} of $${value}. I've logged this in your SetAll timeline. Do you want me to forecast next month's projection based on this?`;
+                triggerAiResponse(prompt, response);
+            };
+
+            const sendMsg = (e) => {
+                e.preventDefault();
+                if (!input.trim()) return;
+                const userText = input;
+                setInput("");
+                triggerAiResponse(userText, "I am processing your financial request through the SetAll engine. (Add a Gemini API key in the source code to enable real-time deep analysis).");
+            };
+
+            const removeWidget = (id) => setWidgets(widgets.filter(w => w.id !== id));
+
             const renderWidget = (w) => {
                 if (w.type === 'stat') return (
-                    <div className="flex flex-col justify-center h-full">
-                        <Icon name={w.metric === 'burn' ? 'flame' : 'activity'} className={w.metric === 'expense' || w.metric === 'burn' ? 'text-brand-purple' : 'text-brand-teal'} size={24} />
-                        <p className="text-3xl font-bold mt-4">${stats[w.metric]}</p>
+                    <div className="flex flex-col justify-center h-full pt-2">
+                        <Icon name={w.metric === 'burn' ? 'flame' : 'activity'} className={w.metric === 'expense' || w.metric === 'burn' ? 'text-brand-purple' : 'text-brand-teal'} size={28} />
+                        <p className="text-4xl font-extrabold mt-4 tracking-tight">${stats[w.metric]}</p>
                     </div>
                 );
-                if (w.type === 'donut') return <DonutChart data={stats.cats} total={stats.exp} />;
-                if (w.type === 'trend') return <div className="h-[200px]"><TrendBarChart data={stats.trend} /></div>;
+                if (w.type === 'donut') return (
+                    <div className="flex flex-col h-full justify-between">
+                        <InteractiveDonut data={stats.cats} total={stats.exp} onSliceClick={handleSliceClick} />
+                        <div className="space-y-3 mt-4">
+                            {stats.cats.slice(0, 3).map((c, i) => (
+                                <div key={i} className="flex justify-between items-center px-2">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-3 h-3 rounded-full" style={{ background: CATEGORY_COLORS[i % CATEGORY_COLORS.length] }}></div>
+                                        <span className="text-sm font-semibold text-slate-300">{c.name}</span>
+                                    </div>
+                                    <span className="text-sm font-bold text-white">${c.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+                if (w.type === 'trend') return <div className="h-[280px] w-full"><InteractiveBarChart data={stats.trend} onBarClick={handleBarClick} /></div>;
             };
 
             return (
-                <div className="flex flex-col md:flex-row h-screen overflow-hidden">
-                    <div className="flex-1 overflow-y-auto p-8 relative">
-                        <header className="flex justify-between items-center mb-8">
-                            <div className="flex items-center gap-3">
-                                <div className="bg-brand-teal p-2.5 rounded-2xl"><Icon name="layout-dashboard" className="text-brand-deep" size={24} /></div>
-                                <div><h1 className="text-2xl font-extrabold">Insights <span className="text-brand-teal">Canvas</span></h1></div>
+                <div className="flex flex-col lg:flex-row h-screen overflow-hidden relative z-10">
+                    
+                    {/* Main Dashboard Canvas */}
+                    <div className="flex-1 overflow-y-auto p-4 md:p-10 relative">
+                        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10">
+                            <div className="flex items-center gap-4">
+                                <div className="bg-brand-teal p-3.5 rounded-2xl shadow-[0_0_30px_rgba(20,184,166,0.25)] flex items-center justify-center">
+                                    <Icon name="scale" className="text-brand-deep" size={28} />
+                                </div>
+                                <div>
+                                    <h1 className="text-3xl font-black text-white tracking-tight">SetAll <span className="text-brand-teal">Canvas</span></h1>
+                                    <p className="text-slate-400 text-sm font-medium mt-1">Interactive Financial Hub</p>
+                                </div>
                             </div>
-                            <button onClick={() => setIsEditMode(!isEditMode)} className={`px-4 py-2 font-bold rounded-xl flex items-center gap-2 ${isEditMode ? 'bg-brand-orange text-white' : 'bg-slate-800 text-slate-300'}`}>
-                                <Icon name="settings-2" size={16}/> {isEditMode ? "Done Editing" : "Edit Layout"}
+                            <button onClick={() => setIsEditMode(!isEditMode)} className={`px-5 py-3 font-bold rounded-xl flex items-center gap-2 transition-all ${isEditMode ? 'bg-brand-orange text-white shadow-lg shadow-orange-500/20' : 'bg-[#0F172A] border border-slate-700 text-slate-300 hover:bg-slate-800'}`}>
+                                <Icon name="settings-2" size={18}/> {isEditMode ? "Done Editing" : "Edit Layout"}
                             </button>
                         </header>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 pb-20">
                             {widgets.map(w => (
-                                <div key={w.id} className={`bg-[#0F172A] border border-slate-800 rounded-3xl p-6 relative ${isEditMode ? 'wiggle ring-2 ring-brand-orange/50' : ''} ${w.type === 'trend' ? 'md:col-span-2' : ''}`}>
-                                    {isEditMode && <button onClick={() => removeWidget(w.id)} className="absolute -top-3 -right-3 p-2 bg-red-500 rounded-full z-10"><Icon name="x" size={14}/></button>}
-                                    <h3 className="text-slate-400 text-sm font-bold uppercase tracking-wider mb-4">{w.title}</h3>
+                                <div key={w.id} className={`bg-[#0F172A]/80 backdrop-blur-xl border border-slate-800 rounded-[32px] p-8 relative shadow-xl ${isEditMode ? 'wiggle ring-2 ring-brand-orange/50' : 'hover:border-brand-teal/30 transition-colors'} 
+                                    ${w.type === 'trend' ? 'xl:col-span-8' : w.type === 'donut' ? 'xl:col-span-4' : 'xl:col-span-4'}`}>
+                                    
+                                    {isEditMode && <button onClick={() => removeWidget(w.id)} className="absolute -top-3 -right-3 p-2.5 bg-red-500 hover:bg-red-400 transition-colors text-white rounded-full z-10 shadow-lg"><Icon name="x" size={16}/></button>}
+                                    
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-brand-teal text-xs font-black uppercase tracking-widest">{w.title}</h3>
+                                        <Icon name={w.type === 'trend' ? 'bar-chart-2' : w.type === 'donut' ? 'pie-chart' : 'zap'} size={16} className="text-slate-600" />
+                                    </div>
+                                    
                                     {renderWidget(w)}
                                 </div>
                             ))}
                         </div>
                     </div>
                     
-                    {/* AI Sidebar */}
-                    <div className="w-full md:w-96 bg-[#0F172A] border-l border-slate-800 flex flex-col h-full shrink-0">
-                        <div className="p-6 border-b border-slate-800 flex items-center gap-3">
-                            <div className="p-2 bg-brand-purple/10 rounded-xl"><Icon name="sparkles" className="text-brand-purple" /></div>
-                            <h2 className="font-bold">AI Co-Pilot</h2>
+                    {/* Right Sidebar: Alive AI Co-Pilot */}
+                    <div className="w-full lg:w-[400px] bg-[#0F172A]/90 backdrop-blur-2xl border-l border-slate-800 flex flex-col h-[50vh] lg:h-full shrink-0 shadow-2xl z-20">
+                        <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-[#020617]/50">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2.5 bg-brand-teal/10 rounded-xl relative">
+                                    <Icon name="cpu" className="text-brand-teal" size={22} />
+                                    <div className="absolute top-0 right-0 w-2.5 h-2.5 bg-brand-orange rounded-full border-2 border-[#0F172A]"></div>
+                                </div>
+                                <div>
+                                    <h2 className="font-bold text-white text-lg tracking-tight">Neural Engine</h2>
+                                    <p className="text-[10px] uppercase tracking-widest text-brand-teal font-bold">Online & Watching</p>
+                                </div>
+                            </div>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+                        <div className="flex-1 overflow-y-auto p-5 space-y-5">
                             {messages.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                    <div className={`p-4 rounded-2xl text-sm max-w-[85%] ${m.role === 'user' ? 'bg-brand-teal text-brand-deep font-medium rounded-tr-sm' : 'bg-slate-800 text-slate-200 rounded-tl-sm'}`}>
+                                    <div className={`p-4 rounded-2xl text-[15px] max-w-[85%] leading-relaxed shadow-md ${m.role === 'user' ? 'bg-brand-teal text-[#020617] font-semibold rounded-tr-sm' : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'}`}>
                                         {m.text}
                                     </div>
                                 </div>
                             ))}
-                            {isThinking && <div className="text-slate-500 text-sm animate-pulse ml-2">AI is thinking...</div>}
+                            {isThinking && (
+                                <div className="flex justify-start">
+                                    <div className="bg-slate-800 border border-slate-700/50 p-4 rounded-2xl rounded-tl-sm flex gap-2 items-center w-20 justify-center">
+                                        <div className="w-2 h-2 bg-brand-teal rounded-full animate-bounce"></div>
+                                        <div className="w-2 h-2 bg-brand-teal rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                                        <div className="w-2 h-2 bg-brand-teal rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                                    </div>
+                                </div>
+                            )}
                             <div ref={chatEndRef} />
                         </div>
-                        <div className="p-4 bg-[#020617]/50 border-t border-slate-800">
+
+                        <div className="p-5 bg-[#020617]/80 border-t border-slate-800 backdrop-blur-md">
                             <form onSubmit={sendMsg} className="relative">
-                                <input type="text" value={input} onChange={e => setInput(e.target.value)} placeholder="Ask to build a widget..." className="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-3 pl-4 pr-12 text-sm focus:outline-none focus:border-brand-purple text-white"/>
-                                <button type="submit" className="absolute right-2 top-1/2 -translate-y-1/2 p-2 bg-brand-purple rounded-xl hover:bg-purple-400"><Icon name="send" size={16}/></button>
+                                <input 
+                                    type="text" value={input} onChange={e => setInput(e.target.value)} 
+                                    placeholder="Ask the SetAll AI..." 
+                                    className="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500"
+                                />
+                                <button type="submit" disabled={!input.trim() || isThinking} className="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#020617] hover:bg-teal-400 disabled:opacity-50 disabled:bg-slate-700 disabled:text-slate-400 transition-all">
+                                    <Icon name="arrow-up" size={18} className="stroke-[3]" />
+                                </button>
                             </form>
                         </div>
                     </div>
                 </div>
             );
         }
+        
         ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
 </body>
