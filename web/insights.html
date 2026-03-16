@@ -301,8 +301,17 @@
                 .slice(-10)
                 .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
 
-            const { data, error } = await sb.functions.invoke('ai-analyst', {
-                body: {
+            const { data: { session } } = await sb.auth.getSession();
+            const jwt = session?.access_token;
+
+            const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-analyst`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type':  'application/json',
+                    'apikey':        SUPABASE_ANON,
+                    ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {})
+                },
+                body: JSON.stringify({
                     message: userText,
                     history,
                     context: {
@@ -313,10 +322,14 @@
                         topCategories:  topCats,
                         recentRows
                     }
-                }
+                })
             });
 
-            if (error) throw new Error(error.message || 'ai-analyst function error');
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err?.error || err?.message || `HTTP ${res.status}`);
+            }
+            const data = await res.json();
             return data?.reply || 'No response from AI analyst.';
         }
 
