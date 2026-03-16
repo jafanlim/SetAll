@@ -83,7 +83,10 @@
     "mode_balance": "Bilanz",
     "total_income": "Gesamteinnahmen",
     "total_expenses": "Gesamtausgaben",
-    "net_position": "Nettoposition"
+    "net_position": "Nettoposition",
+    "pct_of_spend": "{pct}% der Ausgaben",
+    "vs_prev_pct": "{sign}{pct}% ggü. Vorperiode",
+    "burn_rate_detail": "Ausgaberate: {currency} {rate} / Tag"
   },
   "activity": {
     "title": "Aktivität",
@@ -141,7 +144,8 @@
     "camera": "Kamera",
     "gallery": "Galerie",
     "file": "Datei",
-    "today_prefix": "Heute"
+    "today_prefix": "Heute",
+    "retry": "Wiederholen"
   },
   "wallet_screen": {
     "add_entry": "Eintrag hinzufügen",
@@ -262,7 +266,11 @@
     "apply": "Anwenden",
     "colour_label": "Farbe",
     "icon_label": "Symbol",
-    "unsupported_file": "Nicht unterstützter Dateityp. Erlaubt: Bilder, PDF, TXT, MD."
+    "unsupported_file": "Nicht unterstützter Dateityp. Erlaubt: Bilder, PDF, TXT, MD.",
+    "manual_enter_total": "Zuerst Gesamtbetrag eingeben",
+    "manual_sum_matches": "Summe: {currency} {sum} — entspricht Gesamt",
+    "manual_sum_remaining": "Summe: {currency} {sum} — {diff} verbleibend",
+    "manual_sum_over": "Summe: {currency} {sum} — {diff} zu viel"
   },
   "edit_expense": {
     "title": "Eintrag bearbeiten",
@@ -369,16 +377,17 @@
     "password_updated": "Passwort erfolgreich aktualisiert.",
     "password_set": "Passwort gesetzt! Sie können sich jetzt mit E-Mail + Passwort anmelden.",
     "could_not_update_email": "E-Mail konnte nicht aktualisiert werden.",
-    "could_not_update_password": "Passwort konnte nicht aktualisiert werden."
+    "could_not_update_password": "Passwort konnte nicht aktualisiert werden.",
+    "save_profile": "Profil speichern"
   },
   "wallet_entry": {
     "title": "Wallet-Eintrag hinzufügen",
     "what_type": "Welche Art von Eintrag?",
     "choose_direction": "Wählen Sie die Richtung dieses Wallet-Eintrags.",
     "add_income": "EINNAHME HINZUFÜGEN",
-    "income_subtitle": "Gehalt, Freiberuf, Geschenk, Investitionsrendite\u2026",
+    "income_subtitle": "Gehalt, Freiberuf, Geschenk, Investitionsrendite…",
     "add_expense": "AUSGABE HINZUFÜGEN",
-    "expense_subtitle": "Essen, Transport, Rechnungen, Einkaufen, Reisen\u2026",
+    "expense_subtitle": "Essen, Transport, Rechnungen, Einkaufen, Reisen…",
     "group_hint": "Sie können auch Gruppenausgaben aus dem Gruppen-Tab hinzufügen."
   },
   "invite_friend": {
@@ -391,5 +400,18 @@
     "share_via": "Teilen über…",
     "share_subject": "Begleite mich auf SetAll",
     "footer": "Dein Link ist einzigartig für dein Konto und läuft nie ab."
+  },
+  "group_picker": {
+    "title": "Ausgabe hinzufügen",
+    "choose_group": "Gruppe auswählen",
+    "new_group": "Neue Gruppe",
+    "no_groups": "Noch keine Gruppen. Tippe auf \"Neue Gruppe\".",
+    "could_not_load": "Gruppen konnten nicht geladen werden"
+  },
+  "lang_prompt": {
+    "title": "Sprache erkannt",
+    "body": "Erkannte Sprache: {language}. Weiter oder andere wählen?",
+    "keep": "Weiter auf {language}",
+    "change": "Sprache wählen"
   }
 }

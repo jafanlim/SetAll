@@ -83,7 +83,10 @@
     "mode_balance": "ბალანსი",
     "total_income": "სულ შემოსავალი",
     "total_expenses": "სულ ხარჯები",
-    "net_position": "წმინდა პოზიცია"
+    "net_position": "წმინდა პოზიცია",
+    "pct_of_spend": "{pct}% ხარჯებიდან",
+    "vs_prev_pct": "{sign}{pct}% წინა პერ.",
+    "burn_rate_detail": "ხარჯის ტემპი: {currency} {rate} / დღე"
   },
   "activity": {
     "title": "აქტივობა",
@@ -141,7 +144,8 @@
     "camera": "კამერა",
     "gallery": "გალერეა",
     "file": "ფაილი",
-    "today_prefix": "დღეს"
+    "today_prefix": "დღეს",
+    "retry": "ხელახლა ცდა"
   },
   "wallet_screen": {
     "add_entry": "ჩანაწერის დამატება",
@@ -262,7 +266,11 @@
     "apply": "გამოყენება",
     "colour_label": "ფერი",
     "icon_label": "ხატი",
-    "unsupported_file": "მხარდაუჭერი ფაილის ტიპი. დაშვებულია: სურათები, PDF, TXT, MD."
+    "unsupported_file": "მხარდაუჭერი ფაილის ტიპი. დაშვებულია: სურათები, PDF, TXT, MD.",
+    "manual_enter_total": "ჯერ შეიყვანეთ საერთო თანხა",
+    "manual_sum_matches": "ჯამი: {currency} {sum} — ემთხვევა",
+    "manual_sum_remaining": "ჯამი: {currency} {sum} — {diff} დარცა",
+    "manual_sum_over": "ჯამი: {currency} {sum} — {diff} ზედმეტია"
   },
   "edit_expense": {
     "title": "ჩანაწერის რედაქტირება",
@@ -369,7 +377,8 @@
     "password_updated": "პაროლი წარმატებით განახლდა.",
     "password_set": "პაროლი დაყენებულია! ახლა შეგიძლიათ შეხვიდეთ ელ-ფოსტით + პაროლით.",
     "could_not_update_email": "ელ-ფოსტის განახლება ვერ მოხერხდა.",
-    "could_not_update_password": "პაროლის განახლება ვერ მოხერხდა."
+    "could_not_update_password": "პაროლის განახლება ვერ მოხერხდა.",
+    "save_profile": "პროფილის შენახვა"
   },
   "wallet_entry": {
     "title": "საფულის ჩანაწერის დამატება",
@@ -391,5 +400,18 @@
     "share_via": "გაზიარება…",
     "share_subject": "შემომიერთდი SetAll-ში",
     "footer": "თქვენი ბმული უნიკალურია თქვენი ანგარიშისთვის და არასოდეს ვადა ეწურება."
+  },
+  "group_picker": {
+    "title": "ხარჯის დამატება",
+    "choose_group": "აირჩიეთ ჯგუფი",
+    "new_group": "ახალი ჯგუფი",
+    "no_groups": "ჯგუფები ჯერ არ არის. დააჭირეთ «ახალი ჯგუფი».",
+    "could_not_load": "ჯგუფების ჩატვირთვა ვერ მოხდა"
+  },
+  "lang_prompt": {
+    "title": "ენა გამოვლინდა",
+    "body": "გამოვლინდა ენა: {language}. გაგრძელება თუ სხვის არჩევა?",
+    "keep": "გაგრძელება {language}-ზე",
+    "change": "ენის არჩევა"
   }
 }

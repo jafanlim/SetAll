@@ -1289,9 +1289,9 @@ class _ProfileSection extends StatelessWidget {
                         color: Colors.black,
                       ),
                     )
-                  : const Text(
-                      'Save Profile',
-                      style: TextStyle(
+                  : Text(
+                      'settings_ext.save_profile'.tr(),
+                      style: const TextStyle(
                         fontWeight: FontWeight.w700,
                         fontSize: 14,
                       ),

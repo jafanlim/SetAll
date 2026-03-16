@@ -1,5 +1,6 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -44,6 +45,45 @@ class AdaptiveShell extends ConsumerStatefulWidget {
 
 class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   int _selectedIndex = 0;
+
+  static const _langs = [
+    (code: 'en', label: 'English'),
+    (code: 'ru', label: 'Русский'),
+    (code: 'ka', label: 'ქართული'),
+    (code: 'de', label: 'Deutsch'),
+    (code: 'es', label: 'Español'),
+    (code: 'fr', label: 'Français'),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _checkLangPrompt());
+  }
+
+  Future<void> _checkLangPrompt() async {
+    if (!mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('lang_prompt_shown') == true) return;
+    await prefs.setBool('lang_prompt_shown', true);
+    if (!mounted) return;
+    final langCode = context.locale.languageCode;
+    final langLabel = _langs
+        .firstWhere((l) => l.code == langCode, orElse: () => _langs.first)
+        .label;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => _LangPromptSheet(
+        langLabel: langLabel,
+        langs: _langs,
+        currentCode: langCode,
+      ),
+    );
+  }
 
   @override
   void didUpdateWidget(AdaptiveShell oldWidget) {
@@ -434,3 +474,144 @@ class _MobileLayout extends StatelessWidget {
   }
 }
 
+// ---------------------------------------------------------------------------
+// First-launch language confirmation sheet
+// ---------------------------------------------------------------------------
+class _LangPromptSheet extends StatelessWidget {
+  const _LangPromptSheet({
+    required this.langLabel,
+    required this.langs,
+    required this.currentCode,
+  });
+
+  final String langLabel;
+  final List<({String code, String label})> langs;
+  final String currentCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Icon(Icons.language_outlined, color: _kTeal, size: 32),
+            const SizedBox(height: 12),
+            Text(
+              'lang_prompt.title'.tr(),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'lang_prompt.body'.tr(namedArgs: {'language': langLabel}),
+              style: TextStyle(
+                fontSize: 13,
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kTeal,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'lang_prompt.keep'.tr(namedArgs: {'language': langLabel}),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _showLangPicker(context);
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kTeal,
+                  side: const BorderSide(color: _kTeal),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
+                ),
+                child: Text(
+                  'lang_prompt.change'.tr(),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showLangPicker(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 12),
+            Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: Theme.of(ctx).colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'settings.language'.tr(),
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            ...langs.map((l) => ListTile(
+              contentPadding: const EdgeInsets.symmetric(horizontal: 24),
+              title: Text(l.label,
+                  style: TextStyle(
+                    fontWeight: l.code == currentCode
+                        ? FontWeight.w700
+                        : FontWeight.w500,
+                  )),
+              trailing: l.code == currentCode
+                  ? const Icon(Icons.check_rounded, color: _kTeal, size: 20)
+                  : null,
+              onTap: () {
+                ctx.setLocale(Locale(l.code));
+                Navigator.of(ctx).pop();
+              },
+            )),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}

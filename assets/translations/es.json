@@ -83,7 +83,10 @@
     "mode_balance": "Balance",
     "total_income": "Ingresos totales",
     "total_expenses": "Gastos totales",
-    "net_position": "Posición neta"
+    "net_position": "Posición neta",
+    "pct_of_spend": "{pct}% del gasto",
+    "vs_prev_pct": "{sign}{pct}% vs. anterior",
+    "burn_rate_detail": "Tasa: {currency} {rate} / día"
   },
   "activity": {
     "title": "Actividad",
@@ -141,7 +144,8 @@
     "camera": "Cámara",
     "gallery": "Galería",
     "file": "Archivo",
-    "today_prefix": "Hoy"
+    "today_prefix": "Hoy",
+    "retry": "Reintentar"
   },
   "wallet_screen": {
     "add_entry": "Añadir entrada",
@@ -262,7 +266,11 @@
     "apply": "Aplicar",
     "colour_label": "Color",
     "icon_label": "Icono",
-    "unsupported_file": "Tipo de archivo no admitido. Permitidos: imágenes, PDF, TXT, MD."
+    "unsupported_file": "Tipo de archivo no admitido. Permitidos: imágenes, PDF, TXT, MD.",
+    "manual_enter_total": "Introduce primero el importe total",
+    "manual_sum_matches": "Suma: {currency} {sum} — coincide",
+    "manual_sum_remaining": "Suma: {currency} {sum} — {diff} restante",
+    "manual_sum_over": "Suma: {currency} {sum} — {diff} de más"
   },
   "edit_expense": {
     "title": "Editar entrada",
@@ -369,16 +377,17 @@
     "password_updated": "Contraseña actualizada correctamente.",
     "password_set": "¡Contraseña establecida! Ahora puedes iniciar sesión con email + contraseña.",
     "could_not_update_email": "No se pudo actualizar el email.",
-    "could_not_update_password": "No se pudo actualizar la contraseña."
+    "could_not_update_password": "No se pudo actualizar la contraseña.",
+    "save_profile": "Guardar perfil"
   },
   "wallet_entry": {
     "title": "Agregar entrada de cartera",
     "what_type": "¿Qué tipo de entrada?",
     "choose_direction": "Elija la dirección de esta entrada de cartera.",
     "add_income": "AGREGAR UN INGRESO",
-    "income_subtitle": "Salario, autónomo, regalo, rendimiento de inversión\u2026",
+    "income_subtitle": "Salario, autónomo, regalo, rendimiento de inversión…",
     "add_expense": "AGREGAR UN GASTO",
-    "expense_subtitle": "Comida, transporte, facturas, compras, viajes\u2026",
+    "expense_subtitle": "Comida, transporte, facturas, compras, viajes…",
     "group_hint": "También puede agregar gastos de grupo desde la pestaña Grupos."
   },
   "invite_friend": {
@@ -391,5 +400,18 @@
     "share_via": "Compartir por…",
     "share_subject": "Únete a mí en SetAll",
     "footer": "Tu enlace es único para tu cuenta y nunca expira."
+  },
+  "group_picker": {
+    "title": "Añadir gasto",
+    "choose_group": "Elige un grupo",
+    "new_group": "Nuevo grupo",
+    "no_groups": "Sin grupos añadidos. Pulsa \"Nuevo grupo\".",
+    "could_not_load": "No se pudieron cargar los grupos"
+  },
+  "lang_prompt": {
+    "title": "Idioma detectado",
+    "body": "Idioma {language} detectado. ¿Continuar o elegir otro?",
+    "keep": "Continuar en {language}",
+    "change": "Elegir idioma"
   }
 }

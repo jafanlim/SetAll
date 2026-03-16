@@ -1863,12 +1863,12 @@ class _ManualSumIndicator extends StatelessWidget {
     final isExact = total > Decimal.zero && sum == total;
     final color = isExact ? _teal : _orange;
     final label = total == Decimal.zero
-        ? 'Enter total amount first'
+        ? 'add_expense.manual_enter_total'.tr()
         : isExact
-            ? 'Sum: $currency $sum — matches total'
+            ? 'add_expense.manual_sum_matches'.tr(namedArgs: {'currency': currency, 'sum': sum.toString()})
             : sum < total
-                ? 'Sum: $currency $sum — ${total - sum} remaining'
-                : 'Sum: $currency $sum — ${sum - total} over total';
+                ? 'add_expense.manual_sum_remaining'.tr(namedArgs: {'currency': currency, 'sum': sum.toString(), 'diff': (total - sum).toString()})
+                : 'add_expense.manual_sum_over'.tr(namedArgs: {'currency': currency, 'sum': sum.toString(), 'diff': (sum - total).toString()});
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),

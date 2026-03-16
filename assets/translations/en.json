@@ -57,7 +57,10 @@
     "mode_balance": "Balance Sheet",
     "total_income": "Total Income",
     "total_expenses": "Total Expenses",
-    "net_position": "Net Position"
+    "net_position": "Net Position",
+    "pct_of_spend": "{pct}% of spend",
+    "vs_prev_pct": "{sign}{pct}% vs prev",
+    "burn_rate_detail": "Burn rate: {currency} {rate} / day"
   },
   "activity": {
     "title": "Activity",
@@ -115,7 +118,8 @@
     "camera": "Camera",
     "gallery": "Gallery",
     "file": "File",
-    "today_prefix": "Today"
+    "today_prefix": "Today",
+    "retry": "Retry"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -262,7 +266,11 @@
     "apply": "Apply",
     "colour_label": "Colour",
     "icon_label": "Icon",
-    "unsupported_file": "Unsupported file type. Allowed: images, PDF, TXT, MD."
+    "unsupported_file": "Unsupported file type. Allowed: images, PDF, TXT, MD.",
+    "manual_enter_total": "Enter total amount first",
+    "manual_sum_matches": "Sum: {currency} {sum} — matches total",
+    "manual_sum_remaining": "Sum: {currency} {sum} — {diff} remaining",
+    "manual_sum_over": "Sum: {currency} {sum} — {diff} over total"
   },
   "edit_expense": {
     "title": "Edit entry",
@@ -369,7 +377,8 @@
     "password_updated": "Password updated successfully.",
     "password_set": "Password set! You can now sign in with email + password.",
     "could_not_update_email": "Could not update email.",
-    "could_not_update_password": "Could not update password."
+    "could_not_update_password": "Could not update password.",
+    "save_profile": "Save Profile"
   },
   "wallet_entry": {
     "title": "Add Wallet Entry",
@@ -391,5 +400,18 @@
     "share_via": "Share via…",
     "share_subject": "Join me on SetAll",
     "footer": "Your link is unique to your account and never expires."
+  },
+  "group_picker": {
+    "title": "Add expense",
+    "choose_group": "Choose a group",
+    "new_group": "New group",
+    "no_groups": "No groups yet. Tap \"New group\" to create one.",
+    "could_not_load": "Could not load groups"
+  },
+  "lang_prompt": {
+    "title": "Language detected",
+    "body": "Your device language is {language}. Continue or choose another?",
+    "keep": "Continue in {language}",
+    "change": "Choose language"
   }
 }

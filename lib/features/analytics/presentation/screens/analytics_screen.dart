@@ -452,21 +452,21 @@ class _FilterBar extends ConsumerWidget {
               children: [
                 // Source chips
                 _FilterChip(
-                  label: 'All',
+                  label: 'analytics.filter_all'.tr(),
                   active: filter.source == _Source.all,
                   onTap: () => onFilterChanged(
                     filter.copyWith(source: _Source.all, clearGroup: true)),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: 'Wallet',
+                  label: 'analytics.wallet'.tr(),
                   active: filter.source == _Source.wallet,
                   onTap: () => onFilterChanged(
                     filter.copyWith(source: _Source.wallet, clearGroup: true)),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: 'Groups',
+                  label: 'analytics.groups'.tr(),
                   active: filter.source == _Source.groups,
                   onTap: () => onFilterChanged(
                     filter.copyWith(source: _Source.groups)),
@@ -486,7 +486,7 @@ class _FilterBar extends ConsumerWidget {
                 _FilterChip(
                   label: filter.dateRange.days == 0
                       ? filter.dateRange.label()
-                      : 'Custom',
+                      : 'analytics.date_custom'.tr(),
                   active: filter.dateRange.days == 0,
                   icon: Icons.calendar_today_outlined,
                   onTap: () => _pickDateRange(context),
@@ -501,21 +501,21 @@ class _FilterBar extends ConsumerWidget {
             child: Row(
               children: [
                 _FilterChip(
-                  label: 'Spending',
+                  label: 'analytics.mode_spending'.tr(),
                   active: filter.dataMode == _DataMode.spending,
                   onTap: () => onFilterChanged(
                     filter.copyWith(dataMode: _DataMode.spending)),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: 'Income',
+                  label: 'analytics.mode_income'.tr(),
                   active: filter.dataMode == _DataMode.income,
                   onTap: () => onFilterChanged(
                     filter.copyWith(dataMode: _DataMode.income)),
                 ),
                 const SizedBox(width: 6),
                 _FilterChip(
-                  label: 'Balance Sheet',
+                  label: 'analytics.mode_balance'.tr(),
                   active: filter.dataMode == _DataMode.balance,
                   onTap: () => onFilterChanged(
                     filter.copyWith(dataMode: _DataMode.balance)),
@@ -534,7 +534,7 @@ class _FilterBar extends ConsumerWidget {
                 child: Row(
                   children: [
                     _FilterChip(
-                      label: 'All groups',
+                      label: 'analytics.all_groups'.tr(),
                       active: filter.groupId == null,
                       onTap: () => onFilterChanged(
                         filter.copyWith(clearGroup: true)),
@@ -673,7 +673,7 @@ class _AnalyticsBody extends StatelessWidget {
           const SizedBox(height: 16),
           if (data.ivePeriods.isNotEmpty) ...[
             _SectionCard(
-              title: 'Income vs Expense',
+              title: 'analytics.income_vs_expense'.tr(),
               child: _IvEChart(
                   periods: data.ivePeriods, currency: data.currency),
             ),
@@ -732,7 +732,7 @@ class _AnalyticsBody extends StatelessWidget {
           const SizedBox(height: 16),
           if (data.ivePeriods.isNotEmpty) ...[
             _SectionCard(
-              title: 'Income vs Expense',
+              title: 'analytics.income_vs_expense'.tr(),
               child: _IvEChart(
                   periods: data.ivePeriods, currency: data.currency),
             ),
@@ -786,7 +786,7 @@ class _SpendingCard extends StatelessWidget {
     final totals = incomeMode ? data.incomeCategoryTotals : data.categoryTotals;
     final total  = incomeMode ? data.totalIncome : data.totalSpend;
     final title  = incomeMode
-        ? 'Income by Category'
+        ? 'analytics.income_breakdown'.tr()
         : 'analytics.spending_by_category'.tr();
 
     return Container(
@@ -1070,7 +1070,7 @@ class _PieOrDonut extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
                       Text(
-                        'Currencies',
+                        'analytics.currencies'.tr(),
                         style: const TextStyle(
                           fontSize: 10, color: _kSubtitle,
                           fontWeight: FontWeight.w600),
@@ -1434,14 +1434,14 @@ class _VitalSignsRow extends StatelessWidget {
     final flowColor  = isPositive ? _teal : _rose;
     final pctAbs     = data.netFlowPct.abs();
     final pctLabel   = pctAbs > 0
-        ? '${isPositive ? '+' : ''}${data.netFlowPct.toStringAsFixed(1)}% vs prev'
-        : 'vs prev period';
+        ? 'analytics.vs_prev_pct'.tr(namedArgs: {'sign': isPositive ? '+' : '', 'pct': data.netFlowPct.toStringAsFixed(1)})
+        : 'analytics.vs_prev_period'.tr();
 
     return Row(
       children: [
         _VitalCard(
           flex: 4,
-          label: 'Net Flow',
+          label: 'analytics.net_flow'.tr(),
           icon: isPositive ? Icons.trending_up : Icons.trending_down,
           iconColor: flowColor,
           value: '${isPositive ? '+' : ''}${data.netFlow.toStringAsFixed(0)}',
@@ -1455,26 +1455,26 @@ class _VitalSignsRow extends StatelessWidget {
         const SizedBox(width: 8),
         _VitalCard(
           flex: 3,
-          label: 'Burn Rate',
+          label: 'analytics.burn_rate'.tr(),
           icon: Icons.local_fire_department_outlined,
           iconColor: _orange,
           value: data.burnRate.toStringAsFixed(1),
           valueCurrency: data.currency,
           valueColor: _orange,
-          sub: 'per day',
+          sub: 'analytics.per_day'.tr(),
           subColor: _kSubtitle,
         ),
         const SizedBox(width: 8),
         _VitalCard(
           flex: 4,
-          label: 'Top Category',
+          label: 'analytics.top_category'.tr(),
           icon: Icons.star_outline_rounded,
           iconColor: _gold,
           value: data.topCategory.isEmpty ? '—' : data.topCategory,
           valueCurrency: null,
           valueColor: Colors.white,
           sub: data.topCategoryPct > 0
-              ? '${data.topCategoryPct.toStringAsFixed(1)}% of spend'
+              ? 'analytics.pct_of_spend'.tr(namedArgs: {'pct': data.topCategoryPct.toStringAsFixed(1)})
               : '',
           subColor: _kSubtitle,
         ),
@@ -1951,7 +1951,7 @@ class _BalanceSheetCard extends StatelessWidget {
                     size: 13, color: _orange),
                 const SizedBox(width: 6),
                 Text(
-                  'Burn rate: ${data.currency} ${data.burnRate.toStringAsFixed(2)} / day',
+                  'analytics.burn_rate_detail'.tr(namedArgs: {'currency': data.currency, 'rate': data.burnRate.toStringAsFixed(2)}),
                   style: const TextStyle(
                     fontSize: 11, color: _kLabel),
                 ),

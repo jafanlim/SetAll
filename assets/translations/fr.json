@@ -83,7 +83,10 @@
     "mode_balance": "Bilan",
     "total_income": "Revenus totaux",
     "total_expenses": "Dépenses totales",
-    "net_position": "Position nette"
+    "net_position": "Position nette",
+    "pct_of_spend": "{pct}% des d\u00e9penses",
+    "vs_prev_pct": "{sign}{pct}% vs pr\u00e9c.",
+    "burn_rate_detail": "Taux : {currency} {rate} / jour"
   },
   "activity": {
     "title": "Activité",
@@ -141,7 +144,8 @@
     "camera": "Caméra",
     "gallery": "Galerie",
     "file": "Fichier",
-    "today_prefix": "Aujourd'hui"
+    "today_prefix": "Aujourd'hui",
+    "retry": "R\u00e9essayer"
   },
   "wallet_screen": {
     "add_entry": "Ajouter une entrée",
@@ -262,7 +266,11 @@
     "apply": "Appliquer",
     "colour_label": "Couleur",
     "icon_label": "Icône",
-    "unsupported_file": "Type de fichier non pris en charge. Autorisés : images, PDF, TXT, MD."
+    "unsupported_file": "Type de fichier non pris en charge. Autorisés : images, PDF, TXT, MD.",
+    "manual_enter_total": "Entrez d'abord le montant total",
+    "manual_sum_matches": "Somme : {currency} {sum} — correspond",
+    "manual_sum_remaining": "Somme : {currency} {sum} — {diff} restant",
+    "manual_sum_over": "Somme : {currency} {sum} — {diff} de trop"
   },
   "edit_expense": {
     "title": "Modifier l'entrée",
@@ -369,16 +377,17 @@
     "password_updated": "Mot de passe mis à jour avec succès.",
     "password_set": "Mot de passe défini ! Vous pouvez maintenant vous connecter avec email + mot de passe.",
     "could_not_update_email": "Impossible de mettre à jour l'email.",
-    "could_not_update_password": "Impossible de mettre à jour le mot de passe."
+    "could_not_update_password": "Impossible de mettre à jour le mot de passe.",
+    "save_profile": "Enregistrer le profil"
   },
   "wallet_entry": {
     "title": "Ajouter une entrée de portefeuille",
     "what_type": "Quel type d'entrée ?",
     "choose_direction": "Choisissez la direction de cette entrée de portefeuille.",
     "add_income": "AJOUTER UN REVENU",
-    "income_subtitle": "Salaire, freelance, cadeau, rendement d'investissement\u2026",
+    "income_subtitle": "Salaire, freelance, cadeau, rendement d'investissement…",
     "add_expense": "AJOUTER UNE DÉPENSE",
-    "expense_subtitle": "Nourriture, transport, factures, shopping, voyages\u2026",
+    "expense_subtitle": "Nourriture, transport, factures, shopping, voyages…",
     "group_hint": "Vous pouvez également ajouter des dépenses de groupe depuis l'onglet Groupes."
   },
   "invite_friend": {
@@ -391,5 +400,18 @@
     "share_via": "Partager via…",
     "share_subject": "Rejoignez-moi sur SetAll",
     "footer": "Votre lien est unique à votre compte et n'expire jamais."
+  },
+  "group_picker": {
+    "title": "Ajouter une dépense",
+    "choose_group": "Choisir un groupe",
+    "new_group": "Nouveau groupe",
+    "no_groups": "Pas encore de groupes. Appuyez sur \"Nouveau groupe\".",
+    "could_not_load": "Impossible de charger les groupes"
+  },
+  "lang_prompt": {
+    "title": "Langue détectée",
+    "body": "Langue {language} détectée. Continuer ou en choisir une autre ?",
+    "keep": "Continuer en {language}",
+    "change": "Choisir la langue"
   }
 }

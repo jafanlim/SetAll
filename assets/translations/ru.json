@@ -83,7 +83,10 @@
     "mode_balance": "Баланс",
     "total_income": "Итого доходов",
     "total_expenses": "Итого расходов",
-    "net_position": "Чистая позиция"
+    "net_position": "Чистая позиция",
+    "pct_of_spend": "{pct}% от расходов",
+    "vs_prev_pct": "{sign}{pct}% к пред. периоду",
+    "burn_rate_detail": "Расход: {currency} {rate} / день"
   },
   "activity": {
     "title": "Активность",
@@ -141,7 +144,8 @@
     "camera": "Камера",
     "gallery": "Галерея",
     "file": "Файл",
-    "today_prefix": "Сегодня"
+    "today_prefix": "Сегодня",
+    "retry": "Повторить"
   },
   "wallet_screen": {
     "add_entry": "Добавить запись",
@@ -263,9 +267,10 @@
     "colour_label": "Цвет",
     "icon_label": "Значок",
     "unsupported_file": "Неподдерживаемый тип файла. Разрешены: изображения, PDF, TXT, MD.",
-    "add_expense": "Добавить расход",
-    "settings_ext": "Дополнительные настройки",
-    "invite_friend": "Пригласить друга"
+    "manual_enter_total": "Сначала введите общую сумму",
+    "manual_sum_matches": "Сумма: {currency} {sum} — совпадает с итогом",
+    "manual_sum_remaining": "Сумма: {currency} {sum} — осталось {diff}",
+    "manual_sum_over": "Сумма: {currency} {sum} — превышение на {diff}"
   },
   "edit_expense": {
     "title": "Редактировать запись",
@@ -372,7 +377,8 @@
     "password_updated": "Пароль успешно обновлён.",
     "password_set": "Пароль установлен! Теперь вы можете войти с помощью email + пароль.",
     "could_not_update_email": "Не удалось обновить email.",
-    "could_not_update_password": "Не удалось обновить пароль."
+    "could_not_update_password": "Не удалось обновить пароль.",
+    "save_profile": "Сохранить профиль"
   },
   "wallet_entry": {
     "title": "Добавить запись в кошелёк",
@@ -394,5 +400,18 @@
     "share_via": "Поделиться через…",
     "share_subject": "Присоединяйтесь ко мне в SetAll",
     "footer": "Ваша ссылка уникальна для вашего аккаунта и никогда не истекает."
+  },
+  "group_picker": {
+    "title": "Добавить расход",
+    "choose_group": "Выберите группу",
+    "new_group": "Новая группа",
+    "no_groups": "Групп пока нет. Нажмите «Новая группа».",
+    "could_not_load": "Не удалось загрузить группы"
+  },
+  "lang_prompt": {
+    "title": "Язык обнаружен",
+    "body": "Обнаружен язык: {language}. Продолжить или выбрать другой?",
+    "keep": "Продолжить на {language}",
+    "change": "Выбрать язык"
   }
 }
