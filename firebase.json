@@ -6,7 +6,8 @@
     "rewrites": [
       { "source": "/login", "destination": "/login.html" },
       { "source": "/reset-password", "destination": "/reset-password.html" },
-      { "source": "/portal", "destination": "/portal.html" },
+      { "source": "/portal",   "destination": "/portal.html"   },
+      { "source": "/insights", "destination": "/insights.html" },
       { "source": "/download", "destination": "/download.html" },
       { "source": "/support", "destination": "/support.html" },
       { "source": "/privacy", "destination": "/privacy.html" },

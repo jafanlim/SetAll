@@ -31,8 +31,10 @@ build-web:
 	cp web/terms.html           build/web/terms.html
 	cp web/download.html        build/web/download.html
 	cp web/reset-password.html  build/web/reset-password.html
-	cp web/robots.txt      build/web/robots.txt
-	cp web/sitemap.xml     build/web/sitemap.xml
+	cp web/insights.html        build/web/insights.html
+	cp web/_redirects           build/web/_redirects
+	cp web/robots.txt           build/web/robots.txt
+	cp web/sitemap.xml          build/web/sitemap.xml
 	@grep -q 'flutter_bootstrap' build/web/app.html || (echo "ERROR: app.html missing flutter_bootstrap — build step order is wrong!" && exit 1)
 	@grep -q 'flutter_bootstrap' build/web/index.html && (echo "ERROR: index.html has flutter_bootstrap — landing page copy failed!" && exit 1) || true
 	@echo "✓ build/web ready: app.html=Flutter, index.html=Landing, all static pages copied"

@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Insights Hub | SetAll</title>
+    <meta name="description" content="Your personal financial canvas — live data from your SetAll ledger.">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <script>
+        tailwind.config = {
+            theme: { extend: { colors: { brand: { deep: '#0F172A', slate: '#0F172A', teal: '#14B8A6', purple: '#8B5CF6', orange: '#F97316' } } } }
+        }
+    </script>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #0F172A;
+            color: #F8FAFC;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+        ::selection { background: #14B8A6; color: #0F172A; }
+        .brand-watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 25vw; font-weight: 900; color: rgba(255,255,255,0.015); pointer-events: none; z-index: 0; user-select: none; }
+        .donut-segment { transition: stroke-dashoffset 1s ease-out, stroke-width 0.2s; cursor: pointer; }
+        .donut-segment:hover { stroke-width: 10; filter: brightness(1.2); }
+        .bar-grow { transition: height 0.6s cubic-bezier(0.4, 0, 0.2, 1); cursor: pointer; }
+        .bar-grow:hover { filter: brightness(1.3); }
+        .wiggle { animation: wiggle 0.5s ease-in-out infinite; }
+        @keyframes wiggle { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: #14B8A6; }
+        #auth-gate { position: fixed; inset: 0; background: #0F172A; z-index: 9999; display: flex; align-items: center; justify-content: center; }
+        #main-app  { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- Auth Gate (shown while checking session) -->
+    <div id="auth-gate">
+        <div style="text-align:center">
+            <div style="font-size:2rem; margin-bottom:1rem">⚖️</div>
+            <div style="width:1.5rem;height:1.5rem;border:2px solid rgba(20,184,166,0.3);border-top-color:#14B8A6;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto"></div>
+            <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
+        </div>
+    </div>
+
+    <!-- Main App (revealed after auth check) -->
+    <div id="main-app">
+        <div class="brand-watermark" aria-hidden="true">SetAll</div>
+
+        <div class="flex flex-col lg:flex-row h-screen overflow-hidden relative z-10">
+
+            <!-- Main Dashboard Canvas -->
+            <div class="flex-1 overflow-y-auto p-4 md:p-10 relative">
+                <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-10" id="app-header">
+                    <!-- Rendered by JS -->
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-6 pb-20" id="widgets-grid">
+                    <!-- Widgets Rendered by JS -->
+                </div>
+            </div>
+
+            <!-- Right Sidebar: AI Co-Pilot -->
+            <div class="w-full lg:w-[400px] bg-[#0F172A]/90 backdrop-blur-2xl border-l border-slate-800 flex flex-col h-[50vh] lg:h-full shrink-0 shadow-2xl z-20">
+                <div class="p-6 border-b border-slate-800/50 flex items-center justify-between bg-[#020617]/50">
+                    <div class="flex items-center gap-3">
+                        <div class="p-2.5 bg-brand-teal/10 rounded-xl relative">
+                            <i data-lucide="cpu" class="text-brand-teal w-5 h-5"></i>
+                            <div class="absolute top-0 right-0 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-[#0F172A]"></div>
+                        </div>
+                        <div>
+                            <h2 class="font-bold text-white text-lg tracking-tight">Neural Engine</h2>
+                            <p class="text-[10px] uppercase tracking-widest text-brand-teal font-bold">Online & Watching</p>
+                        </div>
+                    </div>
+                    <a href="/portal" class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg border border-slate-700 hover:border-slate-500">
+                        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Portal
+                    </a>
+                </div>
+
+                <div class="flex-1 overflow-y-auto p-5 space-y-5" id="chat-history">
+                    <!-- Chat Rendered by JS -->
+                </div>
+
+                <div class="p-5 bg-[#020617]/80 border-t border-slate-800 backdrop-blur-md">
+                    <form id="chat-form" class="flex items-center gap-3">
+                        <label class="cursor-pointer p-3.5 bg-slate-800 hover:bg-slate-700 rounded-2xl text-brand-teal transition-all border border-slate-700" title="Import CSV">
+                            <i data-lucide="paperclip" class="w-5 h-5"></i>
+                            <input type="file" id="file-upload" class="hidden" accept=".csv,.xls,.xlsx,.pdf" />
+                        </label>
+                        <div class="relative flex-1">
+                            <input type="text" id="chat-input" placeholder="Ask the SetAll AI…" autocomplete="off"
+                                class="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500" />
+                            <button type="submit" id="chat-submit"
+                                class="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#0F172A] hover:bg-teal-400 disabled:opacity-50 transition-all">
+                                <i data-lucide="arrow-up" class="w-[18px] h-[18px] stroke-[3]"></i>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ── Supabase ─────────────────────────────────────────────────────────
+        const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
+        const SUPABASE_ANON = 'REDACTED_JWT';
+        const { createClient } = supabase;
+        const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        let currentUser = null;
+
+        // ── Auth Gate ────────────────────────────────────────────────────────
+        (async () => {
+            const { data: { session } } = await sb.auth.getSession();
+            if (!session) {
+                window.location.href = '/login?next=/insights';
+                return;
+            }
+            currentUser = session.user;
+            await loadLiveData();
+            document.getElementById('auth-gate').style.display = 'none';
+            document.getElementById('main-app').style.display  = 'block';
+            renderHeader();
+            renderWidgets();
+            renderChat();
+            lucide.createIcons();
+        })();
+
+        // ── Live Data Fetch ──────────────────────────────────────────────────
+        async function loadLiveData() {
+            try {
+                const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+                const { data: rows, error } = await sb
+                    .from('expenses')
+                    .select('created_at, category, base_amount_at_entry')
+                    .eq('payer_id', currentUser.id)
+                    .is('group_id', null)
+                    .gte('created_at', since)
+                    .order('created_at', { ascending: true });
+
+                if (error) throw error;
+
+                if (rows && rows.length > 0) {
+                    appData = rows.map(r => ({
+                        date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                        category: r.category || 'Uncategorized',
+                        amount:   parseFloat(r.base_amount_at_entry || 0),
+                        type:     'expense'
+                    }));
+                    chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
+                } else {
+                    chatMessages[0].text = `Welcome! I couldn't find any personal wallet expenses in the last 90 days. Add some expenses in the SetAll app and come back — the canvas will populate automatically.`;
+                }
+            } catch (err) {
+                console.warn('Supabase fetch failed, using demo data:', err);
+                chatMessages[0].text = `Canvas is running on demo data (couldn't connect to your ledger). Try signing out and back in if this persists.`;
+            }
+        }
+
+        // ── Constants ────────────────────────────────────────────────────────
+        const CATEGORY_COLORS = ['#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6', '#EC4899', '#F97316'];
+
+        // ── State ────────────────────────────────────────────────────────────
+        let appData = [
+            { date: '2024-03-01', category: 'Groceries',  amount: 120,  type: 'expense' },
+            { date: '2024-03-05', category: 'Salary',     amount: 3500, type: 'income'  },
+            { date: '2024-03-10', category: 'Rent',        amount: 1200, type: 'expense' },
+            { date: '2024-03-15', category: 'Travel',      amount: 450,  type: 'expense' },
+            { date: '2024-03-18', category: 'Dining',      amount: 85,   type: 'expense' },
+            { date: '2024-03-25', category: 'Utilities',   amount: 150,  type: 'expense' },
+        ];
+
+        let isEditMode = false;
+
+        let widgets = [
+            { id: 'w1', type: 'stat',  title: 'Total Spending', metric: 'exp',  width: 'normal' },
+            { id: 'w2', type: 'stat',  title: 'Daily Burn',     metric: 'burn', width: 'normal' },
+            { id: 'w3', type: 'trend', title: 'Spending Timeline', width: 'wide'   },
+            { id: 'w4', type: 'donut', title: 'Category Split',    width: 'normal' },
+        ];
+
+        let chatMessages = [
+            { role: 'ai', text: 'Loading your ledger data…' }
+        ];
+        let isThinking = false;
+
+        // ── Data Engine ──────────────────────────────────────────────────────
+        function getStats() {
+            let inc = 0, exp = 0;
+            const catMap = {};
+            const trendMap = {};
+
+            appData.forEach(d => {
+                if (d.type === 'income')  inc += d.amount;
+                if (d.type === 'expense') {
+                    exp += d.amount;
+                    catMap[d.category] = (catMap[d.category] || 0) + d.amount;
+                }
+                const key = d.date;
+                if (!trendMap[key]) trendMap[key] = { day: d.date.slice(5), income: 0, expense: 0 };
+                trendMap[key][d.type] += d.amount;
+            });
+
+            return {
+                income: inc,
+                exp:    exp,
+                net:    inc - exp,
+                burn:   (exp / 30).toFixed(2),
+                cats:   Object.keys(catMap).map(k => ({ name: k, value: catMap[k] })).sort((a, b) => b.value - a.value),
+                trend:  Object.values(trendMap).sort((a, b) => a.day < b.day ? -1 : 1)
+            };
+        }
+
+        // ── Action Handlers ──────────────────────────────────────────────────
+        window.toggleEditMode = () => { isEditMode = !isEditMode; renderHeader(); renderWidgets(); };
+
+        window.moveWidget = (index, direction) => {
+            if (direction === 'left'  && index > 0)                  [widgets[index], widgets[index - 1]] = [widgets[index - 1], widgets[index]];
+            if (direction === 'right' && index < widgets.length - 1) [widgets[index], widgets[index + 1]] = [widgets[index + 1], widgets[index]];
+            renderWidgets();
+        };
+
+        window.resizeWidget = (index) => {
+            const widths   = ['normal', 'wide', 'full'];
+            const current  = widgets[index].width || 'normal';
+            widgets[index].width = widths[(widths.indexOf(current) + 1) % widths.length];
+            renderWidgets();
+        };
+
+        window.changeWidgetType = (index, type) => {
+            widgets[index].type   = type;
+            if (type === 'stat') widgets[index].metric = 'exp';
+            renderWidgets();
+        };
+
+        window.changeWidgetMetric = (index, metric) => {
+            const titles = { net: 'Net Worth', burn: 'Daily Burn', income: 'Total Income', exp: 'Total Spending' };
+            widgets[index].metric = metric;
+            widgets[index].title  = titles[metric] || 'Statistic';
+            renderWidgets();
+        };
+
+        window.removeWidget = (id) => { widgets = widgets.filter(w => w.id !== id); renderWidgets(); };
+
+        window.addWidget = (type = 'stat', width = 'normal', title = 'New Statistic') => {
+            widgets.push({ id: 'w' + Date.now(), type, title, metric: 'exp', width });
+            renderWidgets();
+        };
+
+        window.handleSliceClick = (name, value, pct) => {
+            if (isEditMode) return;
+            triggerAiResponse(
+                `I clicked on ${name}.`,
+                `${name} accounts for $${value.toFixed(2)} of your spending — ${pct.toFixed(1)}% of total. That's a meaningful category to watch. I can compare this against your other categories if you'd like.`
+            );
+        };
+
+        window.handleBarClick = (type, value, label) => {
+            if (isEditMode || value === 0) return;
+            triggerAiResponse(
+                `What happened on ${label}?`,
+                `On ${label}, you recorded $${value.toFixed(2)} in ${type.toLowerCase()}. I've noted this in your timeline.`
+            );
+        };
+
+        // ── AI Engine ────────────────────────────────────────────────────────
+        function triggerAiResponse(userText, defaultAiText) {
+            chatMessages.push({ role: 'user', text: userText });
+            isThinking = true;
+            renderChat();
+
+            setTimeout(() => {
+                let aiText = defaultAiText;
+                const lower = userText.toLowerCase();
+
+                if (lower.includes('chart') || lower.includes('visual') || lower.includes('graph')) {
+                    aiText = "I've generated a new trend chart and injected it onto your canvas.";
+                    window.addWidget('trend', 'wide', 'AI Trend Graph');
+                } else if (lower.includes('donut') || lower.includes('pie') || lower.includes('categor')) {
+                    aiText = "I've built a fresh category breakdown donut and added it for you.";
+                    window.addWidget('donut', 'normal', 'AI Category Split');
+                } else if (lower.includes('signout') || lower.includes('sign out') || lower.includes('logout')) {
+                    aiText = "Signing you out now…";
+                    setTimeout(() => { sb.auth.signOut().then(() => window.location.href = '/'); }, 600);
+                } else if (lower.includes('portal') || lower.includes('account')) {
+                    aiText = "Taking you to your Account Portal…";
+                    setTimeout(() => { window.location.href = '/portal'; }, 600);
+                } else if (lower.includes('refresh') || lower.includes('reload')) {
+                    aiText = "Refreshing your live data from the SetAll ledger…";
+                    loadLiveData().then(() => renderWidgets());
+                }
+
+                chatMessages.push({ role: 'ai', text: aiText });
+                isThinking = false;
+                renderChat();
+            }, 1000);
+        }
+
+        document.getElementById('chat-form').addEventListener('submit', e => {
+            e.preventDefault();
+            const input = document.getElementById('chat-input');
+            if (!input.value.trim() || isThinking) return;
+            const text = input.value;
+            input.value = '';
+            triggerAiResponse(text, 'I am processing your request through the SetAll engine.');
+        });
+
+        document.getElementById('file-upload').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            triggerAiResponse(
+                `I uploaded: ${file.name}`,
+                `I've received ${file.name}. In the full release, I'll parse this and merge it with your live ledger data. For now, your canvas reflects your Supabase data.`
+            );
+        });
+
+        // ── Renderers ────────────────────────────────────────────────────────
+        function renderHeader() {
+            const name = currentUser
+                ? (currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User')
+                : 'User';
+
+            document.getElementById('app-header').innerHTML = `
+                <div class="flex items-center gap-4">
+                    <div class="bg-brand-teal p-3.5 rounded-2xl shadow-[0_0_30px_rgba(20,184,166,0.25)] flex items-center justify-center flex-shrink-0">
+                        <i data-lucide="bar-chart-3" class="text-[#0F172A] w-7 h-7"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-3xl font-black text-white tracking-tight">SetAll <span class="text-brand-teal">Canvas</span></h1>
+                        <p class="text-slate-400 text-sm font-medium mt-0.5">${name} · Live from your ledger</p>
+                    </div>
+                </div>
+                <button onclick="window.toggleEditMode()"
+                    class="px-5 py-3 font-bold rounded-xl flex items-center gap-2 transition-all ${isEditMode
+                        ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                        : 'bg-[#0F172A] border border-slate-700 text-slate-300 hover:bg-slate-800'}">
+                    <i data-lucide="${isEditMode ? 'check' : 'layout-dashboard'}" class="w-[18px] h-[18px]"></i>
+                    ${isEditMode ? 'Save Layout' : 'Edit Canvas'}
+                </button>
+            `;
+            lucide.createIcons();
+        }
+
+        function renderChat() {
+            const box = document.getElementById('chat-history');
+            let html = chatMessages.map(m => `
+                <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
+                    <div class="p-4 rounded-2xl text-[15px] max-w-[85%] leading-relaxed shadow-md ${
+                        m.role === 'user'
+                            ? 'bg-brand-teal text-[#0F172A] font-semibold rounded-tr-sm'
+                            : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'}">
+                        ${m.text}
+                    </div>
+                </div>`).join('');
+
+            if (isThinking) {
+                html += `
+                    <div class="flex justify-start">
+                        <div class="bg-slate-800 border border-slate-700/50 p-4 rounded-2xl rounded-tl-sm flex gap-2 items-center w-20 justify-center">
+                            <div class="w-2 h-2 bg-brand-teal rounded-full animate-bounce"></div>
+                            <div class="w-2 h-2 bg-brand-teal rounded-full animate-bounce" style="animation-delay:0.2s"></div>
+                            <div class="w-2 h-2 bg-brand-teal rounded-full animate-bounce" style="animation-delay:0.4s"></div>
+                        </div>
+                    </div>`;
+            }
+
+            document.getElementById('chat-submit').disabled = isThinking;
+            box.innerHTML = html;
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function renderWidgets() {
+            const stats = getStats();
+            let html = '';
+
+            widgets.forEach((w, index) => {
+                const colSpan = w.width === 'full' ? 'xl:col-span-12 md:col-span-2'
+                              : w.width === 'wide' ? 'xl:col-span-8 md:col-span-2'
+                              :                      'xl:col-span-4 md:col-span-1';
+
+                let content = '';
+
+                if (w.type === 'stat') {
+                    const raw = stats[w.metric];
+                    const val = typeof raw === 'number' ? (Math.abs(raw) >= 1000 ? '$' + (raw / 1000).toFixed(1) + 'k' : '$' + parseFloat(raw).toFixed(2)) : '$' + raw;
+                    const iconName  = w.metric === 'burn' ? 'flame' : w.metric === 'income' ? 'trending-up' : 'activity';
+                    const colorCls  = (w.metric === 'exp' || w.metric === 'burn') ? 'text-brand-purple' : 'text-brand-teal';
+                    content = `
+                        <div class="flex flex-col justify-center h-full pt-2">
+                            <i data-lucide="${iconName}" class="${colorCls} w-7 h-7"></i>
+                            <p class="text-4xl font-extrabold mt-4 tracking-tight">${val}</p>
+                            <p class="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">last 90 days</p>
+                        </div>`;
+                } else if (w.type === 'donut') {
+                    const totalExp = stats.exp || 1;
+                    let offset = 0;
+                    const circles = stats.cats.map((c, i) => {
+                        const pct = (c.value / totalExp) * 100;
+                        const off = -offset;
+                        offset += pct;
+                        return `<circle cx="50" cy="50" r="15.9" fill="transparent"
+                            stroke="${CATEGORY_COLORS[i % CATEGORY_COLORS.length]}"
+                            stroke-width="6" stroke-dasharray="${pct} 100" stroke-dashoffset="${off}"
+                            class="donut-segment"
+                            onclick="window.handleSliceClick('${c.name.replace(/'/g, '\\&#39;')}', ${c.value}, ${pct})"></circle>`;
+                    }).join('');
+
+                    const legend = stats.cats.slice(0, 5).map((c, i) => `
+                        <div class="flex justify-between items-center px-2">
+                            <div class="flex items-center gap-3">
+                                <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:${CATEGORY_COLORS[i % CATEGORY_COLORS.length]}"></div>
+                                <span class="text-sm font-semibold text-slate-300 truncate">${c.name}</span>
+                            </div>
+                            <span class="text-sm font-bold text-white ml-2">$${c.value.toFixed(0)}</span>
+                        </div>`).join('');
+
+                    const emptyMsg = stats.cats.length === 0
+                        ? `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="inbox" class="w-8 h-8 mb-3 opacity-40"></i>No expense data yet</div>`
+                        : '';
+
+                    content = emptyMsg || `
+                        <div class="flex flex-col h-full justify-between">
+                            <div class="relative w-full h-56 mx-auto flex items-center justify-center my-2">
+                                <svg viewBox="0 0 100 100" class="w-full h-full max-w-[220px] transform -rotate-90 drop-shadow-2xl">
+                                    <circle cx="50" cy="50" r="15.9" fill="transparent" stroke="#1E293B" stroke-width="6"/>
+                                    ${circles}
+                                </svg>
+                                <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                    <span class="text-[11px] text-slate-500 uppercase font-bold tracking-widest">Spent</span>
+                                    <span class="text-3xl font-extrabold text-white mt-1">$${stats.exp >= 1000 ? (stats.exp/1000).toFixed(1)+'k' : stats.exp.toFixed(0)}</span>
+                                </div>
+                            </div>
+                            <div class="space-y-2.5 mt-2">${legend}</div>
+                        </div>`;
+                } else if (w.type === 'trend') {
+                    if (stats.trend.length === 0) {
+                        content = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="bar-chart-2" class="w-8 h-8 mb-3 opacity-40"></i>No timeline data yet</div>`;
+                    } else {
+                        const max = Math.max(...stats.trend.map(d => Math.max(d.income, d.expense)), 1) * 1.1;
+                        const bars = stats.trend.map(d => `
+                            <div class="flex flex-col justify-end items-center flex-1 h-full group relative">
+                                <div class="absolute bottom-full mb-2 bg-slate-900 text-xs p-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-20 whitespace-nowrap border border-slate-700 shadow-2xl pointer-events-none">
+                                    <div class="font-bold text-white mb-2 border-b border-slate-700 pb-1">${d.day}</div>
+                                    ${d.income  > 0 ? `<div class="flex justify-between gap-4 text-brand-teal"><span>In:</span><span>$${d.income.toFixed(0)}</span></div>` : ''}
+                                    ${d.expense > 0 ? `<div class="flex justify-between gap-4 text-brand-purple"><span>Out:</span><span>$${d.expense.toFixed(0)}</span></div>` : ''}
+                                </div>
+                                <div class="flex items-end gap-1.5 w-full h-full justify-center min-w-[8px]">
+                                    ${d.income  > 0 ? `<div onclick="window.handleBarClick('Income', ${d.income}, '${d.day}')" style="height:${(d.income/max)*100}%" class="w-full max-w-[24px] bg-brand-teal rounded-t-md opacity-90 bar-grow"></div>` : ''}
+                                    ${d.expense > 0 ? `<div onclick="window.handleBarClick('Expense', ${d.expense}, '${d.day}')" style="height:${(d.expense/max)*100}%" class="w-full max-w-[24px] bg-brand-purple rounded-t-md opacity-90 bar-grow"></div>` : ''}
+                                </div>
+                                <span class="text-[9px] text-slate-500 mt-3 font-semibold">${d.day.slice(3)}</span>
+                            </div>`).join('');
+                        content = `<div class="min-h-[280px] h-full w-full flex items-end justify-between gap-1 pt-4">${bars}</div>`;
+                    }
+                }
+
+                let overlay = '';
+                if (isEditMode) {
+                    overlay = `
+                        <div class="absolute inset-0 bg-[#0F172A]/90 backdrop-blur-md z-30 rounded-[32px] flex flex-col items-center justify-center gap-4 border-2 border-orange-500/50">
+                            <div class="text-orange-400 font-bold text-xs uppercase tracking-widest mb-2">Edit Widget</div>
+                            <div class="flex gap-2">
+                                <button onclick="window.moveWidget(${index},'left')"   class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Move Left"><i data-lucide="arrow-left" class="w-4 h-4"></i></button>
+                                <button onclick="window.resizeWidget(${index})"         class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Resize"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
+                                <button onclick="window.moveWidget(${index},'right')"  class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Move Right"><i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                            </div>
+                            <div class="flex gap-2">
+                                <select onchange="window.changeWidgetType(${index},this.value)" class="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer">
+                                    <option value="stat"  ${w.type==='stat'  ? 'selected':''}>Statistic</option>
+                                    <option value="donut" ${w.type==='donut' ? 'selected':''}>Donut</option>
+                                    <option value="trend" ${w.type==='trend' ? 'selected':''}>Trend</option>
+                                </select>
+                                ${w.type === 'stat' ? `
+                                <select onchange="window.changeWidgetMetric(${index},this.value)" class="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer">
+                                    <option value="exp"    ${w.metric==='exp'    ? 'selected':''}>Total Spending</option>
+                                    <option value="burn"   ${w.metric==='burn'   ? 'selected':''}>Daily Burn</option>
+                                    <option value="net"    ${w.metric==='net'    ? 'selected':''}>Net Worth</option>
+                                    <option value="income" ${w.metric==='income' ? 'selected':''}>Total Income</option>
+                                </select>` : ''}
+                            </div>
+                            <button onclick="window.removeWidget('${w.id}')" class="mt-2 p-2 px-4 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> Remove Widget
+                            </button>
+                        </div>`;
+                }
+
+                html += `
+                    <div class="bg-[#1E293B]/70 border border-slate-800 rounded-[32px] p-8 relative shadow-xl hover:border-brand-teal/20 transition-colors flex flex-col ${colSpan} ${isEditMode ? 'wiggle ring-2 ring-orange-500/50' : ''}">
+                        ${overlay}
+                        ${isEditMode ? `<button onclick="window.removeWidget('${w.id}')" class="absolute -top-3 -right-3 p-2.5 bg-red-500 hover:bg-red-400 transition-colors text-white rounded-full z-40 shadow-lg"><i data-lucide="x" class="w-4 h-4"></i></button>` : ''}
+                        <div class="flex items-center justify-between mb-4 relative z-10">
+                            <h3 class="text-brand-teal text-xs font-black uppercase tracking-widest">${w.title}</h3>
+                            <i data-lucide="${w.type==='trend' ? 'bar-chart-2' : w.type==='donut' ? 'pie-chart' : 'zap'}" class="w-4 h-4 text-slate-600"></i>
+                        </div>
+                        <div class="flex-1 relative z-10">${content}</div>
+                    </div>`;
+            });
+
+            if (isEditMode) {
+                html += `
+                    <div onclick="window.addWidget()" class="xl:col-span-4 md:col-span-1 bg-[#1E293B]/30 border-2 border-dashed border-slate-700 rounded-[32px] p-8 flex flex-col items-center justify-center cursor-pointer hover:border-brand-teal hover:bg-[#1E293B]/60 transition-all min-h-[300px]">
+                        <div class="p-4 bg-slate-800 rounded-full mb-4 text-brand-teal"><i data-lucide="plus" class="w-6 h-6"></i></div>
+                        <span class="text-white font-bold">Add Widget</span>
+                    </div>`;
+            }
+
+            document.getElementById('widgets-grid').innerHTML = html;
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
