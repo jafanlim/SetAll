@@ -32,6 +32,9 @@
         .bar-grow:hover { filter: brightness(1.3); }
         .wiggle { animation: wiggle 0.5s ease-in-out infinite; }
         @keyframes wiggle { 0%, 100% { transform: rotate(-1deg); } 50% { transform: rotate(1deg); } }
+        .widget-draggable { cursor: grab; }
+        .widget-draggable:active { cursor: grabbing; }
+        .widget-drag-over { outline: 2px dashed #14B8A6; outline-offset: 4px; opacity: 0.7; }
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #1E293B; border-radius: 10px; }
@@ -224,10 +227,28 @@
         // ── Action Handlers ──────────────────────────────────────────────────
         window.toggleEditMode = () => { isEditMode = !isEditMode; renderHeader(); renderWidgets(); };
 
-        window.moveWidget = (index, direction) => {
-            if (direction === 'left'  && index > 0)                  [widgets[index], widgets[index - 1]] = [widgets[index - 1], widgets[index]];
-            if (direction === 'right' && index < widgets.length - 1) [widgets[index], widgets[index + 1]] = [widgets[index + 1], widgets[index]];
+        let dragSrcIndex = null;
+
+        window.onWidgetDragStart = (index) => { dragSrcIndex = index; };
+
+        window.onWidgetDragOver = (e, el) => {
+            e.preventDefault();
+            document.querySelectorAll('.widget-drag-over').forEach(n => n.classList.remove('widget-drag-over'));
+            el.classList.add('widget-drag-over');
+        };
+
+        window.onWidgetDrop = (index) => {
+            document.querySelectorAll('.widget-drag-over').forEach(n => n.classList.remove('widget-drag-over'));
+            if (dragSrcIndex === null || dragSrcIndex === index) return;
+            const moved = widgets.splice(dragSrcIndex, 1)[0];
+            widgets.splice(index, 0, moved);
+            dragSrcIndex = null;
             renderWidgets();
+        };
+
+        window.onWidgetDragEnd = () => {
+            document.querySelectorAll('.widget-drag-over').forEach(n => n.classList.remove('widget-drag-over'));
+            dragSrcIndex = null;
         };
 
         window.resizeWidget = (index) => {
@@ -259,51 +280,112 @@
 
         window.handleSliceClick = (name, value, pct) => {
             if (isEditMode) return;
-            triggerAiResponse(
-                `I clicked on ${name}.`,
-                `${name} accounts for $${value.toFixed(2)} of your spending — ${pct.toFixed(1)}% of total. That's a meaningful category to watch. I can compare this against your other categories if you'd like.`
-            );
+            triggerAiResponse(`I clicked on the ${name} slice — $${value.toFixed(2)}, ${pct.toFixed(1)}% of my spending. What does this tell you?`);
         };
 
         window.handleBarClick = (type, value, label) => {
             if (isEditMode || value === 0) return;
-            triggerAiResponse(
-                `What happened on ${label}?`,
-                `On ${label}, you recorded $${value.toFixed(2)} in ${type.toLowerCase()}. I've noted this in your timeline.`
-            );
+            triggerAiResponse(`What can you tell me about my ${type.toLowerCase()} of $${value.toFixed(2)} on ${label}?`);
         };
 
         // ── AI Engine ────────────────────────────────────────────────────────
-        function triggerAiResponse(userText, defaultAiText) {
+        async function callAiAnalyst(userText) {
+            const s = getStats();
+            const topCats = s.cats.slice(0, 6).map(c => `${c.name}: $${c.value.toFixed(2)}`).join(', ');
+            const recentRows = appData.slice(-20).map(d =>
+                `${d.date} | ${d.category} | ${d.type} | $${d.amount.toFixed(2)}`
+            ).join('\n');
+
+            const history = chatMessages
+                .filter((m, i) => i > 0)
+                .slice(-10)
+                .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+
+            const { data, error } = await sb.functions.invoke('ai-analyst', {
+                body: {
+                    message: userText,
+                    history,
+                    context: {
+                        totalSpending:  s.exp,
+                        dailyBurn:      parseFloat(s.burn),
+                        totalIncome:    s.income,
+                        net:            s.net,
+                        topCategories:  topCats,
+                        recentRows
+                    }
+                }
+            });
+
+            if (error) throw new Error(error.message || 'ai-analyst function error');
+            return data?.reply || 'No response from AI analyst.';
+        }
+
+        function handleLocalCommands(text) {
+            const lower = text.toLowerCase();
+            if (lower.includes('signout') || lower.includes('sign out') || lower.includes('logout')) {
+                setTimeout(() => sb.auth.signOut().then(() => window.location.href = '/'), 800);
+                return 'Signing you out now…';
+            }
+            if (lower.includes('portal') || lower.includes('account')) {
+                setTimeout(() => window.location.href = '/portal', 800);
+                return 'Taking you to your Account Portal…';
+            }
+            if (lower.includes('refresh') || lower.includes('reload')) {
+                loadLiveData().then(() => renderWidgets());
+                return 'Refreshing your live data from the SetAll ledger…';
+            }
+            return null;
+        }
+
+        function processActions(aiText) {
+            if (aiText.includes('[ACTION:ADD_TREND]')) {
+                window.addWidget('trend', 'wide', 'AI Trend Graph');
+                return aiText.replace('[ACTION:ADD_TREND]', '').trim();
+            }
+            if (aiText.includes('[ACTION:ADD_DONUT]')) {
+                window.addWidget('donut', 'normal', 'AI Category Split');
+                return aiText.replace('[ACTION:ADD_DONUT]', '').trim();
+            }
+            if (aiText.includes('[ACTION:REFRESH]')) {
+                loadLiveData().then(() => renderWidgets());
+                return aiText.replace('[ACTION:REFRESH]', '').trim();
+            }
+            if (aiText.includes('[ACTION:SIGNOUT]')) {
+                setTimeout(() => sb.auth.signOut().then(() => window.location.href = '/'), 1200);
+                return aiText.replace('[ACTION:SIGNOUT]', '').trim();
+            }
+            if (aiText.includes('[ACTION:PORTAL]')) {
+                setTimeout(() => window.location.href = '/portal', 1200);
+                return aiText.replace('[ACTION:PORTAL]', '').trim();
+            }
+            return aiText;
+        }
+
+        function triggerAiResponse(userText) {
             chatMessages.push({ role: 'user', text: userText });
             isThinking = true;
             renderChat();
 
-            setTimeout(() => {
-                let aiText = defaultAiText;
-                const lower = userText.toLowerCase();
-
-                if (lower.includes('chart') || lower.includes('visual') || lower.includes('graph')) {
-                    aiText = "I've generated a new trend chart and injected it onto your canvas.";
-                    window.addWidget('trend', 'wide', 'AI Trend Graph');
-                } else if (lower.includes('donut') || lower.includes('pie') || lower.includes('categor')) {
-                    aiText = "I've built a fresh category breakdown donut and added it for you.";
-                    window.addWidget('donut', 'normal', 'AI Category Split');
-                } else if (lower.includes('signout') || lower.includes('sign out') || lower.includes('logout')) {
-                    aiText = "Signing you out now…";
-                    setTimeout(() => { sb.auth.signOut().then(() => window.location.href = '/'); }, 600);
-                } else if (lower.includes('portal') || lower.includes('account')) {
-                    aiText = "Taking you to your Account Portal…";
-                    setTimeout(() => { window.location.href = '/portal'; }, 600);
-                } else if (lower.includes('refresh') || lower.includes('reload')) {
-                    aiText = "Refreshing your live data from the SetAll ledger…";
-                    loadLiveData().then(() => renderWidgets());
-                }
-
-                chatMessages.push({ role: 'ai', text: aiText });
+            const localResult = handleLocalCommands(userText);
+            if (localResult) {
+                chatMessages.push({ role: 'ai', text: localResult });
                 isThinking = false;
                 renderChat();
-            }, 1000);
+                return;
+            }
+
+            callAiAnalyst(userText)
+                .then(raw => {
+                    const cleaned = processActions(raw);
+                    chatMessages.push({ role: 'ai', text: cleaned });
+                })
+                .catch(err => {
+                    chatMessages.push({ role: 'ai', text: `AI error: ${err.message}. Ensure the ai-analyst edge function is deployed.` });
+                })
+                .finally(() => {
+                    isThinking = false;
+                    renderChat();
+                });
         }
 
         document.getElementById('chat-form').addEventListener('submit', e => {
@@ -312,16 +394,13 @@
             if (!input.value.trim() || isThinking) return;
             const text = input.value;
             input.value = '';
-            triggerAiResponse(text, 'I am processing your request through the SetAll engine.');
+            triggerAiResponse(text);
         });
 
         document.getElementById('file-upload').addEventListener('change', e => {
             const file = e.target.files[0];
             if (!file) return;
-            triggerAiResponse(
-                `I uploaded: ${file.name}`,
-                `I've received ${file.name}. In the full release, I'll parse this and merge it with your live ledger data. For now, your canvas reflects your Supabase data.`
-            );
+            triggerAiResponse(`I uploaded a file: ${file.name}`);
         });
 
         // ── Renderers ────────────────────────────────────────────────────────
@@ -469,10 +548,9 @@
                     overlay = `
                         <div class="absolute inset-0 bg-[#0F172A]/90 backdrop-blur-md z-30 rounded-[32px] flex flex-col items-center justify-center gap-4 border-2 border-orange-500/50">
                             <div class="text-orange-400 font-bold text-xs uppercase tracking-widest mb-2">Edit Widget</div>
-                            <div class="flex gap-2">
-                                <button onclick="window.moveWidget(${index},'left')"   class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Move Left"><i data-lucide="arrow-left" class="w-4 h-4"></i></button>
-                                <button onclick="window.resizeWidget(${index})"         class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Resize"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
-                                <button onclick="window.moveWidget(${index},'right')"  class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Move Right"><i data-lucide="arrow-right" class="w-4 h-4"></i></button>
+                            <div class="flex gap-2 items-center">
+                                <div class="p-3 bg-slate-700/60 rounded-xl text-slate-400 cursor-grab" title="Drag to reorder"><i data-lucide="grip-vertical" class="w-4 h-4"></i></div>
+                                <button onclick="window.resizeWidget(${index})" class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Resize"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
                             </div>
                             <div class="flex gap-2">
                                 <select onchange="window.changeWidgetType(${index},this.value)" class="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer">
@@ -495,7 +573,8 @@
                 }
 
                 html += `
-                    <div class="bg-[#1E293B]/70 border border-slate-800 rounded-[32px] p-8 relative shadow-xl hover:border-brand-teal/20 transition-colors flex flex-col ${colSpan} ${isEditMode ? 'wiggle ring-2 ring-orange-500/50' : ''}">
+                    <div class="bg-[#1E293B]/70 border border-slate-800 rounded-[32px] p-8 relative shadow-xl hover:border-brand-teal/20 transition-colors flex flex-col ${colSpan} ${isEditMode ? 'wiggle ring-2 ring-orange-500/50 widget-draggable' : ''}"
+                        ${isEditMode ? `draggable="true" ondragstart="window.onWidgetDragStart(${index})" ondragover="window.onWidgetDragOver(event,this)" ondrop="window.onWidgetDrop(${index})" ondragend="window.onWidgetDragEnd()"` : ''}>
                         ${overlay}
                         ${isEditMode ? `<button onclick="window.removeWidget('${w.id}')" class="absolute -top-3 -right-3 p-2.5 bg-red-500 hover:bg-red-400 transition-colors text-white rounded-full z-40 shadow-lg"><i data-lucide="x" class="w-4 h-4"></i></button>` : ''}
                         <div class="flex items-center justify-between mb-4 relative z-10">

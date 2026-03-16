@@ -1,168 +1,213 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Support | SetAll</title>
     <meta name="description" content="Get help with SetAll, read FAQs, or contact our support team.">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <!-- SetAll Brand Configuration -->
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            deep: '#020617',
-                            slate: '#0F172A',
-                            border: '#1E293B',
-                            teal: '#14B8A6',
-                            tealHover: '#0D9488',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
     <style>
-        .glass-nav { background: rgba(2, 6, 23, 0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
-        .glass-card { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-        .glow-effect { position: absolute; width: 600px; height: 600px; background: radial-gradient(circle, rgba(20,184,166,0.1) 0%, rgba(2,6,23,0) 70%); top: -100px; left: 50%; transform: translateX(-50%); z-index: -1; pointer-events: none; }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background: #0F172A; color: #cbd5e1;
+            min-height: 100vh; -webkit-font-smoothing: antialiased; overflow-x: hidden;
+        }
+        a { color: inherit; text-decoration: none; }
+        ::selection { background: #14B8A6; color: #0F172A; }
+
+        .bg-glow { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+        .bg-glow::before {
+            content: ''; position: absolute; top: -10%; left: 50%; transform: translateX(-50%);
+            width: 50%; height: 40%; border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(20,184,166,0.12) 0%, transparent 70%);
+        }
+        .z1 { position: relative; z-index: 1; }
+
+        nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+            background: rgba(15,23,42,0.85); backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .nav-inner {
+            max-width: 80rem; margin: 0 auto; padding: 0 1.5rem;
+            height: 5rem; display: flex; align-items: center; justify-content: space-between;
+        }
+        .nav-logo { display: flex; align-items: center; gap: 0.5rem; font-size: 1.25rem; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; }
+        .nav-logo-icon { color: #14B8A6; font-size: 1.5rem; }
+        .nav-links { display: none; gap: 2rem; font-size: 0.875rem; font-weight: 500; color: #94a3b8; }
+        .nav-links a:hover { color: #fff; transition: color .15s; }
+        .nav-links a.active { color: #fff; }
+        @media (min-width: 768px) { .nav-links { display: flex; } }
+        .nav-actions { display: flex; align-items: center; gap: 0.75rem; }
+        .btn-ghost {
+            display: none; font-size: 0.875rem; font-weight: 600; color: #cbd5e1;
+            padding: 0.5rem 1rem; border-radius: 9999px;
+            border: 1px solid #334155; transition: color .15s, border-color .15s;
+        }
+        .btn-ghost:hover { color: #fff; border-color: #64748b; }
+        @media (min-width: 640px) { .btn-ghost { display: inline-block; } }
+        .btn-primary {
+            background: #14B8A6; color: #0F172A;
+            padding: 0.5rem 1.25rem; border-radius: 9999px;
+            font-weight: 700; font-size: 0.875rem;
+            box-shadow: 0 0 14px rgba(20,184,166,0.3); transition: background .15s;
+        }
+        .btn-primary:hover { background: #2dd4bf; }
+
+        .hero { padding: 9rem 1.5rem 3.5rem; text-align: center; max-width: 48rem; margin: 0 auto; }
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem); font-weight: 800;
+            letter-spacing: -0.04em; line-height: 1.1; color: #f1f5f9; margin-bottom: 1rem;
+        }
+        .hero h1 span { color: #14B8A6; }
+        .hero p { font-size: 1.0625rem; color: #94a3b8; line-height: 1.75; }
+
+        .page { max-width: 56rem; margin: 0 auto; padding: 0 1.5rem; }
+
+        .cards-grid { display: grid; gap: 1.25rem; grid-template-columns: 1fr; margin-bottom: 3rem; }
+        @media (min-width: 640px) { .cards-grid { grid-template-columns: repeat(2, 1fr); } }
+
+        .card {
+            background: rgba(30,41,59,0.5); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 1.5rem; padding: 2rem; transition: border-color .18s;
+        }
+        .card:hover { border-color: rgba(20,184,166,0.35); }
+        .card-icon {
+            width: 2.75rem; height: 2.75rem;
+            background: rgba(20,184,166,0.1); border: 1px solid rgba(20,184,166,0.2);
+            border-radius: 0.875rem; display: flex; align-items: center; justify-content: center;
+            margin-bottom: 1.25rem;
+        }
+        .card-icon svg { width: 1.25rem; height: 1.25rem; stroke: #14B8A6; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .card h3 { font-size: 1.0625rem; font-weight: 700; color: #f1f5f9; margin-bottom: 0.5rem; }
+        .card p { font-size: 0.875rem; color: #94a3b8; line-height: 1.7; margin-bottom: 1.25rem; }
+        .card-link {
+            display: inline-flex; align-items: center; gap: 0.375rem;
+            font-size: 0.875rem; font-weight: 700; color: #14B8A6; transition: color .15s;
+        }
+        .card-link:hover { color: #2dd4bf; }
+        .card-link svg { width: 1rem; height: 1rem; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+        .section-label {
+            font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.1em;
+            text-transform: uppercase; color: #14B8A6; margin-bottom: 0.75rem;
+        }
+        .section-heading { font-size: 1.5rem; font-weight: 800; color: #f1f5f9; letter-spacing: -0.02em; margin-bottom: 1.5rem; }
+
+        .faq-list { display: flex; flex-direction: column; gap: 0.875rem; margin-bottom: 5rem; }
+        .faq-item {
+            background: rgba(30,41,59,0.45); border: 1px solid rgba(255,255,255,0.07);
+            border-radius: 1.25rem; padding: 1.5rem;
+        }
+        .faq-item h3 { font-size: 1rem; font-weight: 700; color: #e2e8f0; margin-bottom: 0.5rem; }
+        .faq-item p { font-size: 0.875rem; color: #94a3b8; line-height: 1.75; }
+
+        .divider { border: none; border-top: 1px solid rgba(255,255,255,0.05); margin: 0 0 3rem; }
+
+        footer { border-top: 1px solid #1e293b; padding: 2rem 1.5rem; font-size: 0.8125rem; color: #64748b; }
+        .footer-inner { max-width: 80rem; margin: 0 auto; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
+        @media (min-width: 768px) { .footer-inner { flex-direction: row; justify-content: space-between; } }
+        .footer-links { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+        .footer-links a:hover, .footer-links a.active { color: #fff; transition: color .15s; }
     </style>
 </head>
-<body class="bg-brand-deep text-slate-300 font-sans antialiased overflow-x-hidden relative selection:bg-brand-teal selection:text-brand-deep">
+<body>
+    <div class="bg-glow" aria-hidden="true"></div>
 
-    <div class="glow-effect"></div>
-
-    <!-- Navigation -->
-    <nav class="fixed w-full top-0 z-50 glass-nav">
-        <div class="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-                <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
-                <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
+    <nav>
+        <div class="nav-inner">
+            <a href="/" class="nav-logo">
+                <span class="nav-logo-icon" aria-hidden="true">⚖️</span>
+                <span>SetAll</span>
             </a>
-            
-            <div class="hidden md:flex items-center gap-8 text-sm font-medium">
-                <a href="/download" class="hover:text-white transition-colors">Downloads</a>
-                <a href="/support" class="text-white transition-colors">Support</a>
+            <div class="nav-links">
+                <a href="/">Home</a>
+                <a href="/download">Downloads</a>
+                <a href="/support" class="active">Support</a>
             </div>
-
-            <div class="flex items-center gap-4">
-                <a href="/login" class="text-sm font-semibold text-white hover:text-brand-teal transition-colors hidden sm:block">Sign In</a>
-                <a href="/login" class="bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-sm font-bold py-2.5 px-6 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.3)]">
-                    Sign Up
-                </a>
+            <div class="nav-actions">
+                <a href="/login" class="btn-ghost">Sign In</a>
+                <a href="/login?mode=signup" class="btn-primary">Get Started</a>
             </div>
         </div>
     </nav>
 
-    <!-- Header Section -->
-    <main class="pt-40 pb-16 px-6 relative z-10">
-        <div class="max-w-3xl mx-auto text-center">
-            <h1 class="text-4xl md:text-6xl font-extrabold text-white tracking-tight mb-6">
-                How can we <span class="text-brand-teal">help?</span>
-            </h1>
-            <p class="text-lg text-slate-400 mb-8">
-                Find answers to common questions or reach out to us directly.
-            </p>
+    <main class="z1">
+        <div class="hero">
+            <h1>How can we <span>help?</span></h1>
+            <p>Find answers to common questions or reach out to us directly.</p>
+        </div>
+
+        <div class="page z1">
+            <div class="cards-grid">
+                <div class="card">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    </div>
+                    <h3>Email Support</h3>
+                    <p>Need help with your account or have a specific question? We're here to help.</p>
+                    <a href="mailto:contact@setall.app?subject=SetAll%20Support%20Request" class="card-link">
+                        contact@setall.app
+                        <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+                    </a>
+                </div>
+                <div class="card">
+                    <div class="card-icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    </div>
+                    <h3>Report a Bug</h3>
+                    <p>Found a glitch or have a feature request? Let us know on our public tracker.</p>
+                    <a href="https://github.com/jafanlim/SetAll/issues/new" target="_blank" rel="noopener" class="card-link">
+                        Open an Issue
+                        <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    </a>
+                </div>
+            </div>
+
+            <hr class="divider">
+
+            <p class="section-label">Help Centre</p>
+            <h2 class="section-heading">Frequently Asked Questions</h2>
+            <div class="faq-list">
+                <div class="faq-item">
+                    <h3>Is SetAll free to use?</h3>
+                    <p>Yes, the core SetAll engine is completely free. We believe managing shared expenses shouldn't cost you extra money.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How does the "Greedy Flow" engine work?</h3>
+                    <p>Our engine algorithmically simplifies group debts. Instead of tracking dozens of complex IOUs, SetAll calculates the absolute minimum number of transfers required to settle the entire group, saving everyone time and bank fees.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Does SetAll connect to my bank account?</h3>
+                    <p>No. SetAll is a non-custodial ledger. We track the math, but we never touch your money. When it's time to settle up, you transfer the funds using your preferred method (Cash, Bank Transfer, PayPal) and mark it as settled in the app.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>Can I use the app without an internet connection?</h3>
+                    <p>Yes. SetAll uses a local-first architecture. You can add expenses and create groups while entirely offline. The moment your device reconnects, it seamlessly syncs with the cloud in the background.</p>
+                </div>
+                <div class="faq-item">
+                    <h3>How do I delete my account?</h3>
+                    <p>Open the SetAll app, navigate to Settings → Delete Account, or go to your <a href="/portal" style="color:#14B8A6;font-weight:600">Account Portal</a> → Danger Zone. Your data is permanently wiped from our servers within 30 days.</p>
+                </div>
+            </div>
         </div>
     </main>
 
-    <!-- Contact & Bug Report Cards -->
-    <section class="pb-16 px-6 relative z-10">
-        <div class="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Email Support -->
-            <div class="glass-card p-8 rounded-3xl transition-all duration-300 hover:border-brand-teal/50">
-                <div class="w-12 h-12 bg-brand-deep rounded-xl flex items-center justify-center border border-brand-border mb-6">
-                    <i data-lucide="mail" class="w-6 h-6 text-brand-teal"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Email Support</h3>
-                <p class="text-slate-400 text-sm mb-6">Need help with your account or have a specific question? We're here to help.</p>
-                <a href="mailto:contact@setall.app?subject=SetAll%20Support%20Request" class="inline-flex items-center gap-2 text-brand-teal font-bold hover:text-brand-tealHover transition-colors">
-                    contact@setall.app <i data-lucide="arrow-right" class="w-4 h-4"></i>
-                </a>
-            </div>
-
-            <!-- GitHub Issues -->
-            <div class="glass-card p-8 rounded-3xl transition-all duration-300 hover:border-brand-teal/50">
-                <div class="w-12 h-12 bg-brand-deep rounded-xl flex items-center justify-center border border-brand-border mb-6">
-                    <i data-lucide="bug" class="w-6 h-6 text-brand-teal"></i>
-                </div>
-                <h3 class="text-xl font-bold text-white mb-2">Report a Bug</h3>
-                <p class="text-slate-400 text-sm mb-6">Found a glitch or have a feature request? Let us know on our public tracker.</p>
-                <a href="https://github.com/jafanlim/SetAll/issues/new" target="_blank" rel="noopener" class="inline-flex items-center gap-2 text-brand-teal font-bold hover:text-brand-tealHover transition-colors">
-                    Open an Issue <i data-lucide="external-link" class="w-4 h-4"></i>
-                </a>
-            </div>
-        </div>
-    </section>
-
-    <!-- FAQ Section -->
-    <section class="pb-32 px-6 relative z-10">
-        <div class="max-w-3xl mx-auto">
-            <h2 class="text-2xl font-bold text-white mb-8">Frequently Asked Questions</h2>
-            
-            <div class="space-y-4">
-                <!-- FAQ 1 -->
-                <div class="glass-card p-6 rounded-2xl">
-                    <h3 class="text-lg font-bold text-white mb-2">Is SetAll free to use?</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        Yes, the core SetAll engine is completely free. We believe managing shared expenses shouldn't cost you extra money.
-                    </p>
-                </div>
-
-                <!-- FAQ 2 -->
-                <div class="glass-card p-6 rounded-2xl">
-                    <h3 class="text-lg font-bold text-white mb-2">How does the "Greedy Flow" engine work?</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        Our engine algorithmically simplifies group debts. Instead of tracking dozens of complex IOUs, SetAll calculates the absolute minimum number of transfers required to settle the entire group, saving everyone time and bank fees.
-                    </p>
-                </div>
-
-                <!-- FAQ 3 -->
-                <div class="glass-card p-6 rounded-2xl">
-                    <h3 class="text-lg font-bold text-white mb-2">Does SetAll connect to my bank account?</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        No. SetAll is a non-custodial ledger. We track the math, but we never touch your money. When it's time to settle up, you transfer the funds using your preferred method (Cash, Bank Transfer, PayPal) and mark it as settled in the app.
-                    </p>
-                </div>
-
-                <!-- FAQ 4 -->
-                <div class="glass-card p-6 rounded-2xl">
-                    <h3 class="text-lg font-bold text-white mb-2">Can I use the app without an internet connection?</h3>
-                    <p class="text-slate-400 text-sm leading-relaxed">
-                        Yes! SetAll uses a "Local-First" architecture. You can add expenses and create groups while entirely offline. The moment your device reconnects to the internet, it seamlessly syncs with the cloud in the background.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    <!-- Footer -->
-    <footer class="py-12 px-6 bg-brand-deep border-t border-brand-border">
-        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
-            <div class="flex items-center gap-2">
-                <i data-lucide="scale" class="text-slate-500 w-5 h-5"></i>
-                <span class="text-slate-400 font-semibold tracking-tight">SetAll &copy; 2026</span>
-            </div>
-            <div class="flex gap-6 text-sm font-medium text-slate-500">
-                <a href="/privacy" class="hover:text-white transition-colors">Privacy Policy</a>
-                <a href="/terms" class="hover:text-white transition-colors">Terms of Service</a>
-                <a href="/support" class="text-white transition-colors">Help & Support</a>
-                <a href="mailto:contact@setall.app" class="hover:text-white transition-colors">Contact</a>
-            </div>
+    <footer class="z1">
+        <div class="footer-inner">
+            <p>⚖️ &copy; <span id="yr"></span> SetAll App. All rights reserved.</p>
+            <nav class="footer-links" aria-label="Footer">
+                <a href="/privacy">Privacy Policy</a>
+                <a href="/terms">Terms of Service</a>
+                <a href="/support" class="active">Support</a>
+                <a href="/download">Downloads</a>
+                <a href="mailto:contact@setall.app">Contact</a>
+            </nav>
         </div>
     </footer>
-
-    <script>
-        lucide.createIcons();
-    </script>
+    <script>document.getElementById('yr').textContent = new Date().getFullYear();</script>
 </body>
 </html>
