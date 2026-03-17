@@ -8,6 +8,7 @@
 
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <script>
@@ -122,6 +123,48 @@
 
         let currentUser = null;
 
+        // ── Widget Layout Persistence ─────────────────────────────────────────
+        async function loadWidgetLayout() {
+            // 1. Try Supabase profiles.widget_layout
+            try {
+                const { data: profile, error } = await sb
+                    .from('profiles')
+                    .select('widget_layout')
+                    .eq('id', currentUser.id)
+                    .single();
+                if (!error && profile?.widget_layout) {
+                    const saved = JSON.parse(profile.widget_layout);
+                    if (Array.isArray(saved) && saved.length > 0) {
+                        widgets = saved;
+                        return;
+                    }
+                }
+            } catch (_) {}
+            // 2. Fallback: localStorage
+            try {
+                const local = localStorage.getItem('setall_widget_layout');
+                if (local) {
+                    const parsed = JSON.parse(local);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        widgets = parsed;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        async function saveWidgetLayout() {
+            const payload = JSON.stringify(widgets);
+            // Always persist to localStorage as a fast, reliable fallback
+            try { localStorage.setItem('setall_widget_layout', payload); } catch (_) {}
+            // Best-effort sync to Supabase (requires widget_layout column on profiles)
+            try {
+                await sb.from('profiles').upsert(
+                    { id: currentUser.id, widget_layout: payload },
+                    { onConflict: 'id' }
+                );
+            } catch (_) {}
+        }
+
         // ── Auth Gate ────────────────────────────────────────────────────────
         (async () => {
             const { data: { session } } = await sb.auth.getSession();
@@ -131,6 +174,7 @@
             }
             currentUser = session.user;
             await loadLiveData();
+            await loadWidgetLayout();
             document.getElementById('auth-gate').style.display = 'none';
             document.getElementById('main-app').style.display  = 'block';
             renderHeader();
@@ -225,7 +269,16 @@
         }
 
         // ── Action Handlers ──────────────────────────────────────────────────
-        window.toggleEditMode = () => { isEditMode = !isEditMode; renderHeader(); renderWidgets(); };
+        window.toggleEditMode = () => {
+            const wasEditing = isEditMode;
+            isEditMode = !isEditMode;
+            if (wasEditing) {
+                // Exiting edit mode = Save Layout button clicked
+                saveWidgetLayout();
+            }
+            renderHeader();
+            renderWidgets();
+        };
 
         let dragSrcIndex = null;
 
@@ -330,7 +383,7 @@
                 throw new Error(err?.error || err?.message || `HTTP ${res.status}`);
             }
             const data = await res.json();
-            return data?.reply || 'No response from AI analyst.';
+            return data;
         }
 
         function handleLocalCommands(text) {
@@ -374,6 +427,66 @@
             return aiText;
         }
 
+        // Process structured actions array from the AI response
+        function processStructuredActions(actions) {
+            if (!Array.isArray(actions)) return;
+            for (const action of actions) {
+                switch (action) {
+                    case 'ADD_TREND':  window.addWidget('trend', 'wide', 'AI Trend Graph'); break;
+                    case 'ADD_DONUT':  window.addWidget('donut', 'normal', 'AI Category Split'); break;
+                    case 'REFRESH':    loadLiveData().then(() => renderWidgets()); break;
+                    case 'SIGNOUT':    setTimeout(() => sb.auth.signOut().then(() => window.location.href = '/'), 1200); break;
+                    case 'PORTAL':     setTimeout(() => window.location.href = '/portal', 1200); break;
+                }
+            }
+        }
+
+        // Render a Chart.js chart from structured AI response
+        let aiChartInstance = null;
+        function renderAiChart(chartData) {
+            if (!chartData || typeof chartData !== 'object') return;
+            try {
+                // Destroy previous AI chart if it exists
+                if (aiChartInstance) { aiChartInstance.destroy(); aiChartInstance = null; }
+
+                // Create or reuse the AI chart container
+                let container = document.getElementById('ai-chart-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'ai-chart-container';
+                    container.className = 'px-5 pb-4';
+                    const chatHistory = document.getElementById('chat-history');
+                    chatHistory.parentNode.insertBefore(container, chatHistory.nextSibling);
+                }
+                container.innerHTML = '<canvas id="ai-chart-canvas" style="max-height:280px"></canvas>';
+
+                const ctx = document.getElementById('ai-chart-canvas').getContext('2d');
+
+                // Apply SetAll dark theme defaults
+                const defaults = {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { labels: { color: '#94A3B8', font: { size: 11 } } },
+                    },
+                    scales: chartData.type === 'pie' || chartData.type === 'doughnut' ? {} : {
+                        x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                        y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                    },
+                };
+
+                const config = {
+                    type: chartData.type,
+                    data: chartData.data,
+                    options: { ...defaults, ...(chartData.options || {}) },
+                };
+
+                aiChartInstance = new Chart(ctx, config);
+            } catch (err) {
+                console.warn('AI chart render failed:', err);
+            }
+        }
+
         function triggerAiResponse(userText) {
             chatMessages.push({ role: 'user', text: userText });
             isThinking = true;
@@ -388,9 +501,34 @@
             }
 
             callAiAnalyst(userText)
-                .then(raw => {
-                    const cleaned = processActions(raw);
-                    chatMessages.push({ role: 'ai', text: cleaned });
+                .then(data => {
+                    const structured = data?.structured;
+                    let displayText;
+
+                    if (structured && structured.summary) {
+                        // Build rich display from structured response
+                        let parts = [structured.summary];
+                        if (structured.insights && structured.insights.length > 0) {
+                            parts.push('<ul style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">' +
+                                structured.insights.map(i => `<li style="margin:0.2rem 0;font-size:0.85em;color:#94A3B8">${i}</li>`).join('') +
+                                '</ul>');
+                        }
+                        displayText = parts.join('');
+
+                        // Render Chart.js visualization if provided
+                        if (structured.chartData) {
+                            renderAiChart(structured.chartData);
+                        }
+
+                        // Process structured actions
+                        processStructuredActions(structured.actions);
+                    } else {
+                        // Fallback: legacy text-only response
+                        const raw = data?.reply || 'No response from AI analyst.';
+                        displayText = processActions(raw);
+                    }
+
+                    chatMessages.push({ role: 'ai', text: displayText });
                 })
                 .catch(err => {
                     chatMessages.push({ role: 'ai', text: `AI error: ${err.message}. Ensure the ai-analyst edge function is deployed.` });
@@ -413,7 +551,57 @@
         document.getElementById('file-upload').addEventListener('change', e => {
             const file = e.target.files[0];
             if (!file) return;
-            triggerAiResponse(`I uploaded a file: ${file.name}`);
+            e.target.value = '';
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target.result;
+                try {
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length < 2) {
+                        triggerAiResponse(`Uploaded ${file.name} but it appears empty or has only one row.`);
+                        return;
+                    }
+
+                    // Detect and skip header row (contains non-numeric first column)
+                    const firstCell = lines[0].split(',')[0].trim().toLowerCase();
+                    const hasHeader = isNaN(parseFloat(firstCell)) && firstCell !== '';
+                    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+                    // Parse CSV: expected format: date,category,amount[,type]
+                    const parsed = [];
+                    for (const line of dataLines) {
+                        const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                        if (cols.length < 3) continue;
+                        const date     = cols[0] || new Date().toISOString().slice(0, 10);
+                        const category = cols[1] || 'Uncategorized';
+                        const amount   = parseFloat(cols[2]);
+                        const type     = (cols[3] || 'expense').toLowerCase();
+                        if (isNaN(amount) || amount <= 0) continue;
+                        if (type !== 'expense' && type !== 'income') continue;
+                        parsed.push({ date, category, amount, type });
+                    }
+
+                    if (parsed.length === 0) {
+                        triggerAiResponse(`Could not parse any valid rows from ${file.name}. Expected format: date,category,amount,type`);
+                        return;
+                    }
+
+                    appData = parsed;
+                    renderWidgets();
+
+                    const s = getStats();
+                    triggerAiResponse(
+                        `I imported ${parsed.length} rows from ${file.name}. ` +
+                        `Total spending: $${s.exp.toFixed(2)}, income: $${s.income.toFixed(2)}. ` +
+                        `What patterns do you see?`
+                    );
+                } catch (err) {
+                    triggerAiResponse(`Failed to parse ${file.name}: ${err.message}`);
+                }
+            };
+            reader.onerror = () => triggerAiResponse(`Could not read ${file.name}.`);
+            reader.readAsText(file);
         });
 
         // ── Renderers ────────────────────────────────────────────────────────
@@ -610,5 +798,11 @@
             lucide.createIcons();
         }
     </script>
+
+    <!-- Footer -->
+    <footer style="position:fixed;bottom:0;left:0;right:0;text-align:center;padding:0.75rem 1rem;font-size:0.7rem;color:#475569;background:rgba(15,23,42,0.95);border-top:1px solid rgba(30,41,59,0.5);z-index:50;backdrop-filter:blur(8px)">
+        <span>&copy; 2026 SetAll &middot; <a href="/privacy" style="color:#64748B;text-decoration:none">Privacy</a> &middot; <a href="/terms" style="color:#64748B;text-decoration:none">Terms</a> &middot; <a href="/support" style="color:#64748B;text-decoration:none">Support</a></span>
+        <br><span style="font-size:0.65rem;color:#334155">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</span>
+    </footer>
 </body>
 </html>

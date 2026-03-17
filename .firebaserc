@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "setall-c899a"
-  }
+    "default": "setall-web"
+  },
+  "targets": {},
+  "etags": {}
 }

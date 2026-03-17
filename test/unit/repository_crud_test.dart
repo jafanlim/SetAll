@@ -263,10 +263,6 @@ Future<bool> _groupSoftDeleted(Database db, String groupId) async =>
             where: 'id = ? AND is_deleted = 1', whereArgs: [groupId]))
         .isNotEmpty;
 
-Future<bool> _groupExists(Database db, String groupId) async =>
-    (await db.query('groups', where: 'id = ?', whereArgs: [groupId]))
-        .isNotEmpty;
-
 Future<bool> _inLeftGroups(Database db, String groupId) async =>
     (await db.query('left_groups',
             where: 'group_id = ?', whereArgs: [groupId]))
@@ -570,9 +566,9 @@ void main() {
   });
 
   // ───────────────────────────────────────────────────────────────────────────
-  // 5. deleteGroup — non-owner (hard-delete)
+  // 5. deleteGroup — non-owner (soft-delete + leave)
   // ───────────────────────────────────────────────────────────────────────────
-  group('deleteGroup — non-owner (hard-delete / leave)', () {
+  group('deleteGroup — non-owner (soft-delete / leave)', () {
     const gid = 'g-nonowner';
     const eid = 'e-no-1';
     const realOwner = 'real-owner-uid';
@@ -588,12 +584,15 @@ void main() {
       SharedPreferences.setMockInitialValues({'device_user_id': _otherUid});
     });
 
-    test('fully removes the group row (not soft-deleted)', () async {
+    test('soft-deletes the group row for sync safety', () async {
       final nonOwnerRepo = SetAllRepository();
       await nonOwnerRepo.deleteGroup(gid);
-      // Group must not exist at all — non-owner cannot leave a soft trace
-      expect(await _groupExists(db, gid), isFalse,
-          reason: 'Non-owner leave must hard-delete the group row locally');
+      // Non-owner leave soft-deletes first so concurrent sync ticks see
+      // is_deleted=1 and do not strip the left_groups entry.
+      final rows = await db.query('groups',
+          where: 'id = ? AND is_deleted = 1', whereArgs: [gid]);
+      expect(rows, isNotEmpty,
+          reason: 'Non-owner leave must soft-delete the group row for sync safety');
     });
 
     test('removes expenses from live table', () async {
@@ -609,14 +608,15 @@ void main() {
       expect(await _inLeftGroups(db, gid), isTrue);
     });
 
-    test('does NOT create a soft-deleted record', () async {
+    test('leaves a soft-deleted record as sync guard', () async {
       final nonOwnerRepo = SetAllRepository();
       await nonOwnerRepo.deleteGroup(gid);
-      // Verify no is_deleted=1 row was left behind
+      // The soft-deleted row acts as a guard so concurrent sync does not
+      // re-pull the group before left_groups is checked.
       final rows = await db.query('groups',
           where: 'id = ? AND is_deleted = 1', whereArgs: [gid]);
-      expect(rows, isEmpty,
-          reason: 'Non-owner leave must not leave a restorable soft-delete trace');
+      expect(rows, hasLength(1),
+          reason: 'Non-owner leave must keep a soft-deleted row as sync guard');
     });
   });
 

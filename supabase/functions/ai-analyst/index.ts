@@ -2,7 +2,7 @@
  * SetAll — ai-analyst Edge Function
  * ─────────────────────────────────────────────────────────────────────────────
  * Receives a user message + financial context from the Insights Hub and returns
- * an AI reply powered by Google Gemini (gemini-1.5-flash).
+ * a structured AI reply powered by Google Gemini (gemini-1.5-flash-latest).
  *
  * Secrets required:
  *   supabase secrets set GEMINI_API_KEY="AIza..."
@@ -25,13 +25,21 @@
  *   }
  *
  * Response body:
- *   { reply: string }
+ *   {
+ *     reply: string,                // plain-text summary (backwards compat)
+ *     structured: {
+ *       summary:   string,
+ *       insights:  string[],
+ *       chartData: { type, data, options } | null,
+ *       actions:   string[]          // e.g. ["ADD_TREND", "REFRESH"]
+ *     } | null
+ *   }
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? ''
-const GEMINI_MODEL   = 'gemini-1.5-flash'
+const GEMINI_MODEL   = 'gemini-1.5-flash-latest'
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
 
 const CORS_HEADERS = {
@@ -40,6 +48,9 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'content-type, authorization, apikey, x-client-info',
   'Access-Control-Max-Age':       '86400',
 }
+
+const VALID_CHART_TYPES = new Set(['bar', 'line', 'pie', 'doughnut'])
+const VALID_ACTIONS     = new Set(['ADD_TREND', 'ADD_DONUT', 'REFRESH', 'SIGNOUT', 'PORTAL'])
 
 function buildSystemPrompt(ctx: {
   totalSpending: number
@@ -61,12 +72,24 @@ The user's financial snapshot (last 90 days of their personal wallet):
 Recent transactions (newest last):
 ${ctx.recentRows || 'No transactions loaded yet.'}
 
-You can also control the dashboard. If the user asks for a chart, trend graph, or visual, end your reply with the exact token: [ACTION:ADD_TREND]. If they ask for a category donut or pie chart, end with: [ACTION:ADD_DONUT].
-If they ask to refresh data, end with: [ACTION:REFRESH].
-If they ask to sign out or log out, end with: [ACTION:SIGNOUT].
-If they ask to go to portal or account, end with: [ACTION:PORTAL].
+You MUST respond with a JSON object matching this exact structure:
+{
+  "summary": "A concise 1-3 sentence text response to the user.",
+  "insights": ["Actionable insight 1", "Actionable insight 2"],
+  "chartData": null or a valid Chart.js configuration object: {
+    "type": "bar" | "line" | "pie" | "doughnut",
+    "data": { "labels": [...], "datasets": [{ "label": "...", "data": [...], "backgroundColor": [...] }] },
+    "options": { "responsive": true, "plugins": { "legend": { "display": true } } }
+  },
+  "actions": []
+}
 
-Keep replies under 3 sentences unless the user explicitly asks for detail. Be direct, insightful, and data-driven.`
+Rules:
+- "chartData" should be null unless the user explicitly asks for a chart, graph, or visual.
+- When generating chartData, use realistic values derived from the financial snapshot above.
+- "actions": include "ADD_TREND" if user asks for a trend/timeline chart, "ADD_DONUT" for category/pie chart, "REFRESH" to reload data, "SIGNOUT" to log out, "PORTAL" to navigate to account portal. Leave empty [] if no action is needed.
+- Keep the summary under 3 sentences unless the user explicitly asks for detail.
+- Be direct, insightful, and data-driven.`
 }
 
 serve(async (req) => {
@@ -106,8 +129,9 @@ serve(async (req) => {
       system_instruction: { parts: [{ text: systemPrompt }] },
       contents,
       generationConfig: {
-        maxOutputTokens: 300,
-        temperature:     0.7,
+        maxOutputTokens:  1024,
+        temperature:      0.4,
+        responseMimeType: 'application/json',
       },
     }
 
@@ -127,12 +151,42 @@ serve(async (req) => {
     }
 
     const geminiData = await geminiRes.json()
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? 'No response from Gemini.'
+    let rawText = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
 
-    console.log(`ai-analyst: replied (${reply.length} chars)`)
+    // Strip markdown fences if Gemini wraps the JSON despite responseMimeType
+    rawText = rawText.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+
+    // Attempt structured parse; fall back to plain text reply
+    let structured: { summary: string; insights: string[]; chartData: unknown; actions: string[] } | null = null
+    let reply = rawText || 'No response from Gemini.'
+
+    try {
+      const parsed = JSON.parse(rawText)
+      // Validate required fields
+      const summary  = typeof parsed.summary === 'string' ? parsed.summary : reply
+      const insights = Array.isArray(parsed.insights) ? parsed.insights.filter((i: unknown) => typeof i === 'string') : []
+      const actions  = Array.isArray(parsed.actions)  ? parsed.actions.filter((a: unknown) => typeof a === 'string' && VALID_ACTIONS.has(a as string)) : []
+
+      // Validate chartData if present
+      let chartData = null
+      if (parsed.chartData && typeof parsed.chartData === 'object') {
+        const ct = parsed.chartData
+        if (VALID_CHART_TYPES.has(ct.type) && ct.data && typeof ct.data === 'object') {
+          chartData = ct
+        }
+      }
+
+      structured = { summary, insights, chartData, actions }
+      reply = summary
+    } catch {
+      // JSON parse failed — use raw text as plain reply
+      console.warn('ai-analyst: Gemini returned non-JSON, falling back to text reply')
+    }
+
+    console.log(`ai-analyst: replied (${reply.length} chars, structured=${structured !== null})`)
 
     return new Response(
-      JSON.stringify({ reply }),
+      JSON.stringify({ reply, structured }),
       { status: 200, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
     )
 

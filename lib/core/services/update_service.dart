@@ -103,6 +103,17 @@ class UpdateService {
   static const String _apiUrl    =
       'https://api.github.com/repos/$_repoOwner/$_repoName/releases/latest';
 
+  /// Optional override for unit tests — injected via [injectHttpClient].
+  http.Client? _httpClientOverride;
+
+  /// Injects a mock HTTP client for unit tests. Never call in production.
+  @visibleForTesting
+  void injectHttpClient(http.Client client) => _httpClientOverride = client;
+
+  /// Exposes [_isNewer] for unit tests without hitting the GitHub API.
+  @visibleForTesting
+  static bool isNewer(String remote, String local) => _isNewer(remote, local);
+
   // Current download progress — listened to by the banner widget.
   UpdateDownloadProgress _progress = const UpdateDownloadProgress(
     state: UpdateDownloadState.idle,
@@ -138,7 +149,8 @@ class UpdateService {
       final info    = await PackageInfo.fromPlatform();
       final current = info.version;
 
-      final response = await http
+      final client   = _httpClientOverride ?? http.Client();
+      final response = await client
           .get(Uri.parse(_apiUrl), headers: {'Accept': 'application/vnd.github+json'})
           .timeout(const Duration(seconds: 10));
 

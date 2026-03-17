@@ -38,6 +38,10 @@ build-web:
 	@grep -q 'flutter_bootstrap' build/web/app.html || (echo "ERROR: app.html missing flutter_bootstrap — build step order is wrong!" && exit 1)
 	@grep -q 'flutter_bootstrap' build/web/index.html && (echo "ERROR: index.html has flutter_bootstrap — landing page copy failed!" && exit 1) || true
 	@echo "✓ build/web ready: app.html=Flutter, index.html=Landing, all static pages copied"
+	@for page in login portal support privacy terms download reset-password insights; do \
+	  grep -q "setall.app/$$page" web/sitemap.xml || echo "WARN: /$$page is not in sitemap.xml"; \
+	done
+	@echo "✓ sitemap check complete"
 
 # 6. Build and deploy to Firebase Hosting (production channel)
 deploy-web: build-web
@@ -47,3 +51,8 @@ deploy-web: build-web
 #    Usage: make deploy-preview channel=my-feature
 deploy-preview: build-web
 	firebase hosting:channel:deploy $(or $(channel),preview) --expires 7d
+
+# 8. Build and deploy to Netlify production
+#    Requires: npm install -g netlify-cli && netlify login
+deploy-netlify: build-web
+	netlify deploy --prod --dir=build/web
