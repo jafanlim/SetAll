@@ -241,6 +241,40 @@
         ];
         let isThinking = false;
 
+        // ── Utilities ────────────────────────────────────────────────────────
+        // FNV-1a 32-bit hash — used for AI response caching
+        function simpleHash(str) {
+            let h = 2166136261;
+            for (let i = 0; i < str.length; i++) {
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return 'sai_' + (h >>> 0).toString(36);
+        }
+
+        // Character-by-character typewriter animation for AI replies.
+        // Types plainSummary char-by-char, then swaps in fullHtml (with bullets).
+        function typeText(plainSummary, fullHtml) {
+            return new Promise(resolve => {
+                const msgIndex = chatMessages.length;
+                chatMessages.push({ role: 'ai', text: '' });
+                renderChat();
+                let i = 0;
+                const BATCH = 4;
+                const iv = setInterval(() => {
+                    i = Math.min(i + BATCH, plainSummary.length);
+                    chatMessages[msgIndex] = { role: 'ai', text: plainSummary.slice(0, i) };
+                    renderChat();
+                    if (i >= plainSummary.length) {
+                        clearInterval(iv);
+                        chatMessages[msgIndex] = { role: 'ai', text: fullHtml };
+                        renderChat();
+                        resolve();
+                    }
+                }, 20);
+            });
+        }
+
         // ── Data Engine ──────────────────────────────────────────────────────
         function getStats() {
             let inc = 0, exp = 0;
@@ -349,13 +383,19 @@
                 `${d.date} | ${d.category} | ${d.type} | $${d.amount.toFixed(2)}`
             ).join('\n');
 
+            // Hash-based cache — skip API call for identical dataset + question
+            const cacheKey = simpleHash(userText + '|' + topCats + '|' + recentRows);
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) return JSON.parse(cached);
+            } catch(_) {}
+
             const history = chatMessages
                 .filter((m, i) => i > 0)
                 .slice(-10)
                 .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
 
-            // Force token refresh — getSession() may return a stale token;
-            // refreshSession() ensures the gateway receives a valid JWT.
+            // Force token refresh — getSession() may return a stale token
             let jwt = null;
             try {
                 const { data: refreshed } = await sb.auth.refreshSession();
@@ -371,7 +411,7 @@
                 headers: {
                     'Content-Type':  'application/json',
                     'apikey':        SUPABASE_ANON,
-                    ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {})
+                    'Authorization': `Bearer ${jwt}`
                 },
                 body: JSON.stringify({
                     message: userText,
@@ -392,6 +432,8 @@
                 throw new Error(err?.error || err?.message || `HTTP ${res.status}`);
             }
             const data = await res.json();
+            // Cache successful responses (structured or plain)
+            try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch(_) {}
             return data;
         }
 
@@ -496,7 +538,7 @@
             }
         }
 
-        function triggerAiResponse(userText) {
+        async function triggerAiResponse(userText) {
             chatMessages.push({ role: 'user', text: userText });
             isThinking = true;
             renderChat();
@@ -509,43 +551,35 @@
                 return;
             }
 
-            callAiAnalyst(userText)
-                .then(data => {
-                    const structured = data?.structured;
-                    let displayText;
+            try {
+                const data = await callAiAnalyst(userText);
+                const structured = data?.structured;
+                let summaryText = '';
+                let fullHtml    = '';
 
-                    if (structured && structured.summary) {
-                        // Build rich display from structured response
-                        let parts = [structured.summary];
-                        if (structured.insights && structured.insights.length > 0) {
-                            parts.push('<ul style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">' +
-                                structured.insights.map(i => `<li style="margin:0.2rem 0;font-size:0.85em;color:#94A3B8">${i}</li>`).join('') +
-                                '</ul>');
-                        }
-                        displayText = parts.join('');
+                if (structured && structured.summary) {
+                    summaryText = structured.summary;
+                    const insightHtml = (structured.insights && structured.insights.length > 0)
+                        ? '<ul style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">' +
+                            structured.insights.map(i => `<li style="margin:0.2rem 0;font-size:0.85em;color:#94A3B8">${i}</li>`).join('') +
+                          '</ul>'
+                        : '';
+                    fullHtml = summaryText + insightHtml;
 
-                        // Render Chart.js visualization if provided
-                        if (structured.chartData) {
-                            renderAiChart(structured.chartData);
-                        }
+                    if (structured.chartData) renderAiChart(structured.chartData);
+                    processStructuredActions(structured.actions);
+                } else {
+                    summaryText = processActions(data?.reply || 'No response from AI analyst.');
+                    fullHtml    = summaryText;
+                }
 
-                        // Process structured actions
-                        processStructuredActions(structured.actions);
-                    } else {
-                        // Fallback: legacy text-only response
-                        const raw = data?.reply || 'No response from AI analyst.';
-                        displayText = processActions(raw);
-                    }
-
-                    chatMessages.push({ role: 'ai', text: displayText });
-                })
-                .catch(err => {
-                    chatMessages.push({ role: 'ai', text: `AI error: ${err.message}. Ensure the ai-analyst edge function is deployed.` });
-                })
-                .finally(() => {
-                    isThinking = false;
-                    renderChat();
-                });
+                isThinking = false;
+                await typeText(summaryText, fullHtml);
+            } catch(err) {
+                chatMessages.push({ role: 'ai', text: `AI error: ${err.message}` });
+                isThinking = false;
+                renderChat();
+            }
         }
 
         document.getElementById('chat-form').addEventListener('submit', e => {
@@ -556,6 +590,35 @@
             input.value = '';
             triggerAiResponse(text);
         });
+
+        // ── Mobile Bridge ─────────────────────────────────────────────────────
+        // Flutter WebView posts { action:'setToken', token:'...', refresh_token:'...' }
+        // to inject an authenticated session without a redirect-based OAuth flow.
+        window.addEventListener('message', async (event) => {
+            if (!event.data || event.data.action !== 'setToken' || !event.data.token) return;
+            try {
+                const { error } = await sb.auth.setSession({
+                    access_token:  event.data.token,
+                    refresh_token: event.data.refresh_token || event.data.token
+                });
+                if (!error) {
+                    const { data: { user } } = await sb.auth.getUser();
+                    if (user) {
+                        currentUser = user;
+                        await loadLiveData();
+                        await loadWidgetLayout();
+                        document.getElementById('auth-gate').style.display = 'none';
+                        document.getElementById('main-app').style.display  = 'block';
+                        renderHeader();
+                        renderWidgets();
+                        renderChat();
+                        lucide.createIcons();
+                    }
+                }
+            } catch(e) {
+                console.warn('Mobile bridge setToken failed:', e);
+            }
+        }, false);
 
         document.getElementById('file-upload').addEventListener('change', e => {
             const file = e.target.files[0];
