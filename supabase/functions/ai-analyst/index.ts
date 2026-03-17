@@ -2,7 +2,7 @@
  * SetAll — ai-analyst Edge Function
  * ─────────────────────────────────────────────────────────────────────────────
  * Receives a user message + financial context from the Insights Hub and returns
- * a structured AI reply powered by Google Gemini (gemini-1.5-flash-latest).
+ * a structured AI reply powered by Google Gemini (gemini-2.0-flash).
  *
  * Secrets required:
  *   supabase secrets set GEMINI_API_KEY="AIza..."
@@ -39,7 +39,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 
 const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? ''
-const GEMINI_MODEL   = 'gemini-1.5-flash-latest'
+const GEMINI_MODEL   = 'gemini-2.0-flash'
 const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
 
 const CORS_HEADERS = {
