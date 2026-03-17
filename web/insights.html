@@ -354,8 +354,17 @@
                 .slice(-10)
                 .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
 
-            const { data: { session } } = await sb.auth.getSession();
-            const jwt = session?.access_token;
+            // Force token refresh — getSession() may return a stale token;
+            // refreshSession() ensures the gateway receives a valid JWT.
+            let jwt = null;
+            try {
+                const { data: refreshed } = await sb.auth.refreshSession();
+                jwt = refreshed?.session?.access_token ?? null;
+            } catch (_) {
+                const { data: { session } } = await sb.auth.getSession();
+                jwt = session?.access_token ?? null;
+            }
+            if (!jwt) throw new Error('No active session — please sign in again.');
 
             const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-analyst`, {
                 method: 'POST',
