@@ -116,7 +116,7 @@
         const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
         window.currentUser     = null;
-        window.userCurrency    = 'USD';
+        window.userCurrency    = localStorage.getItem('setall_currency') || 'USD';
         window.exchangeRate    = 1;
         window.fetchInProgress = false;
 
@@ -567,8 +567,8 @@
                     processStructuredActions(structured.actions);
                 } else {
                     // Final fallback: use raw report or reply — never show an empty box
-                    const rawText = data?.report || data?.reply || 'No response from AI analyst.';
-                    summaryText = processActions(rawText);
+                    const rawText = data?.report || data?.reply || '';
+                    summaryText = rawText ? processActions(rawText) : 'AI is thinking…';
                     fullHtml    = summaryText;
                 }
 
@@ -743,7 +743,17 @@
 
                 if (w.type === 'stat') {
                     const raw = stats[w.metric];
-                    const val = typeof raw === 'number' ? (Math.abs(raw) >= 1000 ? '$' + (raw / 1000).toFixed(1) + 'k' : '$' + parseFloat(raw).toFixed(2)) : '$' + raw;
+                    const localVal = typeof raw === 'number' ? raw * window.exchangeRate : 0;
+                    const cur = window.userCurrency || 'USD';
+                    const zeroDec = ['VND','KRW','IDR','JPY','LKR'];
+                    let val;
+                    if (zeroDec.includes(cur)) {
+                        val = Math.round(localVal).toLocaleString('en-US') + ' ' + cur;
+                    } else if (Math.abs(localVal) >= 1000) {
+                        val = (localVal / 1000).toFixed(1) + 'k ' + cur;
+                    } else {
+                        val = localVal.toFixed(2) + ' ' + cur;
+                    }
                     const iconName  = w.metric === 'burn' ? 'flame' : w.metric === 'income' ? 'trending-up' : 'activity';
                     const colorCls  = (w.metric === 'exp' || w.metric === 'burn') ? 'text-brand-purple' : 'text-brand-teal';
                     content = `
@@ -753,6 +763,14 @@
                             <p class="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">last 90 days</p>
                         </div>`;
                 } else if (w.type === 'donut') {
+                    const cur = window.userCurrency || 'USD';
+                    const zeroDec = ['VND','KRW','IDR','JPY','LKR'];
+                    const fmtLocal = (v) => {
+                        const lv = v * window.exchangeRate;
+                        return zeroDec.includes(cur)
+                            ? Math.round(lv).toLocaleString('en-US') + ' ' + cur
+                            : lv.toFixed(2) + ' ' + cur;
+                    };
                     const totalExp = stats.exp || 1;
                     let offset = 0;
                     const circles = stats.cats.map((c, i) => {
@@ -772,7 +790,7 @@
                                 <div class="w-3 h-3 rounded-full flex-shrink-0" style="background:${CATEGORY_COLORS[i % CATEGORY_COLORS.length]}"></div>
                                 <span class="text-sm font-semibold text-slate-300 truncate">${c.name}</span>
                             </div>
-                            <span class="text-sm font-bold text-white ml-2">$${c.value.toFixed(0)}</span>
+                            <span class="text-sm font-bold text-white ml-2">${fmtLocal(c.value)}</span>
                         </div>`).join('');
 
                     const emptyMsg = stats.cats.length === 0
@@ -870,7 +888,6 @@
         }
     </script>
 
-    <!-- Legal metadata (hidden — fullscreen app has no page footer) -->
-    <span style="display:none" aria-hidden="true">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</span>
+    <footer style="text-align:center;padding:2rem 1rem;font-size:0.8rem;color:#475569;border-top:1px solid #1E293B;margin-top:auto">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</footer>
 </body>
 </html>
