@@ -142,7 +142,7 @@
                                 </div>
                                 <span class="text-slate-400 text-sm font-medium">Cash Position</span>
                             </div>
-                            <p id="stat-wallet" class="text-3xl font-extrabold text-white tracking-tight">—</p>
+                            <p id="stat-wallet" class="text-3xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
                             <p id="stat-wallet-label" class="text-xs text-slate-500 mt-1">Net: (owed to you) − (you owe)</p>
                         </div>
                         <div class="glass-card rounded-2xl p-6">
@@ -152,8 +152,8 @@
                                 </div>
                                 <span class="text-slate-400 text-sm font-medium">Personal Spending</span>
                             </div>
-                            <p id="stat-group" class="text-3xl font-extrabold text-white tracking-tight">—</p>
-                            <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Net across all groups</p>
+                            <p id="stat-group" class="text-3xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
+                            <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Personal wallet expenses</p>
                         </div>
                     </div>
                     <!-- Charts -->
@@ -264,7 +264,7 @@
         window.currentUser    = null;
         window.statsLoaded    = false;
         window.fetchInProgress = false;
-        window.userCurrency   = 'USD';
+        window.userCurrency   = null;
         window.exchangeRate   = 1;
         let categoryChart = null;
         let trendChart    = null;
@@ -288,9 +288,14 @@
             const code = (currency || 'USD').toUpperCase();
             const abs  = Math.abs(n);
             const sign = n < 0 ? '-' : '';
-            // Use compact notation for large values (e.g. VND)
-            if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(1) + 'M ' + code;
-            if (abs >= 1000)      return sign + (abs / 1000).toFixed(1) + 'k ' + code;
+            // Zero-decimal currencies: display full integer with comma separators
+            const zeroDec = ['VND', 'KRW', 'IDR', 'JPY', 'LKR'];
+            if (zeroDec.includes(code)) {
+                return sign + Math.round(abs).toLocaleString('en-US') + ' ' + code;
+            }
+            // Compact notation for large values in other currencies
+            if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(2) + 'M ' + code;
+            if (abs >= 1000)      return sign + (abs / 1000).toFixed(2) + 'k ' + code;
             return sign + abs.toFixed(2) + ' ' + code;
         }
 
@@ -351,9 +356,30 @@
                 const userId = window.currentUser.id;
                 const since  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-                // Fire all four independent queries in parallel (4 requests total)
-                const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
-                    sb.from('profiles').select('default_currency').eq('id', userId).single(),
+                // ── STEP 1: Fetch profile FIRST to get currency before any rendering ──
+                const profileRes = await sb.from('profiles').select('default_currency').eq('id', userId).single();
+                window.userCurrency = profileRes.data?.default_currency || 'USD';
+
+                // ── STEP 2: Fetch exchange rate before fetching financial data ────────
+                window.exchangeRate = 1;
+                if (window.userCurrency !== 'USD') {
+                    try {
+                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
+                        if (rateRes.ok) {
+                            const rateJson = await rateRes.json();
+                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
+                        }
+                    } catch (_) {}
+                    // Hardcoded fallbacks only if Frankfurter didn't return a valid rate
+                    if (window.exchangeRate === 1) {
+                        const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
+                        window.exchangeRate = fallbackRates[window.userCurrency] || 1;
+                    }
+                }
+                console.log(`[Portal] currency=${window.userCurrency} exchangeRate=${window.exchangeRate}`);
+
+                // ── STEP 3: Fire remaining queries in parallel ────────────────────────
+                const [expRes, iOweRes, owedMeRes] = await Promise.all([
                     sb.from('expenses')
                       .select('category, amount, created_at')
                       .eq('payer_id', userId)
@@ -368,28 +394,6 @@
                       .neq('user_id', userId)
                       .eq('expenses.payer_id', userId),
                 ]);
-
-                window.userCurrency = 'USD';
-                if (profileRes.data?.default_currency) window.userCurrency = profileRes.data.default_currency;
-
-                // ── Fetch USD→local exchange rate ─────────────────────────────
-                // Used to convert universal_usd_owed back to the user's display currency.
-                window.exchangeRate = 1;
-                if (window.userCurrency !== 'USD') {
-                    try {
-                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
-                        if (rateRes.ok) {
-                            const rateJson = await rateRes.json();
-                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
-                        }
-                    } catch (_) {}
-                    // Hardcoded fallbacks for currencies Frankfurter doesn't cover
-                    if (window.exchangeRate === 1) {
-                        const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
-                        window.exchangeRate = fallbackRates[window.userCurrency] || 1;
-                    }
-                }
-                console.log(`[Portal] currency=${window.userCurrency} exchangeRate=${window.exchangeRate}`);
 
                 if (expRes.error) { console.error('expenses query failed:', expRes.error); return; }
                 if (iOweRes.error) { console.error('iOwe query failed:', iOweRes.error); return; }
