@@ -299,6 +299,42 @@
             return sign + abs.toFixed(2) + ' ' + code;
         }
 
+        function renderDashboard(iOweUsd, owedMeUsd, walletTotal) {
+            const rate = window.exchangeRate || 1;
+            const cur  = window.userCurrency  || 'USD';
+            const netPositionUsd = owedMeUsd - iOweUsd;
+            const netPosition    = netPositionUsd * rate;
+
+            // fmt: walletTotal is already in local currency; netPosition is USD*rate.
+            // Zero-decimal currencies (VND, JPY, etc.) never show fractions.
+            const fmt = (val) => {
+                const isZeroDec = ['VND','JPY','KRW','IDR','LKR'].includes(cur);
+                const abs  = Math.abs(val);
+                const sign = val < 0 ? '-' : '';
+                return sign + (
+                    isZeroDec
+                        ? Math.round(abs).toLocaleString('en-US')
+                        : abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                ) + '\u00a0' + cur;
+            };
+
+            const walletEl    = document.getElementById('stat-wallet');
+            const walletLabel = document.getElementById('stat-wallet-label');
+            if (walletEl) {
+                walletEl.textContent = fmt(netPosition);
+                walletEl.className   = 'text-3xl font-extrabold tracking-tight ' +
+                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
+            }
+            if (walletLabel) walletLabel.textContent = netPosition >= 0
+                ? `You are owed across all groups (${cur})`
+                : `You owe across all groups (${cur})`;
+
+            const groupEl    = document.getElementById('stat-group');
+            const groupLabel = document.getElementById('stat-group-label');
+            if (groupEl) groupEl.textContent = fmt(walletTotal);
+            if (groupLabel) groupLabel.textContent = `Personal expenses, last 30 days (${cur})`;
+        }
+
         function showPwBanner(msg, isError) {
             const b = document.getElementById('pw-banner');
             b.textContent = msg;
@@ -409,8 +445,6 @@
                 const walletTotal = personalExp.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
                 const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
                 const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
-                const netPositionUsd = owedMeUsd - iOweUsd;
-                const netPosition    = netPositionUsd * window.exchangeRate;
 
                 // ── Category map ─────────────────────────────────────────────
                 const catMap = {};
@@ -435,21 +469,7 @@
                 }
 
                 // ── Update summary cards ─────────────────────────────────────
-                // Card 1: Cash Position = (owed to me - I owe) in local currency
-                const walletEl    = document.getElementById('stat-wallet');
-                const walletLabel = document.getElementById('stat-wallet-label');
-                walletEl.textContent = fmtCurrency(netPosition, window.userCurrency);
-                walletEl.className   = 'text-3xl font-extrabold tracking-tight ' +
-                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
-                walletLabel.textContent = netPosition >= 0
-                    ? `You are owed across all groups (${window.userCurrency})`
-                    : `You owe across all groups (${window.userCurrency})`;
-
-                // Card 2: Personal Spending (wallet expenses, already in local currency)
-                const groupEl    = document.getElementById('stat-group');
-                const groupLabel = document.getElementById('stat-group-label');
-                groupEl.textContent    = fmtCurrency(walletTotal, window.userCurrency);
-                groupLabel.textContent = `Personal expenses, last 30 days (${window.userCurrency})`;
+                renderDashboard(iOweUsd, owedMeUsd, walletTotal);
 
                 // ── Render charts ────────────────────────────────────────────
                 const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
