@@ -171,17 +171,27 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Spending + Income row -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <!-- Spending + Group Spending + Income row -->
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div class="glass-card rounded-2xl p-6">
                             <div class="flex items-center gap-3 mb-4">
                                 <div class="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
-                                    <i data-lucide="trending-down" class="w-4 h-4 text-red-400"></i>
+                                    <i data-lucide="wallet" class="w-4 h-4 text-red-400"></i>
                                 </div>
                                 <span class="text-slate-400 text-sm font-medium">Personal Spending</span>
                             </div>
                             <p id="stat-group" class="text-2xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
                             <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Expenses, last 30 days</p>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-orange-500/10 border border-orange-500/20 flex items-center justify-center">
+                                    <i data-lucide="users" class="w-4 h-4 text-orange-400"></i>
+                                </div>
+                                <span class="text-slate-400 text-sm font-medium">Group Spending</span>
+                            </div>
+                            <p id="stat-grpspend" class="text-2xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
+                            <p id="stat-grpspend-label" class="text-xs text-slate-500 mt-1">Group expenses paid, 30 days</p>
                         </div>
                         <div class="glass-card rounded-2xl p-6">
                             <div class="flex items-center gap-3 mb-4">
@@ -459,7 +469,7 @@
             return sign + abs.toFixed(2) + ' ' + code;
         }
 
-        function renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash) {
+        function renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash, grpTotal) {
             const rate = window.exchangeRate || 1;
             const cur  = window.userCurrency  || 'USD';
             const sharedBalance = (owedMeUsd - iOweUsd) * rate;
@@ -505,6 +515,12 @@
             const groupLabel = document.getElementById('stat-group-label');
             if (groupEl) groupEl.textContent = fmt(walletTotal);
             if (groupLabel) groupLabel.textContent = `Expenses, last 30 days (${cur})`;
+
+            // Group Spending
+            const grpEl    = document.getElementById('stat-grpspend');
+            const grpLabel = document.getElementById('stat-grpspend-label');
+            if (grpEl) grpEl.textContent = fmt(grpTotal || 0);
+            if (grpLabel) grpLabel.textContent = `Group expenses paid (${cur})`;
 
             // Income
             const incEl    = document.getElementById('stat-income');
@@ -575,12 +591,18 @@
                 // ── Fetch profile + all financial data in one parallel call ──────────
                 // currency comes from expense rows — never rely on localStorage (may be
                 // poisoned with 'USD' from a prior session where profile field was null).
-                const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
+                const [profileRes, expRes, grpExpRes, iOweRes, owedMeRes] = await Promise.all([
                     sb.from('profiles').select('*').eq('id', userId).maybeSingle(),
                     sb.from('expenses')
                       .select('category, amount, currency, universal_usd_amount, created_at, is_income')
                       .eq('payer_id', userId)
                       .is('group_id', null)
+                      .gte('created_at', since),
+                    sb.from('expenses')
+                      .select('category, amount, currency, universal_usd_amount, created_at')
+                      .eq('payer_id', userId)
+                      .not('group_id', 'is', null)
+                      .eq('is_income', false)
                       .gte('created_at', since),
                     sb.from('splits')
                       .select('universal_usd_owed, expenses!inner(payer_id)')
@@ -592,12 +614,14 @@
                       .eq('expenses.payer_id', userId),
                 ]);
 
-                if (expRes.error) { console.error('expenses query failed:', expRes.error); return; }
-                if (iOweRes.error) { console.error('iOwe query failed:', iOweRes.error); return; }
+                if (expRes.error)    { console.error('expenses query failed:', expRes.error); return; }
+                if (grpExpRes.error) { console.warn('group expenses query failed:', grpExpRes.error); }
+                if (iOweRes.error)   { console.error('iOwe query failed:', iOweRes.error); return; }
                 if (owedMeRes.error) { console.error('owedMe query failed:', owedMeRes.error); return; }
 
-                const personalExp  = expRes.data || [];
-                const iOweSplits   = iOweRes.data || [];
+                const personalExp  = expRes.data    || [];
+                const groupExp     = grpExpRes.data || [];
+                const iOweSplits   = iOweRes.data   || [];
                 const owedMeSplits = owedMeRes.data || [];
 
                 // ── Determine currency: profile field → first expense row → 'USD' ─────
@@ -650,16 +674,19 @@
                 const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
                 const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
 
-                // ── Category map (expenses only) ──────────────────────────────
+                // Group spending total
+                const grpTotal = groupExp.reduce((s, r) => s + baseAmt(r), 0);
+
+                // ── Category map (personal + group expenses) ────────────────────
                 const catMap = {};
-                onlyExpenses.forEach(r => {
+                [...onlyExpenses, ...groupExp].forEach(r => {
                     const cat = r.category || 'Uncategorized';
                     catMap[cat] = (catMap[cat] || 0) + baseAmt(r);
                 });
 
-                // ── 30-day trend (expenses only) ───────────────────────────
+                // ── 30-day trend (personal + group expenses) ─────────────────
                 const trendMap = {};
-                onlyExpenses.forEach(r => {
+                [...onlyExpenses, ...groupExp].forEach(r => {
                     const day = r.created_at ? r.created_at.slice(0, 10) : null;
                     if (day) trendMap[day] = (trendMap[day] || 0) + baseAmt(r);
                 });
@@ -673,7 +700,7 @@
                 }
 
                 // ── Update summary cards ─────────────────────────────────────
-                renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash);
+                renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash, grpTotal);
 
                 // ── Render charts ────────────────────────────────────────────
                 const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);

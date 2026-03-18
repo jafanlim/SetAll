@@ -221,7 +221,7 @@
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, amount, currency, universal_usd_amount')
+                    .select('created_at, category, amount, currency, universal_usd_amount, is_income')
                     .eq('payer_id', window.currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
@@ -230,19 +230,18 @@
                 if (error) throw error;
 
                 if (rows && rows.length > 0) {
-                    // Mirrors Dart: e.universalUsdAmount ?? e.amount
-                    // universalUsdAmount (frozen USD) * exchangeRate = current base currency
-                    const rate = window.exchangeRate || 1;
+                    // Store amounts in USD — renderWidgets multiplies by window.exchangeRate for display.
+                    // universalUsdAmount is the frozen USD value; fall back to raw amount if null (pre-v8).
                     appData = rows.map(r => {
                         const usd = parseFloat(r.universal_usd_amount);
                         const amt = (!isNaN(usd) && r.universal_usd_amount != null)
-                            ? usd * rate
+                            ? usd
                             : parseFloat(r.amount ?? 0);
                         return {
                             date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
                             category: r.category || 'Uncategorized',
                             amount:   amt,
-                            type:     'expense'
+                            type:     r.is_income ? 'income' : 'expense'
                         };
                     });
                     // Use expense entry currency as fallback ONLY if profile gave nothing
@@ -419,9 +418,10 @@
             if (isEditMode) return;
             const cur = window.userCurrency || 'USD';
             const zeroDec = ['VND','JPY','KRW','IDR','LKR'];
+            const localVal = value * (window.exchangeRate || 1);
             const fmtVal = zeroDec.includes(cur)
-                ? Math.round(value).toLocaleString('en-US') + ' ' + cur
-                : value.toFixed(2) + ' ' + cur;
+                ? Math.round(localVal).toLocaleString('en-US') + ' ' + cur
+                : localVal.toFixed(2) + ' ' + cur;
             triggerAiResponse(`I clicked on the ${name} slice — ${fmtVal}, ${pct.toFixed(1)}% of my spending. What does this tell you?`);
         };
 
