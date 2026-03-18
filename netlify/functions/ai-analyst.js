@@ -14,7 +14,7 @@ exports.handler = async (event) => {
     const isCanvas = mode === 'canvas';
 
     // Two models: fast conversational for chat, reasoning model for deep analysis
-    const model = isCanvas ? 'gemini-2.5-flash-preview-04-17' : 'gemini-2.0-flash';
+    const model = isCanvas ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
 
     const systemPrompt = isCanvas
       ? `You are SetAll Analyst — a ruthlessly precise financial data scientist.

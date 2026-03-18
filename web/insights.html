@@ -120,6 +120,13 @@
         window.exchangeRate    = 1;
         window.fetchInProgress = false;
 
+        // Bust stale AI response cache on model upgrade (v3 = 2.5-flash-lite + 2.5-flash)
+        const AI_CACHE_VER = 'sai_v3';
+        if (localStorage.getItem('sai_cache_ver') !== AI_CACHE_VER) {
+            Object.keys(localStorage).filter(k => k.startsWith('sai_')).forEach(k => localStorage.removeItem(k));
+            localStorage.setItem('sai_cache_ver', AI_CACHE_VER);
+        }
+
         // ── UI-First: render icons BEFORE any async ─────────────────────────
         lucide.createIcons();
 
