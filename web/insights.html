@@ -173,6 +173,20 @@
                 return;
             }
             window.currentUser = session.user;
+            // Fetch profile to get default_currency BEFORE rendering widgets.
+            // Without this, window.userCurrency stays 'USD' and fmtCurrency emits
+            // compact notation ("31.00M USD") instead of "31,000,000 VND".
+            try {
+                const { data: profile } = await sb
+                    .from('profiles')
+                    .select('default_currency')
+                    .eq('id', session.user.id)
+                    .single();
+                if (profile?.default_currency) {
+                    window.userCurrency = profile.default_currency;
+                    try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
+                }
+            } catch (_) {}
             try { await loadLiveData(); } catch (e) { console.error('loadLiveData failed:', e); }
             try { await loadWidgetLayout(); } catch (e) { console.error('loadWidgetLayout failed:', e); }
             document.getElementById('auth-gate').style.display = 'none';
