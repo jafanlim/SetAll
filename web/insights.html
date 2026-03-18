@@ -76,7 +76,7 @@
                         </div>
                         <div>
                             <h2 class="font-bold text-white text-lg tracking-tight">Neural Engine</h2>
-                            <p class="text-[10px] uppercase tracking-widest text-brand-teal font-bold">Online & Watching</p>
+                            <p id="ai-mode-label" class="text-[10px] uppercase tracking-widest text-brand-teal font-bold">Advisor &middot; Online</p>
                         </div>
                     </div>
                     <a href="/portal" class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg border border-slate-700 hover:border-slate-500">
@@ -95,7 +95,7 @@
                             <input type="file" id="file-upload" class="hidden" accept=".csv,.xls,.xlsx,.pdf" />
                         </label>
                         <div class="relative flex-1">
-                            <input type="text" id="chat-input" placeholder="Ask the SetAll AI…" autocomplete="off"
+                            <input type="text" id="chat-input" placeholder="Ask anything — or say 'analyze my spending'…" autocomplete="off"
                                 class="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500" />
                             <button type="submit" id="chat-submit"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#0F172A] hover:bg-teal-400 disabled:opacity-50 transition-all">
@@ -289,6 +289,8 @@
             { role: 'ai', text: 'Loading your ledger data…' }
         ];
         let isThinking = false;
+        const aiChartRegistry  = {};
+        const aiChartInstances = {};
 
         // ── Utilities ────────────────────────────────────────────────────────
         // FNV-1a 32-bit hash — used for AI response caching
@@ -299,6 +301,24 @@
                 h = Math.imul(h, 16777619);
             }
             return 'sai_' + (h >>> 0).toString(36);
+        }
+
+        // Auto-detect mode: canvas (analyst) vs chat (advisor) based on intent keywords
+        function detectMode(text) {
+            const canvasTriggers = /\b(chart|graph|visuali|plot|analyz|breakdown|report|trend|pattern|compar|show me|create|generate|add.*(canvas|widget|trend|donut|graph)|break it down|deep dive|forecast|projection|distribution|split by|group by)\b/i;
+            return canvasTriggers.test(text) ? 'canvas' : 'chat';
+        }
+
+        function setModeLabel(mode) {
+            const el = document.getElementById('ai-mode-label');
+            if (!el) return;
+            if (mode === 'canvas') {
+                el.textContent = 'Analyst \u00b7 Generating';
+                el.className = 'text-[10px] uppercase tracking-widest font-bold text-purple-400';
+            } else {
+                el.textContent = 'Advisor \u00b7 Online';
+                el.className = 'text-[10px] uppercase tracking-widest font-bold text-brand-teal';
+            }
         }
 
         // Character-by-character typewriter animation for AI replies.
@@ -454,23 +474,30 @@
                 `${d.date} | ${d.category} | ${d.type} | ${fmtLocal(d.amount)}`
             ).join('\n');
 
-            // Hash-based cache — skip API call for identical dataset + question
-            const cacheKey = simpleHash(userText + '|' + topCats + '|' + recentRows);
-            try {
-                const cached = localStorage.getItem(cacheKey);
-                if (cached) return JSON.parse(cached);
-            } catch(_) {}
+            const mode = detectMode(userText);
+            setModeLabel(mode);
+
+            // Cache only chat responses (canvas always fresh)
+            const cacheKey = simpleHash(userText + '|' + mode + '|' + topCats);
+            if (mode === 'chat') {
+                try {
+                    const cached = localStorage.getItem(cacheKey);
+                    if (cached) return JSON.parse(cached);
+                } catch(_) {}
+            }
 
             const history = chatMessages
                 .filter((m, i) => i > 0)
-                .slice(-10)
-                .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
+                .slice(-6)
+                .map(m => m.role + ': ' + m.text.replace(/<[^>]+>/g, '').slice(0, 120))
+                .join('\n');
 
             const res = await fetch('/.netlify/functions/ai-analyst', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: `User question: ${userText}\n\nFinancial context (currency: ${cur}):\nTotal Spending: ${fmtLocal(s.exp)}\nDaily Burn: ${fmtLocal(parseFloat(s.burn))}\nTotal Income: ${fmtLocal(s.income)}\nNet: ${fmtLocal(s.net)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
+                    mode,
+                    query: `User: ${userText}\n\nFinancial data (${cur}, last 90 days):\nTotal Expenses: ${fmtLocal(s.exp)}\nDaily Burn: ${fmtLocal(parseFloat(s.burn))}\nTotal Income: ${fmtLocal(s.income)}\nNet: ${fmtLocal(s.net)}\nTop Categories: ${topCats}\n\nRecent 20 transactions:\n${recentRows}\n\nRecent chat:\n${history}`
                 })
             });
 
@@ -479,8 +506,9 @@
                 throw new Error(err?.error || err?.message || `HTTP ${res.status}`);
             }
             const data = await res.json();
-            // Cache successful responses (structured or plain)
-            try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch(_) {}
+            if (mode === 'chat') {
+                try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch(_) {}
+            }
             return data;
         }
 
@@ -539,50 +567,64 @@
             }
         }
 
-        // Render a Chart.js chart from structured AI response
-        let aiChartInstance = null;
-        function renderAiChart(chartData) {
-            if (!chartData || typeof chartData !== 'object') return;
-            try {
-                // Destroy previous AI chart if it exists
-                if (aiChartInstance) { aiChartInstance.destroy(); aiChartInstance = null; }
+        // Build Chart.js options for SetAll dark theme
+        function buildChartOptions(type) {
+            const isRound = type === 'pie' || type === 'doughnut';
+            return {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: { legend: { labels: { color: '#94A3B8', font: { size: 11 } } } },
+                scales: isRound ? {} : {
+                    x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                    y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                },
+            };
+        }
 
-                // Create or reuse the AI chart container
+        // Normalise canvas flat format OR legacy Chart.js format into a Chart.js config
+        function normaliseChartConfig(chartData) {
+            if (!chartData || typeof chartData !== 'object') return null;
+            if (chartData.data && chartData.data.datasets) {
+                return { type: chartData.type, data: chartData.data, options: { ...buildChartOptions(chartData.type), ...(chartData.options || {}) } };
+            }
+            const palette = ['#14B8A6','#8B5CF6','#F59E0B','#EF4444','#3B82F6','#EC4899','#F97316'];
+            const colors  = Array.isArray(chartData.backgroundColor) ? chartData.backgroundColor : palette;
+            return {
+                type: chartData.type || 'bar',
+                data: {
+                    labels: chartData.labels || [],
+                    datasets: [{ label: chartData.title || 'Data', data: chartData.data || [], backgroundColor: colors, borderColor: chartData.type === 'line' ? (colors[0] || '#14B8A6') : colors, borderWidth: chartData.type === 'line' ? 2 : 0, fill: false, tension: 0.4 }]
+                },
+                options: buildChartOptions(chartData.type),
+            };
+        }
+
+        // Push AI chart to the canvas grid as a new widget
+        function addAiChartWidget(chartData, title) {
+            const cfg = normaliseChartConfig(chartData);
+            if (!cfg) return;
+            const id = 'aichart_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6);
+            aiChartRegistry[id] = cfg;
+            widgets.push({ id, type: 'aichart', title: title || chartData.title || 'AI Chart', width: 'wide' });
+        }
+
+        // Render a single chart inline in the chat panel (legacy / non-canvas mode)
+        let aiInlineChartInst = null;
+        function renderAiChart(chartData) {
+            const cfg = normaliseChartConfig(chartData);
+            if (!cfg) return;
+            try {
+                if (aiInlineChartInst) { aiInlineChartInst.destroy(); aiInlineChartInst = null; }
                 let container = document.getElementById('ai-chart-container');
                 if (!container) {
                     container = document.createElement('div');
                     container.id = 'ai-chart-container';
                     container.className = 'px-5 pb-4';
-                    const chatHistory = document.getElementById('chat-history');
-                    chatHistory.parentNode.insertBefore(container, chatHistory.nextSibling);
+                    document.getElementById('chat-history').parentNode.insertBefore(container, document.getElementById('chat-history').nextSibling);
                 }
                 container.innerHTML = '<canvas id="ai-chart-canvas" style="max-height:280px"></canvas>';
-
-                const ctx = document.getElementById('ai-chart-canvas').getContext('2d');
-
-                // Apply SetAll dark theme defaults
-                const defaults = {
-                    responsive: true,
-                    maintainAspectRatio: true,
-                    plugins: {
-                        legend: { labels: { color: '#94A3B8', font: { size: 11 } } },
-                    },
-                    scales: chartData.type === 'pie' || chartData.type === 'doughnut' ? {} : {
-                        x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
-                        y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
-                    },
-                };
-
-                const config = {
-                    type: chartData.type,
-                    data: chartData.data,
-                    options: { ...defaults, ...(chartData.options || {}) },
-                };
-
-                aiChartInstance = new Chart(ctx, config);
-            } catch (err) {
-                console.warn('AI chart render failed:', err);
-            }
+                aiInlineChartInst = new Chart(document.getElementById('ai-chart-canvas').getContext('2d'), cfg);
+            } catch (err) { console.warn('AI inline chart render failed:', err); }
         }
 
         async function triggerAiResponse(userText) {
@@ -618,6 +660,8 @@
                     }
                 }
 
+                const responseMode = data.mode || 'chat';
+
                 if (structured && structured.summary) {
                     summaryText = structured.summary;
                     const insightHtml = (structured.insights && structured.insights.length > 0)
@@ -627,10 +671,14 @@
                         : '';
                     fullHtml = summaryText + insightHtml;
 
-                    if (structured.chartData) renderAiChart(structured.chartData);
+                    if (responseMode === 'canvas' && structured.charts && structured.charts.length > 0) {
+                        structured.charts.forEach(c => addAiChartWidget(c));
+                        renderWidgets();
+                    } else if (structured.chartData) {
+                        renderAiChart(structured.chartData);
+                    }
                     processStructuredActions(structured.actions);
                 } else {
-                    // Final fallback: use raw report or reply — never show an empty box
                     const rawText = data?.report || data?.reply || '';
                     summaryText = rawText ? processActions(rawText) : 'AI is thinking…';
                     fullHtml    = summaryText;
@@ -638,9 +686,15 @@
 
                 isThinking = false;
                 await typeText(summaryText, fullHtml);
+                // Tag last AI message with mode for badge rendering
+                const lastIdx = chatMessages.length - 1;
+                if (chatMessages[lastIdx]?.role === 'ai') chatMessages[lastIdx].mode = responseMode;
+                setModeLabel(responseMode);
+                renderChat();
             } catch(err) {
                 chatMessages.push({ role: 'ai', text: `AI error: ${err.message}` });
                 isThinking = false;
+                setModeLabel('chat');
                 renderChat();
             }
         }
@@ -768,15 +822,22 @@
 
         function renderChat() {
             const box = document.getElementById('chat-history');
-            let html = chatMessages.map(m => `
+            let html = chatMessages.map(m => {
+                const badge = m.role === 'ai' && m.mode
+                    ? (m.mode === 'canvas'
+                        ? '<span style="display:inline-block;margin-bottom:4px;font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#a78bfa;background:rgba(139,92,246,0.12);border:1px solid rgba(139,92,246,0.25);border-radius:6px;padding:1px 6px">Analyst</span><br>'
+                        : '<span style="display:inline-block;margin-bottom:4px;font-size:9px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#14B8A6;background:rgba(20,184,166,0.08);border:1px solid rgba(20,184,166,0.2);border-radius:6px;padding:1px 6px">Advisor</span><br>')
+                    : '';
+                return `
                 <div class="flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}">
                     <div class="p-4 rounded-2xl text-[15px] max-w-[85%] leading-relaxed shadow-md ${
                         m.role === 'user'
                             ? 'bg-brand-teal text-[#0F172A] font-semibold rounded-tr-sm'
                             : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'}">
-                        ${m.text}
+                        ${badge}${m.text}
                     </div>
-                </div>`).join('');
+                </div>`;
+            }).join('');
 
             if (isThinking) {
                 html += `
@@ -805,7 +866,9 @@
 
                 let content = '';
 
-                if (w.type === 'stat') {
+                if (w.type === 'aichart') {
+                    content = `<div style="position:relative;height:260px;"><canvas id="aichart-${w.id}" style="max-height:260px"></canvas></div>`;
+                } else if (w.type === 'stat') {
                     const raw = stats[w.metric];
                     const localVal = typeof raw === 'number' ? raw * window.exchangeRate : 0;
                     const cur = window.userCurrency || 'USD';
@@ -947,8 +1010,23 @@
                     </div>`;
             }
 
+            // Destroy stale AI chart instances before rebuilding DOM
+            Object.keys(aiChartInstances).forEach(wid => {
+                if (aiChartInstances[wid]) { aiChartInstances[wid].destroy(); delete aiChartInstances[wid]; }
+            });
+
             document.getElementById('widgets-grid').innerHTML = html;
             lucide.createIcons();
+
+            // Mount AI chart widgets after DOM is live
+            setTimeout(() => {
+                Object.entries(aiChartRegistry).forEach(([wid, cfg]) => {
+                    if (aiChartInstances[wid]) return;
+                    const canvas = document.getElementById('aichart-' + wid);
+                    if (!canvas) return;
+                    try { aiChartInstances[wid] = new Chart(canvas.getContext('2d'), cfg); } catch(e) { console.warn('aichart render:', e); }
+                });
+            }, 0);
         }
     </script>
 
