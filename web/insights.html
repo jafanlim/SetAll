@@ -543,7 +543,15 @@
                 // Legacy Supabase path returns { structured, reply }
                 let structured = data?.structured || null;
                 if (!structured && data?.report) {
-                    try { structured = JSON.parse(data.report); } catch (_) {}
+                    // Aggressive markdown stripper: handles ```json ... ``` and ``` ... ``` fences
+                    const reportBody = data.report
+                        .replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/g, '').trim();
+                    try {
+                        structured = JSON.parse(reportBody);
+                    } catch (_) {
+                        // Raw fallback: JSON parse failed — use the stripped text directly as summary
+                        structured = { summary: reportBody || data.report };
+                    }
                 }
 
                 if (structured && structured.summary) {
@@ -558,7 +566,7 @@
                     if (structured.chartData) renderAiChart(structured.chartData);
                     processStructuredActions(structured.actions);
                 } else {
-                    // Plain text fallback: use report string or reply
+                    // Final fallback: use raw report or reply — never show an empty box
                     const rawText = data?.report || data?.reply || 'No response from AI analyst.';
                     summaryText = processActions(rawText);
                     fullHtml    = summaryText;

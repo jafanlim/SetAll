@@ -264,7 +264,7 @@
         window.currentUser    = null;
         window.statsLoaded    = false;
         window.fetchInProgress = false;
-        window.userCurrency   = null;
+        window.userCurrency   = localStorage.getItem('setall_currency') || null;
         window.exchangeRate   = 1;
         let categoryChart = null;
         let trendChart    = null;
@@ -359,6 +359,7 @@
                 // ── STEP 1: Fetch profile FIRST to get currency before any rendering ──
                 const profileRes = await sb.from('profiles').select('default_currency').eq('id', userId).single();
                 window.userCurrency = profileRes.data?.default_currency || 'USD';
+                try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
 
                 // ── STEP 2: Fetch exchange rate before fetching financial data ────────
                 window.exchangeRate = 1;

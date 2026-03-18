@@ -13,17 +13,26 @@ exports.handler = async (event) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: query }] }],
-        systemInstruction: { parts: [{ text: "You are SetAll AI, a financial expert. You MUST return ONLY valid JSON. Every response MUST include a 'summary' field (string). If the user is just chatting (e.g. 'hello', 'thanks'), put your friendly greeting or reply in the 'summary' field and omit other fields. If analyzing financial data, also include 'insights' (array of strings) and optionally 'chartData' (Chart.js config object) and 'actions' (array of action strings). Never return empty JSON. Never include thought tokens or markdown." }] },
-        generationConfig: { responseMimeType: "application/json", temperature: 0.5 }
+        systemInstruction: { parts: [{ text: "You are SetAll AI, a brilliant financial strategist and witty analyst. You have a Dual Mission:\n\nMISSION A — THE VOICE: The 'summary' field is YOUR voice. Be expressive, helpful, and direct. Explain the 'why' behind the numbers like a trusted CFO. If the user chats casually (hello, thanks, who are you), respond like a sharp, friendly human analyst — warm but not sycophantic.\n\nMISSION B — THE DATA: The 'insights', 'charts', and 'actions' fields are your precision JSON engine. Keep them structured and factual.\n\nYou MUST always return a single valid JSON object. Structure:\n{\"summary\": \"Your voice here — always present, always substantive\", \"insights\": [\"string\", ...], \"charts\": [], \"actions\": []}\n\nRules: The 'summary' field is REQUIRED in every response. Never return empty JSON. Never wrap the output in markdown code fences. Output raw JSON only." }] },
+        generationConfig: { temperature: 0.7 }
       })
     });
     const result = await response.json();
     const actual = (result.candidates?.[0]?.content?.parts ?? []).find(p => p.text && !p.thought);
-    const rawText = actual?.text?.trim() || '{}';
-    // Ensure the parsed JSON always has a summary field
+    const rawText = actual?.text?.trim() || '';
+    // Strip markdown code fences that some model versions emit
+    const cleaned = rawText.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/g, '').trim();
     let parsed = {};
-    try { parsed = JSON.parse(rawText); } catch (_) { parsed = { summary: rawText }; }
-    if (!parsed.summary) parsed.summary = 'Here is my analysis based on your financial data.';
+    try {
+      parsed = JSON.parse(cleaned || '{}');
+    } catch (_) {
+      // JSON parse failed — treat the whole response as the summary (raw fallback)
+      parsed = { summary: cleaned || 'I encountered an issue formulating a response. Please try again.' };
+    }
+    // Final guarantee: summary must never be empty or a generic placeholder
+    if (!parsed.summary || parsed.summary === '{}') {
+      parsed.summary = cleaned || 'Ready to analyse your finances — ask me anything!';
+    }
     return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify(parsed) }) };
   } catch (error) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: error.message }) };
