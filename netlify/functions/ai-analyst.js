@@ -8,7 +8,7 @@ exports.handler = async (event) => {
 
   try {
     const { query, mode = 'chat' } = JSON.parse(event.body);
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.Gemini || process.env.GEMINI_API_KEY;
     if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GEMINI_API_KEY not configured' }) };
 
     const isCanvas = mode === 'canvas';

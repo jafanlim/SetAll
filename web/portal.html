@@ -635,11 +635,13 @@
                 window.exchangeRate = 1;
                 if (window.userCurrency !== 'USD') {
                     try {
-                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
-                        if (rateRes.ok) {
-                            const rateJson = await rateRes.json();
-                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
-                        }
+                        const { data: rateRow } = await sb
+                            .from('exchange_rates')
+                            .select('rate')
+                            .eq('base_currency', 'USD')
+                            .eq('target_currency', window.userCurrency)
+                            .maybeSingle();
+                        if (rateRow?.rate) window.exchangeRate = parseFloat(rateRow.rate);
                     } catch (_) {}
                     if (window.exchangeRate === 1) {
                         const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
