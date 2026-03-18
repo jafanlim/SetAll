@@ -16,10 +16,50 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:title" content="SetAll — Stop Letting Money Stall Your Life">
   <meta name="twitter:description" content="Multi-currency expense sharing. Real-time. Algorithmically optimized.">
+  <meta name="twitter:image" content="https://setall.app/icons/Icon-512.png">
 
+  <link rel="canonical" href="https://setall.app/">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" href="https://setall.app/icons/Icon-192.png">
   <link rel="manifest" href="manifest.json">
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "SetAll",
+    "applicationCategory": "FinanceApplication",
+    "operatingSystem": "iOS, Android, macOS, Windows, Web",
+    "url": "https://setall.app/",
+    "downloadUrl": "https://setall.app/download",
+    "description": "Multi-currency expense-sharing app with algorithmically optimized debt resolution. Split bills, track spending, and settle debts instantly.",
+    "offers": {
+      "@type": "Offer",
+      "price": "0",
+      "priceCurrency": "USD"
+    },
+    "author": {
+      "@type": "Organization",
+      "name": "SetAll Fintech Systems",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "56 Tbilisi-Kojori st",
+        "addressLocality": "Tbilisi",
+        "addressCountry": "GE"
+      },
+      "email": "contact@setall.app",
+      "url": "https://setall.app/"
+    },
+    "screenshot": "https://setall.app/icons/Icon-512.png",
+    "featureList": [
+      "Multi-currency expense splitting",
+      "Algorithmically optimized debt settlement",
+      "Real-time group expense tracking",
+      "Personal finance analytics",
+      "Cross-platform (iOS, Android, macOS, Windows, Web)"
+    ]
+  }
+  </script>
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -281,11 +321,19 @@
   </div>
 </nav>
 
+<!-- ── Beta Announcement Bar ── -->
+<div id="beta-bar" style="background:linear-gradient(90deg,rgba(15,23,42,0.98),rgba(19,78,74,0.95));border-bottom:1px solid rgba(20,184,166,0.25);padding:0.6rem 1.5rem;text-align:center;font-size:0.8125rem;color:#94a3b8;position:relative;z-index:49;display:flex;align-items:center;justify-content:center;gap:0.625rem">
+  <span style="background:#14B8A6;color:#0F172A;font-weight:800;font-size:0.6rem;padding:0.2rem 0.55rem;border-radius:9999px;letter-spacing:0.1em;text-transform:uppercase;flex-shrink:0">Public Beta</span>
+  <span>SetAll is in public beta — features may change. <a href="mailto:contact@setall.app" style="color:#14B8A6;text-decoration:none;font-weight:600">Share feedback →</a></span>
+  <button onclick="document.getElementById('beta-bar').style.display='none';try{localStorage.setItem('beta_dismissed','1')}catch(_){}" aria-label="Dismiss" style="position:absolute;right:1rem;top:50%;transform:translateY(-50%);background:none;border:none;color:#475569;cursor:pointer;font-size:1.1rem;line-height:1;padding:0.25rem">×</button>
+</div>
+<script>try{if(localStorage.getItem('beta_dismissed')==='1')document.getElementById('beta-bar').style.display='none'}catch(_){}</script>
+
 <!-- ── Hero ── -->
 <section class="hero z1">
   <div class="eyebrow">
     <span class="eyebrow-dot"></span>
-    v1.4.0 · Greedy Flow Engine
+    Public Beta · v1.4.0 · Greedy Flow Engine
   </div>
   <h1>Stop Letting <span class="text-gradient">Money</span> Stall Your Life</h1>
   <p class="hero-sub">
@@ -465,6 +513,7 @@
     <a href="/terms">Terms of Service</a>
     <a href="/support">Help &amp; Support</a>
     <a href="mailto:contact@setall.app">Contact</a>
+    <a href="https://github.com/jafanlim/SetAll" target="_blank" rel="noopener">GitHub</a>
   </p>
   <p style="margin-top:0.5rem;font-size:0.75rem">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</p>
 </footer>

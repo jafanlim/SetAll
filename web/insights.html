@@ -6,15 +6,10 @@
     <title>Insights Hub | SetAll</title>
     <meta name="description" content="Your personal financial canvas — live data from your SetAll ledger.">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script>
-        tailwind.config = {
-            theme: { extend: { colors: { brand: { deep: '#0F172A', slate: '#0F172A', teal: '#14B8A6', purple: '#8B5CF6', orange: '#F97316' } } } }
-        }
-    </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -114,13 +109,61 @@
     </div>
 
     <script>
-        // ── Supabase ─────────────────────────────────────────────────────────
+        // ── Global State (window scope) ────────────────────────────────────
         const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
         const SUPABASE_ANON = 'REDACTED_JWT';
         const { createClient } = supabase;
         const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        let currentUser = null;
+        window.currentUser     = null;
+        window.userCurrency    = 'USD';
+        window.exchangeRate    = 1;
+        window.fetchInProgress = false;
+
+        // ── UI-First: render icons BEFORE any async ─────────────────────────
+        lucide.createIcons();
+
+        // ── Widget Layout Persistence ─────────────────────────────────────────
+        async function loadWidgetLayout() {
+            // 1. Try Supabase profiles.widget_layout
+            try {
+                const { data: profile, error } = await sb
+                    .from('profiles')
+                    .select('widget_layout')
+                    .eq('id', window.currentUser.id)
+                    .single();
+                if (!error && profile?.widget_layout) {
+                    const saved = JSON.parse(profile.widget_layout);
+                    if (Array.isArray(saved) && saved.length > 0) {
+                        widgets = saved;
+                        return;
+                    }
+                }
+            } catch (_) {}
+            // 2. Fallback: localStorage
+            try {
+                const local = localStorage.getItem('setall_widget_layout');
+                if (local) {
+                    const parsed = JSON.parse(local);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        widgets = parsed;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        async function saveWidgetLayout() {
+            const payload = JSON.stringify(widgets);
+            // Always persist to localStorage as a fast, reliable fallback
+            try { localStorage.setItem('setall_widget_layout', payload); } catch (_) {}
+            // Best-effort sync to Supabase (requires widget_layout column on profiles)
+            try {
+                await sb.from('profiles').upsert(
+                    { id: window.currentUser.id, widget_layout: payload },
+                    { onConflict: 'id' }
+                );
+            } catch (_) {}
+        }
 
         // ── Auth Gate ────────────────────────────────────────────────────────
         (async () => {
@@ -129,24 +172,29 @@
                 window.location.href = '/login?next=/insights';
                 return;
             }
-            currentUser = session.user;
-            await loadLiveData();
+            window.currentUser = session.user;
+            try { await loadLiveData(); } catch (e) { console.error('loadLiveData failed:', e); }
+            try { await loadWidgetLayout(); } catch (e) { console.error('loadWidgetLayout failed:', e); }
             document.getElementById('auth-gate').style.display = 'none';
             document.getElementById('main-app').style.display  = 'block';
-            renderHeader();
-            renderWidgets();
-            renderChat();
-            lucide.createIcons();
+            try {
+                renderHeader();
+                renderWidgets();
+                renderChat();
+                lucide.createIcons();
+            } catch (e) { console.error('UI render error:', e); }
         })();
 
         // ── Live Data Fetch ──────────────────────────────────────────────────
         async function loadLiveData() {
+            if (window.fetchInProgress) return;
+            window.fetchInProgress = true;
             try {
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, amount, base_amount_at_entry')
-                    .eq('payer_id', currentUser.id)
+                    .select('created_at, category, amount')
+                    .eq('payer_id', window.currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
                     .order('created_at', { ascending: true });
@@ -157,7 +205,7 @@
                     appData = rows.map(r => ({
                         date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
                         category: r.category || 'Uncategorized',
-                        amount:   parseFloat(r.base_amount_at_entry ?? r.amount ?? 0),
+                        amount:   parseFloat(r.amount ?? 0),
                         type:     'expense'
                     }));
                     chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
@@ -167,6 +215,9 @@
             } catch (err) {
                 console.warn('Supabase fetch failed, using demo data:', err);
                 chatMessages[0].text = `Canvas is running on demo data (couldn't connect to your ledger). Try signing out and back in if this persists.`;
+                // DO NOT retry — log and stop
+            } finally {
+                window.fetchInProgress = false;
             }
         }
 
@@ -197,6 +248,40 @@
         ];
         let isThinking = false;
 
+        // ── Utilities ────────────────────────────────────────────────────────
+        // FNV-1a 32-bit hash — used for AI response caching
+        function simpleHash(str) {
+            let h = 2166136261;
+            for (let i = 0; i < str.length; i++) {
+                h ^= str.charCodeAt(i);
+                h = Math.imul(h, 16777619);
+            }
+            return 'sai_' + (h >>> 0).toString(36);
+        }
+
+        // Character-by-character typewriter animation for AI replies.
+        // Types plainSummary char-by-char, then swaps in fullHtml (with bullets).
+        function typeText(plainSummary, fullHtml) {
+            return new Promise(resolve => {
+                const msgIndex = chatMessages.length;
+                chatMessages.push({ role: 'ai', text: '' });
+                renderChat();
+                let i = 0;
+                const BATCH = 4;
+                const iv = setInterval(() => {
+                    i = Math.min(i + BATCH, plainSummary.length);
+                    chatMessages[msgIndex] = { role: 'ai', text: plainSummary.slice(0, i) };
+                    renderChat();
+                    if (i >= plainSummary.length) {
+                        clearInterval(iv);
+                        chatMessages[msgIndex] = { role: 'ai', text: fullHtml };
+                        renderChat();
+                        resolve();
+                    }
+                }, 20);
+            });
+        }
+
         // ── Data Engine ──────────────────────────────────────────────────────
         function getStats() {
             let inc = 0, exp = 0;
@@ -225,7 +310,16 @@
         }
 
         // ── Action Handlers ──────────────────────────────────────────────────
-        window.toggleEditMode = () => { isEditMode = !isEditMode; renderHeader(); renderWidgets(); };
+        window.toggleEditMode = () => {
+            const wasEditing = isEditMode;
+            isEditMode = !isEditMode;
+            if (wasEditing) {
+                // Exiting edit mode = Save Layout button clicked
+                saveWidgetLayout();
+            }
+            renderHeader();
+            renderWidgets();
+        };
 
         let dragSrcIndex = null;
 
@@ -296,32 +390,23 @@
                 `${d.date} | ${d.category} | ${d.type} | $${d.amount.toFixed(2)}`
             ).join('\n');
 
+            // Hash-based cache — skip API call for identical dataset + question
+            const cacheKey = simpleHash(userText + '|' + topCats + '|' + recentRows);
+            try {
+                const cached = localStorage.getItem(cacheKey);
+                if (cached) return JSON.parse(cached);
+            } catch(_) {}
+
             const history = chatMessages
                 .filter((m, i) => i > 0)
                 .slice(-10)
                 .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
 
-            const { data: { session } } = await sb.auth.getSession();
-            const jwt = session?.access_token;
-
-            const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-analyst`, {
+            const res = await fetch('/.netlify/functions/ai-analyst', {
                 method: 'POST',
-                headers: {
-                    'Content-Type':  'application/json',
-                    'apikey':        SUPABASE_ANON,
-                    ...(jwt ? { 'Authorization': `Bearer ${jwt}` } : {})
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: userText,
-                    history,
-                    context: {
-                        totalSpending:  s.exp,
-                        dailyBurn:      parseFloat(s.burn),
-                        totalIncome:    s.income,
-                        net:            s.net,
-                        topCategories:  topCats,
-                        recentRows
-                    }
+                    query: `User question: ${userText}\n\nFinancial context:\nTotal Spending: $${s.exp.toFixed(2)}\nDaily Burn: $${s.burn}\nTotal Income: $${s.income.toFixed(2)}\nNet: $${s.net.toFixed(2)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
                 })
             });
 
@@ -330,7 +415,9 @@
                 throw new Error(err?.error || err?.message || `HTTP ${res.status}`);
             }
             const data = await res.json();
-            return data?.reply || 'No response from AI analyst.';
+            // Cache successful responses (structured or plain)
+            try { localStorage.setItem(cacheKey, JSON.stringify(data)); } catch(_) {}
+            return data;
         }
 
         function handleLocalCommands(text) {
@@ -374,7 +461,67 @@
             return aiText;
         }
 
-        function triggerAiResponse(userText) {
+        // Process structured actions array from the AI response
+        function processStructuredActions(actions) {
+            if (!Array.isArray(actions)) return;
+            for (const action of actions) {
+                switch (action) {
+                    case 'ADD_TREND':  window.addWidget('trend', 'wide', 'AI Trend Graph'); break;
+                    case 'ADD_DONUT':  window.addWidget('donut', 'normal', 'AI Category Split'); break;
+                    case 'REFRESH':    loadLiveData().then(() => renderWidgets()); break;
+                    case 'SIGNOUT':    setTimeout(() => sb.auth.signOut().then(() => window.location.href = '/'), 1200); break;
+                    case 'PORTAL':     setTimeout(() => window.location.href = '/portal', 1200); break;
+                }
+            }
+        }
+
+        // Render a Chart.js chart from structured AI response
+        let aiChartInstance = null;
+        function renderAiChart(chartData) {
+            if (!chartData || typeof chartData !== 'object') return;
+            try {
+                // Destroy previous AI chart if it exists
+                if (aiChartInstance) { aiChartInstance.destroy(); aiChartInstance = null; }
+
+                // Create or reuse the AI chart container
+                let container = document.getElementById('ai-chart-container');
+                if (!container) {
+                    container = document.createElement('div');
+                    container.id = 'ai-chart-container';
+                    container.className = 'px-5 pb-4';
+                    const chatHistory = document.getElementById('chat-history');
+                    chatHistory.parentNode.insertBefore(container, chatHistory.nextSibling);
+                }
+                container.innerHTML = '<canvas id="ai-chart-canvas" style="max-height:280px"></canvas>';
+
+                const ctx = document.getElementById('ai-chart-canvas').getContext('2d');
+
+                // Apply SetAll dark theme defaults
+                const defaults = {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    plugins: {
+                        legend: { labels: { color: '#94A3B8', font: { size: 11 } } },
+                    },
+                    scales: chartData.type === 'pie' || chartData.type === 'doughnut' ? {} : {
+                        x: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                        y: { ticks: { color: '#64748B' }, grid: { color: 'rgba(30,41,59,0.5)' } },
+                    },
+                };
+
+                const config = {
+                    type: chartData.type,
+                    data: chartData.data,
+                    options: { ...defaults, ...(chartData.options || {}) },
+                };
+
+                aiChartInstance = new Chart(ctx, config);
+            } catch (err) {
+                console.warn('AI chart render failed:', err);
+            }
+        }
+
+        async function triggerAiResponse(userText) {
             chatMessages.push({ role: 'user', text: userText });
             isThinking = true;
             renderChat();
@@ -387,18 +534,43 @@
                 return;
             }
 
-            callAiAnalyst(userText)
-                .then(raw => {
-                    const cleaned = processActions(raw);
-                    chatMessages.push({ role: 'ai', text: cleaned });
-                })
-                .catch(err => {
-                    chatMessages.push({ role: 'ai', text: `AI error: ${err.message}. Ensure the ai-analyst edge function is deployed.` });
-                })
-                .finally(() => {
-                    isThinking = false;
-                    renderChat();
-                });
+            try {
+                const data = await callAiAnalyst(userText);
+                let summaryText = '';
+                let fullHtml    = '';
+
+                // Netlify function returns { report: "<json string>" }
+                // Legacy Supabase path returns { structured, reply }
+                let structured = data?.structured || null;
+                if (!structured && data?.report) {
+                    try { structured = JSON.parse(data.report); } catch (_) {}
+                }
+
+                if (structured && structured.summary) {
+                    summaryText = structured.summary;
+                    const insightHtml = (structured.insights && structured.insights.length > 0)
+                        ? '<ul style="margin:0.5rem 0 0 1rem;padding:0;list-style:disc">' +
+                            structured.insights.map(i => `<li style="margin:0.2rem 0;font-size:0.85em;color:#94A3B8">${i}</li>`).join('') +
+                          '</ul>'
+                        : '';
+                    fullHtml = summaryText + insightHtml;
+
+                    if (structured.chartData) renderAiChart(structured.chartData);
+                    processStructuredActions(structured.actions);
+                } else {
+                    // Plain text fallback: use report string or reply
+                    const rawText = data?.report || data?.reply || 'No response from AI analyst.';
+                    summaryText = processActions(rawText);
+                    fullHtml    = summaryText;
+                }
+
+                isThinking = false;
+                await typeText(summaryText, fullHtml);
+            } catch(err) {
+                chatMessages.push({ role: 'ai', text: `AI error: ${err.message}` });
+                isThinking = false;
+                renderChat();
+            }
         }
 
         document.getElementById('chat-form').addEventListener('submit', e => {
@@ -410,16 +582,95 @@
             triggerAiResponse(text);
         });
 
+        // ── Mobile Bridge ─────────────────────────────────────────────────────
+        // Flutter WebView posts { action:'setToken', token:'...', refresh_token:'...' }
+        // to inject an authenticated session without a redirect-based OAuth flow.
+        window.addEventListener('message', async (event) => {
+            if (!event.data || event.data.action !== 'setToken' || !event.data.token) return;
+            try {
+                const { error } = await sb.auth.setSession({
+                    access_token:  event.data.token,
+                    refresh_token: event.data.refresh_token || event.data.token
+                });
+                if (!error) {
+                    const { data: { user } } = await sb.auth.getUser();
+                    if (user) {
+                        window.currentUser = user;
+                        await loadLiveData();
+                        await loadWidgetLayout();
+                        document.getElementById('auth-gate').style.display = 'none';
+                        document.getElementById('main-app').style.display  = 'block';
+                        renderHeader();
+                        renderWidgets();
+                        renderChat();
+                        lucide.createIcons();
+                    }
+                }
+            } catch(e) {
+                console.warn('Mobile bridge setToken failed:', e);
+            }
+        }, false);
+
         document.getElementById('file-upload').addEventListener('change', e => {
             const file = e.target.files[0];
             if (!file) return;
-            triggerAiResponse(`I uploaded a file: ${file.name}`);
+            e.target.value = '';
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const text = ev.target.result;
+                try {
+                    const lines = text.split(/\r?\n/).filter(l => l.trim());
+                    if (lines.length < 2) {
+                        triggerAiResponse(`Uploaded ${file.name} but it appears empty or has only one row.`);
+                        return;
+                    }
+
+                    // Detect and skip header row (contains non-numeric first column)
+                    const firstCell = lines[0].split(',')[0].trim().toLowerCase();
+                    const hasHeader = isNaN(parseFloat(firstCell)) && firstCell !== '';
+                    const dataLines = hasHeader ? lines.slice(1) : lines;
+
+                    // Parse CSV: expected format: date,category,amount[,type]
+                    const parsed = [];
+                    for (const line of dataLines) {
+                        const cols = line.split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+                        if (cols.length < 3) continue;
+                        const date     = cols[0] || new Date().toISOString().slice(0, 10);
+                        const category = cols[1] || 'Uncategorized';
+                        const amount   = parseFloat(cols[2]);
+                        const type     = (cols[3] || 'expense').toLowerCase();
+                        if (isNaN(amount) || amount <= 0) continue;
+                        if (type !== 'expense' && type !== 'income') continue;
+                        parsed.push({ date, category, amount, type });
+                    }
+
+                    if (parsed.length === 0) {
+                        triggerAiResponse(`Could not parse any valid rows from ${file.name}. Expected format: date,category,amount,type`);
+                        return;
+                    }
+
+                    appData = parsed;
+                    renderWidgets();
+
+                    const s = getStats();
+                    triggerAiResponse(
+                        `I imported ${parsed.length} rows from ${file.name}. ` +
+                        `Total spending: $${s.exp.toFixed(2)}, income: $${s.income.toFixed(2)}. ` +
+                        `What patterns do you see?`
+                    );
+                } catch (err) {
+                    triggerAiResponse(`Failed to parse ${file.name}: ${err.message}`);
+                }
+            };
+            reader.onerror = () => triggerAiResponse(`Could not read ${file.name}.`);
+            reader.readAsText(file);
         });
 
         // ── Renderers ────────────────────────────────────────────────────────
         function renderHeader() {
-            const name = currentUser
-                ? (currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User')
+            const name = window.currentUser
+                ? (window.currentUser.user_metadata?.full_name || window.currentUser.user_metadata?.name || window.currentUser.email?.split('@')[0] || 'User')
                 : 'User';
 
             document.getElementById('app-header').innerHTML = `
@@ -610,5 +861,8 @@
             lucide.createIcons();
         }
     </script>
+
+    <!-- Legal metadata (hidden — fullscreen app has no page footer) -->
+    <span style="display:none" aria-hidden="true">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</span>
 </body>
 </html>

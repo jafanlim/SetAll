@@ -5,30 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Account Portal | SetAll</title>
     <meta name="description" content="Manage your SetAll account.">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        brand: {
-                            deep: '#020617',
-                            slate: '#0F172A',
-                            border: '#1E293B',
-                            teal: '#14B8A6',
-                            tealHover: '#0D9488',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', 'sans-serif'],
-                    }
-                }
-            }
-        }
-    </script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <style>
         .glass-nav  { background: rgba(2,6,23,0.7); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,0.05); }
         .glass-card { background: rgba(15,23,42,0.4); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.05); }
@@ -160,17 +140,17 @@
                                 <div class="w-10 h-10 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center">
                                     <i data-lucide="wallet" class="w-4 h-4 text-brand-teal"></i>
                                 </div>
-                                <span class="text-slate-400 text-sm font-medium">Total Wallet Spending</span>
+                                <span class="text-slate-400 text-sm font-medium">Cash Position</span>
                             </div>
                             <p id="stat-wallet" class="text-3xl font-extrabold text-white tracking-tight">—</p>
-                            <p class="text-xs text-slate-500 mt-1">Personal expenses, no group</p>
+                            <p id="stat-wallet-label" class="text-xs text-slate-500 mt-1">Net: (owed to you) − (you owe)</p>
                         </div>
                         <div class="glass-card rounded-2xl p-6">
                             <div class="flex items-center gap-3 mb-4">
                                 <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
                                     <i data-lucide="users" class="w-4 h-4 text-purple-400"></i>
                                 </div>
-                                <span class="text-slate-400 text-sm font-medium">Shared Group Position</span>
+                                <span class="text-slate-400 text-sm font-medium">Personal Spending</span>
                             </div>
                             <p id="stat-group" class="text-3xl font-extrabold text-white tracking-tight">—</p>
                             <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Net across all groups</p>
@@ -275,19 +255,24 @@
     </footer>
 
     <script>
+        // ── Global State (window scope) ────────────────────────────────────
         const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
         const SUPABASE_ANON = 'REDACTED_JWT';
         const { createClient } = supabase;
         const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        lucide.createIcons();
-
-        let currentUser   = null;
-        let statsLoaded   = false;
+        window.currentUser    = null;
+        window.statsLoaded    = false;
+        window.fetchInProgress = false;
+        window.userCurrency   = 'USD';
+        window.exchangeRate   = 1;
         let categoryChart = null;
         let trendChart    = null;
 
         const BRAND_PALETTE = ['#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
+
+        // ── UI-First: render icons + nav BEFORE any async ────────────────
+        lucide.createIcons();
 
         Chart.defaults.color      = '#94A3B8';
         Chart.defaults.font.family = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
@@ -298,12 +283,15 @@
             return new Date(s).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
         }
 
-        function fmtCurrency(n) {
+        function fmtCurrency(n, currency) {
             if (n === null || n === undefined || isNaN(n)) return '—';
-            const abs = Math.abs(n);
+            const code = (currency || 'USD').toUpperCase();
+            const abs  = Math.abs(n);
             const sign = n < 0 ? '-' : '';
-            if (abs >= 1000) return sign + '$' + (abs / 1000).toFixed(1) + 'k';
-            return sign + '$' + abs.toFixed(2);
+            // Use compact notation for large values (e.g. VND)
+            if (abs >= 1_000_000) return sign + (abs / 1_000_000).toFixed(1) + 'M ' + code;
+            if (abs >= 1000)      return sign + (abs / 1000).toFixed(1) + 'k ' + code;
+            return sign + abs.toFixed(2) + ' ' + code;
         }
 
         function showPwBanner(msg, isError) {
@@ -317,19 +305,23 @@
 
         // ── Section Navigation ───────────────────────────────────────────────
         function showSection(id) {
-            ['profile', 'analytics', 'security', 'danger'].forEach(s => {
-                document.getElementById('section-' + s).classList.add('hidden');
-                document.getElementById('nav-' + s).classList.remove('active');
-            });
-            document.getElementById('section-' + id).classList.remove('hidden');
-            document.getElementById('nav-' + id).classList.add('active');
-            lucide.createIcons();
-            if (id === 'analytics' && !statsLoaded) fetchPortalStats();
+            try {
+                ['profile', 'analytics', 'security', 'danger'].forEach(s => {
+                    document.getElementById('section-' + s).classList.add('hidden');
+                    document.getElementById('nav-' + s).classList.remove('active');
+                });
+                document.getElementById('section-' + id).classList.remove('hidden');
+                document.getElementById('nav-' + id).classList.add('active');
+                lucide.createIcons();
+            } catch (e) { console.error('showSection UI error:', e); }
+            if (id === 'analytics' && !window.statsLoaded && !window.fetchInProgress) {
+                fetchPortalStats().catch(e => console.error('fetchPortalStats failed:', e));
+            }
         }
 
         // ── Portal Load ──────────────────────────────────────────────────────
         function loadPortal(user) {
-            currentUser = user;
+            window.currentUser = user;
             document.getElementById('loading-view').classList.add('hidden');
             document.getElementById('portal-view').classList.remove('hidden');
 
@@ -349,55 +341,84 @@
 
         // ── Analytics: Data Fetching ─────────────────────────────────────────
         async function fetchPortalStats() {
+            // Guard: prevent duplicate/recursive fetches
+            if (window.fetchInProgress || window.statsLoaded) return;
+            window.fetchInProgress = true;
+
             const loading = document.getElementById('charts-loading');
             loading.classList.remove('hidden');
             try {
-                const userId = currentUser.id;
+                const userId = window.currentUser.id;
                 const since  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-                // 1. Personal expenses last 30d (group_id IS NULL) – category + trend
-                const { data: personalExp, error: e1 } = await sb
-                    .from('expenses')
-                    .select('category, base_amount_at_entry, created_at')
-                    .eq('payer_id', userId)
-                    .is('group_id', null)
-                    .gte('created_at', since);
-                if (e1) throw e1;
+                // Fire all four independent queries in parallel (4 requests total)
+                const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
+                    sb.from('profiles').select('default_currency').eq('id', userId).single(),
+                    sb.from('expenses')
+                      .select('category, amount, created_at')
+                      .eq('payer_id', userId)
+                      .is('group_id', null)
+                      .gte('created_at', since),
+                    sb.from('splits')
+                      .select('universal_usd_owed, expenses!inner(payer_id)')
+                      .eq('user_id', userId)
+                      .neq('expenses.payer_id', userId),
+                    sb.from('splits')
+                      .select('universal_usd_owed, expenses!inner(payer_id)')
+                      .neq('user_id', userId)
+                      .eq('expenses.payer_id', userId),
+                ]);
 
-                // 2. What I owe others: splits where user = me but payer != me
-                const { data: iOweSplits, error: e2 } = await sb
-                    .from('splits')
-                    .select('amount_owed, expenses!inner(payer_id)')
-                    .eq('user_id', userId)
-                    .neq('expenses.payer_id', userId);
-                if (e2) throw e2;
+                window.userCurrency = 'USD';
+                if (profileRes.data?.default_currency) window.userCurrency = profileRes.data.default_currency;
 
-                // 3. What others owe me: splits where user != me but payer = me
-                const { data: owedMeSplits, error: e3 } = await sb
-                    .from('splits')
-                    .select('amount_owed, expenses!inner(payer_id)')
-                    .neq('user_id', userId)
-                    .eq('expenses.payer_id', userId);
-                if (e3) throw e3;
+                // ── Fetch USD→local exchange rate ─────────────────────────────
+                // Used to convert universal_usd_owed back to the user's display currency.
+                window.exchangeRate = 1;
+                if (window.userCurrency !== 'USD') {
+                    try {
+                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
+                        if (rateRes.ok) {
+                            const rateJson = await rateRes.json();
+                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
+                        }
+                    } catch (_) {}
+                    // Hardcoded fallbacks for currencies Frankfurter doesn't cover
+                    if (window.exchangeRate === 1) {
+                        const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
+                        window.exchangeRate = fallbackRates[window.userCurrency] || 1;
+                    }
+                }
+                console.log(`[Portal] currency=${window.userCurrency} exchangeRate=${window.exchangeRate}`);
+
+                if (expRes.error) { console.error('expenses query failed:', expRes.error); return; }
+                if (iOweRes.error) { console.error('iOwe query failed:', iOweRes.error); return; }
+                if (owedMeRes.error) { console.error('owedMe query failed:', owedMeRes.error); return; }
+
+                const personalExp  = expRes.data || [];
+                const iOweSplits   = iOweRes.data || [];
+                const owedMeSplits = owedMeRes.data || [];
 
                 // ── Compute summary values ───────────────────────────────────
-                const walletTotal = (personalExp   || []).reduce((s, r) => s + parseFloat(r.base_amount_at_entry || 0), 0);
-                const iOweTotal   = (iOweSplits    || []).reduce((s, r) => s + parseFloat(r.amount_owed         || 0), 0);
-                const owedMeTotal = (owedMeSplits  || []).reduce((s, r) => s + parseFloat(r.amount_owed         || 0), 0);
-                const netPosition = owedMeTotal - iOweTotal;
+                // universal_usd_owed is in USD — convert to local for display
+                const walletTotal = personalExp.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+                const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
+                const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
+                const netPositionUsd = owedMeUsd - iOweUsd;
+                const netPosition    = netPositionUsd * window.exchangeRate;
 
                 // ── Category map ─────────────────────────────────────────────
                 const catMap = {};
-                (personalExp || []).forEach(r => {
+                personalExp.forEach(r => {
                     const cat = r.category || 'Uncategorized';
-                    catMap[cat] = (catMap[cat] || 0) + parseFloat(r.base_amount_at_entry || 0);
+                    catMap[cat] = (catMap[cat] || 0) + parseFloat(r.amount || 0);
                 });
 
                 // ── 30-day trend (fill missing days as 0) ────────────────────
                 const trendMap = {};
-                (personalExp || []).forEach(r => {
+                personalExp.forEach(r => {
                     const day = r.created_at ? r.created_at.slice(0, 10) : null;
-                    if (day) trendMap[day] = (trendMap[day] || 0) + parseFloat(r.base_amount_at_entry || 0);
+                    if (day) trendMap[day] = (trendMap[day] || 0) + parseFloat(r.amount || 0);
                 });
 
                 const trendLabels = [], trendValues = [];
@@ -409,32 +430,39 @@
                 }
 
                 // ── Update summary cards ─────────────────────────────────────
-                document.getElementById('stat-wallet').textContent = fmtCurrency(walletTotal);
+                // Card 1: Cash Position = (owed to me - I owe) in local currency
+                const walletEl    = document.getElementById('stat-wallet');
+                const walletLabel = document.getElementById('stat-wallet-label');
+                walletEl.textContent = fmtCurrency(netPosition, window.userCurrency);
+                walletEl.className   = 'text-3xl font-extrabold tracking-tight ' +
+                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
+                walletLabel.textContent = netPosition >= 0
+                    ? `You are owed across all groups (${window.userCurrency})`
+                    : `You owe across all groups (${window.userCurrency})`;
 
+                // Card 2: Personal Spending (wallet expenses, already in local currency)
                 const groupEl    = document.getElementById('stat-group');
                 const groupLabel = document.getElementById('stat-group-label');
-                groupEl.textContent = fmtCurrency(Math.abs(netPosition));
-                groupEl.className   = 'text-3xl font-extrabold tracking-tight ' +
-                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
-                groupLabel.textContent = netPosition >= 0
-                    ? 'Net owed to you across groups'
-                    : 'Net you owe across groups';
+                groupEl.textContent    = fmtCurrency(walletTotal, window.userCurrency);
+                groupLabel.textContent = `Personal expenses, last 30 days (${window.userCurrency})`;
 
                 // ── Render charts ────────────────────────────────────────────
                 const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
-                renderCharts(categoryData, trendLabels, trendValues);
-                statsLoaded = true;
+                renderCharts(categoryData, trendLabels, trendValues, window.userCurrency);
+                window.statsLoaded = true;
             } catch (err) {
                 console.error('fetchPortalStats:', err);
                 document.getElementById('stat-wallet').textContent = 'Error';
                 document.getElementById('stat-group').textContent  = 'Error';
+                // DO NOT retry — log and stop
             } finally {
+                window.fetchInProgress = false;
                 document.getElementById('charts-loading').classList.add('hidden');
             }
         }
 
         // ── Analytics: Chart Rendering ───────────────────────────────────────
-        function renderCharts(categoryData, trendLabels, trendValues) {
+        function renderCharts(categoryData, trendLabels, trendValues, userCurrency) {
             if (categoryChart) { categoryChart.destroy(); categoryChart = null; }
             if (trendChart)    { trendChart.destroy();    trendChart    = null; }
 
@@ -467,7 +495,7 @@
                                 labels:   { padding: 16, boxWidth: 12, font: { size: 12 } }
                             },
                             tooltip: {
-                                callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmtCurrency(ctx.parsed) }
+                                callbacks: { label: ctx => ' ' + ctx.label + ': ' + fmtCurrency(ctx.parsed, userCurrency || 'USD') }
                             }
                         }
                     }
@@ -514,11 +542,36 @@
             }
         }
 
-        // ── Auth Gate ─────────────────────────────────────────────────────────
+        // ── Auth Gate (expiry-aware, non-blocking UI) ─────────────────────
         (async () => {
-            const { data: { session } } = await sb.auth.getSession();
-            if (!session) { window.location.href = '/login'; return; }
-            loadPortal(session.user);
+            try {
+                const { data: { session } } = await sb.auth.getSession();
+                let valid = session;
+
+                if (valid?.access_token) {
+                    try {
+                        let b64 = valid.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+                        while (b64.length % 4 !== 0) b64 += '=';
+                        const payload = JSON.parse(atob(b64));
+                        if ((payload.exp * 1000) - Date.now() < 90_000) valid = null;
+                    } catch (_) { valid = null; }
+                }
+
+                if (!valid) {
+                    const { data: refreshed, error } = await sb.auth.refreshSession();
+                    if (!error && refreshed?.session) {
+                        valid = refreshed.session;
+                    } else {
+                        window.location.href = '/login?next=/portal';
+                        return;
+                    }
+                }
+
+                loadPortal(valid.user);
+            } catch (e) {
+                console.error('Auth gate failed:', e);
+                window.location.href = '/login?next=/portal';
+            }
         })();
 
         // ── Sign Out ──────────────────────────────────────────────────────────

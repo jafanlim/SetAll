@@ -66,4 +66,10 @@ class DeepLinkService {
     _sub?.cancel();
     _sub = null;
   }
+
+  /// Returns true if [uri] uses the SetAll custom scheme.
+  /// Exposed for unit tests without requiring a live Supabase connection.
+  @visibleForTesting
+  bool isSetAllSchemeUri(Uri uri) =>
+      uri.scheme == 'setall' || uri.scheme == 'com.jafa.setall';
 }

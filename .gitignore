@@ -13,6 +13,10 @@ build_log_ios.txt
 .swiftpm/
 migrate_working_dir/
 
+# Large debug/log files
+chrome log.md
+*.har
+
 # IntelliJ related
 *.iml
 *.ipr
@@ -65,3 +69,13 @@ xcresult_*.json
 *.xcresult
 flutter_*.log
 build_log_*.txt
+
+# Local Netlify folder
+.netlify
+
+# Node modules (Tailwind CLI)
+node_modules/
+package-lock.json
+
+# Generated Tailwind CSS (rebuild with: make tailwind)
+web/styles.css

@@ -2,6 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "SetAll (iOS Simulator)",
+            "request": "launch",
+            "type": "dart",
+            "args": ["-d", "iPhone"]
+        },
+        {
             "name": "SetAll (iOS Device)",
             "request": "launch",
             "type": "dart",
@@ -12,6 +18,12 @@
             "request": "launch",
             "type": "dart",
             "args": ["-d", "macos"]
+        },
+        {
+            "name": "SetAll (Android Emulator)",
+            "request": "launch",
+            "type": "dart",
+            "args": ["-d", "emulator-5554"]
         },
         {
             "name": "SetAll (Web — Chrome)",
@@ -32,12 +44,6 @@
             "type": "dart",
             "args": ["-d", "chrome", "--web-port", "8080"],
             "flutterMode": "profile"
-        },
-        {
-            "name": "SetAll (Android Emulator)",
-            "request": "launch",
-            "type": "dart",
-            "args": ["-d", "emulator-5554"]
         },
         {
             "name": "Regression Guard Tests",
