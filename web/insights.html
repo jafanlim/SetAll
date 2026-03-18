@@ -173,20 +173,34 @@
                 return;
             }
             window.currentUser = session.user;
-            // Fetch profile to get default_currency BEFORE rendering widgets.
-            // Without this, window.userCurrency stays 'USD' and fmtCurrency emits
-            // compact notation ("31.00M USD") instead of "31,000,000 VND".
+            // Fetch profile (same as app getCurrentUserProfile: select* + maybeSingle)
             try {
                 const { data: profile } = await sb
                     .from('profiles')
-                    .select('default_currency')
+                    .select('*')
                     .eq('id', session.user.id)
-                    .single();
+                    .maybeSingle();
                 if (profile?.default_currency) {
                     window.userCurrency = profile.default_currency;
                     try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
                 }
             } catch (_) {}
+            // Fetch exchange rate now so loadLiveData can use it for conversion
+            window.exchangeRate = 1;
+            if (window.userCurrency && window.userCurrency !== 'USD') {
+                try {
+                    const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
+                    if (rateRes.ok) {
+                        const rateJson = await rateRes.json();
+                        window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
+                    }
+                } catch (_) {}
+                if (window.exchangeRate === 1) {
+                    const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
+                    window.exchangeRate = fallbackRates[window.userCurrency] || 1;
+                }
+            }
+            console.log('[Insights] userCurrency =', window.userCurrency, 'exchangeRate =', window.exchangeRate);
             try { await loadLiveData(); } catch (e) { console.error('loadLiveData failed:', e); }
             try { await loadWidgetLayout(); } catch (e) { console.error('loadWidgetLayout failed:', e); }
             document.getElementById('auth-gate').style.display = 'none';
@@ -207,7 +221,7 @@
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, amount, currency')
+                    .select('created_at, category, amount, currency, universal_usd_amount')
                     .eq('payer_id', window.currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
@@ -216,15 +230,24 @@
                 if (error) throw error;
 
                 if (rows && rows.length > 0) {
-                    appData = rows.map(r => ({
-                        date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
-                        category: r.category || 'Uncategorized',
-                        amount:   parseFloat(r.amount ?? 0),
-                        type:     'expense'
-                    }));
-                    // Infer currency from actual expense rows — overrides any poisoned localStorage value
+                    // Mirrors Dart: e.universalUsdAmount ?? e.amount
+                    // universalUsdAmount (frozen USD) * exchangeRate = current base currency
+                    const rate = window.exchangeRate || 1;
+                    appData = rows.map(r => {
+                        const usd = parseFloat(r.universal_usd_amount);
+                        const amt = (!isNaN(usd) && r.universal_usd_amount != null)
+                            ? usd * rate
+                            : parseFloat(r.amount ?? 0);
+                        return {
+                            date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
+                            category: r.category || 'Uncategorized',
+                            amount:   amt,
+                            type:     'expense'
+                        };
+                    });
+                    // Use expense entry currency as fallback ONLY if profile gave nothing
                     const expCurrency = rows.find(r => r.currency)?.currency;
-                    if (expCurrency) {
+                    if (expCurrency && !window.userCurrency) {
                         window.userCurrency = expCurrency;
                         try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
                     }

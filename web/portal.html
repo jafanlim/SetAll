@@ -540,7 +540,7 @@
                 const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
                     sb.from('profiles').select('*').eq('id', userId).maybeSingle(),
                     sb.from('expenses')
-                      .select('category, amount, currency, created_at')
+                      .select('category, amount, currency, universal_usd_amount, created_at')
                       .eq('payer_id', userId)
                       .is('group_id', null)
                       .gte('created_at', since),
@@ -589,9 +589,20 @@
                 if (sel && window.userCurrency) sel.value = window.userCurrency;
 
 
-                // ── Compute summary values ───────────────────────────────────
-                // universal_usd_owed is in USD — convert to local for display
-                const walletTotal = personalExp.reduce((s, r) => s + parseFloat(r.amount || 0), 0);
+                // ── Mirrors Dart: e.universalUsdAmount ?? e.amount ────────────
+                // universalUsdAmount is frozen USD → multiply by exchangeRate for
+                // current base currency. If null (pre-v8 expense), fall back to
+                // amount which was stored in the base currency at entry time.
+                const rate = window.exchangeRate || 1;
+                const baseAmt = (r) => {
+                    const usd = parseFloat(r.universal_usd_amount);
+                    return (!isNaN(usd) && r.universal_usd_amount != null)
+                        ? usd * rate
+                        : parseFloat(r.amount || 0);
+                };
+
+                // ── Compute summary values ────────────────────────────────────
+                const walletTotal = personalExp.reduce((s, r) => s + baseAmt(r), 0);
                 const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
                 const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
 
@@ -599,14 +610,14 @@
                 const catMap = {};
                 personalExp.forEach(r => {
                     const cat = r.category || 'Uncategorized';
-                    catMap[cat] = (catMap[cat] || 0) + parseFloat(r.amount || 0);
+                    catMap[cat] = (catMap[cat] || 0) + baseAmt(r);
                 });
 
                 // ── 30-day trend (fill missing days as 0) ────────────────────
                 const trendMap = {};
                 personalExp.forEach(r => {
                     const day = r.created_at ? r.created_at.slice(0, 10) : null;
-                    if (day) trendMap[day] = (trendMap[day] || 0) + parseFloat(r.amount || 0);
+                    if (day) trendMap[day] = (trendMap[day] || 0) + baseAmt(r);
                 });
 
                 const trendLabels = [], trendValues = [];
@@ -699,7 +710,7 @@
                         maintainAspectRatio: false,
                         plugins: {
                             legend: { display: false },
-                            tooltip: { callbacks: { label: ctx => ' ' + fmtCurrency(ctx.parsed.y) } }
+                            tooltip: { callbacks: { label: ctx => ' ' + fmtCurrency(ctx.parsed.y, userCurrency) } }
                         },
                         scales: {
                             x: {
@@ -708,7 +719,7 @@
                             },
                             y: {
                                 grid:  { color: 'rgba(30, 41, 59, 0.7)' },
-                                ticks: { font: { size: 11 }, callback: v => fmtCurrency(v) }
+                                ticks: { font: { size: 11 }, callback: v => fmtCurrency(v, userCurrency) }
                             }
                         }
                     }
