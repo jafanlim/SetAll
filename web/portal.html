@@ -152,26 +152,46 @@
                         <span class="text-xs text-slate-500 font-medium">Personal · last 30 days</span>
                     </div>
                     <!-- Summary Cards -->
+                    <!-- Net Worth Hero (mirrors app Dashboard top card) -->
+                    <div class="glass-card rounded-2xl p-6">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="w-2 h-2 rounded-full bg-brand-teal inline-block"></span>
+                            <span class="text-slate-400 text-sm font-medium">Net Worth</span>
+                        </div>
+                        <p id="stat-networth" class="text-4xl font-extrabold text-brand-teal tracking-tight mb-1"><span class="inline-block w-32 h-10 bg-slate-800 animate-pulse rounded-lg"></span></p>
+                        <p id="stat-networth-label" class="text-slate-500 text-xs mb-4">Combined wallet + shared balance</p>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div class="bg-purple-500/10 border border-purple-500/20 rounded-xl p-3">
+                                <p class="text-xs text-slate-400 mb-1">Wallet Cash</p>
+                                <p id="stat-walletcash" class="text-base font-bold text-purple-300"><span class="inline-block w-16 h-5 bg-slate-800 animate-pulse rounded"></span></p>
+                            </div>
+                            <div class="bg-brand-teal/10 border border-brand-teal/20 rounded-xl p-3">
+                                <p class="text-xs text-slate-400 mb-1">Shared Balance</p>
+                                <p id="stat-shared" class="text-base font-bold text-brand-teal"><span class="inline-block w-16 h-5 bg-slate-800 animate-pulse rounded"></span></p>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Spending + Income row -->
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div class="glass-card rounded-2xl p-6">
                             <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-brand-teal/10 border border-brand-teal/20 flex items-center justify-center">
-                                    <i data-lucide="wallet" class="w-4 h-4 text-brand-teal"></i>
-                                </div>
-                                <span class="text-slate-400 text-sm font-medium">Cash Position</span>
-                            </div>
-                            <p id="stat-wallet" class="text-3xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
-                            <p id="stat-wallet-label" class="text-xs text-slate-500 mt-1">Net: (owed to you) − (you owe)</p>
-                        </div>
-                        <div class="glass-card rounded-2xl p-6">
-                            <div class="flex items-center gap-3 mb-4">
-                                <div class="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center">
-                                    <i data-lucide="users" class="w-4 h-4 text-purple-400"></i>
+                                <div class="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center">
+                                    <i data-lucide="trending-down" class="w-4 h-4 text-red-400"></i>
                                 </div>
                                 <span class="text-slate-400 text-sm font-medium">Personal Spending</span>
                             </div>
-                            <p id="stat-group" class="text-3xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
-                            <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Personal wallet expenses</p>
+                            <p id="stat-group" class="text-2xl font-extrabold text-white tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
+                            <p id="stat-group-label" class="text-xs text-slate-500 mt-1">Expenses, last 30 days</p>
+                        </div>
+                        <div class="glass-card rounded-2xl p-6">
+                            <div class="flex items-center gap-3 mb-4">
+                                <div class="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center">
+                                    <i data-lucide="trending-up" class="w-4 h-4 text-green-400"></i>
+                                </div>
+                                <span class="text-slate-400 text-sm font-medium">Income</span>
+                            </div>
+                            <p id="stat-income" class="text-2xl font-extrabold text-green-400 tracking-tight"><span class="inline-block w-24 h-8 bg-slate-800 animate-pulse rounded-lg"></span></p>
+                            <p id="stat-income-label" class="text-xs text-slate-500 mt-1">Income, last 30 days</p>
                         </div>
                     </div>
                     <!-- Charts -->
@@ -439,14 +459,12 @@
             return sign + abs.toFixed(2) + ' ' + code;
         }
 
-        function renderDashboard(iOweUsd, owedMeUsd, walletTotal) {
+        function renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash) {
             const rate = window.exchangeRate || 1;
             const cur  = window.userCurrency  || 'USD';
-            const netPositionUsd = owedMeUsd - iOweUsd;
-            const netPosition    = netPositionUsd * rate;
+            const sharedBalance = (owedMeUsd - iOweUsd) * rate;
+            const netWorth      = walletCash + sharedBalance;
 
-            // fmt: walletTotal is already in local currency; netPosition is USD*rate.
-            // Zero-decimal currencies (VND, JPY, etc.) never show fractions.
             const fmt = (val) => {
                 const isZeroDec = ['VND','JPY','KRW','IDR','LKR'].includes(cur);
                 const abs  = Math.abs(val);
@@ -457,22 +475,42 @@
                         : abs.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                 ) + '\u00a0' + cur;
             };
+            const setTxt = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
 
-            const walletEl    = document.getElementById('stat-wallet');
-            const walletLabel = document.getElementById('stat-wallet-label');
-            if (walletEl) {
-                walletEl.textContent = fmt(netPosition);
-                walletEl.className   = 'text-3xl font-extrabold tracking-tight ' +
-                    (netPosition >= 0 ? 'text-brand-teal' : 'text-red-400');
+            // Net Worth hero
+            const nwEl = document.getElementById('stat-networth');
+            if (nwEl) {
+                nwEl.textContent = fmt(netWorth);
+                nwEl.className   = 'text-4xl font-extrabold tracking-tight mb-1 ' +
+                    (netWorth >= 0 ? 'text-brand-teal' : 'text-red-400');
             }
-            if (walletLabel) walletLabel.textContent = netPosition >= 0
-                ? `You are owed across all groups (${cur})`
-                : `You owe across all groups (${cur})`;
+            setTxt('stat-networth-label', netWorth >= 0 ? 'You are in the green' : 'Deficit position');
 
+            // Wallet Cash sub-stat
+            const wcEl = document.getElementById('stat-walletcash');
+            if (wcEl) {
+                wcEl.textContent = fmt(walletCash);
+                wcEl.className   = 'text-base font-bold ' + (walletCash >= 0 ? 'text-purple-300' : 'text-red-400');
+            }
+
+            // Shared Balance sub-stat
+            const sbEl = document.getElementById('stat-shared');
+            if (sbEl) {
+                sbEl.textContent = (sharedBalance >= 0 ? '+' : '') + fmt(sharedBalance);
+                sbEl.className   = 'text-base font-bold ' + (sharedBalance >= 0 ? 'text-brand-teal' : 'text-red-400');
+            }
+
+            // Personal Spending (expenses only)
             const groupEl    = document.getElementById('stat-group');
             const groupLabel = document.getElementById('stat-group-label');
             if (groupEl) groupEl.textContent = fmt(walletTotal);
-            if (groupLabel) groupLabel.textContent = `Personal expenses, last 30 days (${cur})`;
+            if (groupLabel) groupLabel.textContent = `Expenses, last 30 days (${cur})`;
+
+            // Income
+            const incEl    = document.getElementById('stat-income');
+            const incLabel = document.getElementById('stat-income-label');
+            if (incEl) incEl.textContent = fmt(incomeTotal);
+            if (incLabel) incLabel.textContent = `Income, last 30 days (${cur})`;
         }
 
         function showPwBanner(msg, isError) {
@@ -540,7 +578,7 @@
                 const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
                     sb.from('profiles').select('*').eq('id', userId).maybeSingle(),
                     sb.from('expenses')
-                      .select('category, amount, currency, universal_usd_amount, created_at')
+                      .select('category, amount, currency, universal_usd_amount, created_at, is_income')
                       .eq('payer_id', userId)
                       .is('group_id', null)
                       .gte('created_at', since),
@@ -601,21 +639,27 @@
                         : parseFloat(r.amount || 0);
                 };
 
+                // ── Split by type (is_income flag) ─────────────────────────────
+                const onlyExpenses = personalExp.filter(r => !r.is_income);
+                const onlyIncome   = personalExp.filter(r =>  r.is_income);
+
                 // ── Compute summary values ────────────────────────────────────
-                const walletTotal = personalExp.reduce((s, r) => s + baseAmt(r), 0);
+                const walletTotal = onlyExpenses.reduce((s, r) => s + baseAmt(r), 0);
+                const incomeTotal = onlyIncome.reduce((s, r)   => s + baseAmt(r), 0);
+                const walletCash  = incomeTotal - walletTotal;
                 const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
                 const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
 
-                // ── Category map ─────────────────────────────────────────────
+                // ── Category map (expenses only) ──────────────────────────────
                 const catMap = {};
-                personalExp.forEach(r => {
+                onlyExpenses.forEach(r => {
                     const cat = r.category || 'Uncategorized';
                     catMap[cat] = (catMap[cat] || 0) + baseAmt(r);
                 });
 
-                // ── 30-day trend (fill missing days as 0) ────────────────────
+                // ── 30-day trend (expenses only) ───────────────────────────
                 const trendMap = {};
-                personalExp.forEach(r => {
+                onlyExpenses.forEach(r => {
                     const day = r.created_at ? r.created_at.slice(0, 10) : null;
                     if (day) trendMap[day] = (trendMap[day] || 0) + baseAmt(r);
                 });
@@ -629,7 +673,7 @@
                 }
 
                 // ── Update summary cards ─────────────────────────────────────
-                renderDashboard(iOweUsd, owedMeUsd, walletTotal);
+                renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash);
 
                 // ── Render charts ────────────────────────────────────────────
                 const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -637,8 +681,8 @@
                 window.statsLoaded = true;
             } catch (err) {
                 console.error('fetchPortalStats:', err);
-                document.getElementById('stat-wallet').textContent = 'Error';
-                document.getElementById('stat-group').textContent  = 'Error';
+                document.getElementById('stat-networth').textContent = 'Error';
+                document.getElementById('stat-group').textContent   = 'Error';
                 // DO NOT retry — log and stop
             } finally {
                 window.fetchInProgress = false;
