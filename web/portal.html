@@ -394,7 +394,8 @@
 
                 // ── STEP 1: Fetch profile FIRST to get currency before any rendering ──
                 const profileRes = await sb.from('profiles').select('default_currency').eq('id', userId).single();
-                window.userCurrency = profileRes.data?.default_currency || 'USD';
+                // Prefer: profile field > localStorage (seeded on previous visit) > 'USD'
+                window.userCurrency = profileRes.data?.default_currency || window.userCurrency || 'USD';
                 try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
 
                 // ── STEP 2: Fetch exchange rate before fetching financial data ────────
