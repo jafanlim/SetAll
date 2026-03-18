@@ -440,13 +440,18 @@
         async function callAiAnalyst(userText) {
             const s = getStats();
             const cur = window.userCurrency || 'USD';
+            const rate = window.exchangeRate || 1;
             const zeroDec = ['VND','JPY','KRW','IDR','LKR'];
-            const fmtAmt = (v) => zeroDec.includes(cur)
-                ? Math.round(v).toLocaleString('en-US') + ' ' + cur
-                : v.toFixed(2) + ' ' + cur;
-            const topCats = s.cats.slice(0, 6).map(c => `${c.name}: ${fmtAmt(c.value)}`).join(', ');
+            // appData.amount and getStats() values are in USD — convert to local for display
+            const fmtLocal = (usdVal) => {
+                const v = parseFloat(usdVal) * rate;
+                return zeroDec.includes(cur)
+                    ? Math.round(v).toLocaleString('en-US') + ' ' + cur
+                    : v.toFixed(2) + ' ' + cur;
+            };
+            const topCats = s.cats.slice(0, 6).map(c => `${c.name}: ${fmtLocal(c.value)}`).join(', ');
             const recentRows = appData.slice(-20).map(d =>
-                `${d.date} | ${d.category} | ${d.type} | ${fmtAmt(d.amount)}`
+                `${d.date} | ${d.category} | ${d.type} | ${fmtLocal(d.amount)}`
             ).join('\n');
 
             // Hash-based cache — skip API call for identical dataset + question
@@ -465,7 +470,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: `User question: ${userText}\n\nFinancial context (currency: ${cur}):\nTotal Spending: ${fmtAmt(s.exp)}\nDaily Burn: ${fmtAmt(s.burn)}\nTotal Income: ${fmtAmt(s.income)}\nNet: ${fmtAmt(s.net)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
+                    query: `User question: ${userText}\n\nFinancial context (currency: ${cur}):\nTotal Spending: ${fmtLocal(s.exp)}\nDaily Burn: ${fmtLocal(parseFloat(s.burn))}\nTotal Income: ${fmtLocal(s.income)}\nNet: ${fmtLocal(s.net)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
                 })
             });
 

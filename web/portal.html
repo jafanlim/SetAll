@@ -519,8 +519,8 @@
             // Group Spending
             const grpEl    = document.getElementById('stat-grpspend');
             const grpLabel = document.getElementById('stat-grpspend-label');
-            if (grpEl) grpEl.textContent = fmt(grpTotal || 0);
-            if (grpLabel) grpLabel.textContent = `Group expenses paid (${cur})`;
+            if (grpEl) grpEl.textContent = fmt(Math.max(0, grpTotal || 0));
+            if (grpLabel) grpLabel.textContent = `Your share of group expenses (${cur})`;
 
             // Income
             const incEl    = document.getElementById('stat-income');
@@ -609,9 +609,10 @@
                       .eq('user_id', userId)
                       .neq('expenses.payer_id', userId),
                     sb.from('splits')
-                      .select('universal_usd_owed, expenses!inner(payer_id)')
+                      .select('universal_usd_owed, expenses!inner(payer_id, created_at)')
                       .neq('user_id', userId)
-                      .eq('expenses.payer_id', userId),
+                      .eq('expenses.payer_id', userId)
+                      .gte('expenses.created_at', since),
                 ]);
 
                 if (expRes.error)    { console.error('expenses query failed:', expRes.error); return; }
@@ -674,8 +675,9 @@
                 const iOweUsd     = iOweSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
                 const owedMeUsd   = owedMeSplits.reduce((s, r) => s + parseFloat(r.universal_usd_owed || 0), 0);
 
-                // Group spending total
-                const grpTotal = groupExp.reduce((s, r) => s + baseAmt(r), 0);
+                // Group spending: gross paid minus others' shares = user's own net share
+                const grpTotal    = groupExp.reduce((s, r) => s + baseAmt(r), 0);
+                const netGrpTotal = grpTotal - owedMeUsd * rate;
 
                 // ── Category map (personal + group expenses) ────────────────────
                 const catMap = {};
@@ -700,7 +702,7 @@
                 }
 
                 // ── Update summary cards ─────────────────────────────────────
-                renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash, grpTotal);
+                renderDashboard(iOweUsd, owedMeUsd, walletTotal, incomeTotal, walletCash, netGrpTotal);
 
                 // ── Render charts ────────────────────────────────────────────
                 const categoryData = Object.entries(catMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
