@@ -207,7 +207,7 @@
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, amount')
+                    .select('created_at, category, amount, currency')
                     .eq('payer_id', window.currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
@@ -222,6 +222,12 @@
                         amount:   parseFloat(r.amount ?? 0),
                         type:     'expense'
                     }));
+                    // Infer currency from actual expense rows — overrides any poisoned localStorage value
+                    const expCurrency = rows.find(r => r.currency)?.currency;
+                    if (expCurrency) {
+                        window.userCurrency = expCurrency;
+                        try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
+                    }
                     chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
                 } else {
                     chatMessages[0].text = `Welcome! I couldn't find any personal wallet expenses in the last 90 days. Add some expenses in the SetAll app and come back — the canvas will populate automatically.`;
@@ -388,20 +394,36 @@
 
         window.handleSliceClick = (name, value, pct) => {
             if (isEditMode) return;
-            triggerAiResponse(`I clicked on the ${name} slice — $${value.toFixed(2)}, ${pct.toFixed(1)}% of my spending. What does this tell you?`);
+            const cur = window.userCurrency || 'USD';
+            const zeroDec = ['VND','JPY','KRW','IDR','LKR'];
+            const fmtVal = zeroDec.includes(cur)
+                ? Math.round(value).toLocaleString('en-US') + ' ' + cur
+                : value.toFixed(2) + ' ' + cur;
+            triggerAiResponse(`I clicked on the ${name} slice — ${fmtVal}, ${pct.toFixed(1)}% of my spending. What does this tell you?`);
         };
 
         window.handleBarClick = (type, value, label) => {
             if (isEditMode || value === 0) return;
-            triggerAiResponse(`What can you tell me about my ${type.toLowerCase()} of $${value.toFixed(2)} on ${label}?`);
+            const cur = window.userCurrency || 'USD';
+            const zeroDec = ['VND','JPY','KRW','IDR','LKR'];
+            const localVal = value * (window.exchangeRate || 1);
+            const fmtVal = zeroDec.includes(cur)
+                ? Math.round(localVal).toLocaleString('en-US') + ' ' + cur
+                : localVal.toFixed(2) + ' ' + cur;
+            triggerAiResponse(`What can you tell me about my ${type.toLowerCase()} of ${fmtVal} on ${label}?`);
         };
 
         // ── AI Engine ────────────────────────────────────────────────────────
         async function callAiAnalyst(userText) {
             const s = getStats();
-            const topCats = s.cats.slice(0, 6).map(c => `${c.name}: $${c.value.toFixed(2)}`).join(', ');
+            const cur = window.userCurrency || 'USD';
+            const zeroDec = ['VND','JPY','KRW','IDR','LKR'];
+            const fmtAmt = (v) => zeroDec.includes(cur)
+                ? Math.round(v).toLocaleString('en-US') + ' ' + cur
+                : v.toFixed(2) + ' ' + cur;
+            const topCats = s.cats.slice(0, 6).map(c => `${c.name}: ${fmtAmt(c.value)}`).join(', ');
             const recentRows = appData.slice(-20).map(d =>
-                `${d.date} | ${d.category} | ${d.type} | $${d.amount.toFixed(2)}`
+                `${d.date} | ${d.category} | ${d.type} | ${fmtAmt(d.amount)}`
             ).join('\n');
 
             // Hash-based cache — skip API call for identical dataset + question
@@ -420,7 +442,7 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    query: `User question: ${userText}\n\nFinancial context:\nTotal Spending: $${s.exp.toFixed(2)}\nDaily Burn: $${s.burn}\nTotal Income: $${s.income.toFixed(2)}\nNet: $${s.net.toFixed(2)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
+                    query: `User question: ${userText}\n\nFinancial context (currency: ${cur}):\nTotal Spending: ${fmtAmt(s.exp)}\nDaily Burn: ${fmtAmt(s.burn)}\nTotal Income: ${fmtAmt(s.income)}\nNet: ${fmtAmt(s.net)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
                 })
             });
 

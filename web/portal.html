@@ -392,34 +392,13 @@
                 const userId = window.currentUser.id;
                 const since  = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-                // ── STEP 1: Fetch profile FIRST to get currency before any rendering ──
-                const profileRes = await sb.from('profiles').select('default_currency').eq('id', userId).single();
-                // Prefer: profile field > localStorage (seeded on previous visit) > 'USD'
-                window.userCurrency = profileRes.data?.default_currency || window.userCurrency || 'USD';
-                try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
-
-                // ── STEP 2: Fetch exchange rate before fetching financial data ────────
-                window.exchangeRate = 1;
-                if (window.userCurrency !== 'USD') {
-                    try {
-                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
-                        if (rateRes.ok) {
-                            const rateJson = await rateRes.json();
-                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
-                        }
-                    } catch (_) {}
-                    // Hardcoded fallbacks only if Frankfurter didn't return a valid rate
-                    if (window.exchangeRate === 1) {
-                        const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
-                        window.exchangeRate = fallbackRates[window.userCurrency] || 1;
-                    }
-                }
-                console.log(`[Portal] currency=${window.userCurrency} exchangeRate=${window.exchangeRate}`);
-
-                // ── STEP 3: Fire remaining queries in parallel ────────────────────────
-                const [expRes, iOweRes, owedMeRes] = await Promise.all([
+                // ── Fetch profile + all financial data in one parallel call ──────────
+                // currency comes from expense rows — never rely on localStorage (may be
+                // poisoned with 'USD' from a prior session where profile field was null).
+                const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
+                    sb.from('profiles').select('default_currency').eq('id', userId).single(),
                     sb.from('expenses')
-                      .select('category, amount, created_at')
+                      .select('category, amount, currency, created_at')
                       .eq('payer_id', userId)
                       .is('group_id', null)
                       .gte('created_at', since),
@@ -440,6 +419,30 @@
                 const personalExp  = expRes.data || [];
                 const iOweSplits   = iOweRes.data || [];
                 const owedMeSplits = owedMeRes.data || [];
+
+                // ── Determine currency: profile field → first expense row → 'USD' ─────
+                const profileCurrency = profileRes.data?.default_currency;
+                const expCurrency     = personalExp.find(r => r.currency)?.currency;
+                window.userCurrency   = profileCurrency || expCurrency || 'USD';
+                try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
+
+                // ── Exchange rate (only needed for USD-denominated split amounts) ──────
+                window.exchangeRate = 1;
+                if (window.userCurrency !== 'USD') {
+                    try {
+                        const rateRes = await fetch(`https://api.frankfurter.dev/latest?from=USD&to=${window.userCurrency}`);
+                        if (rateRes.ok) {
+                            const rateJson = await rateRes.json();
+                            window.exchangeRate = rateJson.rates?.[window.userCurrency] || 1;
+                        }
+                    } catch (_) {}
+                    if (window.exchangeRate === 1) {
+                        const fallbackRates = { VND: 25000, GEL: 2.65, KRW: 1350, IDR: 15800, LKR: 300 };
+                        window.exchangeRate = fallbackRates[window.userCurrency] || 1;
+                    }
+                }
+                console.log(`[Portal] currency=${window.userCurrency} (profile=${profileCurrency}, exp=${expCurrency}) rate=${window.exchangeRate}`);
+
 
                 // ── Compute summary values ───────────────────────────────────
                 // universal_usd_owed is in USD — convert to local for display
