@@ -51,8 +51,8 @@ Rules:
 - Respond in plain conversational text. No bullet points unless explicitly asked.`;
 
     const generationConfig = isCanvas
-      ? { temperature: 0.2, maxOutputTokens: 2048 }
-      : { temperature: 0.9, maxOutputTokens: 700 };
+      ? { temperature: 0.2, maxOutputTokens: 8192 }
+      : { temperature: 0.9, maxOutputTokens: 1024 };
 
     const safetySettings = [
       { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
@@ -76,11 +76,15 @@ Rules:
     );
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify({ summary: "Quota reached — too many requests. Try again in a few hours." }), mode }) };
-      }
       const errText = await response.text();
-      throw new Error(`Gemini API ${response.status}: ${errText.slice(0, 300)}`);
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-requests');
+        const waitMsg = retryAfter ? ` Retry after ${retryAfter}s.` : ' Try again in a moment.';
+        let detail = '';
+        try { detail = JSON.parse(errText)?.error?.message || ''; } catch (_) {}
+        throw new Error(`Rate limited (429).${waitMsg}${detail ? ' ' + detail : ''}`);
+      }
+      throw new Error(`Gemini API ${response.status}: ${errText.slice(0, 400)}`);
     }
 
     const result  = await response.json();
