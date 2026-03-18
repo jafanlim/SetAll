@@ -40,7 +40,7 @@ class SettlementEngine {
   /// [currency]: the display currency label for returned [SettlementTransaction]s.
   /// [expenses]: raw expense maps, each containing at minimum:
   ///   { id, group_id, payer_id, amount (string), currency (string),
-  ///     base_amount_at_entry (string|null) }
+  ///     universal_usd_amount (string|null) }
   /// [splits]: [SplitModel] list with [universalUsdOwed] populated.
   ///
   /// Returns a minimal list of [SettlementTransaction]s that fully settles the group.
@@ -63,7 +63,7 @@ class SettlementEngine {
 
     for (final expense in groupExpenses) {
       final payerId = expense['payer_id'] as String;
-      final baseStr = expense['base_amount_at_entry']?.toString();
+      final baseStr = expense['universal_usd_amount']?.toString();
       final baseAmount =
           baseStr != null ? Decimal.tryParse(baseStr) : null;
       final amount = baseAmount ?? _parseDecimal(expense['amount']);

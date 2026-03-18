@@ -246,16 +246,17 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
     final ok = await repo.deleteGroups(_selected.toList());
     if (!mounted) return;
     setState(() => _batchDeleting = false);
-    if (ok) {
-      HapticUtils.success();
-      ref.invalidate(myGroupsProvider);
-      ref.invalidate(balanceSummaryProvider);
-      ref.invalidate(recentExpensesProvider);
-      setState(() {
-        _editMode = false;
-        _selected.clear();
-      });
-    } else {
+    // Always refresh — some deletes may have succeeded even if not all did.
+    HapticUtils.success();
+    ref.invalidate(myGroupsProvider);
+    ref.invalidate(balanceSummaryProvider);
+    ref.invalidate(recentExpensesProvider);
+    ref.invalidate(allGroupMembersBatchProvider);
+    setState(() {
+      _editMode = false;
+      _selected.clear();
+    });
+    if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('groups_screen.error_delete'.tr())),
       );
@@ -1205,7 +1206,10 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
   @override
   Widget build(BuildContext context) {
     final theme        = Theme.of(context);
-    final membersAsync = ref.watch(groupMembersProvider(widget.group.id));
+    final allMembersMap = ref.watch(allGroupMembersBatchProvider);
+    final membersAsync  = allMembersMap.whenData(
+      (map) => map[widget.group.id] ?? [],
+    );
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(widget.group.id));
 
     final group       = widget.group;

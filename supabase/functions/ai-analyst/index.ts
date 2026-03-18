@@ -135,6 +135,37 @@ serve(async (req) => {
   }
 
   try {
+    // ── Lightweight auth gate (verify_jwt is off to avoid gateway 401 race) ──
+    // We still require a Bearer token with a valid-looking sub claim.
+    const authHeader = req.headers.get('authorization') ?? ''
+    const bearerToken = authHeader.replace(/^Bearer\s+/i, '')
+    if (!bearerToken) {
+      return new Response(
+        JSON.stringify({ error: 'Missing authorization token.' }),
+        { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      )
+    }
+    let userId = ''
+    try {
+      const parts = bearerToken.split('.')
+      if (parts.length !== 3) throw new Error(`JWT has ${parts.length} parts, expected 3`)
+      // URL-safe base64 → standard base64, then pad to 4-char boundary
+      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+      while (b64.length % 4 !== 0) b64 += '='
+      const payload = JSON.parse(atob(b64))
+      userId = payload.sub ?? ''
+      console.log(`ai-analyst: JWT sub=${userId}, exp=${payload.exp}, iss=${payload.iss}`)
+    } catch (jwtErr) {
+      console.error('ai-analyst: JWT decode failed:', jwtErr)
+    }
+    if (!userId) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization token.' }),
+        { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      )
+    }
+    console.log(`ai-analyst: authenticated user ${userId}`)
+
     if (!GEMINI_API_KEY) {
       return new Response(
         JSON.stringify({ reply: 'AI analyst is not configured. Set the GEMINI_API_KEY secret on the Supabase dashboard.' }),

@@ -14,9 +14,7 @@ class SplitModel extends Split {
       id: json['id'] as String,
       expenseId: json['expense_id'] as String,
       userId: json['user_id'] as String,
-      // Support both the new column name (universal_usd_owed, schema v8+) and
-      // the old name (amount_owed) for DBs not yet migrated via 20260220110135.
-      universalUsdOwed: (json['universal_usd_owed'] ?? json['amount_owed'] ?? '0').toString(),
+      universalUsdOwed: (json['universal_usd_owed'] ?? '0').toString(),
       entryAmountOwed: json['entry_amount_owed']?.toString(),
     );
   }

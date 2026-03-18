@@ -70,8 +70,8 @@ Map<String, dynamic> _expense({
       'payer_id': payerId,
       'amount': amount,
       'currency': currency,
-      // Engine reads this key directly from the map
-      'base_amount_at_entry': baseAmountAtEntry,
+      // Engine reads this key directly from the map (renamed in schema v8)
+      'universal_usd_amount': baseAmountAtEntry,
     };
 
 /// Build a SplitModel as the engine expects.

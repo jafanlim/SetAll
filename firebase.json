@@ -1,27 +1,4 @@
 {
-  "hosting": {
-    "site": "setall-web",
-    "public": "build/web",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
-    "rewrites": [
-      { "source": "/login",    "destination": "/login.html"    },
-      { "source": "/portal",   "destination": "/portal.html"   },
-      { "source": "/insights", "destination": "/insights.html" },
-      { "source": "/download", "destination": "/download.html" },
-      { "source": "/support",  "destination": "/support.html"  },
-      { "source": "/privacy",  "destination": "/privacy.html"  },
-      { "source": "/terms",    "destination": "/terms.html"    },
-      { "source": "/app/**",   "destination": "/app.html"      },
-      { "source": "/app",      "destination": "/app.html"      },
-      { "source": "**",        "destination": "/index.html"    }
-    ],
-    "headers": [
-      {
-        "source": "/**",
-        "headers": [{"key": "Cache-Control", "value": "no-cache, no-store, must-revalidate"}]
-      }
-    ]
-  },
   "flutter": {
     "platforms": {
       "dart": {

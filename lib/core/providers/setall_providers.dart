@@ -244,6 +244,19 @@ final groupMembersProvider =
   return ref.watch(setAllRepositoryProvider).getGroupMembers(groupId);
 });
 
+/// Batch-loads all members for every currently visible group in a single
+/// Supabase round-trip (2 queries total instead of 2N).
+/// The groups list screen watches this instead of [groupMembersProvider]
+/// per tile to eliminate N+1 slowness.
+final allGroupMembersBatchProvider =
+    FutureProvider<Map<String, List<ProfileModel>>>((ref) async {
+  final groupsAsync = ref.watch(myGroupsProvider);
+  final groups      = groupsAsync.asData?.value ?? [];
+  final groupIds    = groups.map((g) => g.id).toList();
+  if (groupIds.isEmpty) return {};
+  return ref.watch(setAllRepositoryProvider).getGroupMembersBatch(groupIds);
+});
+
 /// Creator ID for a given group. Used to gate member-removal UI.
 final groupCreatorProvider =
     FutureProvider.family<String?, String>((ref, groupId) async {
@@ -298,18 +311,19 @@ final userCategoriesProvider = FutureProvider<List<Map<String, String>>>((ref) a
 
 /// All unique profiles from every group the current user belongs to.
 /// Used for fast-add member suggestions in group create/edit screens.
+/// Uses [getGroupMembersBatch] to avoid N+1 Supabase queries.
 final allGroupMembersProvider = FutureProvider<List<ProfileModel>>((ref) async {
   final groups = await ref.watch(myGroupsProvider.future);
   final repo   = ref.watch(setAllRepositoryProvider);
   final uid    = await repo.ensureUser();
+  final batchMap = await repo.getGroupMembersBatch(
+    groups.map((g) => g.id).toList(),
+  );
   final seen   = <String>{};
   final result = <ProfileModel>[];
-  for (final g in groups) {
-    final members = await repo.getGroupMembers(g.id);
+  for (final members in batchMap.values) {
     for (final m in members) {
-      if (m.id != uid && seen.add(m.id)) {
-        result.add(m);
-      }
+      if (m.id != uid && seen.add(m.id)) result.add(m);
     }
   }
   result.sort((a, b) => a.name.compareTo(b.name));

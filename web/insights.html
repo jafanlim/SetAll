@@ -6,16 +6,10 @@
     <title>Insights Hub | SetAll</title>
     <meta name="description" content="Your personal financial canvas — live data from your SetAll ledger.">
 
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    <link rel="stylesheet" href="/styles.css">
+    <script src="https://unpkg.com/lucide@0.460.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <script>
-        tailwind.config = {
-            theme: { extend: { colors: { brand: { deep: '#0F172A', slate: '#0F172A', teal: '#14B8A6', purple: '#8B5CF6', orange: '#F97316' } } } }
-        }
-    </script>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -115,13 +109,19 @@
     </div>
 
     <script>
-        // ── Supabase ─────────────────────────────────────────────────────────
+        // ── Global State (window scope) ────────────────────────────────────
         const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
         const SUPABASE_ANON = 'REDACTED_JWT';
         const { createClient } = supabase;
         const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
-        let currentUser = null;
+        window.currentUser     = null;
+        window.userCurrency    = 'USD';
+        window.exchangeRate    = 1;
+        window.fetchInProgress = false;
+
+        // ── UI-First: render icons BEFORE any async ─────────────────────────
+        lucide.createIcons();
 
         // ── Widget Layout Persistence ─────────────────────────────────────────
         async function loadWidgetLayout() {
@@ -130,7 +130,7 @@
                 const { data: profile, error } = await sb
                     .from('profiles')
                     .select('widget_layout')
-                    .eq('id', currentUser.id)
+                    .eq('id', window.currentUser.id)
                     .single();
                 if (!error && profile?.widget_layout) {
                     const saved = JSON.parse(profile.widget_layout);
@@ -159,7 +159,7 @@
             // Best-effort sync to Supabase (requires widget_layout column on profiles)
             try {
                 await sb.from('profiles').upsert(
-                    { id: currentUser.id, widget_layout: payload },
+                    { id: window.currentUser.id, widget_layout: payload },
                     { onConflict: 'id' }
                 );
             } catch (_) {}
@@ -172,25 +172,29 @@
                 window.location.href = '/login?next=/insights';
                 return;
             }
-            currentUser = session.user;
-            await loadLiveData();
-            await loadWidgetLayout();
+            window.currentUser = session.user;
+            try { await loadLiveData(); } catch (e) { console.error('loadLiveData failed:', e); }
+            try { await loadWidgetLayout(); } catch (e) { console.error('loadWidgetLayout failed:', e); }
             document.getElementById('auth-gate').style.display = 'none';
             document.getElementById('main-app').style.display  = 'block';
-            renderHeader();
-            renderWidgets();
-            renderChat();
-            lucide.createIcons();
+            try {
+                renderHeader();
+                renderWidgets();
+                renderChat();
+                lucide.createIcons();
+            } catch (e) { console.error('UI render error:', e); }
         })();
 
         // ── Live Data Fetch ──────────────────────────────────────────────────
         async function loadLiveData() {
+            if (window.fetchInProgress) return;
+            window.fetchInProgress = true;
             try {
                 const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
                 const { data: rows, error } = await sb
                     .from('expenses')
-                    .select('created_at, category, amount, base_amount_at_entry')
-                    .eq('payer_id', currentUser.id)
+                    .select('created_at, category, amount')
+                    .eq('payer_id', window.currentUser.id)
                     .is('group_id', null)
                     .gte('created_at', since)
                     .order('created_at', { ascending: true });
@@ -201,7 +205,7 @@
                     appData = rows.map(r => ({
                         date:     r.created_at ? r.created_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
                         category: r.category || 'Uncategorized',
-                        amount:   parseFloat(r.base_amount_at_entry ?? r.amount ?? 0),
+                        amount:   parseFloat(r.amount ?? 0),
                         type:     'expense'
                     }));
                     chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
@@ -211,6 +215,9 @@
             } catch (err) {
                 console.warn('Supabase fetch failed, using demo data:', err);
                 chatMessages[0].text = `Canvas is running on demo data (couldn't connect to your ledger). Try signing out and back in if this persists.`;
+                // DO NOT retry — log and stop
+            } finally {
+                window.fetchInProgress = false;
             }
         }
 
@@ -395,35 +402,11 @@
                 .slice(-10)
                 .map(m => ({ role: m.role === 'user' ? 'user' : 'assistant', content: m.text }));
 
-            // Force token refresh — getSession() may return a stale token
-            let jwt = null;
-            try {
-                const { data: refreshed } = await sb.auth.refreshSession();
-                jwt = refreshed?.session?.access_token ?? null;
-            } catch (_) {
-                const { data: { session } } = await sb.auth.getSession();
-                jwt = session?.access_token ?? null;
-            }
-            if (!jwt) throw new Error('No active session — please sign in again.');
-
-            const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-analyst`, {
+            const res = await fetch('/.netlify/functions/ai-analyst', {
                 method: 'POST',
-                headers: {
-                    'Content-Type':  'application/json',
-                    'apikey':        SUPABASE_ANON,
-                    'Authorization': `Bearer ${jwt}`
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    message: userText,
-                    history,
-                    context: {
-                        totalSpending:  s.exp,
-                        dailyBurn:      parseFloat(s.burn),
-                        totalIncome:    s.income,
-                        net:            s.net,
-                        topCategories:  topCats,
-                        recentRows
-                    }
+                    query: `User question: ${userText}\n\nFinancial context:\nTotal Spending: $${s.exp.toFixed(2)}\nDaily Burn: $${s.burn}\nTotal Income: $${s.income.toFixed(2)}\nNet: $${s.net.toFixed(2)}\nTop Categories: ${topCats}\n\nRecent transactions:\n${recentRows}\n\nChat history (last 10):\n${history.map(m => m.role + ': ' + m.content).join('\n')}`
                 })
             });
 
@@ -553,9 +536,15 @@
 
             try {
                 const data = await callAiAnalyst(userText);
-                const structured = data?.structured;
                 let summaryText = '';
                 let fullHtml    = '';
+
+                // Netlify function returns { report: "<json string>" }
+                // Legacy Supabase path returns { structured, reply }
+                let structured = data?.structured || null;
+                if (!structured && data?.report) {
+                    try { structured = JSON.parse(data.report); } catch (_) {}
+                }
 
                 if (structured && structured.summary) {
                     summaryText = structured.summary;
@@ -569,7 +558,9 @@
                     if (structured.chartData) renderAiChart(structured.chartData);
                     processStructuredActions(structured.actions);
                 } else {
-                    summaryText = processActions(data?.reply || 'No response from AI analyst.');
+                    // Plain text fallback: use report string or reply
+                    const rawText = data?.report || data?.reply || 'No response from AI analyst.';
+                    summaryText = processActions(rawText);
                     fullHtml    = summaryText;
                 }
 
@@ -604,7 +595,7 @@
                 if (!error) {
                     const { data: { user } } = await sb.auth.getUser();
                     if (user) {
-                        currentUser = user;
+                        window.currentUser = user;
                         await loadLiveData();
                         await loadWidgetLayout();
                         document.getElementById('auth-gate').style.display = 'none';
@@ -678,8 +669,8 @@
 
         // ── Renderers ────────────────────────────────────────────────────────
         function renderHeader() {
-            const name = currentUser
-                ? (currentUser.user_metadata?.full_name || currentUser.user_metadata?.name || currentUser.email?.split('@')[0] || 'User')
+            const name = window.currentUser
+                ? (window.currentUser.user_metadata?.full_name || window.currentUser.user_metadata?.name || window.currentUser.email?.split('@')[0] || 'User')
                 : 'User';
 
             document.getElementById('app-header').innerHTML = `

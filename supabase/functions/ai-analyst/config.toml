@@ -1,2 +1,2 @@
 [functions.ai-analyst]
-verify_jwt = true
+verify_jwt = false

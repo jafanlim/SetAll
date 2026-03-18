@@ -273,46 +273,40 @@ class SyncService {
 
     final pendingExpenses =
         await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
-    for (final row in pendingExpenses) {
-      try {
+    if (pendingExpenses.isNotEmpty) {
+      // Build all payloads in memory, then push in a single batch upsert.
+      final payloads = <Map<String, dynamic>>[];
+      for (final row in pendingExpenses) {
         final expense = ExpenseModel.fromJson(row);
-        // Strip local-only / schema-mismatched fields before sending to Supabase.
         final raw = expense.toJson()
           ..remove('created_by')
           ..remove('base_amount_at_entry');
-        // Remap is_income int→bool, coerce empty group_id to null,
-        // and clamp icon_color to signed INT4 (ARGB uint32 overflows Postgres INTEGER).
-        final payload = <String, dynamic>{
+        payloads.add(<String, dynamic>{
           ...raw,
           'is_income': expense.isIncome,
           'group_id': (raw['group_id'] as String?)?.isEmpty == true
               ? null
               : raw['group_id'],
           'icon_color': (raw['icon_color'] as int?)?.toSigned(32),
-        };
-        await _client.from('expenses').insert(payload);
-        await LocalDatabase.db.update(
-          'expenses',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
+        });
+      }
+      try {
+        debugPrint('[Sync] Starting Batch Push: ${payloads.length} expenses');
+        await _client.from('expenses').upsert(payloads);
+        debugPrint('[Sync] Batch Push Complete: expenses');
+        // Batch-mark all synced in a single SQLite transaction.
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await LocalDatabase.db.transaction((txn) async {
+          for (final row in pendingExpenses) {
+            await txn.update('expenses', {'synced_at': now},
+                where: 'id = ?', whereArgs: [row['id']]);
+          }
+        });
       } catch (e) {
-        if (e is PostgrestException && e.code == '23505') {
-          // Duplicate key: row is already in Supabase — mark synced locally.
-          debugPrint('[SyncService] expense already in cloud, marking synced: ${row['id']}');
-          await LocalDatabase.db.update(
-            'expenses',
-            {'synced_at': DateTime.now().millisecondsSinceEpoch},
-            where: 'id = ?',
-            whereArgs: [row['id']],
-          );
-        } else if (e is PostgrestException && e.code == '42501') {
-          // RLS policy violation — likely a transient auth issue (e.g. token
-          // not yet refreshed). Leave synced_at IS NULL so the next tick retries.
-          debugPrint('[SyncService] RLS ERROR on expense ${row['id']}, will retry: ${e.message}');
+        if (e is PostgrestException && e.code == '42501') {
+          debugPrint('[SyncService] RLS ERROR on expense batch, will retry: ${e.message}');
         } else {
-          debugPrint('[SyncService] expense push failed, will retry: $e');
+          debugPrint('[SyncService] expense batch push failed (${payloads.length} items): $e');
         }
       }
     }
@@ -322,30 +316,26 @@ class SyncService {
       INNER JOIN expenses e ON s.expense_id = e.id
       WHERE s.synced_at IS NULL AND e.synced_at IS NOT NULL
     ''');
-    for (final row in pendingSplits) {
+    if (pendingSplits.isNotEmpty) {
+      final payloads = pendingSplits
+          .map((row) => SplitModel.fromJson(row).toJson())
+          .toList();
       try {
-        final split = SplitModel.fromJson(row);
-        await _client.from('splits').insert(split.toJson());
-        await LocalDatabase.db.update(
-          'splits',
-          {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?',
-          whereArgs: [row['id']],
-        );
+        debugPrint('[Sync] Starting Batch Push: ${payloads.length} splits');
+        await _client.from('splits').upsert(payloads);
+        debugPrint('[Sync] Batch Push Complete: splits');
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await LocalDatabase.db.transaction((txn) async {
+          for (final row in pendingSplits) {
+            await txn.update('splits', {'synced_at': now},
+                where: 'id = ?', whereArgs: [row['id']]);
+          }
+        });
       } catch (e) {
-        if (e is PostgrestException && e.code == '23505') {
-          // Duplicate key: already in Supabase — mark synced.
-          await LocalDatabase.db.update(
-            'splits',
-            {'synced_at': DateTime.now().millisecondsSinceEpoch},
-            where: 'id = ?',
-            whereArgs: [row['id']],
-          );
-        } else if (e is PostgrestException && e.code == '42501') {
-          // RLS policy violation — likely transient. Leave synced_at NULL to retry.
-          debugPrint('[SyncService] RLS ERROR on split ${row['id']}, will retry: ${e.message}');
+        if (e is PostgrestException && e.code == '42501') {
+          debugPrint('[SyncService] RLS ERROR on split batch, will retry: ${e.message}');
         } else {
-          debugPrint('[SyncService] split push failed, will retry: $e');
+          debugPrint('[SyncService] split batch push failed (${payloads.length} items): $e');
         }
       }
     }
@@ -521,13 +511,13 @@ class SyncService {
       whereArgs: [uid],
     );
     debugPrint('[SyncService] reconciler: ${localPersonalRows.length} local synced personal expenses, ${cloudPersonalIds.length} in cloud');
-    for (final row in localPersonalRows) {
-      final eid = row['id'] as String;
-      final payerId = row['payer_id'] as String?;
-      if (!cloudPersonalIds.contains(eid)) {
-        debugPrint('[SyncService] reconciler: pruning orphan personal expense $eid payer=$payerId (not in cloud set)');
-        await LocalDatabase.db.delete('expenses', where: 'id = ?', whereArgs: [eid]);
-      }
+    final localPersonalIds = localPersonalRows.map((r) => r['id'] as String).toSet();
+    final orphanPersonalIds = localPersonalIds.difference(cloudPersonalIds);
+    if (orphanPersonalIds.isNotEmpty) {
+      debugPrint('[SyncService] reconciler: pruning ${orphanPersonalIds.length} orphan personal expenses');
+      final orphanList = orphanPersonalIds.toList();
+      final ph = orphanList.map((_) => '?').join(',');
+      await LocalDatabase.db.delete('expenses', where: 'id IN ($ph)', whereArgs: orphanList);
     }
 
     if (memberIds.isEmpty) return;
@@ -565,7 +555,7 @@ class SyncService {
           'is_deleted': 0,
           'icon_name':   map['icon_name']   ?? ex['icon_name'],
           'color_value': map['color_value'] ?? ex['color_value'],
-          'avatar_url':  map['avatar_url']  ?? ex['avatar_url'],
+          'avatar_url':  sanitizeAvatarUrl(map['avatar_url'] as String?) ?? sanitizeAvatarUrl(ex['avatar_url'] as String?),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -604,7 +594,7 @@ class SyncService {
             'id': m['id'],
             'name': m['name'] ?? '',
             'nickname': m['nickname'],
-            'avatar_url': m['avatar_url'],
+            'avatar_url': sanitizeAvatarUrl(m['avatar_url'] as String?),
             'is_ghost': (m['is_ghost'] == true) ? 1 : 0,
             'default_currency': m['default_currency'] ?? 'USD',
             'synced_at': DateTime.now().millisecondsSinceEpoch,
@@ -696,21 +686,23 @@ class SyncService {
     final orphanGroupIds = syncedLocalGroupIds
         .difference(cloudGroupIdSet)
         .difference(leftGroupIds);
-    for (final gid in orphanGroupIds) {
-      debugPrint('[SyncService] reconciler: pruning orphan group $gid');
-      // Cascade: delete expenses and splits for this group first.
-      final expRows = await LocalDatabase.db
-          .query('expenses', columns: ['id'], where: 'group_id = ?', whereArgs: [gid]);
-      for (final row in expRows) {
-        await LocalDatabase.db.delete(
-          'splits',
-          where: 'expense_id = ?',
-          whereArgs: [row['id']],
-        );
-      }
-      await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [gid]);
-      await LocalDatabase.db.delete('group_members', where: 'group_id = ?', whereArgs: [gid]);
-      await LocalDatabase.db.delete('groups', where: 'id = ?', whereArgs: [gid]);
+    if (orphanGroupIds.isNotEmpty) {
+      debugPrint('[SyncService] reconciler: pruning ${orphanGroupIds.length} orphan groups');
+      final orphanList = orphanGroupIds.toList();
+      final ph = orphanList.map((_) => '?').join(',');
+      await LocalDatabase.db.transaction((txn) async {
+        // Cascade: get expense IDs for orphan groups, delete their splits first
+        final expRows = await txn.query('expenses', columns: ['id'],
+            where: 'group_id IN ($ph)', whereArgs: orphanList);
+        if (expRows.isNotEmpty) {
+          final expIds = expRows.map((r) => r['id'] as String).toList();
+          final eph = expIds.map((_) => '?').join(',');
+          await txn.delete('splits', where: 'expense_id IN ($eph)', whereArgs: expIds);
+        }
+        await txn.delete('expenses', where: 'group_id IN ($ph)', whereArgs: orphanList);
+        await txn.delete('group_members', where: 'group_id IN ($ph)', whereArgs: orphanList);
+        await txn.delete('groups', where: 'id IN ($ph)', whereArgs: orphanList);
+      });
     }
 
     if (cloudGroupIds.isEmpty) return;
@@ -742,21 +734,27 @@ class SyncService {
         columns: ['id', 'group_id'],
         where: 'synced_at IS NOT NULL AND group_id IS NOT NULL',
       );
-      for (final row in localExpenses) {
-        final eid = row['id'] as String;
-        final gid = row['group_id'] as String?;
-        if (gid != null && softDeletedGroupIds.contains(gid)) continue;
-        if (!cloudExpenseIds.contains(eid)) {
-          debugPrint('[SyncService] reconciler: pruning orphan expense $eid');
-          await LocalDatabase.db.delete('splits', where: 'expense_id = ?', whereArgs: [eid]);
-          await LocalDatabase.db.delete('expenses', where: 'id = ?', whereArgs: [eid]);
-        }
+      // Set difference: find local expense IDs not in cloud (excluding soft-deleted groups)
+      final localExpenseIds = localExpenses
+          .where((row) {
+            final gid = row['group_id'] as String?;
+            return gid == null || !softDeletedGroupIds.contains(gid);
+          })
+          .map((row) => row['id'] as String)
+          .toSet();
+      final orphanExpenseIds = localExpenseIds.difference(cloudExpenseIds);
+      if (orphanExpenseIds.isNotEmpty) {
+        debugPrint('[SyncService] reconciler: pruning ${orphanExpenseIds.length} orphan expenses');
+        final orphanList = orphanExpenseIds.toList();
+        final ph = orphanList.map((_) => '?').join(',');
+        await LocalDatabase.db.transaction((txn) async {
+          await txn.delete('splits', where: 'expense_id IN ($ph)', whereArgs: orphanList);
+          await txn.delete('expenses', where: 'id IN ($ph)', whereArgs: orphanList);
+        });
       }
 
       // ── Splits ─────────────────────────────────────────────────────────────
-      // Any split whose expense_id is no longer in local DB is already gone
-      // (cascade above). Also remove splits for expenses that exist locally
-      // but whose split row was removed in Supabase.
+      // Set difference: find local split IDs not in cloud.
       if (cloudExpenseIds.isNotEmpty) {
         final cloudSplitRows = await _client
             .from('splits')
@@ -765,15 +763,15 @@ class SyncService {
         final cloudSplitIds =
             cloudSplitRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toSet();
 
-        // Same: only reconcile splits that have been confirmed in Supabase.
         final localSplits = await LocalDatabase.db.query(
           'splits', columns: ['id'], where: 'synced_at IS NOT NULL');
-        for (final row in localSplits) {
-          final sid = row['id'] as String;
-          if (!cloudSplitIds.contains(sid)) {
-            debugPrint('[SyncService] reconciler: pruning orphan split $sid');
-            await LocalDatabase.db.delete('splits', where: 'id = ?', whereArgs: [sid]);
-          }
+        final localSplitIds = localSplits.map((r) => r['id'] as String).toSet();
+        final orphanSplitIds = localSplitIds.difference(cloudSplitIds);
+        if (orphanSplitIds.isNotEmpty) {
+          debugPrint('[SyncService] reconciler: pruning ${orphanSplitIds.length} orphan splits');
+          final orphanList = orphanSplitIds.toList();
+          final ph = orphanList.map((_) => '?').join(',');
+          await LocalDatabase.db.delete('splits', where: 'id IN ($ph)', whereArgs: orphanList);
         }
       }
     } catch (e) {

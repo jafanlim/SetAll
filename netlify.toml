@@ -1,6 +1,13 @@
 [build]
   publish = "build/web"
 
+[functions]
+  node_bundler = "esbuild"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+# Security headers on everything
 [[headers]]
   for = "/*"
   [headers.values]
@@ -9,3 +16,10 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
     Content-Security-Policy = "upgrade-insecure-requests;"
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML files must revalidate so new deploys are picked up immediately
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"

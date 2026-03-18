@@ -4,7 +4,7 @@
 # Usage: CLOUDFLARE_TOKEN=<token> bash scripts/cloudflare_dns_setup.sh
 #
 # Adds all required DNS records for:
-#   - Firebase Hosting (A records for setall.app + www)
+#   - Netlify Hosting (A records for setall.app + www)
 #   - Resend mailing (SPF, DKIM, DMARC, MX)
 #
 # IMPORTANT: Before running, replace RESEND_DKIM_VALUE below with the
@@ -44,7 +44,7 @@ add() {
 }
 
 echo ""
-echo "=== Firebase Hosting — A records ==="
+echo "=== Netlify Hosting — A records ==="
 add "setall.app A 151.101.1.195"  '{"type":"A","name":"setall.app","content":"151.101.1.195","ttl":1,"proxied":false}'
 add "setall.app A 151.101.65.195" '{"type":"A","name":"setall.app","content":"151.101.65.195","ttl":1,"proxied":false}'
 add "www        A 151.101.1.195"  '{"type":"A","name":"www","content":"151.101.1.195","ttl":1,"proxied":false}'
