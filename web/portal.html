@@ -125,6 +125,24 @@
                             </div>
                         </div>
                     </div>
+
+                    <!-- Currency Setting (mirrors app Settings screen) -->
+                    <div class="glass-card rounded-3xl p-8">
+                        <h2 class="text-lg font-bold text-white mb-1 flex items-center gap-2">
+                            <i data-lucide="coins" class="w-5 h-5 text-brand-teal"></i> Default Currency
+                        </h2>
+                        <p class="text-slate-500 text-xs mb-5">Used for all financial displays. Synced with the SetAll app.</p>
+                        <div class="flex items-center gap-3">
+                            <select id="currency-select" class="flex-1 bg-[#0A1120] border border-brand-border rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-brand-teal/50 cursor-pointer">
+                                <option value="">Loading…</option>
+                            </select>
+                            <button onclick="saveCurrency()" id="currency-save-btn"
+                                class="px-5 py-2.5 rounded-xl bg-brand-teal text-brand-deep text-sm font-bold hover:bg-brand-teal/80 transition-colors disabled:opacity-50">
+                                Save
+                            </button>
+                        </div>
+                        <p id="currency-status" class="text-xs mt-2 hidden"></p>
+                    </div>
                 </section>
 
                 <!-- Section: Dashboard Stats -->
@@ -271,6 +289,128 @@
 
         const BRAND_PALETTE = ['#14B8A6', '#8B5CF6', '#F59E0B', '#EF4444', '#3B82F6'];
 
+        // ── Currency catalogue (mirrors kAllSupportedCurrencies in Dart) ─────
+        const CURRENCIES = [
+            {code:'USD',name:'US Dollar',flag:'🇺🇸'},{code:'EUR',name:'Euro',flag:'🇪🇺'},
+            {code:'GBP',name:'British Pound',flag:'🇬🇧'},{code:'GEL',name:'Georgian Lari',flag:'🇬🇪'},
+            {code:'AED',name:'UAE Dirham',flag:'🇦🇪'},{code:'TRY',name:'Turkish Lira',flag:'🇹🇷'},
+            {code:'PLN',name:'Polish Złoty',flag:'🇵🇱'},{code:'VND',name:'Vietnamese Dong',flag:'🇻🇳'},
+            {code:'AFN',name:'Afghan Afghani',flag:'🇦🇫'},{code:'ALL',name:'Albanian Lek',flag:'🇦🇱'},
+            {code:'AMD',name:'Armenian Dram',flag:'🇦🇲'},{code:'ARS',name:'Argentine Peso',flag:'🇦🇷'},
+            {code:'AUD',name:'Australian Dollar',flag:'🇦🇺'},{code:'AZN',name:'Azerbaijani Manat',flag:'🇦🇿'},
+            {code:'BDT',name:'Bangladeshi Taka',flag:'🇧🇩'},{code:'BGN',name:'Bulgarian Lev',flag:'🇧🇬'},
+            {code:'BHD',name:'Bahraini Dinar',flag:'🇧🇭'},{code:'BND',name:'Brunei Dollar',flag:'🇧🇳'},
+            {code:'BOB',name:'Bolivian Boliviano',flag:'🇧🇴'},{code:'BRL',name:'Brazilian Real',flag:'🇧🇷'},
+            {code:'BWP',name:'Botswanan Pula',flag:'🇧🇼'},{code:'BYN',name:'Belarusian Ruble',flag:'🇧🇾'},
+            {code:'CAD',name:'Canadian Dollar',flag:'🇨🇦'},{code:'CHF',name:'Swiss Franc',flag:'🇨🇭'},
+            {code:'CLP',name:'Chilean Peso',flag:'🇨🇱'},{code:'CNY',name:'Chinese Yuan',flag:'🇨🇳'},
+            {code:'COP',name:'Colombian Peso',flag:'🇨🇴'},{code:'CRC',name:'Costa Rican Colón',flag:'🇨🇷'},
+            {code:'CZK',name:'Czech Koruna',flag:'🇨🇿'},{code:'DKK',name:'Danish Krone',flag:'🇩🇰'},
+            {code:'DOP',name:'Dominican Peso',flag:'🇩🇴'},{code:'DZD',name:'Algerian Dinar',flag:'🇩🇿'},
+            {code:'EGP',name:'Egyptian Pound',flag:'🇪🇬'},{code:'ETB',name:'Ethiopian Birr',flag:'🇪🇹'},
+            {code:'GHS',name:'Ghanaian Cedi',flag:'🇬🇭'},{code:'GTQ',name:'Guatemalan Quetzal',flag:'🇬🇹'},
+            {code:'HKD',name:'Hong Kong Dollar',flag:'🇭🇰'},{code:'HNL',name:'Honduran Lempira',flag:'🇭🇳'},
+            {code:'HUF',name:'Hungarian Forint',flag:'🇭🇺'},{code:'IDR',name:'Indonesian Rupiah',flag:'🇮🇩'},
+            {code:'ILS',name:'Israeli Shekel',flag:'🇮🇱'},{code:'INR',name:'Indian Rupee',flag:'🇮🇳'},
+            {code:'IQD',name:'Iraqi Dinar',flag:'🇮🇶'},{code:'ISK',name:'Icelandic Króna',flag:'🇮🇸'},
+            {code:'JMD',name:'Jamaican Dollar',flag:'🇯🇲'},{code:'JOD',name:'Jordanian Dinar',flag:'🇯🇴'},
+            {code:'JPY',name:'Japanese Yen',flag:'🇯🇵'},{code:'KES',name:'Kenyan Shilling',flag:'🇰🇪'},
+            {code:'KHR',name:'Cambodian Riel',flag:'🇰🇭'},{code:'KRW',name:'South Korean Won',flag:'🇰🇷'},
+            {code:'KWD',name:'Kuwaiti Dinar',flag:'🇰🇼'},{code:'KZT',name:'Kazakhstani Tenge',flag:'🇰🇿'},
+            {code:'LAK',name:'Lao Kip',flag:'🇱🇦'},{code:'LBP',name:'Lebanese Pound',flag:'🇱🇧'},
+            {code:'LKR',name:'Sri Lankan Rupee',flag:'🇱🇰'},{code:'MAD',name:'Moroccan Dirham',flag:'🇲🇦'},
+            {code:'MDL',name:'Moldovan Leu',flag:'🇲🇩'},{code:'MKD',name:'Macedonian Denar',flag:'🇲🇰'},
+            {code:'MMK',name:'Myanmar Kyat',flag:'🇲🇲'},{code:'MXN',name:'Mexican Peso',flag:'🇲🇽'},
+            {code:'MYR',name:'Malaysian Ringgit',flag:'🇲🇾'},{code:'NGN',name:'Nigerian Naira',flag:'🇳🇬'},
+            {code:'NOK',name:'Norwegian Krone',flag:'🇳🇴'},{code:'NPR',name:'Nepalese Rupee',flag:'🇳🇵'},
+            {code:'NZD',name:'New Zealand Dollar',flag:'🇳🇿'},{code:'OMR',name:'Omani Rial',flag:'🇴🇲'},
+            {code:'PEN',name:'Peruvian Sol',flag:'🇵🇪'},{code:'PHP',name:'Philippine Peso',flag:'🇵🇭'},
+            {code:'PKR',name:'Pakistani Rupee',flag:'🇵🇰'},{code:'PYG',name:'Paraguayan Guaraní',flag:'🇵🇾'},
+            {code:'QAR',name:'Qatari Riyal',flag:'🇶🇦'},{code:'RON',name:'Romanian Leu',flag:'🇷🇴'},
+            {code:'RSD',name:'Serbian Dinar',flag:'🇷🇸'},{code:'RUB',name:'Russian Ruble',flag:'🇷🇺'},
+            {code:'RWF',name:'Rwandan Franc',flag:'🇷🇼'},{code:'SAR',name:'Saudi Riyal',flag:'🇸🇦'},
+            {code:'SEK',name:'Swedish Krona',flag:'🇸🇪'},{code:'SGD',name:'Singapore Dollar',flag:'🇸🇬'},
+            {code:'THB',name:'Thai Baht',flag:'🇹🇭'},{code:'TJS',name:'Tajikistani Somoni',flag:'🇹🇯'},
+            {code:'TND',name:'Tunisian Dinar',flag:'🇹🇳'},{code:'TWD',name:'Taiwan Dollar',flag:'🇹🇼'},
+            {code:'TZS',name:'Tanzanian Shilling',flag:'🇹🇿'},{code:'UAH',name:'Ukrainian Hryvnia',flag:'🇺🇦'},
+            {code:'UGX',name:'Ugandan Shilling',flag:'🇺🇬'},{code:'UYU',name:'Uruguayan Peso',flag:'🇺🇾'},
+            {code:'UZS',name:'Uzbekistani Som',flag:'🇺🇿'},{code:'VES',name:'Venezuelan Bolívar',flag:'🇻🇪'},
+            {code:'XAF',name:'Central African CFA',flag:'🌍'},{code:'XOF',name:'West African CFA',flag:'🌍'},
+            {code:'YER',name:'Yemeni Rial',flag:'🇾🇪'},{code:'ZAR',name:'South African Rand',flag:'🇿🇦'},
+            {code:'ZMW',name:'Zambian Kwacha',flag:'🇿🇲'},
+        ];
+
+        function populateCurrencySelect(selectedCode) {
+            const sel = document.getElementById('currency-select');
+            if (!sel) return;
+            sel.innerHTML = '';
+            CURRENCIES.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.code;
+                opt.textContent = `${c.flag}  ${c.code} — ${c.name}`;
+                if (c.code === (selectedCode || 'USD')) opt.selected = true;
+                sel.appendChild(opt);
+            });
+        }
+
+        async function loadProfileDetails(userId) {
+            try {
+                const { data, error } = await sb
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .maybeSingle();
+                const code = data?.default_currency || null;
+                if (code) {
+                    window.userCurrency = code;
+                    try { localStorage.setItem('setall_currency', code); } catch (_) {}
+                }
+                populateCurrencySelect(window.userCurrency || 'USD');
+                console.log('[Portal] profile.default_currency =', code, '→ window.userCurrency =', window.userCurrency);
+            } catch (e) {
+                populateCurrencySelect(window.userCurrency || 'USD');
+                console.warn('[Portal] loadProfileDetails failed:', e);
+            }
+        }
+
+        async function saveCurrency() {
+            const sel = document.getElementById('currency-select');
+            const code = sel?.value;
+            if (!code || !window.currentUser) return;
+            const btn    = document.getElementById('currency-save-btn');
+            const status = document.getElementById('currency-status');
+            btn.disabled = true;
+            btn.textContent = 'Saving…';
+            try {
+                const { error } = await sb
+                    .from('profiles')
+                    .update({ default_currency: code })
+                    .eq('id', window.currentUser.id);
+                if (error) throw error;
+                window.userCurrency = code;
+                try { localStorage.setItem('setall_currency', code); } catch (_) {}
+                // Reset so the dashboard re-renders with the new currency
+                window.statsLoaded    = false;
+                window.fetchInProgress = false;
+                status.textContent = '✓ Saved. Refreshing dashboard…';
+                status.className   = 'text-xs mt-2 text-brand-teal';
+                status.classList.remove('hidden');
+                // Reload analytics if currently visible
+                const sec = document.getElementById('section-analytics');
+                if (sec && !sec.classList.contains('hidden')) {
+                    await fetchPortalStats().catch(e => console.error(e));
+                }
+                setTimeout(() => status.classList.add('hidden'), 3000);
+            } catch (err) {
+                status.textContent = 'Error: ' + (err.message || 'Could not save');
+                status.className   = 'text-xs mt-2 text-red-400';
+                status.classList.remove('hidden');
+            } finally {
+                btn.disabled    = false;
+                btn.textContent = 'Save';
+            }
+        }
+
         // ── UI-First: render icons + nav BEFORE any async ────────────────
         lucide.createIcons();
 
@@ -378,6 +518,8 @@
             document.getElementById('detail-created').textContent   = fmtDate(user.created_at);
             document.getElementById('detail-lastsign').textContent  = fmtDate(user.last_sign_in_at);
             lucide.createIcons();
+            // Fetch full profile (same as app's getCurrentUserProfile) to get default_currency
+            loadProfileDetails(user.id).catch(e => console.error('[Portal] loadProfileDetails:', e));
         }
 
         // ── Analytics: Data Fetching ─────────────────────────────────────────
@@ -396,7 +538,7 @@
                 // currency comes from expense rows — never rely on localStorage (may be
                 // poisoned with 'USD' from a prior session where profile field was null).
                 const [profileRes, expRes, iOweRes, owedMeRes] = await Promise.all([
-                    sb.from('profiles').select('default_currency').eq('id', userId).single(),
+                    sb.from('profiles').select('*').eq('id', userId).maybeSingle(),
                     sb.from('expenses')
                       .select('category, amount, currency, created_at')
                       .eq('payer_id', userId)
@@ -442,6 +584,9 @@
                     }
                 }
                 console.log(`[Portal] currency=${window.userCurrency} (profile=${profileCurrency}, exp=${expCurrency}) rate=${window.exchangeRate}`);
+                // Keep the currency picker in sync
+                const sel = document.getElementById('currency-select');
+                if (sel && window.userCurrency) sel.value = window.userCurrency;
 
 
                 // ── Compute summary values ───────────────────────────────────
