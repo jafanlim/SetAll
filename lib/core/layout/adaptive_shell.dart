@@ -170,10 +170,12 @@ class _DesktopLayout extends ConsumerWidget {
           Expanded(
             child: Container(
               color: _kContentBg,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
-                  child: child,
+              child: SafeArea(
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+                    child: child,
+                  ),
                 ),
               ),
             ),

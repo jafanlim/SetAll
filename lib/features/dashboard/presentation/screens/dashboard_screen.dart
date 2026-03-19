@@ -154,7 +154,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(_aiInsightProvider);
         },
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+          padding: EdgeInsets.fromLTRB(16, 16, 16, 96 + MediaQuery.of(context).padding.bottom),
           children: [
             // ── WIDGET 1: Master Net Worth Hero ─────────────────────────────
             masterAsync.when(
