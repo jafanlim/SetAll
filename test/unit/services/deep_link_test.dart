@@ -1,6 +1,7 @@
 // Tests for DeepLinkService — URI scheme validation and lifecycle.
 //
-// The core invariant being tested: only `setall://` and `com.jafa.setall://`
+// The core invariant being tested: only `setall://`, `com.jafa.setall.app://`
+// (iOS App Store bundle), and `com.setall.app://` (Android/macOS unified bundle)
 // URIs should trigger session recovery. All other schemes must be silently
 // ignored to prevent injection attacks via custom-scheme hijacking.
 //
@@ -29,13 +30,18 @@ void main() {
       expect(svc.isSetAllSchemeUri(uri), isTrue);
     });
 
-    test('com.jafa.setall://login-callback → accepted', () {
-      final uri = Uri.parse('com.jafa.setall://login-callback');
+    test('com.jafa.setall.app://login-callback → accepted (iOS bundle)', () {
+      final uri = Uri.parse('com.jafa.setall.app://login-callback');
       expect(svc.isSetAllSchemeUri(uri), isTrue);
     });
 
-    test('com.jafa.setall://login-callback?code=xyz → accepted', () {
-      final uri = Uri.parse('com.jafa.setall://login-callback?code=xyz');
+    test('com.jafa.setall.app://login-callback?code=xyz → accepted', () {
+      final uri = Uri.parse('com.jafa.setall.app://login-callback?code=xyz');
+      expect(svc.isSetAllSchemeUri(uri), isTrue);
+    });
+
+    test('com.setall.app://login-callback → accepted (Android/macOS bundle)', () {
+      final uri = Uri.parse('com.setall.app://login-callback');
       expect(svc.isSetAllSchemeUri(uri), isTrue);
     });
 
@@ -136,7 +142,7 @@ void main() {
 
     test('type=recovery present in password-reset URIs', () {
       final uri = Uri.parse(
-          'com.jafa.setall://login-callback?code=reset&type=recovery');
+          'com.jafa.setall.app://login-callback?code=reset&type=recovery');
       expect(svc.isSetAllSchemeUri(uri), isTrue);
       expect(uri.queryParameters['type'], equals('recovery'));
     });
