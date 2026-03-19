@@ -125,7 +125,8 @@
     "gallery": "Gallery",
     "file": "File",
     "today_prefix": "Today",
-    "retry": "Retry"
+    "retry": "Retry",
+    "continue_anyway": "Continue"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -279,7 +280,8 @@
     "manual_enter_total": "Enter total amount first",
     "manual_sum_matches": "Sum: {currency} {sum} — matches total",
     "manual_sum_remaining": "Sum: {currency} {sum} — {diff} remaining",
-    "manual_sum_over": "Sum: {currency} {sum} — {diff} over total"
+    "manual_sum_over": "Sum: {currency} {sum} — {diff} over total",
+    "amount_unusually_large": "Amount exceeds $10,000,000 — is this correct?"
   },
   "edit_expense": {
     "title": "Edit entry",
@@ -394,9 +396,9 @@
     "what_type": "What type of entry?",
     "choose_direction": "Choose the direction of this wallet entry.",
     "add_income": "ADD AN INCOME",
-    "income_subtitle": "Salary, freelance, gift, investment return\u2026",
+    "income_subtitle": "Salary, freelance, gift, investment return…",
     "add_expense": "ADD AN EXPENSE",
-    "expense_subtitle": "Food, transport, bills, shopping, travel\u2026",
+    "expense_subtitle": "Food, transport, bills, shopping, travel…",
     "group_hint": "You can also add group expenses from the Groups tab."
   },
   "invite_friend": {

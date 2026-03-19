@@ -154,7 +154,8 @@
     "gallery": "Галерея",
     "file": "Файл",
     "today_prefix": "Сегодня",
-    "retry": "Повторить"
+    "retry": "Повторить",
+    "continue_anyway": "Продолжить"
   },
   "wallet_screen": {
     "add_entry": "Добавить запись",
@@ -279,7 +280,8 @@
     "manual_enter_total": "Сначала введите общую сумму",
     "manual_sum_matches": "Сумма: {currency} {sum} — совпадает с итогом",
     "manual_sum_remaining": "Сумма: {currency} {sum} — осталось {diff}",
-    "manual_sum_over": "Сумма: {currency} {sum} — превышение на {diff}"
+    "manual_sum_over": "Сумма: {currency} {sum} — превышение на {diff}",
+    "amount_unusually_large": "Сумма превышает $10,000,000 — вы уверены?"
   },
   "edit_expense": {
     "title": "Редактировать запись",
@@ -377,7 +379,7 @@
     "display_name": "Отображаемое имя",
     "name_hint": "Ваше имя",
     "nickname_optional": "Никнейм (необязательно)",
-    "nickname_hint": "вашник (\u0431ез @)",
+    "nickname_hint": "вашник (без @)",
     "change_photo": "Изменить фото",
     "uploading_photo": "Загрузка…",
     "theme_dark": "Тёмная",
@@ -394,9 +396,9 @@
     "what_type": "Какой тип записи?",
     "choose_direction": "Выберите направление этой записи кошелька.",
     "add_income": "ДОБАВИТЬ ДОХОД",
-    "income_subtitle": "Зарплата, фриланс, подарок, доход от инвестиций\u2026",
+    "income_subtitle": "Зарплата, фриланс, подарок, доход от инвестиций…",
     "add_expense": "ДОБАВИТЬ РАСХОД",
-    "expense_subtitle": "Еда, транспорт, счета, покупки, путешествия\u2026",
+    "expense_subtitle": "Еда, транспорт, счета, покупки, путешествия…",
     "group_hint": "Вы также можете добавить групповые расходы на вкладке «Группы»."
   },
   "invite_friend": {

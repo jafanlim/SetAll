@@ -87,8 +87,8 @@
     "total_income": "Revenus totaux",
     "total_expenses": "Dépenses totales",
     "net_position": "Position nette",
-    "pct_of_spend": "{pct}% des d\u00e9penses",
-    "vs_prev_pct": "{sign}{pct}% vs pr\u00e9c.",
+    "pct_of_spend": "{pct}% des dépenses",
+    "vs_prev_pct": "{sign}{pct}% vs préc.",
     "burn_rate_detail": "Taux : {currency} {rate} / jour",
     "spending": "Dépenses",
     "income": "Revenus",
@@ -154,7 +154,8 @@
     "gallery": "Galerie",
     "file": "Fichier",
     "today_prefix": "Aujourd'hui",
-    "retry": "R\u00e9essayer"
+    "retry": "Réessayer",
+    "continue_anyway": "Continuer"
   },
   "wallet_screen": {
     "add_entry": "Ajouter une entrée",
@@ -279,7 +280,8 @@
     "manual_enter_total": "Entrez d'abord le montant total",
     "manual_sum_matches": "Somme : {currency} {sum} — correspond",
     "manual_sum_remaining": "Somme : {currency} {sum} — {diff} restant",
-    "manual_sum_over": "Somme : {currency} {sum} — {diff} de trop"
+    "manual_sum_over": "Somme : {currency} {sum} — {diff} de trop",
+    "amount_unusually_large": "Le montant dépasse $10 000 000 — est-ce correct?"
   },
   "edit_expense": {
     "title": "Modifier l'entrée",

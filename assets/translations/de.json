@@ -154,7 +154,8 @@
     "gallery": "Galerie",
     "file": "Datei",
     "today_prefix": "Heute",
-    "retry": "Wiederholen"
+    "retry": "Wiederholen",
+    "continue_anyway": "Fortfahren"
   },
   "wallet_screen": {
     "add_entry": "Eintrag hinzufügen",
@@ -279,7 +280,8 @@
     "manual_enter_total": "Zuerst Gesamtbetrag eingeben",
     "manual_sum_matches": "Summe: {currency} {sum} — entspricht Gesamt",
     "manual_sum_remaining": "Summe: {currency} {sum} — {diff} verbleibend",
-    "manual_sum_over": "Summe: {currency} {sum} — {diff} zu viel"
+    "manual_sum_over": "Summe: {currency} {sum} — {diff} zu viel",
+    "amount_unusually_large": "Betrag übersteigt $10.000.000 — ist das korrekt?"
   },
   "edit_expense": {
     "title": "Eintrag bearbeiten",

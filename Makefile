@@ -1,6 +1,6 @@
 # Makefile for SetAll AI Workflow
 
-.PHONY: bundle prompt test local-db tailwind build-web deploy-web
+.PHONY: bundle prompt test local-db tailwind build-web deploy-web bump bump-patch bump-minor bump-major
 
 # 1. Bundles the current state of critical files
 bundle:
@@ -51,5 +51,21 @@ build-web: tailwind
 
 # 7. Build and deploy to Netlify production
 #    Requires: npm install -g netlify-cli && netlify login
-deploy-web: build-web
+deploy-web: bump build-web
 	netlify deploy --prod --dir=build/web
+	git add pubspec.yaml
+	git commit -m "chore: bump build number to $$(grep '^version:' pubspec.yaml | sed 's/version: *//')"
+	git push origin main
+
+# 8. Version bump helpers (build number only, or semantic bump)
+bump:
+	@bash scripts/bump_version.sh
+
+bump-patch:
+	@bash scripts/bump_version.sh --patch
+
+bump-minor:
+	@bash scripts/bump_version.sh --minor
+
+bump-major:
+	@bash scripts/bump_version.sh --major

@@ -247,6 +247,28 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       );
       return false;
     }
+    if (d > Decimal.fromInt(10000000)) {
+      ScaffoldMessenger.of(context).showMaterialBanner(
+        MaterialBanner(
+          content: Text('add_expense.amount_unusually_large'.tr()),
+          leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8C42)),
+          actions: [
+            TextButton(
+              onPressed: () {
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                setState(() => _step++);
+              },
+              child: Text('common.continue_anyway'.tr()),
+            ),
+            TextButton(
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+              child: Text('common.cancel'.tr()),
+            ),
+          ],
+        ),
+      );
+      return false;
+    }
     return true;
   }
 
@@ -264,6 +286,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       );
       return;
     }
+    if (amount > Decimal.fromInt(10000000)) return;
 
     final repo = ref.read(setAllRepositoryProvider);
     final currentUid = await repo.ensureUser();

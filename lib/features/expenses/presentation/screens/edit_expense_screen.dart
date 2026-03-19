@@ -293,7 +293,32 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
           .showSnackBar(const SnackBar(content: Text('Enter a valid amount')));
       return;
     }
+    if (amount > Decimal.fromInt(10000000)) {
+      ScaffoldMessenger.of(context).showMaterialBanner(
+        MaterialBanner(
+          content: const Text('Amount is unusually large (>10,000,000). Are you sure?'),
+          leading: const Icon(Icons.warning_amber_rounded, color: Color(0xFFFF8C42)),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                ScaffoldMessenger.of(context).hideCurrentMaterialBanner();
+                await _submitConfirmed(amount);
+              },
+              child: const Text('Continue'),
+            ),
+            TextButton(
+              onPressed: () => ScaffoldMessenger.of(context).hideCurrentMaterialBanner(),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+    await _submitConfirmed(amount);
+  }
 
+  Future<void> _submitConfirmed(Decimal amount) async {
     final repo       = ref.read(setAllRepositoryProvider);
     final currentUid = await repo.ensureUser();
     final payerId    = _payerId ?? currentUid;

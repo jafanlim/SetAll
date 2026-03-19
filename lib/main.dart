@@ -89,7 +89,7 @@ void main() async {
   };
 
   await EasyLocalization.ensureInitialized();
-  await initializeDateFormatting('en_NZ');
+  await initializeDateFormatting();
 
   runApp(
     EasyLocalization(

@@ -154,7 +154,8 @@
     "gallery": "Galería",
     "file": "Archivo",
     "today_prefix": "Hoy",
-    "retry": "Reintentar"
+    "retry": "Reintentar",
+    "continue_anyway": "Continuar"
   },
   "wallet_screen": {
     "add_entry": "Añadir entrada",
@@ -279,7 +280,8 @@
     "manual_enter_total": "Introduce primero el importe total",
     "manual_sum_matches": "Suma: {currency} {sum} — coincide",
     "manual_sum_remaining": "Suma: {currency} {sum} — {diff} restante",
-    "manual_sum_over": "Suma: {currency} {sum} — {diff} de más"
+    "manual_sum_over": "Suma: {currency} {sum} — {diff} de más",
+    "amount_unusually_large": "El monto supera $10,000,000 — ¿es correcto?"
   },
   "edit_expense": {
     "title": "Editar entrada",

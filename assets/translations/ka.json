@@ -154,7 +154,8 @@
     "gallery": "გალერეა",
     "file": "ფაილი",
     "today_prefix": "დღეს",
-    "retry": "ხელახლა ცდა"
+    "retry": "ხელახლა ცდა",
+    "continue_anyway": "გაგრძელება"
   },
   "wallet_screen": {
     "add_entry": "ჩანაწერის დამატება",
@@ -279,7 +280,8 @@
     "manual_enter_total": "ჯერ შეიყვანეთ საერთო თანხა",
     "manual_sum_matches": "ჯამი: {currency} {sum} — ემთხვევა",
     "manual_sum_remaining": "ჯამი: {currency} {sum} — {diff} დარცა",
-    "manual_sum_over": "ჯამი: {currency} {sum} — {diff} ზედმეტია"
+    "manual_sum_over": "ჯამი: {currency} {sum} — {diff} ზედმეტია",
+    "amount_unusually_large": "თანხა აღემატება $10,000,000 — დარწმუნებული ხართ?"
   },
   "edit_expense": {
     "title": "ჩანაწერის რედაქტირება",
@@ -394,9 +396,9 @@
     "what_type": "ჩანაწერის სახეობა?",
     "choose_direction": "აირჩიეთ ამ საფულის ჩანაწერის მიმართულება.",
     "add_income": "შემოსავლის დამატება",
-    "income_subtitle": "ხელფასი, ფრილანსი, საჩუქარი, საინვესტიციო შემოსავალი\u2026",
+    "income_subtitle": "ხელფასი, ფრილანსი, საჩუქარი, საინვესტიციო შემოსავალი…",
     "add_expense": "ხარჯის დამატება",
-    "expense_subtitle": "საკვები, ტრანსპორტი, გადასახადები, საყიდლები, მოგზაურობა\u2026",
+    "expense_subtitle": "საკვები, ტრანსპორტი, გადასახადები, საყიდლები, მოგზაურობა…",
     "group_hint": "ასევე შეგიძლიათ დაამატოთ ჯგუფური ხარჯები ჯგუფების ჩანართიდან."
   },
   "invite_friend": {
