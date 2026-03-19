@@ -3489,32 +3489,27 @@ class SetAllRepository {
         if (uid == null) return const BalanceSummary();
         final profile = await getCurrentUserProfile();
         final baseCurrency = profile?.defaultCurrency ?? 'USD';
-  
-        if (_isWeb && _client != null) {
-          final raw = await getBalanceRawData(uid);
-          var youOwe = Decimal.zero;
-          var youAreOwed = Decimal.zero;
-          for (final e in raw.youOwe) {
-            youOwe += e.universalUsdAmount ?? e.amount;
-          }
-          for (final e in raw.youAreOwed) {
-            youAreOwed += e.universalUsdAmount ?? e.amount;
-          }
-          return BalanceSummary(
-            youOwe: youOwe.toStringAsFixed(2),
-            youAreOwed: youAreOwed.toStringAsFixed(2),
-            currency: baseCurrency,
-          );
+
+        // Fetch USD→base rate once (returns Decimal.one when base IS USD).
+        Decimal usdToBase = Decimal.one;
+        if (baseCurrency != 'USD' && _currencyService != null) {
+          try {
+            usdToBase = await _currencyService.getRate('USD', baseCurrency);
+            if (usdToBase <= Decimal.zero) usdToBase = Decimal.one;
+          } catch (_) {}
         }
-  
+
+        Decimal toBase(Decimal usdAmt) =>
+            (usdAmt * usdToBase).round(scale: 2);
+
         final raw = await getBalanceRawData(uid);
         var youOwe = Decimal.zero;
         var youAreOwed = Decimal.zero;
         for (final e in raw.youOwe) {
-          youOwe += e.universalUsdAmount ?? e.amount;
+          youOwe += toBase(e.universalUsdAmount ?? e.amount);
         }
         for (final e in raw.youAreOwed) {
-          youAreOwed += e.universalUsdAmount ?? e.amount;
+          youAreOwed += toBase(e.universalUsdAmount ?? e.amount);
         }
         return BalanceSummary(
           youOwe: youOwe.toStringAsFixed(2),
