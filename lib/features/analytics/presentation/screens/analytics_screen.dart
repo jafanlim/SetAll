@@ -149,6 +149,12 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
   final baseCurrency = await ref.watch(baseCurrencyProvider.future);
   final filter       = ref.watch(_analyticsFilterProvider);
 
+  // Fetch the USD → baseCurrency rate once for the whole computation.
+  // If baseCurrency IS USD this returns 1 (no network call).
+  final usdToBaseRate = await ref
+      .watch(exchangeRateProvider(baseCurrency).future)
+      .then((s) => Decimal.tryParse(s) ?? Decimal.one);
+
   // Pull raw expenses based on source
   List<ExpenseModel> all = [];
   if (filter.source == _Source.wallet || filter.source == _Source.all) {
@@ -172,14 +178,16 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
       ? dedup.where((e) => e.groupId == filter.groupId).toList()
       : dedup;
 
-  // Amount normalization: mirror Wallet screen logic
+  // Amount normalization: convert to baseCurrency.
+  // 1. If the expense was originally recorded in baseCurrency, use originalAmount directly.
+  // 2. Otherwise multiply the stored universalUsdAmount by the live USD→base rate.
   double normalizedAmt(ExpenseModel e) {
     final rawUsd   = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
     final entryCcy = e.originalCurrency ?? e.currency;
     if (entryCcy == baseCurrency && e.originalAmount != null) {
       return (Decimal.tryParse(e.originalAmount!) ?? rawUsd).toDouble();
     }
-    return rawUsd.toDouble();
+    return (rawUsd * usdToBaseRate).toDouble();
   }
 
   // Date window
