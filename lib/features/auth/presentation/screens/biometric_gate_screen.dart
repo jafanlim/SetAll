@@ -7,6 +7,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/biometric_service.dart';
+import '../../../../core/utils/haptic_utils.dart';
 
 const String _kGracePeriodKey    = 'setall_biometric_grace_seconds';
 const String _kLastForegroundKey = 'setall_last_foreground_ts';
@@ -126,7 +127,7 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
       _unlock();
     } else {
       setState(() => _pinError = 'Incorrect PIN');
-      HapticFeedback.vibrate();
+      HapticUtils.error();
     }
   }
 
@@ -143,10 +144,10 @@ class _BiometricGateScreenState extends State<BiometricGateScreen>
       _unlock();
     } on AuthException catch (e) {
       if (mounted) setState(() { _pwChecking = false; _pwError = e.message; });
-      HapticFeedback.vibrate();
+      HapticUtils.error();
     } catch (_) {
       if (mounted) setState(() { _pwChecking = false; _pwError = 'Incorrect password'; });
-      HapticFeedback.vibrate();
+      HapticUtils.error();
     }
   }
 

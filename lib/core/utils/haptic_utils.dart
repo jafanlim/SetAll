@@ -23,4 +23,9 @@ class HapticUtils {
   static void lightTap() {
     HapticFeedback.lightImpact();
   }
+
+  /// Call on error / wrong input (e.g. wrong PIN, failed auth).
+  static void error() {
+    HapticFeedback.vibrate();
+  }
 }

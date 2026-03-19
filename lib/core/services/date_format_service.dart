@@ -7,8 +7,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 const _regionChannel = MethodChannel('com.setall.app/region');
 
 // Matches the keys in regional_screen.dart
-const String _kDateFmtKey = 'regional_date_format';
-const String _kManualFmt  = 'regional_manual_override';
+const String _kDateFmtKey  = 'regional_date_format';
+const String _kManualFmt   = 'regional_manual_override';
+const String _kTimeFmtKey  = 'regional_time_format';   // '24h' | '12h'
+const String _kManualTime  = 'regional_manual_time_override';
 
 /// App-wide date formatting service.
 /// Call [DateFormatService.instance.format(dateTime)] anywhere in the UI
@@ -19,8 +21,9 @@ class DateFormatService {
   static final DateFormatService instance = DateFormatService._();
 
   // Cached so widgets don't hit SharedPreferences on every build.
-  String _pattern = 'dd/MM/yyyy';
-  bool   _loaded  = false;
+  String _pattern     = 'dd/MM/yyyy';
+  String _timePattern = 'HH:mm'; // 24h default
+  bool   _loaded      = false;
 
   /// Load (or reload) prefs. Call once at app start and after the user
   /// changes their regional setting.
@@ -34,6 +37,14 @@ class DateFormatService {
     } else {
       _pattern = await _systemPatternAsync();
     }
+
+    final manualTime   = p.getBool(_kManualTime)   ?? false;
+    final timeFmtToken = p.getString(_kTimeFmtKey) ?? '24h';
+    if (manualTime) {
+      _timePattern = timeFmtToken == '12h' ? 'h:mm a' : 'HH:mm';
+    } else {
+      _timePattern = await _systemTimePatternAsync();
+    }
     _loaded = true;
   }
 
@@ -45,8 +56,16 @@ class DateFormatService {
 
   /// Full timestamp: date + time.
   String formatWithTime(DateTime dt) {
-    return DateFormat('$_pattern  HH:mm').format(dt.toLocal());
+    return DateFormat('$_pattern  $_timePattern').format(dt.toLocal());
   }
+
+  /// Time only.
+  String formatTimeOnly(DateTime dt) {
+    return DateFormat(_timePattern).format(dt.toLocal());
+  }
+
+  /// Whether the current effective time format is 24-hour.
+  bool get is24Hour => !_timePattern.contains('a');
 
   /// Short: e.g. "14 Mar" (no year, always unambiguous).
   String formatShort(DateTime dt) {
@@ -72,6 +91,33 @@ class DateFormatService {
   /// (Locale.current.identifier), which reflects System Settings → Region
   /// independently of the preferred language. Falls back to the intl-skeleton
   /// approach on other platforms.
+  /// Detects system 24h/12h preference.
+  /// macOS encodes this in the locale extension: @hours=h23 (24h) or @hours=h12 (12h).
+  /// Falls back to locale-driven detection via intl.
+  Future<String> _systemTimePatternAsync() async {
+    String? localeStr;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      try {
+        localeStr = await _regionChannel.invokeMethod<String>('getRegionLocale');
+      } catch (_) {}
+    }
+    localeStr ??= WidgetsBinding.instance.platformDispatcher.locale.toString();
+    // Check for explicit @hours= ICU extension
+    final hoursMatch = RegExp(r'[@;]hours=(h\d+)', caseSensitive: false)
+        .firstMatch(localeStr);
+    if (hoursMatch != null) {
+      final h = hoursMatch.group(1)!.toLowerCase();
+      // h23 / h24 → 24-hour; h12 / h11 → 12-hour
+      return (h == 'h23' || h == 'h24') ? 'HH:mm' : 'h:mm a';
+    }
+    // Fallback: use intl to ask what jm() skeleton looks like
+    try {
+      final skeleton = DateFormat.jm(localeStr).pattern ?? '';
+      if (skeleton.contains('a') || skeleton.contains('h')) return 'h:mm a';
+    } catch (_) {}
+    return 'HH:mm'; // 24h safe default
+  }
+
   Future<String> _systemPatternAsync() async {
     String? localeStr;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
