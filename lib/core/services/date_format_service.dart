@@ -1,6 +1,10 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+const _regionChannel = MethodChannel('com.setall.app/region');
 
 // Matches the keys in regional_screen.dart
 const String _kDateFmtKey = 'regional_date_format';
@@ -22,13 +26,13 @@ class DateFormatService {
   /// changes their regional setting.
   Future<void> reload() async {
     final p = await SharedPreferences.getInstance();
-    final manual   = p.getBool(_kManualFmt)    ?? false;
+    final manual    = p.getBool(_kManualFmt)    ?? false;
     final manualFmt = p.getString(_kDateFmtKey) ?? 'DD/MM/YYYY';
 
     if (manual) {
       _pattern = _toIntlPattern(manualFmt);
     } else {
-      _pattern = _systemPattern();
+      _pattern = await _systemPatternAsync();
     }
     _loaded = true;
   }
@@ -64,22 +68,32 @@ class DateFormatService {
     }
   }
 
-  /// Derives the correct date field order from the intl locale data rather
-  /// than a hardcoded country list. DateFormat.yMd() returns the locale's
-  /// actual short-date skeleton (e.g. "M/d/y" for en_US, "d/M/y" for en_GB,
-  /// "y-MM-dd" for ja). We inspect the position of 'M' vs 'd' vs 'y' in that
-  /// skeleton to determine the canonical order.
-  String _systemPattern() {
+  /// Async version: on macOS queries the region locale via platform channel
+  /// (Locale.current.identifier), which reflects System Settings → Region
+  /// independently of the preferred language. Falls back to the intl-skeleton
+  /// approach on other platforms.
+  Future<String> _systemPatternAsync() async {
+    String? localeStr;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      try {
+        localeStr = await _regionChannel.invokeMethod<String>('getRegionLocale');
+      } catch (_) {}
+    }
+    localeStr ??= WidgetsBinding.instance.platformDispatcher.locale.toString();
+    return _patternFromLocale(localeStr);
+  }
+
+  /// Derives date field order from the intl locale skeleton for a given locale string.
+  static String _patternFromLocale(String localeStr) {
     try {
-      final localeStr = WidgetsBinding.instance.platformDispatcher.locale.toString();
-      final skeleton  = DateFormat.yMd(localeStr).pattern ?? '';
+      final skeleton = DateFormat.yMd(localeStr).pattern ?? '';
       final mPos = skeleton.indexOf('M');
       final dPos = skeleton.indexOf('d');
       final yPos = skeleton.indexOf('y');
-      if (yPos >= 0 && yPos < mPos && yPos < dPos) return 'yyyy-MM-dd'; // YMD (ja, zh, ko)
-      if (mPos >= 0 && dPos >= 0 && mPos < dPos) return 'MM/dd/yyyy';   // MDY (en_US, etc.)
+      if (yPos >= 0 && yPos < mPos && yPos < dPos) return 'yyyy-MM-dd';
+      if (mPos >= 0 && dPos >= 0 && mPos < dPos)   return 'MM/dd/yyyy';
     } catch (_) {}
-    return 'dd/MM/yyyy'; // DMY safe default (en_GB, en_GE, en_NZ, etc.)
+    return 'dd/MM/yyyy';
   }
 
   bool get isLoaded => _loaded;

@@ -1,11 +1,14 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/date_format_service.dart';
-
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
+
+const _kRegionChannel = MethodChannel('com.setall.app/region');
 
 const _teal  = Color(0xFF00D9B0);
 const _slate = Color(0xFF94A3B8);
@@ -31,23 +34,20 @@ class RegionalScreen extends StatefulWidget {
 }
 
 class _RegionalScreenState extends State<RegionalScreen> {
-  bool   _manualOverride = false;
-  String _dateFormat     = _kFmtDMY;
-  bool   _loading        = true;
+  bool   _manualOverride  = false;
+  String _dateFormat      = _kFmtDMY;
+  bool   _loading         = true;
+  // Resolved region locale string — on macOS comes from platform channel
+  // (Locale.current.identifier = region locale); other platforms use language locale.
+  String _regionLocaleStr = 'en_GB';
 
-  Locale get _sysLocale {
+  String get _systemLocale => _regionLocaleStr;
+
+  String get _systemDateFormat => _fmtFromLocale(_regionLocaleStr);
+
+  static String _fmtFromLocale(String localeStr) {
     try {
-      return WidgetsBinding.instance.platformDispatcher.locale;
-    } catch (_) {
-      return const Locale('en', 'GB');
-    }
-  }
-
-  String get _systemLocale => _sysLocale.toString();
-
-  String get _systemDateFormat {
-    try {
-      final skeleton = DateFormat.yMd(_sysLocale.toString()).pattern ?? '';
+      final skeleton = DateFormat.yMd(localeStr).pattern ?? '';
       final mPos = skeleton.indexOf('M');
       final dPos = skeleton.indexOf('d');
       final yPos = skeleton.indexOf('y');
@@ -81,11 +81,26 @@ class _RegionalScreenState extends State<RegionalScreen> {
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
+    // Resolve region locale: macOS → platform channel; others → PlatformDispatcher
+    String regionLocale;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+      try {
+        regionLocale = await _kRegionChannel.invokeMethod<String>('getRegionLocale') ?? '';
+      } catch (_) {
+        regionLocale = '';
+      }
+    } else {
+      regionLocale = '';
+    }
+    if (regionLocale.isEmpty) {
+      regionLocale = WidgetsBinding.instance.platformDispatcher.locale.toString();
+    }
     if (mounted) {
       setState(() {
-        _manualOverride = p.getBool(_kManualFmt)  ?? false;
-        _dateFormat     = p.getString(_kDateFmtKey) ?? _kFmtDMY;
-        _loading        = false;
+        _regionLocaleStr = regionLocale;
+        _manualOverride  = p.getBool(_kManualFmt)  ?? false;
+        _dateFormat      = p.getString(_kDateFmtKey) ?? _kFmtDMY;
+        _loading         = false;
       });
     }
   }
