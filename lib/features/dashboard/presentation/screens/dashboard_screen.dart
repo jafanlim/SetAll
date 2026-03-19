@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
@@ -40,10 +42,30 @@ const _kPaletteColors = [
   _aTeal, _aGold, _aRose, _aViolet, _aSky, _aOrange, _aLime, _aPink,
 ];
 
+// Sentinel values returned by _aiInsightProvider to distinguish UI states.
+const _kAiEmpty   = '__empty__';   // no transactions yet
+const _kAiOffline = '__offline__'; // no connectivity
+
 // AI insight provider — cached result keyed to the current user session.
 // Invalidate on manual refresh or app re-open.
 final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   final analyticsData = await ref.watch(analyticsDataProvider.future);
+
+  // Empty state: no expenses and no income — skip the network call entirely.
+  if (analyticsData.allExpenses.isEmpty &&
+      analyticsData.totalIncome == 0 &&
+      analyticsData.totalSpend  == 0) {
+    return _kAiEmpty;
+  }
+
+  // Connectivity check: if offline return distinct sentinel immediately.
+  if (!kIsWeb) {
+    final conn = await Connectivity().checkConnectivity();
+    if (conn.every((r) => r == ConnectivityResult.none)) {
+      return _kAiOffline;
+    }
+  }
+
   final client = Supabase.instance.client;
   final topCats = analyticsData.categoryTotals.entries
       .toList()
@@ -81,7 +103,8 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
         ?? (data?['reply'] as String?)
         ?? '';
   } catch (_) {
-    return '';
+    // Network / Supabase error — return empty so the error state shows.
+    rethrow;
   }
 });
 
@@ -315,16 +338,19 @@ class _MasterNetWorthHero extends StatelessWidget {
           if (_loading)
             const SizedBox(height: 36, child: LinearProgressIndicator())
           else
-            Text(
-              _error ? '—' : (isPos ? netStr : '-$netStr'),
-              style: TextStyle(
-                fontWeight: FontWeight.w800,
-                fontSize: 32,
-                letterSpacing: -1,
-                color: _error ? theme.colorScheme.onSurfaceVariant : accent,
-),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                _error ? '—' : (isPos ? netStr : '-$netStr'),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 32,
+                  letterSpacing: -1,
+                  color: _error ? theme.colorScheme.onSurfaceVariant : accent,
+                ),
+                maxLines: 1,
+              ),
             ),
           const SizedBox(height: 4),
           Text(
@@ -490,26 +516,65 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
                   height: 55,
                   child: aiAsync.when(
                     skipLoadingOnReload: true,
-                    data: (insight) => insight.isEmpty
-                        ? Text(
-                            'dashboard.ai_no_data'.tr(),
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: theme.colorScheme.onSurfaceVariant,
-                              height: 1.4,
-                            ),
-                          )
-                        : Text(
-                            insight,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: theme.colorScheme.onSurface,
-                              height: 1.4,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
+                    data: (insight) {
+                      // Distinct sentinel states
+                      if (insight == _kAiEmpty) {
+                        return Text(
+                          'dashboard.ai_empty_state'.tr(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.4,
                           ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        );
+                      }
+                      if (insight == _kAiOffline) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(Icons.wifi_off_rounded,
+                                size: 14,
+                                color: theme.colorScheme.onSurfaceVariant),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                'dashboard.ai_offline'.tr(),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  height: 1.4,
+                                ),
+                                maxLines: 3,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+                      if (insight.isEmpty) {
+                        return Text(
+                          'dashboard.ai_no_data'.tr(),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        );
+                      }
+                      return Text(
+                        insight,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: theme.colorScheme.onSurface,
+                          height: 1.4,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                      );
+                    },
                     loading: () => AnimatedBuilder(
                       animation: _alpha,
                       builder: (_, child) => Column(
@@ -542,7 +607,7 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
                         ],
                       ),
                     ),
-                    error: (_, _) => Text(
+                    error: (_, e) => Text(
                       'dashboard.ai_unavailable'.tr(),
                       style: TextStyle(
                         fontSize: 12,

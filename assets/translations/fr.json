@@ -34,7 +34,9 @@
     "group_count_other": "{count} groupes",
     "trends": "Tendances & insights",
     "ai_no_data": "Ajoutez des dépenses pour obtenir votre premier aperçu IA.",
-    "ai_unavailable": "Aperçu IA indisponible"
+    "ai_unavailable": "Aperçu IA indisponible",
+    "ai_empty_state": "Commencez à suivre vos dépenses — les insights IA se débloquent dès que vous avez des transactions.",
+    "ai_offline": "Vous êtes hors ligne. Les insights IA reprendront à la reconnexion."
   },
   "wallet": {
     "title": "Portefeuille",
