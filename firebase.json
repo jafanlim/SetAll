@@ -1,14 +1,1 @@
-{
-  "flutter": {
-    "platforms": {
-      "dart": {
-        "lib/firebase_options.dart": {
-          "projectId": "setall-c899a",
-          "configurations": {
-            "web": "1:454096661669:web:81e03534573eeead5ab14c"
-          }
-        }
-      }
-    }
-  }
-}
+{"flutter":{"platforms":{"android":{"default":{"projectId":"setall-app-prod","appId":"1:73119302557:android:c589fa0e97bf5e412b2574","fileOutput":"android/app/google-services.json"}},"ios":{"default":{"projectId":"setall-app-prod","appId":"1:73119302557:ios:e9d49713c60715262b2574","uploadDebugSymbols":false,"fileOutput":"ios/Runner/GoogleService-Info.plist"}},"macos":{"default":{"projectId":"setall-app-prod","appId":"1:73119302557:ios:e9d49713c60715262b2574","uploadDebugSymbols":false,"fileOutput":"macos/Runner/GoogleService-Info.plist"}},"dart":{"lib/firebase_options.dart":{"projectId":"setall-app-prod","configurations":{"android":"1:73119302557:android:c589fa0e97bf5e412b2574","ios":"1:73119302557:ios:e9d49713c60715262b2574","macos":"1:73119302557:ios:e9d49713c60715262b2574","web":"1:73119302557:web:e736e476acd67f1d2b2574"}}}}}}

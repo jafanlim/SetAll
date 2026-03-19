@@ -31,7 +31,10 @@
     "in_the_green": "თქვენ პლუსში ხართ",
     "in_the_red": "თქვენ მინუსში ხართ",
     "group_count_one": "{count} ჯგუფი",
-    "group_count_other": "{count} ჯგუფი"
+    "group_count_other": "{count} ჯგუფი",
+    "trends": "ტრენდები და ანალიტიკა",
+    "ai_no_data": "დაამატე ხარჯები პირველი AI-ინსაითის მისაღებად.",
+    "ai_unavailable": "AI-ინსაითი მიუწვდომელია"
   },
   "wallet": {
     "title": "საფულე",
@@ -86,7 +89,11 @@
     "net_position": "წმინდა პოზიცია",
     "pct_of_spend": "{pct}% ხარჯებიდან",
     "vs_prev_pct": "{sign}{pct}% წინა პერ.",
-    "burn_rate_detail": "ხარჯის ტემპი: {currency} {rate} / დღე"
+    "burn_rate_detail": "ხარჯის ტემპი: {currency} {rate} / დღე",
+    "spending": "ხარჯები",
+    "income": "შემოსავალი",
+    "daily_burn": "დღიური ხარჯი",
+    "more": "მეტი"
   },
   "activity": {
     "title": "აქტივობა",

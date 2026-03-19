@@ -1,13 +1,19 @@
+import 'dart:math' as math;
+
 import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../analytics/presentation/screens/analytics_screen.dart'
+    show analyticsDataProvider, AnalyticsData;
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -17,6 +23,67 @@ const _purple    = Color(0xFF8B5CF6);
 const _orange    = Color(0xFFFF8C42);
 const _tealDim   = Color(0x1800D9B0);
 const _purpleDim = Color(0x188B5CF6);
+
+// Analytics palette (matches analytics_screen.dart)
+const _aTeal   = Color(0xFF14B8A6);
+const _aGold   = Color(0xFFD4AF37);
+const _aRose   = Color(0xFFF43F5E);
+const _aViolet = Color(0xFF8B5CF6);
+const _aSky    = Color(0xFF0EA5E9);
+const _aOrange = Color(0xFFF97316);
+const _aLime   = Color(0xFF84CC16);
+const _aPink   = Color(0xFFEC4899);
+const _kSubtitle = Color(0xFF64748B);
+const _kLabel    = Color(0xFF94A3B8);
+
+const _kPaletteColors = [
+  _aTeal, _aGold, _aRose, _aViolet, _aSky, _aOrange, _aLime, _aPink,
+];
+
+// AI insight provider — cached result keyed to the current user session.
+// Invalidate on manual refresh or app re-open.
+final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
+  final analyticsData = await ref.watch(analyticsDataProvider.future);
+  final client = Supabase.instance.client;
+  final topCats = analyticsData.categoryTotals.entries
+      .toList()
+    ..sort((a, b) => b.value.compareTo(a.value));
+  final topCatsStr = topCats
+      .take(5)
+      .map((e) => '${e.key}: \$${e.value.toStringAsFixed(2)}')
+      .join(', ');
+
+  final recentRows = analyticsData.allExpenses
+      .take(20)
+      .map((e) =>
+          '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
+      .join('\n');
+
+  try {
+    final res = await client.functions.invoke(
+      'ai-analyst',
+      body: {
+        'message': 'Give me a concise 1-sentence financial insight about my spending this month.',
+        'history': <Map<String, String>>[],
+        'context': {
+          'totalSpending':  analyticsData.totalSpend,
+          'dailyBurn':      analyticsData.burnRate,
+          'totalIncome':    analyticsData.totalIncome,
+          'net':            analyticsData.netFlow,
+          'topCategories':  topCatsStr,
+          'recentRows':     recentRows,
+        },
+      },
+    );
+    final data = res.data as Map<String, dynamic>?;
+    final structured = data?['structured'] as Map<String, dynamic>?;
+    return (structured?['summary'] as String?)
+        ?? (data?['reply'] as String?)
+        ?? '';
+  } catch (_) {
+    return '';
+  }
+});
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -35,6 +102,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(masterBalanceProvider);
           ref.invalidate(walletBalanceProvider);
           ref.invalidate(balanceSummaryProvider);
+          ref.invalidate(_aiInsightProvider);
         }
       });
     });
@@ -46,6 +114,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final masterAsync  = ref.watch(masterBalanceProvider);
     final groupsAsync  = ref.watch(myGroupsProvider);
     final walletAsync  = ref.watch(walletBalanceProvider);
+    final analyticsAsync = ref.watch(analyticsDataProvider);
+    final aiAsync      = ref.watch(_aiInsightProvider);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -81,6 +151,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(walletBalanceProvider);
           ref.invalidate(balanceSummaryProvider);
           ref.invalidate(myGroupsProvider);
+          ref.invalidate(_aiInsightProvider);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
@@ -133,6 +204,33 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               valuePrefix: '',
               groupCount: groupsAsync.valueOrNull?.length,
               onTap: () { HapticUtils.lightTap(); context.go('/groups'); },
+            ),
+
+            const SizedBox(height: 24),
+
+            // ── Section header: Trends ───────────────────────────────────────
+            Text(
+              'dashboard.trends'.tr().toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 1.2,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // ── WIDGET 4: SetAll AI Insight Card ─────────────────────────────
+            _AiInsightCard(aiAsync: aiAsync),
+            const SizedBox(height: 10),
+
+            // ── WIDGET 5: Compact Analytics Summary ──────────────────────────
+            analyticsAsync.when(
+              skipLoadingOnReload: true,
+              data: (data) => data.totalSpend == 0 && data.totalIncome == 0
+                  ? const SizedBox.shrink()
+                  : _CompactAnalyticsSection(data: data),
+              loading: () => const _AnalyticsLoadingCard(),
+              error: (_, _) => const SizedBox.shrink(),
             ),
           ],
         ),
@@ -296,6 +394,477 @@ class _StatPill extends StatelessWidget {
             overflow: TextOverflow.ellipsis),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Widget 4 — SetAll AI Insight Card
+// ---------------------------------------------------------------------------
+class _AiInsightCard extends StatelessWidget {
+  const _AiInsightCard({required this.aiAsync});
+  final AsyncValue<String> aiAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            _aTeal.withValues(alpha: 0.12),
+            _aViolet.withValues(alpha: 0.08),
+          ],
+        ),
+        border: Border.all(color: _aTeal.withValues(alpha: 0.25), width: 1),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 36, height: 36,
+            decoration: BoxDecoration(
+              color: _aTeal.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Icon(Icons.auto_awesome, color: _aTeal, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'SetAll AI',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: _aTeal,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                aiAsync.when(
+                  skipLoadingOnReload: true,
+                  data: (insight) => insight.isEmpty
+                      ? Text(
+                          'dashboard.ai_no_data'.tr(),
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        )
+                      : Text(
+                          insight,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurface,
+                            height: 1.4,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                  loading: () => Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 10, width: double.infinity,
+                        decoration: BoxDecoration(
+                          color: _aTeal.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Container(
+                        height: 10, width: 160,
+                        decoration: BoxDecoration(
+                          color: _aTeal.withValues(alpha: 0.08),
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                    ],
+                  ),
+                  error: (_, _) => Text(
+                    'dashboard.ai_unavailable'.tr(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Widget 5 — Compact Analytics Section (Charts merged into Dashboard)
+// ---------------------------------------------------------------------------
+class _CompactAnalyticsSection extends StatelessWidget {
+  const _CompactAnalyticsSection({required this.data});
+  final AnalyticsData data;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // ── Spending by Category ─────────────────────────────────────────
+        if (data.categoryTotals.isNotEmpty) ...[
+          _DashboardSectionCard(
+            title: 'analytics.spending_by_category'.tr(),
+            child: _DashboardDonutChart(
+              categoryTotals: data.categoryTotals,
+              totalSpend: data.totalSpend,
+              currency: data.currency,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // ── Net Trend ────────────────────────────────────────────────────
+        if (data.netTrend.length > 1) ...[
+          _DashboardSectionCard(
+            title: 'analytics.net_position_trend'.tr(),
+            child: _DashboardTrendChart(
+              spots: data.netTrend,
+              currency: data.currency,
+              spanDays: 30,
+            ),
+          ),
+          const SizedBox(height: 10),
+        ],
+
+        // ── Quick stats row ──────────────────────────────────────────────
+        Row(
+          children: [
+            Expanded(
+              child: _QuickStatTile(
+                label: 'analytics.spending'.tr(),
+                value: '${data.currency} ${data.totalSpend.toStringAsFixed(0)}',
+                color: _aRose,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _QuickStatTile(
+                label: 'analytics.income'.tr(),
+                value: '${data.currency} ${data.totalIncome.toStringAsFixed(0)}',
+                color: _aTeal,
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _QuickStatTile(
+                label: 'analytics.daily_burn'.tr(),
+                value: '${data.currency} ${data.burnRate.toStringAsFixed(1)}',
+                color: _aOrange,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _DashboardSectionCard extends StatelessWidget {
+  const _DashboardSectionCard({required this.title, required this.child});
+  final String title;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.4,
+              color: _kLabel,
+            ),
+          ),
+          const SizedBox(height: 14),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardDonutChart extends StatelessWidget {
+  const _DashboardDonutChart({
+    required this.categoryTotals,
+    required this.totalSpend,
+    required this.currency,
+  });
+  final Map<String, double> categoryTotals;
+  final double totalSpend;
+  final String currency;
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = categoryTotals.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    final sections = List.generate(entries.length, (i) {
+      final color = _kPaletteColors[i % _kPaletteColors.length];
+      return PieChartSectionData(
+        value: entries[i].value,
+        color: color,
+        radius: 30,
+        showTitle: false,
+      );
+    });
+
+    return SizedBox(
+      height: 160,
+      child: Row(
+        children: [
+          // Donut
+          SizedBox(
+            width: 120,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                centerSpaceRadius: 38,
+                sectionsSpace: 2,
+                pieTouchData: PieTouchData(enabled: false),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Legend (top 5)
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ...entries.take(5).toList().asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final e = entry.value;
+                  final color = _kPaletteColors[i % _kPaletteColors.length];
+                  final pct = totalSpend > 0 ? e.value / totalSpend * 100 : 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 3),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 8, height: 8,
+                          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            e.key,
+                            style: const TextStyle(fontSize: 11, color: _kLabel),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${pct.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 11, fontWeight: FontWeight.w700, color: _kLabel),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                if (entries.length > 5)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      '+${entries.length - 5} ${'analytics.more'.tr()}',
+                      style: const TextStyle(fontSize: 10, color: _kSubtitle),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardTrendChart extends StatelessWidget {
+  const _DashboardTrendChart({
+    required this.spots,
+    required this.currency,
+    required this.spanDays,
+  });
+  final List<FlSpot> spots;
+  final String currency;
+  final int spanDays;
+
+  @override
+  Widget build(BuildContext context) {
+    if (spots.isEmpty) return const SizedBox.shrink();
+
+    final maxY   = spots.map((s) => s.y).reduce(math.max);
+    final minY   = spots.map((s) => s.y).reduce(math.min);
+    final range  = (maxY - minY).abs();
+    final padded = (range * 0.15).clamp(1.0, double.infinity);
+
+    final xInterval = spanDays <= 14 ? 1.0
+        : spanDays <= 60  ? 7.0
+        : 14.0;
+
+    return SizedBox(
+      height: 140,
+      child: LineChart(
+        LineChartData(
+          minX: 0,
+          maxX: (spots.length - 1).toDouble(),
+          minY: minY - padded,
+          maxY: maxY + padded,
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            horizontalInterval: range > 0 ? range / 3 : 1,
+            getDrawingHorizontalLine: (_) => const FlLine(
+              color: Color(0xFF1E293B), strokeWidth: 1),
+          ),
+          borderData: FlBorderData(show: false),
+          titlesData: FlTitlesData(
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 48,
+                getTitlesWidget: (v, _) => Text(
+                  _shortNum(v),
+                  style: const TextStyle(fontSize: 9, color: _kSubtitle),
+                ),
+              ),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: xInterval,
+                getTitlesWidget: (v, _) {
+                  final daysAgo = (spots.length - 1 - v.toInt());
+                  if (daysAgo == 0) {
+                    return Text('analytics.today'.tr(),
+                      style: const TextStyle(fontSize: 9, color: _kSubtitle));
+                  }
+                  return Text('${daysAgo}d',
+                    style: const TextStyle(fontSize: 9, color: _kSubtitle));
+                },
+              ),
+            ),
+            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            topTitles:   const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          ),
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              getTooltipColor: (_) => const Color(0xFF1E293B),
+              getTooltipItems: (spots) => spots.map((s) =>
+                LineTooltipItem(
+                  '$currency ${s.y.toStringAsFixed(2)}',
+                  const TextStyle(color: _aTeal, fontWeight: FontWeight.w700, fontSize: 11),
+                )).toList(),
+            ),
+          ),
+          lineBarsData: [
+            LineChartBarData(
+              spots: spots,
+              isCurved: true,
+              curveSmoothness: 0.3,
+              color: _aTeal,
+              barWidth: 2,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  colors: [_aTeal.withValues(alpha: 0.18), _aTeal.withValues(alpha: 0.0)],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _shortNum(double v) {
+    if (v.abs() >= 1000000) return '${(v / 1000000).toStringAsFixed(1)}M';
+    if (v.abs() >= 1000)    return '${(v / 1000).toStringAsFixed(1)}k';
+    return v.toStringAsFixed(0);
+  }
+}
+
+class _QuickStatTile extends StatelessWidget {
+  const _QuickStatTile({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+  final String label;
+  final String value;
+  final Color  color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.18), width: 0.8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label,
+            style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: color),
+            overflow: TextOverflow.ellipsis),
+          const SizedBox(height: 4),
+          Text(value,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color),
+            overflow: TextOverflow.ellipsis),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsLoadingCard extends StatelessWidget {
+  const _AnalyticsLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      height: 120,
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: theme.colorScheme.outlineVariant, width: 0.5),
+      ),
+      child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
     );
   }
 }

@@ -94,9 +94,8 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
   int _indexForPath(String path) {
     if (path.startsWith('/wallet'))    return 1;
     if (path.startsWith('/groups'))    return 2;
-    if (path.startsWith('/analytics')) return 3;
-    if (path.startsWith('/activity'))  return 4;
-    if (path.startsWith('/settings'))  return 5;
+    if (path.startsWith('/activity'))  return 3;
+    if (path.startsWith('/settings'))  return 4;
     return 0;
   }
 
@@ -115,12 +114,9 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
         context.go(AppRouter.groups);
       case 3:
         setState(() => _selectedIndex = 3);
-        context.go(AppRouter.analytics);
+        context.go(AppRouter.activity);
       case 4:
         setState(() => _selectedIndex = 4);
-        context.go(AppRouter.activity);
-      case 5:
-        setState(() => _selectedIndex = 5);
         context.go(AppRouter.settings);
     }
   }
@@ -203,8 +199,7 @@ class _PremiumSidebar extends StatelessWidget {
     (icon: Icons.dashboard_outlined,               selectedIcon: Icons.dashboard,               label: 'nav.dashboard', index: 0),
     (icon: Icons.account_balance_wallet_outlined,  selectedIcon: Icons.account_balance_wallet,  label: 'nav.wallet',    index: 1),
     (icon: Icons.group_outlined,                   selectedIcon: Icons.group,                   label: 'nav.groups',    index: 2),
-    (icon: Icons.bar_chart_outlined,               selectedIcon: Icons.bar_chart,               label: 'nav.analytics', index: 3),
-    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'nav.activity',  index: 4),
+    (icon: Icons.history,                          selectedIcon: Icons.history,                 label: 'nav.activity',  index: 3),
   ];
 
   @override
@@ -273,8 +268,8 @@ class _PremiumSidebar extends StatelessWidget {
             icon: Icons.settings_outlined,
             selectedIcon: Icons.settings,
             label: 'nav.settings',
-            isSelected: selectedIndex == 5,
-            onTap: () => onTap(5),
+            isSelected: selectedIndex == 4,
+            onTap: () => onTap(4),
             unselectedColor: unselectedFg,
           ),
 
@@ -384,21 +379,40 @@ class _MobileLayout extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Row(
-        children: [
-          if (useRail) _buildRail(context),
-          Expanded(child: child),
-        ],
+      body: SafeArea(
+        bottom: false,
+        child: Row(
+          children: [
+            if (useRail) _buildRail(context),
+            Expanded(child: child),
+          ],
+        ),
       ),
       bottomNavigationBar: !useRail ? _buildBottomNav(context) : null,
     );
   }
 
   Widget _buildRail(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     return NavigationRail(
       selectedIndex: selectedIndex,
       onDestinationSelected: onTap,
       labelType: NavigationRailLabelType.all,
+      backgroundColor: isDark ? theme.colorScheme.surface : theme.colorScheme.surfaceContainerLow,
+      selectedIconTheme: IconThemeData(color: isDark ? _kTeal : const Color(0xFF0D9488)),
+      selectedLabelTextStyle: TextStyle(
+        color: isDark ? _kTeal : const Color(0xFF0D9488),
+        fontWeight: FontWeight.w700,
+        fontSize: 11,
+      ),
+      unselectedIconTheme: IconThemeData(
+        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+      ),
+      unselectedLabelTextStyle: TextStyle(
+        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        fontSize: 11,
+      ),
       destinations: [
         NavigationRailDestination(
           icon: const Icon(Icons.dashboard_outlined),
@@ -414,11 +428,6 @@ class _MobileLayout extends StatelessWidget {
           icon: const Icon(Icons.group_outlined),
           selectedIcon: const Icon(Icons.group),
           label: Text('nav.groups'.tr()),
-        ),
-        NavigationRailDestination(
-          icon: const Icon(Icons.bar_chart_outlined),
-          selectedIcon: const Icon(Icons.bar_chart),
-          label: Text('nav.analytics'.tr()),
         ),
         NavigationRailDestination(
           icon: const Icon(Icons.history),
@@ -453,11 +462,6 @@ class _MobileLayout extends StatelessWidget {
           icon: const Icon(Icons.group_outlined),
           selectedIcon: const Icon(Icons.group),
           label: 'nav.groups'.tr(),
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.bar_chart_outlined),
-          selectedIcon: const Icon(Icons.bar_chart),
-          label: 'nav.analytics'.tr(),
         ),
         NavigationDestination(
           icon: const Icon(Icons.history),

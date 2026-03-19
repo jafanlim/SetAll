@@ -55,7 +55,7 @@ class _DateRange {
     if (days == 90)  return '90d';
     if (days == 365) return '1y';
     if (days == 0 && from != null && to != null) {
-      final fmt = DateFormat('MMM d');
+      final fmt = DateFormat('dd/MM/yyyy');
       return '${fmt.format(from!)} – ${fmt.format(to!)}';
     }
     return 'Custom'; // analytics.date_custom

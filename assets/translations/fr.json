@@ -31,7 +31,10 @@
     "in_the_green": "Vous êtes dans le vert",
     "in_the_red": "Vous êtes dans le rouge",
     "group_count_one": "{count} groupe",
-    "group_count_other": "{count} groupes"
+    "group_count_other": "{count} groupes",
+    "trends": "Tendances & insights",
+    "ai_no_data": "Ajoutez des dépenses pour obtenir votre premier aperçu IA.",
+    "ai_unavailable": "Aperçu IA indisponible"
   },
   "wallet": {
     "title": "Portefeuille",
@@ -86,7 +89,11 @@
     "net_position": "Position nette",
     "pct_of_spend": "{pct}% des d\u00e9penses",
     "vs_prev_pct": "{sign}{pct}% vs pr\u00e9c.",
-    "burn_rate_detail": "Taux : {currency} {rate} / jour"
+    "burn_rate_detail": "Taux : {currency} {rate} / jour",
+    "spending": "Dépenses",
+    "income": "Revenus",
+    "daily_burn": "Dépense journalière",
+    "more": "de plus"
   },
   "activity": {
     "title": "Activité",

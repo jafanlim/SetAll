@@ -31,7 +31,10 @@
     "in_the_green": "Du bist im Plus",
     "in_the_red": "Du bist im Minus",
     "group_count_one": "{count} Gruppe",
-    "group_count_other": "{count} Gruppen"
+    "group_count_other": "{count} Gruppen",
+    "trends": "Trends & Einblicke",
+    "ai_no_data": "Füge Ausgaben hinzu, um deinen ersten KI-Einblick zu erhalten.",
+    "ai_unavailable": "KI-Einblick nicht verfügbar"
   },
   "wallet": {
     "title": "Geldbörse",
@@ -86,7 +89,11 @@
     "net_position": "Nettoposition",
     "pct_of_spend": "{pct}% der Ausgaben",
     "vs_prev_pct": "{sign}{pct}% ggü. Vorperiode",
-    "burn_rate_detail": "Ausgaberate: {currency} {rate} / Tag"
+    "burn_rate_detail": "Ausgaberate: {currency} {rate} / Tag",
+    "spending": "Ausgaben",
+    "income": "Einnahmen",
+    "daily_burn": "Tagesbedarf",
+    "more": "weitere"
   },
   "activity": {
     "title": "Aktivität",

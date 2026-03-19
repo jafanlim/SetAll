@@ -31,7 +31,10 @@
     "in_the_green": "Вы в плюсе",
     "in_the_red": "Вы в минусе",
     "group_count_one": "{count} группа",
-    "group_count_other": "{count} групп"
+    "group_count_other": "{count} групп",
+    "trends": "Тренды и аналитика",
+    "ai_no_data": "Добавьте расходы, чтобы получить первый AI-инсайт.",
+    "ai_unavailable": "AI-инсайт недоступен"
   },
   "wallet": {
     "title": "Кошелёк",
@@ -86,7 +89,11 @@
     "net_position": "Чистая позиция",
     "pct_of_spend": "{pct}% от расходов",
     "vs_prev_pct": "{sign}{pct}% к пред. периоду",
-    "burn_rate_detail": "Расход: {currency} {rate} / день"
+    "burn_rate_detail": "Расход: {currency} {rate} / день",
+    "spending": "Расходы",
+    "income": "Доходы",
+    "daily_burn": "Дневной расход",
+    "more": "ещё"
   },
   "activity": {
     "title": "Активность",

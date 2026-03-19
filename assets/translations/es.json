@@ -31,7 +31,10 @@
     "in_the_green": "Estás en positivo",
     "in_the_red": "Estás en negativo",
     "group_count_one": "{count} grupo",
-    "group_count_other": "{count} grupos"
+    "group_count_other": "{count} grupos",
+    "trends": "Tendencias e información",
+    "ai_no_data": "Agrega gastos para obtener tu primer análisis IA.",
+    "ai_unavailable": "IA no disponible"
   },
   "wallet": {
     "title": "Cartera",
@@ -86,7 +89,11 @@
     "net_position": "Posición neta",
     "pct_of_spend": "{pct}% del gasto",
     "vs_prev_pct": "{sign}{pct}% vs. anterior",
-    "burn_rate_detail": "Tasa: {currency} {rate} / día"
+    "burn_rate_detail": "Tasa: {currency} {rate} / día",
+    "spending": "Gastos",
+    "income": "Ingresos",
+    "daily_burn": "Gasto diario",
+    "more": "más"
   },
   "activity": {
     "title": "Actividad",

@@ -22,10 +22,10 @@
 	<array>
 		<dict>
 			<key>CFBundleURLName</key>
-			<string>com.jafa.setall</string>
+			<string>com.setall.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.jafa.setall</string>
+				<string>com.setall.app</string>
 			</array>
 		</dict>
 	</array>

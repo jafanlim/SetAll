@@ -60,7 +60,11 @@
     "net_position": "Net Position",
     "pct_of_spend": "{pct}% of spend",
     "vs_prev_pct": "{sign}{pct}% vs prev",
-    "burn_rate_detail": "Burn rate: {currency} {rate} / day"
+    "burn_rate_detail": "Burn rate: {currency} {rate} / day",
+    "spending": "Spending",
+    "income": "Income",
+    "daily_burn": "Daily burn",
+    "more": "more"
   },
   "activity": {
     "title": "Activity",
@@ -147,7 +151,10 @@
     "in_the_green": "You are in the green",
     "in_the_red": "You are in the red",
     "group_count_one": "{count} group",
-    "group_count_other": "{count} groups"
+    "group_count_other": "{count} groups",
+    "trends": "Trends & Insights",
+    "ai_no_data": "Add some expenses to get your first AI insight.",
+    "ai_unavailable": "AI insight unavailable"
   },
   "wallet_screen": {
     "add_entry": "Add wallet entry",

@@ -16,7 +16,7 @@
 	<true/>
 	<key>com.apple.security.keychain-access-groups</key>
 	<array>
-		<string>$(AppIdentifierPrefix)com.setall.setall</string>
+		<string>$(AppIdentifierPrefix)com.setall.app</string>
 	</array>
 </dict>
 </plist>
