@@ -4,11 +4,18 @@
 /// For a production app, these should eventually be moved to environment variables (.env).
 library;
 
-/// Deep link callback URL for mobile OAuth (Google Sign-In) and email confirmation redirects.
-/// Must match exactly what is registered in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
-/// iOS keeps the old bundle ID scheme (com.jafa.setall.app) to match the existing App Store listing.
-/// Android and macOS use the unified scheme (com.setall.app).
-const String kAuthRedirectBaseUrl = 'com.jafa.setall.app://login-callback';
+import 'package:flutter/foundation.dart';
+
+/// Returns the correct OAuth redirect URL for the current platform.
+/// - iOS:          com.jafa.setall.app://login-callback  (App Store bundle ID)
+/// - macOS/Android: com.setall.app://login-callback       (unified bundle ID)
+/// - Web:          https://vrsmsgyxeyzyrdonsnrk.supabase.co/auth/v1/callback
+/// All values must be registered in Supabase → Authentication → URL Configuration → Redirect URLs.
+String get kAuthRedirectBaseUrl {
+  if (kIsWeb) return 'https://vrsmsgyxeyzyrdonsnrk.supabase.co/auth/v1/callback';
+  if (defaultTargetPlatform == TargetPlatform.iOS) return 'com.jafa.setall.app://login-callback';
+  return 'com.setall.app://login-callback';
+}
 
 class AuthConfig {
   // 1. SUPABASE CREDENTIALS
