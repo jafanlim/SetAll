@@ -29,7 +29,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.setall.app</string>
+				<string>com.jafa.setall.app</string>
 			</array>
 		</dict>
 	</array>

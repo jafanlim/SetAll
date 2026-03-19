@@ -47,7 +47,7 @@ class DeepLinkService {
     if (kDebugMode) debugPrint('[DeepLinkService] incoming link: $uri');
 
     // Only act on our custom scheme.
-    if (uri.scheme != 'setall' && uri.scheme != 'com.setall.app') return;
+    if (uri.scheme != 'setall' && uri.scheme != 'com.setall.app' && uri.scheme != 'com.jafa.setall.app') return;
 
     try {
       // Supabase PKCE flow: the redirect carries a `code` query parameter.
@@ -71,5 +71,5 @@ class DeepLinkService {
   /// Exposed for unit tests without requiring a live Supabase connection.
   @visibleForTesting
   bool isSetAllSchemeUri(Uri uri) =>
-      uri.scheme == 'setall' || uri.scheme == 'com.setall.app';
+      uri.scheme == 'setall' || uri.scheme == 'com.setall.app' || uri.scheme == 'com.jafa.setall.app';
 }

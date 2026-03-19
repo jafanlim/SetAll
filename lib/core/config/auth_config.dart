@@ -6,7 +6,9 @@ library;
 
 /// Deep link callback URL for mobile OAuth (Google Sign-In) and email confirmation redirects.
 /// Must match exactly what is registered in Supabase Dashboard → Authentication → URL Configuration → Redirect URLs.
-const String kAuthRedirectBaseUrl = 'com.setall.app://login-callback';
+/// iOS keeps the old bundle ID scheme (com.jafa.setall.app) to match the existing App Store listing.
+/// Android and macOS use the unified scheme (com.setall.app).
+const String kAuthRedirectBaseUrl = 'com.jafa.setall.app://login-callback';
 
 class AuthConfig {
   // 1. SUPABASE CREDENTIALS
