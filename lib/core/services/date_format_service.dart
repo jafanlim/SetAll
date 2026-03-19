@@ -90,12 +90,22 @@ class DateFormatService {
   ///   2. intl skeleton fallback for language-only locales (e.g. "ja", "zh").
   ///   3. DMY safe default.
   static String _patternFromLocale(String localeStr) {
+    // macOS appends an ICU region extension: e.g. "en_US@rg=gezzzz"
+    // where "ge" is the ISO 3166-1 country code for Georgia.
+    // Extract it first — it overrides the locale's own country code.
+    String? regionCountry;
+    final rgMatch = RegExp(r'[@;]rg=([a-z]{2})zzzz', caseSensitive: false)
+        .firstMatch(localeStr);
+    if (rgMatch != null) {
+      regionCountry = rgMatch.group(1)!.toUpperCase(); // e.g. "GE"
+    }
+
     // Normalise separator: macOS may use underscore or hyphen
     final normalised = localeStr.replaceAll('-', '_').split('@').first;
     final parts = normalised.split('_');
 
-    // Extract country code (second segment if present, e.g. GE from en_GE)
-    final country = parts.length >= 2 ? parts[1].toUpperCase() : '';
+    // Country code: prefer @rg region extension, then locale's own country code
+    final country = regionCountry ?? (parts.length >= 2 ? parts[1].toUpperCase() : '');
     final lang    = parts.first.toLowerCase();
 
     // Country-code-driven lookup (covers cases like en_GE where intl falls

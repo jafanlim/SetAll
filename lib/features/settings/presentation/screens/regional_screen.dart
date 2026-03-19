@@ -46,9 +46,14 @@ class _RegionalScreenState extends State<RegionalScreen> {
   String get _systemDateFormat => _fmtFromLocale(_regionLocaleStr);
 
   static String _fmtFromLocale(String localeStr) {
+    String? regionCountry;
+    final rgMatch = RegExp(r'[@;]rg=([a-z]{2})zzzz', caseSensitive: false)
+        .firstMatch(localeStr);
+    if (rgMatch != null) regionCountry = rgMatch.group(1)!.toUpperCase();
+
     final normalised = localeStr.replaceAll('-', '_').split('@').first;
     final parts   = normalised.split('_');
-    final country = parts.length >= 2 ? parts[1].toUpperCase() : '';
+    final country = regionCountry ?? (parts.length >= 2 ? parts[1].toUpperCase() : '');
     final lang    = parts.first.toLowerCase();
 
     const mdyCountries = {'US', 'CA', 'PH', 'MH', 'FM', 'PR', 'AS', 'GU', 'VI', 'MP'};
