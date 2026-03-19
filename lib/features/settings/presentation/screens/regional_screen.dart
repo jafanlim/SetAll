@@ -46,10 +46,14 @@ class _RegionalScreenState extends State<RegionalScreen> {
   String get _systemLocale => _sysLocale.toString();
 
   String get _systemDateFormat {
-    final lang    = _sysLocale.languageCode;
-    final country = _sysLocale.countryCode ?? '';
-    if (lang == 'en' && (country == 'US' || country == 'CA' || country == 'PH')) return _kFmtMDY;
-    if (lang == 'ja' || lang == 'zh' || lang == 'ko') return _kFmtYMD;
+    try {
+      final skeleton = DateFormat.yMd(_sysLocale.toString()).pattern ?? '';
+      final mPos = skeleton.indexOf('M');
+      final dPos = skeleton.indexOf('d');
+      final yPos = skeleton.indexOf('y');
+      if (yPos >= 0 && yPos < mPos && yPos < dPos) return _kFmtYMD;
+      if (mPos >= 0 && dPos >= 0 && mPos < dPos)   return _kFmtMDY;
+    } catch (_) {}
     return _kFmtDMY;
   }
 

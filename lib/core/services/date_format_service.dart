@@ -64,19 +64,22 @@ class DateFormatService {
     }
   }
 
+  /// Derives the correct date field order from the intl locale data rather
+  /// than a hardcoded country list. DateFormat.yMd() returns the locale's
+  /// actual short-date skeleton (e.g. "M/d/y" for en_US, "d/M/y" for en_GB,
+  /// "y-MM-dd" for ja). We inspect the position of 'M' vs 'd' vs 'y' in that
+  /// skeleton to determine the canonical order.
   String _systemPattern() {
     try {
-      final locale = WidgetsBinding.instance.platformDispatcher.locale;
-      final lang   = locale.languageCode;
-      final country = locale.countryCode ?? '';
-      if (lang == 'en' && (country == 'US' || country == 'CA' || country == 'PH')) {
-        return 'MM/dd/yyyy';
-      }
-      if (lang == 'ja' || lang == 'zh' || lang == 'ko') {
-        return 'yyyy-MM-dd';
-      }
+      final localeStr = WidgetsBinding.instance.platformDispatcher.locale.toString();
+      final skeleton  = DateFormat.yMd(localeStr).pattern ?? '';
+      final mPos = skeleton.indexOf('M');
+      final dPos = skeleton.indexOf('d');
+      final yPos = skeleton.indexOf('y');
+      if (yPos >= 0 && yPos < mPos && yPos < dPos) return 'yyyy-MM-dd'; // YMD (ja, zh, ko)
+      if (mPos >= 0 && dPos >= 0 && mPos < dPos) return 'MM/dd/yyyy';   // MDY (en_US, etc.)
     } catch (_) {}
-    return 'dd/MM/yyyy';
+    return 'dd/MM/yyyy'; // DMY safe default (en_GB, en_GE, en_NZ, etc.)
   }
 
   bool get isLoaded => _loaded;
