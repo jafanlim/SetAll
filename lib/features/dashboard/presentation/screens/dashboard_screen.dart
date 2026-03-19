@@ -401,13 +401,30 @@ class _StatPill extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Widget 4 — SetAll AI Insight Card
 // ---------------------------------------------------------------------------
-class _AiInsightCard extends StatelessWidget {
+class _AiInsightCard extends ConsumerStatefulWidget {
   const _AiInsightCard({required this.aiAsync});
   final AsyncValue<String> aiAsync;
 
   @override
+  ConsumerState<_AiInsightCard> createState() => _AiInsightCardState();
+}
+
+class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
+  @override
+  void initState() {
+    super.initState();
+    ref.listenManual(_aiInsightProvider, (prev, next) {
+      if (next is AsyncData && next.value != null && next.value!.isNotEmpty &&
+          prev is! AsyncData) {
+        HapticUtils.success();
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final aiAsync = widget.aiAsync;
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(

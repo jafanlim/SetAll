@@ -685,7 +685,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
                 borderSide: BorderSide.none,
               ),
             ),
-            onChanged: (_) => setState(() {}),
+            onChanged: (_) { HapticUtils.lightTap(); setState(() {}); },
             validator: (v) {
               if (v == null || v.trim().isEmpty) return 'Enter amount';
               final d = Decimal.tryParse(v.trim().replaceAll(',', '.'));

@@ -18,10 +18,14 @@ const _slate = Color(0xFF94A3B8);
 // ---------------------------------------------------------------------------
 const _kDateFmtKey   = 'regional_date_format';
 const _kManualFmt    = 'regional_manual_override';
+const _kTimeFmtKey   = 'regional_time_format';
+const _kManualTime   = 'regional_manual_time_override';
 
 const _kFmtDMY  = 'DD/MM/YYYY';
 const _kFmtMDY  = 'MM/DD/YYYY';
 const _kFmtYMD  = 'YYYY-MM-DD';
+const _kFmt24h  = '24h';
+const _kFmt12h  = '12h';
 
 // ---------------------------------------------------------------------------
 // RegionalScreen
@@ -34,16 +38,40 @@ class RegionalScreen extends StatefulWidget {
 }
 
 class _RegionalScreenState extends State<RegionalScreen> {
-  bool   _manualOverride  = false;
-  String _dateFormat      = _kFmtDMY;
-  bool   _loading         = true;
+  bool   _manualOverride     = false;
+  String _dateFormat         = _kFmtDMY;
+  bool   _manualTimeOverride = false;
+  String _timeFormat         = _kFmt24h;
+  bool   _loading            = true;
   // Resolved region locale string — on macOS comes from platform channel
-  // (Locale.current.identifier = region locale); other platforms use language locale.
-  String _regionLocaleStr = 'en_GB';
+  String _regionLocaleStr    = 'en_GB';
 
   String get _systemLocale => _regionLocaleStr;
 
   String get _systemDateFormat => _fmtFromLocale(_regionLocaleStr);
+
+  String get _systemTimeFormat {
+    // Check @hours= ICU extension (macOS)
+    final hoursMatch = RegExp(r'[@;]hours=(h\d+)', caseSensitive: false)
+        .firstMatch(_regionLocaleStr);
+    if (hoursMatch != null) {
+      final h = hoursMatch.group(1)!.toLowerCase();
+      return (h == 'h23' || h == 'h24') ? _kFmt24h : _kFmt12h;
+    }
+    // Fallback: intl jm() skeleton
+    try {
+      final skeleton = DateFormat.jm(_regionLocaleStr.split('@').first).pattern ?? '';
+      if (skeleton.contains('a') || skeleton.toLowerCase().contains('h:')) return _kFmt12h;
+    } catch (_) {}
+    return _kFmt24h;
+  }
+
+  String get _effectiveTimeFormat => _manualTimeOverride ? _timeFormat : _systemTimeFormat;
+
+  String _previewTime(String fmt) {
+    final now = DateTime.now();
+    return DateFormat(fmt == _kFmt12h ? 'h:mm a' : 'HH:mm').format(now);
+  }
 
   static String _fmtFromLocale(String localeStr) {
     String? regionCountry;
@@ -118,18 +146,22 @@ class _RegionalScreenState extends State<RegionalScreen> {
     }
     if (mounted) {
       setState(() {
-        _regionLocaleStr = regionLocale;
-        _manualOverride  = p.getBool(_kManualFmt)  ?? false;
-        _dateFormat      = p.getString(_kDateFmtKey) ?? _kFmtDMY;
-        _loading         = false;
+        _regionLocaleStr   = regionLocale;
+        _manualOverride    = p.getBool(_kManualFmt)    ?? false;
+        _dateFormat        = p.getString(_kDateFmtKey) ?? _kFmtDMY;
+        _manualTimeOverride = p.getBool(_kManualTime)  ?? false;
+        _timeFormat        = p.getString(_kTimeFmtKey) ?? _kFmt24h;
+        _loading           = false;
       });
     }
   }
 
   Future<void> _save() async {
     final p = await SharedPreferences.getInstance();
-    await p.setBool(_kManualFmt,   _manualOverride);
+    await p.setBool(_kManualFmt,    _manualOverride);
     await p.setString(_kDateFmtKey, _dateFormat);
+    await p.setBool(_kManualTime,   _manualTimeOverride);
+    await p.setString(_kTimeFmtKey, _timeFormat);
     await DateFormatService.instance.reload();
     HapticUtils.success();
   }
@@ -249,6 +281,97 @@ class _RegionalScreenState extends State<RegionalScreen> {
                   ),
                 ],
 
+                const SizedBox(height: 28),
+
+                // ── Time Format ──────────────────────────────────────────
+                _SectionLabel('Time Format'),
+                Text(
+                  'Affects how times are shown throughout the app.',
+                  style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+                ),
+                const SizedBox(height: 12),
+
+                GlassCard(
+                  padding: const EdgeInsets.all(14),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time_rounded, color: _teal, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text('System time format',
+                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text(
+                              '$_systemTimeFormat  ·  ${_previewTime(_systemTimeFormat)}',
+                              style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!_manualTimeOverride)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0x2200D9B0),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Text('Active',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _teal)),
+                        ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                GlassCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: const Icon(Icons.tune_rounded, color: _slate),
+                    title: const Text('Manual override',
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: Text(
+                      'Choose 24h or AM/PM instead of the system default.',
+                      style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                    value: _manualTimeOverride,
+                    activeThumbColor: _teal,
+                    onChanged: (v) {
+                      setState(() => _manualTimeOverride = v);
+                      _save();
+                    },
+                  ),
+                ),
+
+                if (_manualTimeOverride) ...[
+                  const SizedBox(height: 12),
+                  GlassCard(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Column(
+                      children: [
+                        _FormatTile(
+                          fmt: _kFmt24h,
+                          label: '24-hour  (14:30)',
+                          example: _previewTime(_kFmt24h),
+                          selected: _timeFormat == _kFmt24h,
+                          onTap: () { setState(() => _timeFormat = _kFmt24h); _save(); },
+                        ),
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                        _FormatTile(
+                          fmt: _kFmt12h,
+                          label: '12-hour  (2:30 PM)',
+                          example: _previewTime(_kFmt12h),
+                          selected: _timeFormat == _kFmt12h,
+                          onTap: () { setState(() => _timeFormat = _kFmt12h); _save(); },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 20),
 
                 // ── Preview ─────────────────────────────────────────────
@@ -263,13 +386,17 @@ class _RegionalScreenState extends State<RegionalScreen> {
                         const Icon(Icons.calendar_today_outlined, size: 16, color: _teal),
                         const SizedBox(width: 8),
                         Text(
-                          'Today: ${_preview(_effectiveFormat)}',
+                          'Today: ${_preview(_effectiveFormat)}  ${_previewTime(_effectiveTimeFormat)}',
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                       ]),
                       const SizedBox(height: 6),
                       Text(
-                        'Format in use: $_effectiveFormat  (${_manualOverride ? 'manual' : 'system default'})',
+                        'Date: $_effectiveFormat  (${_manualOverride ? 'manual' : 'system default'})',
+                        style: const TextStyle(fontSize: 11, color: _slate),
+                      ),
+                      Text(
+                        'Time: $_effectiveTimeFormat  (${_manualTimeOverride ? 'manual' : 'system default'})',
                         style: const TextStyle(fontSize: 11, color: _slate),
                       ),
                     ],
