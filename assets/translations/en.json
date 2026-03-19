@@ -155,7 +155,9 @@
     "group_count_other": "{count} groups",
     "trends": "Trends & Insights",
     "ai_no_data": "Add some expenses to get your first AI insight.",
-    "ai_unavailable": "AI insight unavailable"
+    "ai_unavailable": "AI insight unavailable",
+    "ai_empty_state": "Start tracking your spending — AI insights unlock once you have transactions.",
+    "ai_offline": "You're offline. AI insights will resume when you reconnect."
   },
   "wallet_screen": {
     "add_entry": "Add wallet entry",

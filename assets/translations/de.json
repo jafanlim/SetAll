@@ -34,7 +34,9 @@
     "group_count_other": "{count} Gruppen",
     "trends": "Trends & Einblicke",
     "ai_no_data": "Füge Ausgaben hinzu, um deinen ersten KI-Einblick zu erhalten.",
-    "ai_unavailable": "KI-Einblick nicht verfügbar"
+    "ai_unavailable": "KI-Einblick nicht verfügbar",
+    "ai_empty_state": "Beginne deine Ausgaben zu erfassen — KI-Einblicke werden freigeschaltet, sobald du Transaktionen hast.",
+    "ai_offline": "Du bist offline. KI-Einblicke kehren zurück, sobald du wieder verbunden bist."
   },
   "wallet": {
     "title": "Geldbörse",

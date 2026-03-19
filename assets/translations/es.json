@@ -34,7 +34,9 @@
     "group_count_other": "{count} grupos",
     "trends": "Tendencias e información",
     "ai_no_data": "Agrega gastos para obtener tu primer análisis IA.",
-    "ai_unavailable": "IA no disponible"
+    "ai_unavailable": "IA no disponible",
+    "ai_empty_state": "Empieza a registrar tus gastos — los insights de IA se desbloquean cuando tengas transacciones.",
+    "ai_offline": "Estás sin conexión. Los insights de IA volverán cuando te reconectes."
   },
   "wallet": {
     "title": "Cartera",
