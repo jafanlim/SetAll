@@ -46,6 +46,20 @@ class _RegionalScreenState extends State<RegionalScreen> {
   String get _systemDateFormat => _fmtFromLocale(_regionLocaleStr);
 
   static String _fmtFromLocale(String localeStr) {
+    final normalised = localeStr.replaceAll('-', '_').split('@').first;
+    final parts   = normalised.split('_');
+    final country = parts.length >= 2 ? parts[1].toUpperCase() : '';
+    final lang    = parts.first.toLowerCase();
+
+    const mdyCountries = {'US', 'CA', 'PH', 'MH', 'FM', 'PR', 'AS', 'GU', 'VI', 'MP'};
+    const ymdLanguages = {'ja', 'zh', 'ko', 'mn', 'hu'};
+
+    if (country.isNotEmpty) {
+      if (mdyCountries.contains(country)) return _kFmtMDY;
+      if (country.length == 2)            return _kFmtDMY;
+    }
+    if (ymdLanguages.contains(lang)) return _kFmtYMD;
+
     try {
       final skeleton = DateFormat.yMd(localeStr).pattern ?? '';
       final mPos = skeleton.indexOf('M');
@@ -86,7 +100,9 @@ class _RegionalScreenState extends State<RegionalScreen> {
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
       try {
         regionLocale = await _kRegionChannel.invokeMethod<String>('getRegionLocale') ?? '';
-      } catch (_) {
+        debugPrint('[RegionalScreen] macOS Locale.current.identifier = $regionLocale');
+      } catch (e) {
+        debugPrint('[RegionalScreen] platform channel error: $e');
         regionLocale = '';
       }
     } else {

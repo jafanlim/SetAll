@@ -83,8 +83,36 @@ class DateFormatService {
     return _patternFromLocale(localeStr);
   }
 
-  /// Derives date field order from the intl locale skeleton for a given locale string.
+  /// Determines date field order from a locale identifier string.
+  /// Priority:
+  ///   1. Country code from locale (e.g. "GE" from "en_GE" or "ka_GE") —
+  ///      most reliable when region locale comes from the platform channel.
+  ///   2. intl skeleton fallback for language-only locales (e.g. "ja", "zh").
+  ///   3. DMY safe default.
   static String _patternFromLocale(String localeStr) {
+    // Normalise separator: macOS may use underscore or hyphen
+    final normalised = localeStr.replaceAll('-', '_').split('@').first;
+    final parts = normalised.split('_');
+
+    // Extract country code (second segment if present, e.g. GE from en_GE)
+    final country = parts.length >= 2 ? parts[1].toUpperCase() : '';
+    final lang    = parts.first.toLowerCase();
+
+    // Country-code-driven lookup (covers cases like en_GE where intl falls
+    // back to en → MDY, but the actual region format for GE is DMY)
+    const mdyCountries = {'US', 'CA', 'PH', 'MH', 'FM', 'PR', 'AS', 'GU', 'VI', 'MP'};
+    const ymdLanguages = {'ja', 'zh', 'ko', 'mn', 'hu'};
+
+    if (country.isNotEmpty) {
+      if (mdyCountries.contains(country)) return 'MM/dd/yyyy';
+      // For all other countries (GE, GB, NZ, AU, DE, FR, RU, etc.) → DMY
+      if (country.length == 2) return 'dd/MM/yyyy';
+    }
+
+    // Language-only fallback (e.g. "ja", "zh", "ko" with no country code)
+    if (ymdLanguages.contains(lang)) return 'yyyy-MM-dd';
+
+    // intl skeleton as last resort
     try {
       final skeleton = DateFormat.yMd(localeStr).pattern ?? '';
       final mPos = skeleton.indexOf('M');
@@ -93,6 +121,7 @@ class DateFormatService {
       if (yPos >= 0 && yPos < mPos && yPos < dPos) return 'yyyy-MM-dd';
       if (mPos >= 0 && dPos >= 0 && mPos < dPos)   return 'MM/dd/yyyy';
     } catch (_) {}
+
     return 'dd/MM/yyyy';
   }
 
