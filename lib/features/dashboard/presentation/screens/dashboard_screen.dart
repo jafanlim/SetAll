@@ -409,16 +409,33 @@ class _AiInsightCard extends ConsumerStatefulWidget {
   ConsumerState<_AiInsightCard> createState() => _AiInsightCardState();
 }
 
-class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
+class _AiInsightCardState extends ConsumerState<_AiInsightCard>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+  late final Animation<double> _alpha;
+
   @override
   void initState() {
     super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+    _alpha = Tween<double>(begin: 0.06, end: 0.22).animate(
+      CurvedAnimation(parent: _pulse, curve: Curves.easeInOut),
+    );
     ref.listenManual(_aiInsightProvider, (prev, next) {
       if (next is AsyncData && next.value != null && next.value!.isNotEmpty &&
           prev is! AsyncData) {
         HapticUtils.success();
       }
     });
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
   }
 
   @override
@@ -466,51 +483,71 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                aiAsync.when(
-                  skipLoadingOnReload: true,
-                  data: (insight) => insight.isEmpty
-                      ? Text(
-                          'dashboard.ai_no_data'.tr(),
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurfaceVariant,
-                            height: 1.4,
+                // Pre-allocate a fixed content area (3 lines ≈ 56px) so the
+                // card never changes height when transitioning loading → data.
+                SizedBox(
+                  // 3 lines at fontSize 13 * height 1.4 ≈ 55px
+                  height: 55,
+                  child: aiAsync.when(
+                    skipLoadingOnReload: true,
+                    data: (insight) => insight.isEmpty
+                        ? Text(
+                            'dashboard.ai_no_data'.tr(),
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurfaceVariant,
+                              height: 1.4,
+                            ),
+                          )
+                        : Text(
+                            insight,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurface,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                        )
-                      : Text(
-                          insight,
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: theme.colorScheme.onSurface,
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
+                    loading: () => AnimatedBuilder(
+                      animation: _alpha,
+                      builder: (_, child) => Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            height: 11, width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: _aTeal.withValues(alpha: _alpha.value),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
                           ),
-                        ),
-                  loading: () => Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 10, width: double.infinity,
-                        decoration: BoxDecoration(
-                          color: _aTeal.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                          const SizedBox(height: 7),
+                          Container(
+                            height: 11, width: double.infinity,
+                            decoration: BoxDecoration(
+                              color: _aTeal.withValues(alpha: _alpha.value * 0.8),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                          const SizedBox(height: 7),
+                          Container(
+                            height: 11, width: 140,
+                            decoration: BoxDecoration(
+                              color: _aTeal.withValues(alpha: _alpha.value * 0.55),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(height: 6),
-                      Container(
-                        height: 10, width: 160,
-                        decoration: BoxDecoration(
-                          color: _aTeal.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(5),
-                        ),
+                    ),
+                    error: (_, _) => Text(
+                      'dashboard.ai_unavailable'.tr(),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
-                  error: (_, _) => Text(
-                    'dashboard.ai_unavailable'.tr(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
