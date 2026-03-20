@@ -1059,14 +1059,19 @@ class _NavCard extends StatelessWidget {
                 children: [
                   valueAsync.when(
                     skipLoadingOnReload: true,
-                    data: (v) => Text(
-                      '$valuePrefix$v',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        color: accentColor,
-                      ),
-                    ),
+                    data: (v) => // ACT-overflow: FittedBox mirrors _MasterNetWorthHero pattern for long currency strings.
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '$valuePrefix$v',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: accentColor,
+                            ),
+                          ),
+                        ),
                     loading: () => SizedBox(
                       width: 60, height: 14,
                       child: LinearProgressIndicator(

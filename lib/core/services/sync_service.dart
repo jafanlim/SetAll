@@ -273,10 +273,16 @@ class SyncService {
 
     final pendingExpenses =
         await LocalDatabase.db.query('expenses', where: 'synced_at IS NULL');
-    if (pendingExpenses.isNotEmpty) {
+    // Skip rows created by a different user (e.g. stale rows from a previous
+    // session on shared device). Upserting them under a new JWT would always
+    // fail RLS (payer_id != auth.uid()) and log an infinite retry loop.
+    final ownedExpenses = pendingExpenses
+        .where((r) => (r['payer_id'] as String?) == uid)
+        .toList();
+    if (ownedExpenses.isNotEmpty) {
       // Build all payloads in memory, then push in a single batch upsert.
       final payloads = <Map<String, dynamic>>[];
-      for (final row in pendingExpenses) {
+      for (final row in ownedExpenses) {
         final expense = ExpenseModel.fromJson(row);
         final raw = expense.toJson()
           ..remove('created_by')
@@ -297,7 +303,7 @@ class SyncService {
         // Batch-mark all synced in a single SQLite transaction.
         final now = DateTime.now().millisecondsSinceEpoch;
         await LocalDatabase.db.transaction((txn) async {
-          for (final row in pendingExpenses) {
+          for (final row in ownedExpenses) {
             await txn.update('expenses', {'synced_at': now},
                 where: 'id = ?', whereArgs: [row['id']]);
           }
