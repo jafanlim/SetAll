@@ -1,3 +1,6 @@
+// CHORE-01: Active path for setall.app web portal ONLY.
+// Flutter client uses supabase/functions/ai-analyst/index.ts directly.
+// Keep both in sync when changing model, prompt, or response shape.
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
