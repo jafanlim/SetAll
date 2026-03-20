@@ -244,7 +244,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               accentDim: _purpleDim,
               valueAsync: walletAsync,
               valuePrefix: '',
-              onTap: () { HapticUtils.lightTap(); context.go('/wallet'); },
+              onTap: () { HapticUtils.lightTap(); context.go('/wallet'); }, // HAPTIC-01: nav card tap feedback
             ),
             const SizedBox(height: 10),
 
@@ -262,7 +262,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               }),
               valuePrefix: '',
               groupCount: groupsAsync.valueOrNull?.length,
-              onTap: () { HapticUtils.lightTap(); context.go('/groups'); },
+              onTap: () { HapticUtils.lightTap(); context.go('/groups'); }, // HAPTIC-01: nav card tap feedback
             ),
 
             const SizedBox(height: 24),

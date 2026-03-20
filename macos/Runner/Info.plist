@@ -26,6 +26,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.setall.app</string>
+				<string>setall</string>
 			</array>
 		</dict>
 	</array>

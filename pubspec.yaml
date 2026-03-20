@@ -81,6 +81,12 @@ dependencies:
   # Deep linking — catches setall:// OAuth/email redirects on Windows (and mobile)
   app_links: ^6.4.0
 
+  # Voice input (FEAT-01)
+  speech_to_text: ^6.6.0
+
+  # QR code generation (FEAT-03)
+  qr_flutter: ^4.1.0
+
   # System share sheet (iOS / Android / macOS / Windows)
   share_plus: ^10.1.4
   package_info_plus: ^9.0.0
