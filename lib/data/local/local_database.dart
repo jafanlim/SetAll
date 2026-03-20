@@ -78,7 +78,7 @@ class LocalDatabase {
   ///     breakdown display never needs a lossy USD back-conversion.
   /// Schema v25 adds:
   ///   • groups.default_currency – ISO 4217 code for the group's settlement currency
-  static const int _version = 25;
+  static const int _version = 26;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -410,6 +410,22 @@ class LocalDatabase {
     if (oldVersion < 25) {
       await _addColumnIfNotExists(db, 'groups', 'default_currency', 'TEXT');
     }
+    if (oldVersion < 26) {
+      // Schema v26: AI chat history for InsightsPanel (FEAT-06)
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS ai_chat_messages (
+          id         TEXT PRIMARY KEY,
+          session_id TEXT NOT NULL,
+          role       TEXT NOT NULL,
+          content    TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          is_canvas  INTEGER DEFAULT 0
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ai_chat_session ON ai_chat_messages(session_id)',
+      );
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -574,6 +590,19 @@ class LocalDatabase {
         deleted_with_group_id TEXT        -- Schema v18: set when cascade-deleted with a group
       )
     ''');
+    await db.execute('''
+      CREATE TABLE ai_chat_messages (
+        id         TEXT PRIMARY KEY,
+        session_id TEXT NOT NULL,
+        role       TEXT NOT NULL,
+        content    TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        is_canvas  INTEGER DEFAULT 0
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_chat_session ON ai_chat_messages(session_id)',
+    );
     await db.execute('''
       CREATE TABLE deleted_splits (
         id                    TEXT PRIMARY KEY,

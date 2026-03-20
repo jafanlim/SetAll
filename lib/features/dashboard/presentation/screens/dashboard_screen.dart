@@ -17,6 +17,7 @@ import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../analytics/presentation/screens/analytics_screen.dart'
     show analyticsDataProvider, AnalyticsData;
+import '../../../../core/services/dashboard_preferences_service.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -548,8 +549,8 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
                 // Pre-allocate a fixed content area (3 lines ≈ 56px) so the
                 // card never changes height when transitioning loading → data.
                 SizedBox(
-                  // 3 lines at fontSize 13 * height 1.4 ≈ 55px
-                  height: 55,
+                  // 2 lines + button row — increased to 72px (FEAT-06)
+                  height: 72,
                   child: aiAsync.when(
                     skipLoadingOnReload: true,
                     data: (insight) {
@@ -599,16 +600,37 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
                           ),
                         );
                       }
-                      return Text(
-                        insight,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: theme.colorScheme.onSurface,
-                          height: 1.4,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 3,
-                        overflow: TextOverflow.ellipsis,
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            insight,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: theme.colorScheme.onSurface,
+                              height: 1.4,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 2),
+                          GestureDetector(
+                            onTap: () {
+                              HapticUtils.lightTap(); // FEAT-06: entry point to InsightsPanel
+                              context.push(AppRouter.insights);
+                            },
+                            child: const Text(
+                              'Full analysis →',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: _aTeal,
+                              ),
+                            ),
+                          ),
+                        ],
                       );
                     },
                     loading: () => AnimatedBuilder(
@@ -662,20 +684,59 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
 }
 
 // ---------------------------------------------------------------------------
-// Widget 5 — Compact Analytics Section (Charts merged into Dashboard)
+// Widget 5 — Compact Analytics Section (reorderable, FEAT-07)
 // ---------------------------------------------------------------------------
-class _CompactAnalyticsSection extends StatelessWidget {
+class _CompactAnalyticsSection extends StatefulWidget {
   const _CompactAnalyticsSection({required this.data});
   final AnalyticsData data;
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        // ── Spending by Category ─────────────────────────────────────────
-        if (data.categoryTotals.isNotEmpty) ...[
-          _DashboardSectionCard(
+  State<_CompactAnalyticsSection> createState() =>
+      _CompactAnalyticsSectionState();
+}
+
+class _CompactAnalyticsSectionState extends State<_CompactAnalyticsSection> {
+  List<String> _order = List.of(DashboardPreferencesService.defaultOrder);
+
+  @override
+  void initState() {
+    super.initState();
+    DashboardPreferencesService.loadOrder().then((saved) {
+      if (mounted) setState(() => _order = saved);
+    });
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    HapticUtils.primaryTap(); // HAPTIC-01: drag start feedback — primaryTap = mediumImpact
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final item = _order.removeAt(oldIndex);
+      _order.insert(newIndex, item);
+    });
+    DashboardPreferencesService.saveOrder(_order);
+  }
+
+  void _removeTile(String tileId) {
+    HapticUtils.lightTap();
+    setState(() => _order.remove(tileId));
+    DashboardPreferencesService.saveOrder(_order);
+  }
+
+  void _addTile(String tileId) {
+    if (_order.contains(tileId)) return;
+    HapticUtils.lightTap();
+    setState(() => _order.add(tileId));
+    DashboardPreferencesService.saveOrder(_order);
+  }
+
+  Widget _buildTileContent(String tileId) {
+    final data = widget.data;
+    switch (tileId) {
+      case kTileDonut:
+        return Visibility(
+          visible: data.categoryTotals.isNotEmpty,
+          maintainState: true,
+          child: _DashboardSectionCard(
             title: 'analytics.spending_by_category'.tr(),
             child: _DashboardDonutChart(
               categoryTotals: data.categoryTotals,
@@ -683,12 +744,12 @@ class _CompactAnalyticsSection extends StatelessWidget {
               currency: data.currency,
             ),
           ),
-          const SizedBox(height: 10),
-        ],
-
-        // ── Net Trend ────────────────────────────────────────────────────
-        if (data.netTrend.length > 1) ...[
-          _DashboardSectionCard(
+        );
+      case kTileTrend:
+        return Visibility(
+          visible: data.netTrend.length > 1,
+          maintainState: true,
+          child: _DashboardSectionCard(
             title: 'analytics.net_position_trend'.tr(),
             child: _DashboardTrendChart(
               spots: data.netTrend,
@@ -696,16 +757,15 @@ class _CompactAnalyticsSection extends StatelessWidget {
               spanDays: 30,
             ),
           ),
-          const SizedBox(height: 10),
-        ],
-
-        // ── Quick stats row ──────────────────────────────────────────────
-        Row(
+        );
+      case kTileQuickStats:
+        return Row(
           children: [
             Expanded(
               child: _QuickStatTile(
                 label: 'analytics.spending'.tr(),
-                value: '${data.currency} ${data.totalSpend.toStringAsFixed(0)}',
+                value:
+                    '${data.currency} ${data.totalSpend.toStringAsFixed(0)}',
                 color: _aRose,
               ),
             ),
@@ -713,7 +773,8 @@ class _CompactAnalyticsSection extends StatelessWidget {
             Expanded(
               child: _QuickStatTile(
                 label: 'analytics.income'.tr(),
-                value: '${data.currency} ${data.totalIncome.toStringAsFixed(0)}',
+                value:
+                    '${data.currency} ${data.totalIncome.toStringAsFixed(0)}',
                 color: _aTeal,
               ),
             ),
@@ -721,13 +782,114 @@ class _CompactAnalyticsSection extends StatelessWidget {
             Expanded(
               child: _QuickStatTile(
                 label: 'analytics.daily_burn'.tr(),
-                value: '${data.currency} ${data.burnRate.toStringAsFixed(1)}',
+                value:
+                    '${data.currency} ${data.burnRate.toStringAsFixed(1)}',
                 color: _aOrange,
               ),
             ),
           ],
+        );
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        ReorderableListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _order.length,
+          onReorder: _onReorder,
+          proxyDecorator: (child, index, animation) => Material(
+            color: Colors.transparent,
+            child: child,
+          ),
+          itemBuilder: (context, index) {
+            final tileId = _order[index];
+            return Padding(
+              key: Key(tileId),
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                        width: 0.5,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: _buildTileContent(tileId),
+                  ),
+                  // ── Drag handle (top-right) ──────────────────────────
+                  Positioned(
+                    top: 6,
+                    right: 36,
+                    child: ReorderableDragStartListener(
+                      index: index,
+                      child: const Icon(
+                        Icons.drag_handle,
+                        size: 18,
+                        color: _aTeal,
+                      ),
+                    ),
+                  ),
+                  // ── Remove button (top-right) ────────────────────────
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: GestureDetector(
+                      onTap: () => _removeTile(tileId),
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: Icon(
+                          Icons.close,
+                          size: 14,
+                          color: theme.colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.5),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         ),
+        // ── Add chart tile button ────────────────────────────────────────
+        if (_order.length < DashboardPreferencesService.defaultOrder.length)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => _showChartPicker(context),
+              icon: const Icon(Icons.add, size: 16, color: _aTeal),
+              label: const Text(
+                'Add chart',
+                style: TextStyle(fontSize: 12, color: _aTeal),
+              ),
+            ),
+          ),
       ],
+    );
+  }
+
+  void _showChartPicker(BuildContext context) {
+    final missing = DashboardPreferencesService.defaultOrder
+        .where((id) => !_order.contains(id))
+        .toList();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _ChartPickerSheet(
+        availableTiles: missing,
+        onAdd: _addTile,
+      ),
     );
   }
 }
@@ -1124,6 +1286,146 @@ class _NavCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Chart Picker Sheet — shown when tapping "+ Add chart" (FEAT-07)
+// ---------------------------------------------------------------------------
+class _ChartPickerSheet extends StatelessWidget {
+  const _ChartPickerSheet({
+    required this.availableTiles,
+    required this.onAdd,
+  });
+
+  final List<String> availableTiles;
+  final void Function(String tileId) onAdd;
+
+  static const _meta = <String, (IconData, String, String)>{
+    kTileDonut: (
+      Icons.donut_large_outlined,
+      'Spending by Category',
+      'Donut chart of your top expense categories',
+    ),
+    kTileTrend: (
+      Icons.show_chart_outlined,
+      'Net Position Trend',
+      'Line chart of your net position over 30 days',
+    ),
+    kTileQuickStats: (
+      Icons.bar_chart_outlined,
+      'Quick Stats',
+      'Spending, income and daily burn at a glance',
+    ),
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.5,
+      minChildSize: 0.35,
+      maxChildSize: 0.85,
+      expand: false,
+      builder: (context, scrollController) {
+        return Container(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: ListView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant
+                        .withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Add a chart',
+                style: theme.textTheme.titleMedium
+                    ?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 16),
+              if (availableTiles.isEmpty)
+                Center(
+                  child: Text(
+                    'All charts are already on your dashboard.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              else
+                GridView.count(
+                  crossAxisCount: 2,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.4,
+                  children: availableTiles.map((tileId) {
+                    final meta = _meta[tileId];
+                    if (meta == null) return const SizedBox.shrink();
+                    final (icon, name, desc) = meta;
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () {
+                        onAdd(tileId);
+                        Navigator.of(context).pop();
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: _aTeal.withValues(alpha: 0.35),
+                            width: 1,
+                          ),
+                          borderRadius: BorderRadius.circular(14),
+                          color: _aTeal.withValues(alpha: 0.05),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(icon, color: _aTeal, size: 22),
+                            const SizedBox(height: 8),
+                            Text(
+                              name,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                                color: _aTeal,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              desc,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
