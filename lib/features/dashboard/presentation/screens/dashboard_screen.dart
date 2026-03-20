@@ -1302,7 +1302,7 @@ class _ChartPickerSheet extends StatelessWidget {
   final List<String> availableTiles;
   final void Function(String tileId) onAdd;
 
-  static const _meta = <String, (IconData, String, String)>{
+  static final _meta = <String, (IconData, String, String)>{
     kTileDonut: (
       Icons.donut_large_outlined,
       'Spending by Category',
