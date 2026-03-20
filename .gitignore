@@ -79,3 +79,13 @@ package-lock.json
 
 # Generated Tailwind CSS (rebuild with: make tailwind)
 web/styles.css
+
+# ── Local Co-Dev Artifacts (never commit) ────────────────────────────────────
+# Living documentation files — managed outside version control
+projectledger.md
+wiki doc.md
+
+# Local environment config — use .env.example as the committed template
+.env
+.env.local
+.env.*.local

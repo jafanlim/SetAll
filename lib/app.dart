@@ -13,6 +13,7 @@ import 'core/theme/setall_theme.dart';
 import 'core/router/app_router.dart';
 import 'core/providers/setall_providers.dart';
 import 'core/providers/theme_mode_provider.dart';
+import 'core/services/date_format_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
@@ -32,13 +33,15 @@ class SetAllApp extends ConsumerStatefulWidget {
   ConsumerState<SetAllApp> createState() => _SetAllAppState();
 }
 
-class _SetAllAppState extends ConsumerState<SetAllApp> {
+class _SetAllAppState extends ConsumerState<SetAllApp>
+    with WidgetsBindingObserver {
   StreamSubscription<AuthState>? _authSub;
   String? _lastUserId;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     try {
       _authSub = Supabase.instance.client.auth.onAuthStateChange.listen(
         _onAuthChange,
@@ -50,8 +53,22 @@ class _SetAllAppState extends ConsumerState<SetAllApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _authSub?.cancel();
     super.dispose();
+  }
+
+  // MED-01: Live locale reload without app restart.
+  // didChangeLocales fires when the user changes system locale in Settings.
+  // DateFormatService.reload() re-reads ICU locale extensions and resets
+  // date/currency formatting. No restart required.
+  // MANUAL: verify didChangeLocales fires on device
+  // by changing system locale in iOS/macOS Settings while app is open.
+  // Date formats should update without restart.
+  @override
+  void didChangeLocales(List<Locale>? locales) {
+    super.didChangeLocales(locales);
+    DateFormatService.instance.reload();
   }
 
   Future<void> _onAuthChange(AuthState state) async {
