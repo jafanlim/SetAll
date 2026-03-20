@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:window_manager/window_manager.dart' if (dart.library.html) 'core/stubs/window_manager_stub.dart';
 
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
 import 'app.dart';
 import 'firebase_options.dart';
@@ -76,34 +77,42 @@ void main() async {
     );
   };
 
-  // Unhandled async errors (no zone so runApp stays in same zone as bindings; avoids web "Zone mismatch").
-  ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    if (kDebugMode) {
-      debugPrint('Uncaught error: $error');
-      debugPrint(stack.toString());
-    }
-    return true;
-  };
-
   await EasyLocalization.ensureInitialized();
   await initializeDateFormatting();
 
-  runApp(
-    EasyLocalization(
-      supportedLocales: const [
-        Locale('en'),
-        Locale('ru'),
-        Locale('ka'),
-        Locale('de'),
-        Locale('es'),
-        Locale('fr'),
-      ],
-      path: 'assets/translations',
-      fallbackLocale: const Locale('en'),
-      child: const ProviderScope(
-        child: _AppLoader(),
+  // MED-05: Full Crashlytics wiring — three error surfaces covered:
+  // recordFlutterFatalError → Flutter framework/widget errors
+  // PlatformDispatcher.onError → native platform + isolate errors
+  // runZonedGuarded → all uncaught errors in the root Dart zone
+  // Collection disabled in debug builds (kDebugMode guard).
+  FlutterError.onError =
+      FirebaseCrashlytics.instance.recordFlutterFatalError;
+
+  ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
+    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    return true;
+  };
+
+  runZonedGuarded(
+    () => runApp(
+      EasyLocalization(
+        supportedLocales: const [
+          Locale('en'),
+          Locale('ru'),
+          Locale('ka'),
+          Locale('de'),
+          Locale('es'),
+          Locale('fr'),
+        ],
+        path: 'assets/translations',
+        fallbackLocale: const Locale('en'),
+        child: const ProviderScope(
+          child: _AppLoader(),
+        ),
       ),
     ),
+    (error, stack) =>
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
   );
 }
 
@@ -156,6 +165,8 @@ class _AppLoaderState extends State<_AppLoader> {
         await Firebase.initializeApp(
           options: DefaultFirebaseOptions.currentPlatform,
         );
+        await FirebaseCrashlytics.instance
+            .setCrashlyticsCollectionEnabled(!kDebugMode);
         if (!kIsWeb) unawaited(NotificationService.instance.init());
       } catch (_) {
         // Firebase not configured yet — skip silently.
