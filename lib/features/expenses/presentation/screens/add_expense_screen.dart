@@ -334,7 +334,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       if (mounted) {
         setState(() => _isSubmitting = false);
         if (expense != null) {
-          HapticUtils.success();
+          HapticUtils.success(); // HAPTIC-01: wallet creation — heavy confirms high-value action
           ref.invalidate(walletBalanceProvider);
           ref.invalidate(personalExpensesProvider);
           ref.invalidate(recentExpensesProvider);
@@ -460,7 +460,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     if (mounted) {
       setState(() => _isSubmitting = false);
       if (expense != null) {
-        HapticUtils.success();
+        HapticUtils.primaryTap(); // HAPTIC-01: expense saved — medium confirms data was committed
         ref.invalidate(balanceSummaryProvider);
         ref.invalidate(recentExpensesProvider);
         ref.invalidate(groupExpensesProvider(widget.groupId));

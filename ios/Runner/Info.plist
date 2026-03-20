@@ -30,6 +30,7 @@
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>com.jafa.setall.app</string>
+				<string>setall</string>
 			</array>
 		</dict>
 	</array>
@@ -39,6 +40,8 @@
 	<true/>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SetAll uses your microphone to transcribe expense descriptions.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>SetAll uses your camera to photograph receipts and bills for wallet entries.</string>
 	<key>NSFaceIDUsageDescription</key>
