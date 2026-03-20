@@ -24,6 +24,7 @@ import '../models/group_model.dart';
 import '../models/profile_model.dart';
 import '../models/split_model.dart';
 import '../../core/services/currency_service.dart';
+import '../../features/insights/models/ai_chat_message.dart';
 
 const String _deviceUserIdKey = 'device_user_id';
 /// Thrown when [SetAllRepository.createDirectGroup] cannot find a user with
@@ -3606,6 +3607,57 @@ class SetAllRepository {
       expenses: expenseRows,
       splits: splitModels,
     );
+  }
+
+  // ---------------------------------------------------------------------------
+  // AI Chat History (FEAT-06 — InsightsPanel)
+  // ---------------------------------------------------------------------------
+
+  Future<void> insertChatMessage(AiChatMessage msg) async {
+    if (LocalDatabase.isWeb) return;
+    final db = LocalDatabase.db;
+    await db.insert(
+      'ai_chat_messages',
+      msg.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    // Enforce max 20 sessions — delete oldest when exceeded.
+    await _pruneOldChatSessions(db);
+  }
+
+  Future<List<AiChatMessage>> getChatHistory(String sessionId) async {
+    if (LocalDatabase.isWeb) return [];
+    final db = LocalDatabase.db;
+    final rows = await db.query(
+      'ai_chat_messages',
+      where: 'session_id = ?',
+      whereArgs: [sessionId],
+      orderBy: 'created_at ASC',
+    );
+    return rows.map(AiChatMessage.fromMap).toList();
+  }
+
+  Future<List<String>> getChatSessionIds() async {
+    if (LocalDatabase.isWeb) return [];
+    final db = LocalDatabase.db;
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT session_id, MAX(created_at) AS latest '
+      'FROM ai_chat_messages GROUP BY session_id ORDER BY latest DESC',
+    );
+    return rows.map((r) => r['session_id'] as String).toList();
+  }
+
+  Future<void> _pruneOldChatSessions(Database db) async {
+    const maxSessions = 20;
+    final ids = await db.rawQuery(
+      'SELECT DISTINCT session_id, MAX(created_at) AS latest '
+      'FROM ai_chat_messages GROUP BY session_id ORDER BY latest DESC',
+    );
+    if (ids.length <= maxSessions) return;
+    final toDelete = ids.skip(maxSessions).map((r) => r['session_id'] as String).toList();
+    for (final sid in toDelete) {
+      await db.delete('ai_chat_messages', where: 'session_id = ?', whereArgs: [sid]);
+    }
   }
 
   // ---------------------------------------------------------------------------

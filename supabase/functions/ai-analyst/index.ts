@@ -199,7 +199,7 @@ serve(async (req) => {
       contents,
       safetySettings: SAFETY_SETTINGS,
       generationConfig: {
-        maxOutputTokens:  2048,
+        maxOutputTokens:  8192, // FEAT-06: bumped for InsightsPanel full-chat mode
         temperature:      0.4,
         responseMimeType: 'application/json',
       },

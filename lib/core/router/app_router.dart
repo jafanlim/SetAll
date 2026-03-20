@@ -34,6 +34,7 @@ import '../../features/settings/presentation/screens/change_password_screen.dart
 import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 import '../../features/web/download_screen.dart';
 import '../../features/web/legal_screen.dart';
+import '../../features/insights/presentation/screens/insights_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -63,6 +64,7 @@ final class AppRouter {
   static const String groupExpenseDetail     = '/group-expense-detail';
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
+  static const String insights = '/insights';
   static const String download = '/download';
   static const String privacy  = '/privacy';
   static const String terms    = '/terms';
@@ -496,6 +498,18 @@ final class AppRouter {
               },
             ),
           ],
+        ),
+
+        // ── AI Insights Panel (pushed over dashboard, back-swipe supported) ──
+        GoRoute(
+          path: insights,
+          name: 'insights',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const InsightsScreen(),
+            ),
+          ),
         ),
 
         // ── Public web routes (no auth required) ──────────────────────────
