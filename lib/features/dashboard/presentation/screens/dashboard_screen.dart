@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -102,7 +103,18 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     return (structured?['summary'] as String?)
         ?? (data?['reply'] as String?)
         ?? '';
-  } catch (_) {
+  } catch (error, stackTrace) {
+    // ACT-crash: structured breadcrumb — fatal:false means degraded UX, not a crash.
+    await FirebaseCrashlytics.instance.recordError(
+      error,
+      stackTrace,
+      reason: 'AI insight provider failure',
+      information: [
+        DiagnosticsProperty<String>('stage', 'supabase_edge_fn_invoke'),
+        DiagnosticsProperty<String>('timestamp', DateTime.now().toIso8601String()),
+      ],
+      fatal: false,
+    );
     // Network / Supabase error — return empty so the error state shows.
     rethrow;
   }
