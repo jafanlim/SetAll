@@ -20,12 +20,21 @@ String get kAuthRedirectBaseUrl {
 class AuthConfig {
   // 1. SUPABASE CREDENTIALS
   // Go to Supabase Dashboard -> Project Settings -> API
-  
+
+  // ACT-config: Read from --dart-define at build time.
+  // Fallback values allow plain `flutter run` in local dev without flags.
+
   /// Your Project URL (e.g., 'https://xyzcompany.supabase.co')
-  static const String supabaseUrl = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
+  static const supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://vrsmsgyxeyzyrdonsnrk.supabase.co',
+  );
 
   /// Your Project Anon Public Key
-  static const String supabaseAnonKey = 'REDACTED_JWT';
+  static const supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'REDACTED_JWT',
+  );
 
   // 2. OAUTH CREDENTIALS (For Phase 0: Google Sign-In)
   // You will need these from the Google Cloud Console later when setting up Google Auth.

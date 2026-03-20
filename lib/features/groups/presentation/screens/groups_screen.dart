@@ -14,6 +14,7 @@ import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
+import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
 
 const _teal       = Color(0xFF00D9B0);
@@ -1173,7 +1174,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
   }
 
   static const _kStorageBase =
-      'https://vrsmsgyxeyzyrdonsnrk.supabase.co/storage/v1/object/public/group-avatars/';
+      '${AuthConfig.supabaseUrl}/storage/v1/object/public/group-avatars/';
 
   static String? _resolveAvatarUrl(String? raw) {
     if (raw == null || raw.isEmpty) return null;

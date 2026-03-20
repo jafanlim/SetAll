@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
 
 // ---------------------------------------------------------------------------
@@ -18,7 +19,7 @@ const _brandOrange = Color(0xFFF97316);
 // Helpers
 // ---------------------------------------------------------------------------
 const _kStorageBase =
-    'https://vrsmsgyxeyzyrdonsnrk.supabase.co/storage/v1/object/public/group-avatars/';
+    '${AuthConfig.supabaseUrl}/storage/v1/object/public/group-avatars/';
 
 String? _resolveAvatarUrl(String? raw) {
   if (raw == null || raw.isEmpty) return null;

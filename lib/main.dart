@@ -17,11 +17,8 @@ import 'core/services/currency_sync_service.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/config/auth_config.dart';
 import 'data/local/local_database.dart';
-
-/// SetAll Supabase project (organisation: Shoko12).
-const String _supabaseUrl = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
-const String _supabaseAnonKey = 'REDACTED_JWT';
 
 /// Base URL for email confirmation and OAuth redirects. Set this to your deployed web app URL (e.g. https://your-app.vercel.app) so links work on mobile. When null, web uses current origin.
 void main() async {
@@ -130,7 +127,7 @@ class _AppLoaderState extends State<_AppLoader> {
 
   Future<void> _init() async {
     try {
-      final hasSupabase = !_supabaseUrl.startsWith('YOUR_') && !_supabaseAnonKey.startsWith('YOUR_');
+      final hasSupabase = !AuthConfig.supabaseUrl.startsWith('YOUR_') && !AuthConfig.supabaseAnonKey.startsWith('YOUR_');
 
       if (kIsWeb) {
         // Web: Supabase only. No anonymous sign-in; user signs in with Email or Google.
@@ -139,7 +136,7 @@ class _AppLoaderState extends State<_AppLoader> {
           // Implicit flow on web: email confirmation links work cross-device
           // because GoTrue returns tokens in #fragment (no client-side
           // PKCE verifier required). Mobile uses PKCE via _initSupabase().
-          await Supabase.initialize(url: _supabaseUrl, anonKey: _supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
+          await Supabase.initialize(url: AuthConfig.supabaseUrl, anonKey: AuthConfig.supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
           // Recover session when user lands from email confirmation or OAuth (e.g. on iPhone opening link).
           await _recoverSessionFromUrlIfNeeded();
         }
@@ -186,8 +183,8 @@ class _AppLoaderState extends State<_AppLoader> {
 
   Future<void> _initSupabase() async {
     await Supabase.initialize(
-      url: _supabaseUrl,
-      anonKey: _supabaseAnonKey,
+      url: AuthConfig.supabaseUrl,
+      anonKey: AuthConfig.supabaseAnonKey,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
       ),
