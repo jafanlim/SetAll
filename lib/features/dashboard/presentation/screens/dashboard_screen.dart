@@ -47,6 +47,18 @@ const _kPaletteColors = [
 const _kAiEmpty   = '__empty__';   // no transactions yet
 const _kAiOffline = '__offline__'; // no connectivity
 
+// ACT-retry: maximum one retry on Gemini rate-limit (429 embedded in reply).
+const _maxRetries = 1;
+
+// Detects a Gemini 429 rate-limit surfaced as a 200 reply string.
+// The Supabase edge function swallows the HTTP 429 and returns:
+//   { reply: "Gemini error: ... 429 ...", structured: null }
+bool _isRateLimitReply(Map<String, dynamic>? data) {
+  final reply = (data?['reply'] as String? ?? '').toLowerCase();
+  return data?['structured'] == null &&
+      (reply.contains('429') || reply.contains('rate'));
+}
+
 // AI insight provider — cached result keyed to the current user session.
 // Invalidate on manual refresh or app re-open.
 final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
@@ -82,23 +94,35 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
           '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
       .join('\n');
 
+  final invokeBody = {
+    'message': 'Give me a concise 1-sentence financial insight about my spending this month.',
+    'history': <Map<String, String>>[],
+    'context': {
+      'totalSpending':  analyticsData.totalSpend,
+      'dailyBurn':      analyticsData.burnRate,
+      'totalIncome':    analyticsData.totalIncome,
+      'net':            analyticsData.netFlow,
+      'topCategories':  topCatsStr,
+      'recentRows':     recentRows,
+    },
+  };
+
   try {
-    final res = await client.functions.invoke(
-      'ai-analyst',
-      body: {
-        'message': 'Give me a concise 1-sentence financial insight about my spending this month.',
-        'history': <Map<String, String>>[],
-        'context': {
-          'totalSpending':  analyticsData.totalSpend,
-          'dailyBurn':      analyticsData.burnRate,
-          'totalIncome':    analyticsData.totalIncome,
-          'net':            analyticsData.netFlow,
-          'topCategories':  topCatsStr,
-          'recentRows':     recentRows,
-        },
-      },
-    );
-    final data = res.data as Map<String, dynamic>?;
+    var res = await client.functions.invoke('ai-analyst', body: invokeBody);
+    var data = res.data as Map<String, dynamic>?;
+
+    // ACT-retry: honour retry-after before surfacing ai_unavailable.
+    // One attempt only — prevents call stacking if Gemini is overloaded.
+    // The edge function swallows Gemini 429 and returns 200 with an error
+    // string; no retry-after header is forwarded, so we default to 3s.
+    if (_isRateLimitReply(data)) {
+      const retryDelaySecs = 3;
+      debugPrint('[AI] Rate limited — retrying in ${retryDelaySecs}s (attempt 1/$_maxRetries)');
+      await Future.delayed(const Duration(seconds: retryDelaySecs));
+      res  = await client.functions.invoke('ai-analyst', body: invokeBody);
+      data = res.data as Map<String, dynamic>?;
+    }
+
     final structured = data?['structured'] as Map<String, dynamic>?;
     return (structured?['summary'] as String?)
         ?? (data?['reply'] as String?)
