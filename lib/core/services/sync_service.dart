@@ -34,6 +34,7 @@ class SyncService {
   RealtimeChannel? _channel;
   Timer? _periodicTimer;
   Timer? _resubscribeTimer;
+  Timer? _debounceTimer;
   StreamSubscription<List<ConnectivityResult>>? _connectivitySub;
 
   bool get _isWeb => LocalDatabase.isWeb;
@@ -122,8 +123,12 @@ class SyncService {
     });
 
     void onRemoteChange(PostgresChangePayload payload) {
-      // Fire-and-forget: errors are swallowed inside performFullSync.
-      performFullSync();
+      // FEAT-05-Ph2: Debounce concurrent Realtime events into a single sync.
+      // Coalesces all row-level changes within 500ms into one performFullSync()
+      // call. Prevents N parallel full-pulls when multiple group members write
+      // simultaneously. 500ms is imperceptible to users but eliminates the flood.
+      _debounceTimer?.cancel();
+      _debounceTimer = Timer(const Duration(milliseconds: 500), performFullSync);
     }
 
     _channel = _client
@@ -209,6 +214,8 @@ class SyncService {
     _periodicTimer = null;
     _resubscribeTimer?.cancel();
     _resubscribeTimer = null;
+    _debounceTimer?.cancel(); // FEAT-05-Ph2: cancel pending debounce on dispose
+    _debounceTimer = null;
     _connectivitySub?.cancel();
     _connectivitySub = null;
     if (_channel != null) {
