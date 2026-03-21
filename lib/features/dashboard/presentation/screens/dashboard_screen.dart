@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
 import '../../../../core/config/auth_config.dart';
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/services/quick_actions_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/dashboard_preferences_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -158,6 +159,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(_aiInsightProvider);
         }
       });
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // HOTFIX-03: drain pending quick action once router shell is mounted.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) QuickActionsService.drainPending(context);
     });
   }
 
