@@ -80,19 +80,6 @@ void main() async {
   await EasyLocalization.ensureInitialized();
   await initializeDateFormatting();
 
-  // MED-05: Full Crashlytics wiring — three error surfaces covered:
-  // recordFlutterFatalError → Flutter framework/widget errors
-  // PlatformDispatcher.onError → native platform + isolate errors
-  // runZonedGuarded → all uncaught errors in the root Dart zone
-  // Collection disabled in debug builds (kDebugMode guard).
-  FlutterError.onError =
-      FirebaseCrashlytics.instance.recordFlutterFatalError;
-
-  ui.PlatformDispatcher.instance.onError = (Object error, StackTrace stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
-
   runZonedGuarded(
     () => runApp(
       EasyLocalization(
@@ -111,8 +98,11 @@ void main() async {
         ),
       ),
     ),
-    (error, stack) =>
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true),
+    (error, stack) {
+      if (!kIsWeb) {
+        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      }
+    },
   );
 }
 
@@ -167,6 +157,17 @@ class _AppLoaderState extends State<_AppLoader> {
         );
         await FirebaseCrashlytics.instance
             .setCrashlyticsCollectionEnabled(!kDebugMode);
+        // MED-05: Full Crashlytics wiring — three error surfaces covered:
+        // recordFlutterFatalError → Flutter framework/widget errors
+        // PlatformDispatcher.onError → native platform + isolate errors
+        // runZonedGuarded → all uncaught errors in the root Dart zone
+        FlutterError.onError =
+            FirebaseCrashlytics.instance.recordFlutterFatalError;
+        ui.PlatformDispatcher.instance.onError =
+            (Object error, StackTrace stack) {
+          FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+          return true;
+        };
         if (!kIsWeb) unawaited(NotificationService.instance.init());
       } catch (_) {
         // Firebase not configured yet — skip silently.
