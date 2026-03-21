@@ -37,8 +37,9 @@ target_link_libraries(${BINARY_NAME} PRIVATE "dwmapi.lib")
 target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 # HOTFIX-04: explicitly add vendored speech_to_text_windows include path
 # so generated_plugin_registrant.cc can resolve the SpeechToTextWindows* declaration.
+# CMAKE_CURRENT_SOURCE_DIR = windows/runner/ so ../../ = project root
 target_include_directories(${BINARY_NAME} PRIVATE
-  "${CMAKE_SOURCE_DIR}/../packages/speech_to_text_windows/windows/include"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../../packages/speech_to_text_windows/windows/include"
 )
 
 # Run the Flutter tool portions of the build. This must not be removed.
