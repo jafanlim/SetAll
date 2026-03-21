@@ -48,16 +48,29 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # speech_to_text_windows 1.0.0+beta.8 exports SpeechToTextWindowsPluginRegisterWithRegistrar
-      # but flutter pub get regenerates the registrant with the old symbol name. Patch it.
+      # speech_to_text_windows 1.0.0+beta.8: the compiled DLL exports
+      # SpeechToTextWindowsPluginRegisterWithRegistrar but the pub-cache header
+      # declares SpeechToTextWindowsRegisterWithRegistrar. flutter build windows
+      # regenerates generated_plugin_registrant.cc from the header at cmake time,
+      # so we must patch the pub-cache header BEFORE building.
       - name: Patch Windows speech_to_text symbol
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
+          $pubCache = "$env:LOCALAPPDATA\Pub\Cache\hosted\pub.dev"
+          $header = Get-ChildItem "$pubCache\speech_to_text_windows*\windows\include\speech_to_text_windows\speech_to_text_windows.h" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($header) {
+            (Get-Content $header.FullName) -replace 'void SpeechToTextWindowsRegisterWithRegistrar\b', 'void SpeechToTextWindowsPluginRegisterWithRegistrar' |
+              Set-Content $header.FullName
+            Write-Host "Patched pub cache header: $($header.FullName)"
+          } else {
+            Write-Host "Header not found in LOCALAPPDATA pub cache"
+          }
+          # Also patch the already-generated registrant file as a belt-and-suspenders measure
           $f = "windows/flutter/generated_plugin_registrant.cc"
           (Get-Content $f) -replace 'SpeechToTextWindowsRegisterWithRegistrar\b', 'SpeechToTextWindowsPluginRegisterWithRegistrar' |
             Set-Content $f
-          Write-Host "Patched speech_to_text symbol in $f"
+          Write-Host "Patched registrant: $f"
 
       # ── macOS Build & Package ──────────────────────────────────────────────
       - name: Build macOS
