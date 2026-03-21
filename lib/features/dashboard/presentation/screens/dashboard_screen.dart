@@ -44,13 +44,6 @@ const _kPaletteColors = [
   _aTeal, _aGold, _aRose, _aViolet, _aSky, _aOrange, _aLime, _aPink,
 ];
 
-// Streams the current Supabase session so _aiInsightProvider rebuilds once
-// the session is restored after app launch.
-final _supabaseSessionProvider = StreamProvider.autoDispose<Session?>((ref) {
-  return Supabase.instance.client.auth.onAuthStateChange
-      .map((event) => event.session);
-});
-
 // Sentinel values returned by _aiInsightProvider to distinguish UI states.
 const _kAiEmpty   = '__empty__';   // no transactions yet
 const _kAiOffline = '__offline__'; // no connectivity
@@ -88,11 +81,8 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   }
 
   final client = Supabase.instance.client;
-  // Wait for session to be available — provider rebuilds via _supabaseSessionProvider.
-  final session = ref.watch(_supabaseSessionProvider).valueOrNull;
-  if (session == null && client.auth.currentSession == null) {
-    return _kAiEmpty;
-  }
+  final accessToken = client.auth.currentSession?.accessToken;
+  if (accessToken == null) return _kAiEmpty;
   final topCats = analyticsData.categoryTotals.entries
       .toList()
     ..sort((a, b) => b.value.compareTo(a.value));
@@ -121,7 +111,8 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   };
 
   try {
-    var res = await client.functions.invoke('ai-analyst', body: invokeBody);
+    final headers = {'Authorization': 'Bearer $accessToken'};
+    var res = await client.functions.invoke('ai-analyst', body: invokeBody, headers: headers);
     var data = res.data as Map<String, dynamic>?;
 
     // ACT-retry: honour retry-after before surfacing ai_unavailable.
@@ -132,7 +123,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       const retryDelaySecs = 3;
       debugPrint('[AI] Rate limited — retrying in ${retryDelaySecs}s (attempt 1/$_maxRetries)');
       await Future.delayed(const Duration(seconds: retryDelaySecs));
-      res  = await client.functions.invoke('ai-analyst', body: invokeBody);
+      res  = await client.functions.invoke('ai-analyst', body: invokeBody, headers: headers);
       data = res.data as Map<String, dynamic>?;
     }
 
