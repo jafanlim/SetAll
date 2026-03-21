@@ -16,8 +16,12 @@
 extern "C" {
 #endif
 
-FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsRegisterWithRegistrar(
+FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
+
+// Alias: generated_plugin_registrant.cc calls SpeechToTextWindowsRegisterWithRegistrar
+// but the compiled DLL exports SpeechToTextWindowsPluginRegisterWithRegistrar.
+#define SpeechToTextWindowsRegisterWithRegistrar SpeechToTextWindowsPluginRegisterWithRegistrar
 
 #if defined(__cplusplus)
 }  // extern "C"
