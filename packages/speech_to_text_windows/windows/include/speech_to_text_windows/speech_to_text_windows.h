@@ -19,9 +19,10 @@ extern "C" {
 FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsPluginRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
-// Alias: generated_plugin_registrant.cc calls SpeechToTextWindowsRegisterWithRegistrar
-// but the compiled DLL exports SpeechToTextWindowsPluginRegisterWithRegistrar.
-#define SpeechToTextWindowsRegisterWithRegistrar SpeechToTextWindowsPluginRegisterWithRegistrar
+// Forward declaration for generated_plugin_registrant.cc compatibility.
+// Defined in speech_to_text_windows_shim.cpp as a forwarder.
+FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsRegisterWithRegistrar(
+    FlutterDesktopPluginRegistrarRef registrar);
 
 #if defined(__cplusplus)
 }  // extern "C"
