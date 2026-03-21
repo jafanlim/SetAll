@@ -699,113 +699,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       : Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                   onTap: _passwordChanging ? null : _showSetPasswordDialog,
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: const Icon(Icons.delete_sweep_outlined, color: Colors.orangeAccent),
-                  title: Text(
-                    'settings_ext.clear_expenses'.tr(),
-                    style: const TextStyle(
-                      color: Colors.orangeAccent,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text('settings_ext.clear_expenses_subtitle'.tr()),
-                  onTap: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text('settings_ext.dialog_clear_expenses_title'.tr()),
-                        content: Text(
-                          'settings_ext.dialog_clear_expenses_body'.tr(),
+
+                // FEAT-11: Danger Zone — destructive actions separated from account management.
+                // Clear Data and Resync tiles removed per product decision.
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  child: Row(
+                    children: [
+                      Expanded(child: Divider(color: Colors.red.withValues(alpha: 0.35), thickness: 1)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        child: Text(
+                          'DANGER ZONE',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            letterSpacing: 1.2,
+                            color: Colors.red.withValues(alpha: 0.7),
+                          ),
                         ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: Text('common.cancel'.tr()),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.orangeAccent,
-                              foregroundColor: Colors.black,
-                            ),
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            child: Text('settings_ext.dialog_clear_expenses_confirm'.tr()),
-                          ),
-                        ],
                       ),
-                    );
-                    if (confirmed != true || !context.mounted) return;
-                    await ref.read(setAllRepositoryProvider).clearAllExpenses();
-                    ref.invalidate(recentExpensesProvider);
-                    ref.invalidate(balanceSummaryProvider);
-                    ref.invalidate(myGroupsProvider);
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('settings_ext.expenses_cleared'.tr())),
-                      );
-                    }
-                  },
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: const Icon(Icons.refresh, color: Colors.orangeAccent),
-                  title: Text(
-                    'settings_ext.reset_cache'.tr(),
-                    style: const TextStyle(
-                      color: Colors.orangeAccent,
-                      fontWeight: FontWeight.w600,
-                    ),
+                      Expanded(child: Divider(color: Colors.red.withValues(alpha: 0.35), thickness: 1)),
+                    ],
                   ),
-                  subtitle: Text(
-                    'settings_ext.reset_cache_subtitle'.tr(),
-                    style: const TextStyle(fontSize: 11),
-                  ),
-                  onTap: () async {
-                    final confirmed = await showDialog<bool>(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: Text('settings_ext.dialog_reset_cache_title'.tr()),
-                        content: Text(
-                          'settings_ext.dialog_reset_cache_body'.tr(),
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(false),
-                            child: Text('common.cancel'.tr()),
-                          ),
-                          FilledButton(
-                            style: FilledButton.styleFrom(
-                              backgroundColor: Colors.orangeAccent,
-                              foregroundColor: Colors.black,
-                            ),
-                            onPressed: () => Navigator.of(ctx).pop(true),
-                            child: Text('settings_ext.dialog_reset_sync'.tr()),
-                          ),
-                        ],
-                      ),
-                    );
-                    if (confirmed != true || !context.mounted) return;
-                    try {
-                      await LocalDatabase.db.delete('splits');
-                      await LocalDatabase.db.delete('expenses');
-                      await LocalDatabase.db.delete('group_members');
-                      await LocalDatabase.db.delete('groups');
-                      await LocalDatabase.db.delete('profiles');
-                      await ref.read(syncServiceProvider).performFullSync();
-                      ref.invalidate(myGroupsProvider);
-                      ref.invalidate(balanceSummaryProvider);
-                      ref.invalidate(recentExpensesProvider);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('settings_ext.cache_reset_success'.tr())),
-                        );
-                      }
-                    } catch (e) {
-                      debugPrint('Reset Local Cache error: $e');
-                    }
-                  },
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
+
                 ListTile(
                   leading: const Icon(Icons.person_remove_outlined, color: Colors.redAccent),
                   title: Text(
@@ -818,51 +736,60 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   ),
                   onTap: _showDeleteAccountDialog,
                 ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                ListTile(
-                  leading: const Icon(Icons.logout, color: Colors.redAccent),
-                  title: Text(
-                    'settings.sign_out'.tr(),
-                    style: const TextStyle(
-                      color: Colors.redAccent,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  onTap: () async {
-                    // Best-effort sync: push pending writes but never let it
-                    // block sign-out (3 s cap covers slow / offline Windows).
-                    try {
-                      await ref
-                          .read(syncServiceProvider)
-                          .performFullSync()
-                          .timeout(const Duration(seconds: 3));
-                    } catch (_) {}
-
-                    // Wipe SQLite BEFORE signOut so the auth-state listener
-                    // never races with the delete and re-populates the cache.
-                    try {
-                      await LocalDatabase.db.delete('splits');
-                      await LocalDatabase.db.delete('expenses');
-                      await LocalDatabase.db.delete('group_members');
-                      await LocalDatabase.db.delete('groups');
-                      await LocalDatabase.db.delete('profiles');
-                    } catch (e) {
-                      debugPrint('❌ Logout wipe error: $e');
-                    }
-
-                    try {
-                      await Supabase.instance.client.auth.signOut();
-                      // _AuthRefresh notifies GoRouter → redirects to /login.
-                      // Do NOT call context.go here — double-navigation on
-                      // Windows silently no-ops when the widget is already gone.
-                    } catch (e) {
-                      debugPrint('❌ Logout signOut error: $e');
-                      // Force-navigate even if signOut threw (e.g. network error).
-                      if (context.mounted) context.go('/login');
-                    }
-                  },
-                ),
               ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // Sign Out — standalone full-width button, outside the ACCOUNT card.
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 0),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.logout, size: 16),
+                label: Text('settings.sign_out'.tr()),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: theme.colorScheme.error,
+                  side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: () async {
+                  // Best-effort sync: push pending writes but never let it
+                  // block sign-out (3 s cap covers slow / offline Windows).
+                  try {
+                    await ref
+                        .read(syncServiceProvider)
+                        .performFullSync()
+                        .timeout(const Duration(seconds: 3));
+                  } catch (_) {}
+
+                  // Wipe SQLite BEFORE signOut so the auth-state listener
+                  // never races with the delete and re-populates the cache.
+                  try {
+                    await LocalDatabase.db.delete('splits');
+                    await LocalDatabase.db.delete('expenses');
+                    await LocalDatabase.db.delete('group_members');
+                    await LocalDatabase.db.delete('groups');
+                    await LocalDatabase.db.delete('profiles');
+                  } catch (e) {
+                    debugPrint('❌ Logout wipe error: $e');
+                  }
+
+                  try {
+                    await Supabase.instance.client.auth.signOut();
+                    // _AuthRefresh notifies GoRouter → redirects to /login.
+                    // Do NOT call context.go here — double-navigation on
+                    // Windows silently no-ops when the widget is already gone.
+                  } catch (e) {
+                    debugPrint('❌ Logout signOut error: $e');
+                    // Force-navigate even if signOut threw (e.g. network error).
+                    if (context.mounted) context.go('/login');
+                  }
+                },
+              ),
             ),
           ),
 

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -77,6 +78,8 @@ class SyncService {
       try {
         await _pullFromSupabase(uid);
         _repo.notifySyncComplete();
+        // FEAT-10: Write net worth to App Group UserDefaults for the iOS widget.
+        await _writeWidgetData();
       } catch (e) {
         debugPrint('[SyncService] pull error: $e');
       }
@@ -789,6 +792,28 @@ class SyncService {
       }
     } catch (e) {
       debugPrint('[SyncService] reconciler error (non-fatal): $e');
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // FEAT-10: iOS Home Screen Widget — write net worth to shared UserDefaults
+  // ---------------------------------------------------------------------------
+
+  /// Writes the current net worth to [SharedPreferences] so the iOS WidgetKit
+  /// extension can read it from the App Group UserDefaults container.
+  /// This is best-effort — never blocks or fails a sync on error.
+  Future<void> _writeWidgetData() async {
+    if (kIsWeb) return;
+    try {
+      final profile = await _repo.getCurrentUserProfile();
+      final currency = profile?.defaultCurrency ?? 'USD';
+      final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble('widget_net_worth', walletNet.toDouble());
+      await prefs.setString('widget_currency', currency);
+      await prefs.setString('widget_updated', DateTime.now().toIso8601String());
+    } catch (_) {
+      // Widget data is best-effort — never block sync on failure.
     }
   }
 }

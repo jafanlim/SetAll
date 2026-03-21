@@ -15,6 +15,7 @@ import 'core/providers/setall_providers.dart';
 import 'core/providers/theme_mode_provider.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/quick_actions_service.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
@@ -49,6 +50,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     } catch (_) {
       // Supabase not configured (e.g. no credentials) — skip.
     }
+    // FEAT-09: Register iOS quick actions after first frame.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) QuickActionsService.init(context);
+    });
   }
 
   @override

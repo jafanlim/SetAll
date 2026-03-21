@@ -90,5 +90,32 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>add_expense</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Add Expense</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>plus.circle</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>add_wallet_entry</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Wallet Entry</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>wallet.pass</string>
+		</dict>
+		<dict>
+			<key>UIApplicationShortcutItemType</key>
+			<string>open_groups</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Groups</string>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>person.3</string>
+		</dict>
+	</array>
 </dict>
 </plist>
