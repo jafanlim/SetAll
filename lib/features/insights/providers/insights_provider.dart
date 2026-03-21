@@ -1,7 +1,11 @@
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 
+import '../../../core/config/auth_config.dart';
 import '../../../core/providers/setall_providers.dart';
 import '../../analytics/presentation/screens/analytics_screen.dart'
     show analyticsDataProvider;
@@ -90,7 +94,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
     );
   }
 
-  Future<void> sendMessage(String userText) async {
+  Future<void> sendMessage(String userText, {String mode = 'chat'}) async {
     final current = state.valueOrNull ?? const InsightsState();
     if (userText.trim().isEmpty) return;
 
@@ -126,15 +130,6 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
               '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
           .join('\n');
 
-      final financialContext = {
-        'totalSpending': analyticsData.totalSpend,
-        'dailyBurn': analyticsData.burnRate,
-        'totalIncome': analyticsData.totalIncome,
-        'net': analyticsData.netFlow,
-        'topCategories': topCatsStr,
-        'recentRows': recentRows,
-      };
-
       // Build history (last 10 messages before current).
       final history = updatedMessages
           .where((m) => m.id != userMsg.id)
@@ -149,25 +144,42 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
               })
           .toList();
 
-      final client = Supabase.instance.client;
-      // TODO(FEAT-06-P3): add canvas mode to edge function once FEAT-02 Ph.2 is built
-      final res = await client.functions.invoke('ai-analyst', body: {
-        'message': userText.trim(),
-        'history': history,
-        'context': financialContext,
-        'mode': 'canvas',
-      });
+      // ARCH-01: Migrated from supabase.functions.invoke — no JWT, no auth header.
+      // FEAT-06-P3: Canvas mode is live — pass mode:'canvas' to this function.
+      // Netlify fn returns: {summary, insights, charts[], actions[]} at 8192t.
+      // Remaining TODO: wire _CanvasPanel in insights_screen.dart to this response.
+      final historyStr = history
+          .map((m) => '${m['role']}: ${m['content']}')
+          .join('\n');
+      final query = 'User: ${userText.trim()}'
+          '\n\nFinancial data (last 30 days):'
+          '\nTotal Expenses: \$${analyticsData.totalSpend.toStringAsFixed(2)}'
+          '\nDaily Burn: \$${analyticsData.burnRate.toStringAsFixed(2)}'
+          '\nTotal Income: \$${analyticsData.totalIncome.toStringAsFixed(2)}'
+          '\nNet: \$${analyticsData.netFlow.toStringAsFixed(2)}'
+          '\nTop Categories: $topCatsStr'
+          '\n\nRecent 20 transactions:\n$recentRows'
+          '${historyStr.isNotEmpty ? '\n\nRecent chat:\n$historyStr' : ''}';
 
-      final data = res.data as Map<String, dynamic>?;
-      final structured = data?['structured'] as Map<String, dynamic>?;
-      final replyText = (structured?['summary'] as String?)
-          ?? (data?['reply'] as String?)
-          ?? 'No response.';
+      final httpRes = await http.post(
+        Uri.parse(AuthConfig.netlifyAiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'query': query, 'mode': mode}),
+      );
 
-      // Detect if response includes canvas (chart) data.
-      final hasCanvas = structured?['chartData'] != null;
+      if (httpRes.statusCode != 200) {
+        debugPrint('[AI] Netlify returned ${httpRes.statusCode}: ${httpRes.body.substring(0, httpRes.body.length.clamp(0, 200))}');
+        throw Exception('AI service error (${httpRes.statusCode})');
+      }
+
+      final data   = jsonDecode(httpRes.body) as Map<String, dynamic>?;
+      final report = jsonDecode(data?['report'] as String? ?? '{}') as Map<String, dynamic>?;
+      final replyText = (report?['summary'] as String?) ?? 'No response.';
+
+      // Detect if response includes canvas data (charts array from canvas mode).
+      final hasCanvas = report?['charts'] != null && mode == 'canvas';
       final assistantContent = hasCanvas
-          ? '$replyText\n__CANVAS__:${structured!['chartData'].toString()}'
+          ? '$replyText\n__CANVAS__:${jsonEncode(report!['charts'])}'
           : replyText;
 
       final assistantMsg = AiChatMessage.create(

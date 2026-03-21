@@ -1,52 +1,58 @@
-# AI Architecture
+# SetAll AI Architecture
 
-Two active AI paths exist in this codebase. They serve different clients and must be kept in sync when changing model, prompt structure, or response shape.
+## Active AI Paths
 
----
+### Flutter client (dashboard card + Insights Panel)
 
-## Path 1 — Flutter Client (Supabase Edge Function)
-
-**File:** `supabase/functions/ai-analyst/index.ts`  
-**Caller:** Flutter app → `lib/features/analytics/` (Insights Hub screen)  
-**Invocation:** Direct Supabase Edge Function call with Bearer JWT token  
-**URL:** `https://vrsmsgyxeyzyrdonsnrk.supabase.co/functions/v1/ai-analyst`
-
-| Property | Value |
-|---|---|
-| Model | `gemini-2.5-flash` |
-| Max tokens | 2048 |
-| Temperature | 0.4 |
-| Auth | Bearer JWT (Supabase user token, sub claim validated) |
-| Response format | `{ reply: string, structured: { summary, insights, chartData, actions } \| null }` |
-| Context shape | `{ message, history[], context: { totalSpending, dailyBurn, totalIncome, net, topCategories, recentRows } }` |
-| Unique features | Conversation history support, pie/doughnut normalisation, `responseMimeType: application/json`, action tokens (ADD_TREND, ADD_DONUT, REFRESH, SIGNOUT, PORTAL) |
-
----
-
-## Path 2 — Web Portal (Netlify Function)
-
-**File:** `netlify/functions/ai-analyst.js`  
-**Caller:** `web/insights.html` line 504 — `fetch('/.netlify/functions/ai-analyst', ...)`  
-**Invocation:** Netlify serverless function, no auth gate  
-**URL:** `/.netlify/functions/ai-analyst` (relative, served from Netlify deployment)
-
-| Property | Value |
-|---|---|
-| Models | `gemini-2.5-flash-lite` (chat mode) / `gemini-2.5-flash` (canvas mode) |
-| Max tokens | 1024 (chat) / 8192 (canvas) |
-| Temperature | 0.9 (chat) / 0.2 (canvas) |
-| Auth | None (public endpoint) |
-| Response format | `{ report: string (JSON-encoded), mode: 'chat'\|'canvas' }` |
-| Request shape | `{ query: string, mode: 'chat'\|'canvas' }` |
-| Unique features | Canvas mode with chart JSON (`summary/insights/charts/actions`), rate-limit 429 handling with retry-after header, two-model routing |
+- **Endpoint:** `https://setall.app/.netlify/functions/ai-analyst`
+- **Auth:** NONE required from caller
+- **How Gemini is authenticated:** Netlify environment variable (`process.env.GEMINI_API_KEY`),
+  handled entirely server-side. Flutter sends a plain POST with `Content-Type` only.
+- **Models:** `gemini-2.5-flash-lite` (chat, 1024t, temp 0.9) /
+  `gemini-2.5-flash` (canvas, 8192t, temp 0.2)
+- **Request body:** `{ query: string, mode?: 'chat'|'canvas' }`
+  - `query` — single pre-formatted string embedding message + financial context + history
+  - `mode` — defaults to `'chat'`
+- **Response (chat):** `{ report: '{"summary":"..."}', mode: 'chat' }`
+  - Parse: `jsonDecode(data['report'])['summary']`
+- **Response (canvas):** `{ report: '{"summary":"...","insights":[...],"charts":[...],"actions":[]}', mode: 'canvas' }`
+  - Parse: `jsonDecode(data['report'])` → access `summary`, `insights`, `charts`, `actions`
+- **Call sites:**
+  - `lib/features/dashboard/presentation/screens/dashboard_screen.dart` — `_aiInsightProvider`
+  - `lib/features/insights/providers/insights_provider.dart` — `InsightsNotifier.sendMessage()`
+- **Migration:** Previously called `supabase/functions/ai-analyst/index.ts` (ARCH-01).
+  Reason: persistent `FunctionException(401)` — JWT session race in `FunctionsClient` SDK.
 
 ---
 
-## Sync Checklist
+### Web portal (web/insights.html)
 
-When updating either path, apply equivalent changes to the other if relevant:
+- **Endpoint:** `/.netlify/functions/ai-analyst` (same function, relative URL)
+- **Auth:** NONE — plain `fetch()`, `Content-Type` only
+- **Callers:** `web/insights.html:504`
 
-- **Model change** — update both `GEMINI_MODEL` constant and the `model` variable
-- **Prompt change** — keep financial persona and zero-filler rules consistent
-- **Response shape change** — update the Flutter `AiAnalystService` parser and the `insights.html` JS response handler
-- **Safety settings** — both currently set all categories to `BLOCK_NONE`; keep in sync
+---
+
+## Inactive / Retired
+
+### supabase/functions/ai-analyst/index.ts
+
+- **Status:** Deployed (v14) but not called by any active code.
+- **Reason:** Persistent 401 JWT errors (ARCH-01). Retained, not deleted.
+
+---
+
+## Netlify Environment Variables (set in Netlify dashboard)
+
+- `GEMINI_API_KEY` — Gemini API key, used by the function server-side
+  - Note: the function also checks `process.env.Gemini` as a fallback alias
+- *(No other secrets required for AI functionality)*
+
+---
+
+## Sync Checklist (when changing the AI function)
+
+- Edit `netlify/functions/ai-analyst.js`
+- Update response parsing in: `dashboard_screen.dart` + `insights_provider.dart`
+- Deploy: `netlify deploy --prod`
+- Smoke test: dashboard AI card + Insights Panel on a physical device

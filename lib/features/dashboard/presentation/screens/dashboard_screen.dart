@@ -1,23 +1,25 @@
+import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:decimal/decimal.dart';
-import 'package:flutter/foundation.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:http/http.dart' as http;
+import '../../../../core/config/auth_config.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/services/dashboard_preferences_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../analytics/presentation/screens/analytics_screen.dart'
     show analyticsDataProvider, AnalyticsData;
-import '../../../../core/services/dashboard_preferences_service.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -48,17 +50,6 @@ const _kPaletteColors = [
 const _kAiEmpty   = '__empty__';   // no transactions yet
 const _kAiOffline = '__offline__'; // no connectivity
 
-// ACT-retry: maximum one retry on Gemini rate-limit (429 embedded in reply).
-const _maxRetries = 1;
-
-// Detects a Gemini 429 rate-limit surfaced as a 200 reply string.
-// The Supabase edge function swallows the HTTP 429 and returns:
-//   { reply: "Gemini error: ... 429 ...", structured: null }
-bool _isRateLimitReply(Map<String, dynamic>? data) {
-  final reply = (data?['reply'] as String? ?? '').toLowerCase();
-  return data?['structured'] == null &&
-      (reply.contains('429') || reply.contains('rate'));
-}
 
 // AI insight provider — cached result keyed to the current user session.
 // Invalidate on manual refresh or app re-open.
@@ -80,9 +71,6 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     }
   }
 
-  final client = Supabase.instance.client;
-  final accessToken = client.auth.currentSession?.accessToken;
-  if (accessToken == null) return _kAiEmpty;
   final topCats = analyticsData.categoryTotals.entries
       .toList()
     ..sort((a, b) => b.value.compareTo(a.value));
@@ -97,40 +85,43 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
           '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
       .join('\n');
 
-  final invokeBody = {
-    'message': 'Give me a concise 1-sentence financial insight about my spending this month.',
-    'history': <Map<String, String>>[],
-    'context': {
-      'totalSpending':  analyticsData.totalSpend,
-      'dailyBurn':      analyticsData.burnRate,
-      'totalIncome':    analyticsData.totalIncome,
-      'net':            analyticsData.netFlow,
-      'topCategories':  topCatsStr,
-      'recentRows':     recentRows,
-    },
-  };
+  // ARCH-01: Migrated from supabase.functions.invoke — plain HTTPS, no JWT.
+  // Netlify fn authenticates to Gemini server-side via process.env.GEMINI_API_KEY.
+  // No caller auth required: mirrors web/insights.html:504 fetch() exactly.
+  final query = 'Give me a concise 1-sentence financial insight about my spending this month.'
+      '\n\nFinancial data (last 30 days):'
+      '\nTotal Expenses: \$${analyticsData.totalSpend.toStringAsFixed(2)}'
+      '\nDaily Burn: \$${analyticsData.burnRate.toStringAsFixed(2)}'
+      '\nTotal Income: \$${analyticsData.totalIncome.toStringAsFixed(2)}'
+      '\nNet: \$${analyticsData.netFlow.toStringAsFixed(2)}'
+      '\nTop Categories: $topCatsStr'
+      '\n\nRecent 20 transactions:\n$recentRows';
 
   try {
-    final headers = {'Authorization': 'Bearer $accessToken'};
-    var res = await client.functions.invoke('ai-analyst', body: invokeBody, headers: headers);
-    var data = res.data as Map<String, dynamic>?;
+    final response = await http.post(
+      Uri.parse(AuthConfig.netlifyAiUrl),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'query': query, 'mode': 'chat'}),
+    );
 
-    // ACT-retry: honour retry-after before surfacing ai_unavailable.
-    // One attempt only — prevents call stacking if Gemini is overloaded.
-    // The edge function swallows Gemini 429 and returns 200 with an error
-    // string; no retry-after header is forwarded, so we default to 3s.
-    if (_isRateLimitReply(data)) {
-      const retryDelaySecs = 3;
-      debugPrint('[AI] Rate limited — retrying in ${retryDelaySecs}s (attempt 1/$_maxRetries)');
-      await Future.delayed(const Duration(seconds: retryDelaySecs));
-      res  = await client.functions.invoke('ai-analyst', body: invokeBody, headers: headers);
-      data = res.data as Map<String, dynamic>?;
+    if (response.statusCode == 429) {
+      debugPrint('[AI] Rate limited (429) — retrying in 3s');
+      await Future.delayed(const Duration(seconds: 3));
+      final retry = await http.post(
+        Uri.parse(AuthConfig.netlifyAiUrl),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'query': query, 'mode': 'chat'}),
+      );
+      if (retry.statusCode != 200) return '';
+      final retryData = jsonDecode(retry.body) as Map<String, dynamic>?;
+      final retryReport = jsonDecode(retryData?['report'] as String? ?? '{}') as Map<String, dynamic>?;
+      return (retryReport?['summary'] as String?) ?? '';
     }
 
-    final structured = data?['structured'] as Map<String, dynamic>?;
-    return (structured?['summary'] as String?)
-        ?? (data?['reply'] as String?)
-        ?? '';
+    if (response.statusCode != 200) return '';
+    final data   = jsonDecode(response.body) as Map<String, dynamic>?;
+    final report = jsonDecode(data?['report'] as String? ?? '{}') as Map<String, dynamic>?;
+    return (report?['summary'] as String?) ?? '';
   } catch (error, stackTrace) {
     // ACT-crash: structured breadcrumb — fatal:false means degraded UX, not a crash.
     await FirebaseCrashlytics.instance.recordError(
@@ -138,12 +129,11 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       stackTrace,
       reason: 'AI insight provider failure',
       information: [
-        DiagnosticsProperty<String>('stage', 'supabase_edge_fn_invoke'),
+        DiagnosticsProperty<String>('stage', 'netlify_ai_analyst_invoke'),
         DiagnosticsProperty<String>('timestamp', DateTime.now().toIso8601String()),
       ],
       fatal: false,
     );
-    // Network / Supabase error — return empty so the error state shows.
     rethrow;
   }
 });
