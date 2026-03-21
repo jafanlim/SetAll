@@ -41,7 +41,7 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("ScreenRetrieverWindowsPluginCApi"));
   SharePlusWindowsPluginCApiRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SharePlusWindowsPluginCApi"));
-  SpeechToTextWindowsRegisterWithRegistrar(
+  SpeechToTextWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("SpeechToTextWindows"));
   UrlLauncherWindowsRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("UrlLauncherWindows"));
