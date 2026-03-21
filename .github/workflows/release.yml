@@ -48,29 +48,26 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # speech_to_text_windows 1.0.0+beta.8: the compiled DLL exports
-      # SpeechToTextWindowsPluginRegisterWithRegistrar but the pub-cache header
-      # declares SpeechToTextWindowsRegisterWithRegistrar. flutter build windows
-      # regenerates generated_plugin_registrant.cc from the header at cmake time,
-      # so we must patch the pub-cache header BEFORE building.
-      - name: Patch Windows speech_to_text symbol
+      # speech_to_text_windows 1.0.0+beta.8 bug: pubspec.yaml declares
+      # pluginClass: SpeechToTextWindows but the compiled DLL exports
+      # SpeechToTextWindowsPluginRegisterWithRegistrar (with Plugin suffix).
+      # Flutter tools derives the C symbol from pluginClass, so changing
+      # pluginClass -> SpeechToTextWindowsPlugin makes the generator emit the
+      # correct symbol. This patch must run before `flutter build windows`.
+      - name: Patch Windows speech_to_text pluginClass
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
           $pubCache = "$env:LOCALAPPDATA\Pub\Cache\hosted\pub.dev"
-          $header = Get-ChildItem "$pubCache\speech_to_text_windows*\windows\include\speech_to_text_windows\speech_to_text_windows.h" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
-          if ($header) {
-            (Get-Content $header.FullName) -replace 'void SpeechToTextWindowsRegisterWithRegistrar\b', 'void SpeechToTextWindowsPluginRegisterWithRegistrar' |
-              Set-Content $header.FullName
-            Write-Host "Patched pub cache header: $($header.FullName)"
+          $spec = Get-ChildItem "$pubCache\speech_to_text_windows*\pubspec.yaml" -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($spec) {
+            (Get-Content $spec.FullName) -replace 'pluginClass: SpeechToTextWindows$', 'pluginClass: SpeechToTextWindowsPlugin' |
+              Set-Content $spec.FullName
+            Write-Host "Patched pluginClass in: $($spec.FullName)"
           } else {
-            Write-Host "Header not found in LOCALAPPDATA pub cache"
+            Write-Host "speech_to_text_windows pubspec.yaml not found — pub cache path: $pubCache"
+            Get-ChildItem $pubCache -Directory | Where-Object { $_.Name -like "speech_to_text*" } | ForEach-Object { Write-Host $_.FullName }
           }
-          # Also patch the already-generated registrant file as a belt-and-suspenders measure
-          $f = "windows/flutter/generated_plugin_registrant.cc"
-          (Get-Content $f) -replace 'SpeechToTextWindowsRegisterWithRegistrar\b', 'SpeechToTextWindowsPluginRegisterWithRegistrar' |
-            Set-Content $f
-          Write-Host "Patched registrant: $f"
 
       # ── macOS Build & Package ──────────────────────────────────────────────
       - name: Build macOS
