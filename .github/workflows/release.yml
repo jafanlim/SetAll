@@ -48,6 +48,17 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # speech_to_text_windows 1.0.0+beta.8 exports SpeechToTextWindowsPluginRegisterWithRegistrar
+      # but flutter pub get regenerates the registrant with the old symbol name. Patch it.
+      - name: Patch Windows speech_to_text symbol
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $f = "windows/flutter/generated_plugin_registrant.cc"
+          (Get-Content $f) -replace 'SpeechToTextWindowsRegisterWithRegistrar\b', 'SpeechToTextWindowsPluginRegisterWithRegistrar' |
+            Set-Content $f
+          Write-Host "Patched speech_to_text symbol in $f"
+
       # ── macOS Build & Package ──────────────────────────────────────────────
       - name: Build macOS
         if: matrix.os == 'macos-latest'
