@@ -110,6 +110,15 @@ dependencies:
   flutter_svg: ^2.2.4
   google_fonts: ^8.0.2
 
+# HOTFIX-04: speech_to_text_windows 1.0.0+beta.8 pubspec.yaml declares
+# pluginClass: SpeechToTextWindows but the compiled DLL exports
+# SpeechToTextWindowsPluginRegisterWithRegistrar. Vendored copy at
+# packages/speech_to_text_windows has pluginClass corrected to
+# SpeechToTextWindowsPlugin so Flutter tools generates the right C symbol.
+dependency_overrides:
+  speech_to_text_windows:
+    path: packages/speech_to_text_windows
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
