@@ -87,9 +87,14 @@ jobs:
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
+        shell: pwsh
         run: |
           flutter config --enable-windows-desktop
           flutter build windows --release
+          $rc = $LASTEXITCODE
+          Write-Host "=== registrant after build ==="
+          Get-Content windows\flutter\generated_plugin_registrant.cc | Select-String "speech_to_text|SpeechToText|#include"
+          exit $rc
 
       - name: Package Windows installer
         if: matrix.os == 'windows-latest'
