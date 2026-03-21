@@ -87,23 +87,9 @@ jobs:
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
-        shell: pwsh
         run: |
           flutter config --enable-windows-desktop
           flutter build windows --release
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host "=== plugin_symlinks ==="
-            dir windows\flutter\ephemeral\.plugin_symlinks\ | Select-Object Name, LinkType, Target
-            Write-Host "=== speech_to_text_windows symlink target ==="
-            (Get-Item windows\flutter\ephemeral\.plugin_symlinks\speech_to_text_windows).Target
-            Write-Host "=== include dir contents ==="
-            dir windows\flutter\ephemeral\.plugin_symlinks\speech_to_text_windows\windows\include\speech_to_text_windows\
-            Write-Host "=== generated_plugin_registrant.cc speech_to_text lines ==="
-            Get-Content windows\flutter\generated_plugin_registrant.cc | Select-String "SpeechToText"
-            Write-Host "=== vendored header ==="
-            Get-Content packages\speech_to_text_windows\windows\include\speech_to_text_windows\speech_to_text_windows.h
-            exit $LASTEXITCODE
-          }
 
       - name: Package Windows installer
         if: matrix.os == 'windows-latest'
