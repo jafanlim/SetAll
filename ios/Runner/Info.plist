@@ -42,6 +42,8 @@
 	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>SetAll uses your microphone to transcribe expense descriptions.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>SetAll uses speech recognition to convert your voice into expense descriptions.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>SetAll uses your camera to photograph receipts and bills for wallet entries.</string>
 	<key>NSFaceIDUsageDescription</key>
