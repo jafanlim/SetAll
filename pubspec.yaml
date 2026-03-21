@@ -81,6 +81,9 @@ dependencies:
   # Deep linking — catches setall:// OAuth/email redirects on Windows (and mobile)
   app_links: ^6.4.0
 
+  # iOS/Android Home Screen Quick Actions (FEAT-09)
+  quick_actions: ^1.0.0
+
   # Voice input (FEAT-01)
   speech_to_text: ^7.0.0
 
