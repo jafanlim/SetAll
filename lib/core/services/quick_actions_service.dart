@@ -46,17 +46,18 @@ class QuickActionsService {
     final t = _pending;
     if (t == null) return;
     try {
+      final router = GoRouter.of(context);
       switch (t) {
         case 'action_add_expense':
-          context.go('/add-expense');
+          router.go('/add-expense');
         case 'action_wallet_entry':
-          context.go('/wallet/add');
+          router.go('/wallet/add');
         case 'action_open_groups':
-          context.go('/groups');
+          router.go('/groups');
       }
       _pending = null;
     } catch (_) {
-      // Router not ready — _pending stays set, drained by drainPending().
+      // Router not ready — _pending preserved for next drain attempt.
     }
   }
 }

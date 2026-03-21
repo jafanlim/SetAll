@@ -165,9 +165,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // HOTFIX-03: drain pending quick action once router shell is mounted.
+    // HOTFIX-03b: Future.delayed(Duration.zero) defers navigation to the next
+    // event loop tick — after GoRouter has fully built its navigator stack.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) QuickActionsService.drainPending(context);
+      Future.delayed(Duration.zero, () {
+        if (mounted) QuickActionsService.drainPending(context);
+      });
     });
   }
 
