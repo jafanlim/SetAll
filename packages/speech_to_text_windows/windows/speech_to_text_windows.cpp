@@ -3,7 +3,7 @@
 
 #include "speech_to_text_windows_plugin.h"
 
-void SpeechToTextWindowsRegisterWithRegistrar(
+__declspec(dllexport) void SpeechToTextWindowsRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar) {
   speech_to_text_windows::SpeechToTextWindowsPlugin::RegisterWithRegistrar(
       flutter::PluginRegistrarManager::GetInstance()

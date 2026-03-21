@@ -8,7 +8,6 @@ set(PLUGIN_NAME "speech_to_text_windows_plugin")
 list(APPEND PLUGIN_SOURCES
   "speech_to_text_windows_plugin.cpp"
   "speech_to_text_windows_plugin.h"
-  "speech_to_text_windows_shim.cpp"
 )
 
 # Define the plugin library target

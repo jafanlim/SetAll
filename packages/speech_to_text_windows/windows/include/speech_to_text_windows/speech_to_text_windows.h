@@ -16,11 +16,6 @@
 extern "C" {
 #endif
 
-FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsPluginRegisterWithRegistrar(
-    FlutterDesktopPluginRegistrarRef registrar);
-
-// Forward declaration for generated_plugin_registrant.cc compatibility.
-// Defined in speech_to_text_windows_shim.cpp as a forwarder.
 FLUTTER_PLUGIN_EXPORT void SpeechToTextWindowsRegisterWithRegistrar(
     FlutterDesktopPluginRegistrarRef registrar);
 
