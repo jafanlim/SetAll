@@ -44,6 +44,13 @@ const _kPaletteColors = [
   _aTeal, _aGold, _aRose, _aViolet, _aSky, _aOrange, _aLime, _aPink,
 ];
 
+// Streams the current Supabase session so _aiInsightProvider rebuilds once
+// the session is restored after app launch.
+final _supabaseSessionProvider = StreamProvider.autoDispose<Session?>((ref) {
+  return Supabase.instance.client.auth.onAuthStateChange
+      .map((event) => event.session);
+});
+
 // Sentinel values returned by _aiInsightProvider to distinguish UI states.
 const _kAiEmpty   = '__empty__';   // no transactions yet
 const _kAiOffline = '__offline__'; // no connectivity
@@ -81,6 +88,11 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   }
 
   final client = Supabase.instance.client;
+  // Wait for session to be available — provider rebuilds via _supabaseSessionProvider.
+  final session = ref.watch(_supabaseSessionProvider).valueOrNull;
+  if (session == null && client.auth.currentSession == null) {
+    return _kAiEmpty;
+  }
   final topCats = analyticsData.categoryTotals.entries
       .toList()
     ..sort((a, b) => b.value.compareTo(a.value));

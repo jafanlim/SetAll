@@ -22,66 +22,66 @@ import 'core/config/auth_config.dart';
 import 'data/local/local_database.dart';
 
 /// Base URL for email confirmation and OAuth redirects. Set this to your deployed web app URL (e.g. https://your-app.vercel.app) so links work on mobile. When null, web uses current origin.
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+void main() {
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-  // Set minimum window size on desktop so the UI never breaks.
-  if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.macOS ||
-      defaultTargetPlatform == TargetPlatform.windows ||
-      defaultTargetPlatform == TargetPlatform.linux)) {
-    await windowManager.ensureInitialized();
-    final options = WindowOptions(
-      minimumSize: const Size(800, 600),
-      size: const Size(1100, 720),
-      center: true,
-      titleBarStyle: defaultTargetPlatform == TargetPlatform.windows
-          ? TitleBarStyle.hidden
-          : TitleBarStyle.hidden,
-      windowButtonVisibility: defaultTargetPlatform == TargetPlatform.macOS,
-    );
-    await windowManager.waitUntilReadyToShow(options);
-    await windowManager.show();
-  }
+    // Set minimum window size on desktop so the UI never breaks.
+    if (!kIsWeb && (defaultTargetPlatform == TargetPlatform.macOS ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux)) {
+      await windowManager.ensureInitialized();
+      final options = WindowOptions(
+        minimumSize: const Size(800, 600),
+        size: const Size(1100, 720),
+        center: true,
+        titleBarStyle: defaultTargetPlatform == TargetPlatform.windows
+            ? TitleBarStyle.hidden
+            : TitleBarStyle.hidden,
+        windowButtonVisibility: defaultTargetPlatform == TargetPlatform.macOS,
+      );
+      await windowManager.waitUntilReadyToShow(options);
+      await windowManager.show();
+    }
 
-  ErrorWidget.builder = (FlutterErrorDetails details) {
-    return Directionality(
-      textDirection: ui.TextDirection.ltr,
-      child: Material(
-        child: Container(
-          color: const Color(0xFF0F0F12),
-          padding: const EdgeInsets.all(24),
-          child: SafeArea(
-            child: SingleChildScrollView(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Something went wrong',
-                    style: TextStyle(
-                      color: Colors.red.shade300,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+    ErrorWidget.builder = (FlutterErrorDetails details) {
+      return Directionality(
+        textDirection: ui.TextDirection.ltr,
+        child: Material(
+          child: Container(
+            color: const Color(0xFF0F0F12),
+            padding: const EdgeInsets.all(24),
+            child: SafeArea(
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Something went wrong',
+                      style: TextStyle(
+                        color: Colors.red.shade300,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    details.toString(),
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    Text(
+                      details.toString(),
+                      style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
-    );
-  };
+      );
+    };
 
-  await EasyLocalization.ensureInitialized();
-  await initializeDateFormatting();
+    await EasyLocalization.ensureInitialized();
+    await initializeDateFormatting();
 
-  runZonedGuarded(
-    () => runApp(
+    runApp(
       EasyLocalization(
         supportedLocales: const [
           Locale('en'),
@@ -97,13 +97,12 @@ void main() async {
           child: _AppLoader(),
         ),
       ),
-    ),
-    (error, stack) {
-      if (!kIsWeb) {
-        FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-      }
-    },
-  );
+    );
+  }, (error, stack) {
+    if (!kIsWeb) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+    }
+  });
 }
 
 /// Shows loading until DB (and optional Supabase) are ready, then SetAllApp. Avoids white screen.
