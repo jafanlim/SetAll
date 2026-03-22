@@ -159,14 +159,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ref.invalidate(_aiInsightProvider);
         }
       });
+      // HOTFIX-03c: drain on initState covers cold launch — dashboard mounts
+      // after auth resolves, by which point GoRouter is fully ready.
+      Future.delayed(Duration.zero, () {
+        if (mounted) QuickActionsService.drainPending(context);
+      });
     });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // HOTFIX-03b: Future.delayed(Duration.zero) defers navigation to the next
-    // event loop tick — after GoRouter has fully built its navigator stack.
+    // HOTFIX-03b: warm launch drain — fires when dashboard is navigated back to.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Future.delayed(Duration.zero, () {
         if (mounted) QuickActionsService.drainPending(context);

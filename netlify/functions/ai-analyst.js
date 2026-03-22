@@ -1,6 +1,12 @@
+// FEAT-13b: Migrated from Gemini API (suspended a.setall.app@gmail.com account)
+// to Groq API (llama-3.3-70b-versatile). Same request/response shape.
+// API key: process.env.GROQ_API_KEY (set in Netlify environment variables)
 // CHORE-01: Active path for setall.app web portal ONLY.
 // Flutter client uses supabase/functions/ai-analyst/index.ts directly.
 // Keep both in sync when changing model, prompt, or response shape.
+
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -11,13 +17,10 @@ exports.handler = async (event) => {
 
   try {
     const { query, mode = 'chat' } = JSON.parse(event.body);
-    const apiKey = process.env.Gemini || process.env.GEMINI_API_KEY;
-    if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GEMINI_API_KEY not configured' }) };
+    const apiKey = process.env.GROQ_API_KEY || process.env.Gemini || process.env.GEMINI_API_KEY;
+    if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GROQ_API_KEY not configured' }) };
 
     const isCanvas = mode === 'canvas';
-
-    // Two models: fast conversational for chat, reasoning model for deep analysis
-    const model = isCanvas ? 'gemini-2.5-flash' : 'gemini-2.5-flash-lite';
 
     const systemPrompt = isCanvas
       ? `You are SetAll Analyst — a ruthlessly precise financial data scientist.
@@ -53,47 +56,41 @@ Rules:
 - You may ask one follow-up question if genuinely useful.
 - Respond in plain conversational text. No bullet points unless explicitly asked.`;
 
-    const generationConfig = isCanvas
-      ? { temperature: 0.2, maxOutputTokens: 8192 }
-      : { temperature: 0.9, maxOutputTokens: 1024 };
+    const maxTokens  = isCanvas ? 4096 : 1024;
+    const temperature = isCanvas ? 0.2 : 0.9;
 
-    const safetySettings = [
-      { category: 'HARM_CATEGORY_HARASSMENT',        threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_HATE_SPEECH',       threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_NONE' },
-      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_NONE' },
-    ];
+    const callGroq = async () => fetch(GROQ_API_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: query },
+        ],
+        max_tokens:  maxTokens,
+        temperature,
+      }),
+    });
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents:           [{ parts: [{ text: query }] }],
-          generationConfig,
-          safetySettings,
-        })
-      }
-    );
+    let response = await callGroq();
+
+    if (response.status === 429) {
+      const retryAfter = response.headers.get('retry-after') || '3';
+      await new Promise(r => setTimeout(r, parseInt(retryAfter) * 1000));
+      response = await callGroq();
+    }
 
     if (!response.ok) {
       const errText = await response.text();
-      if (response.status === 429) {
-        const retryAfter = response.headers.get('retry-after') || response.headers.get('x-ratelimit-reset-requests');
-        const waitMsg = retryAfter ? ` Retry after ${retryAfter}s.` : ' Try again in a moment.';
-        let detail = '';
-        try { detail = JSON.parse(errText)?.error?.message || ''; } catch (_) {}
-        throw new Error(`Rate limited (429).${waitMsg}${detail ? ' ' + detail : ''}`);
-      }
-      throw new Error(`Gemini API ${response.status}: ${errText.slice(0, 400)}`);
+      throw new Error(`Groq API ${response.status}: ${errText.slice(0, 400)}`);
     }
 
     const result  = await response.json();
-    const parts   = result.candidates?.[0]?.content?.parts ?? [];
-    const actual  = parts.find(p => p.text && !p.thought);
-    const rawText = actual?.text?.trim() || '';
+    const rawText = result.choices?.[0]?.message?.content?.trim() || '';
 
     if (!rawText) {
       return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify({ summary: 'No response — try rephrasing.' }), mode }) };

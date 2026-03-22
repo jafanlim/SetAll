@@ -40,10 +40,10 @@ class AuthConfig {
   // You will need these from the Google Cloud Console later when setting up Google Auth.
   
   /// Web Client ID (Required for Android & Web Google Sign-in)
-  static const String googleWebClientId = '73119302557-gflq85m9dg3jklmkeh2fjc9hpks4l2sl.apps.googleusercontent.com';
+  static const String googleWebClientId = '41197170572-cbv1qbr8m2s7hk3s2nc9delqsd55usil.apps.googleusercontent.com';
   
   /// iOS Client ID (Required for iOS Google Sign-in)
-  static const String googleIosClientId = '73119302557-95k1njr3tt4mg2o2htl86eosjbf780kv.apps.googleusercontent.com';
+  static const String googleIosClientId = '41197170572-cbv1qbr8m2s7hk3s2nc9delqsd55usil.apps.googleusercontent.com';
 
   // ARCH-01: Netlify ai-analyst endpoint — replaces Supabase edge fn (persistent 401).
   // No caller auth required — Gemini key is a Netlify env var, handled server-side.
