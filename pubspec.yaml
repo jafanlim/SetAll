@@ -107,6 +107,10 @@ dependencies:
 
   # OS-level permission request (notifications, etc.)
   permission_handler: ^11.3.1
+
+  # Apple Sign-In (iOS + macOS native; nonce flow via Supabase)
+  sign_in_with_apple: ^6.1.0
+  crypto: ^3.0.3
   flutter_svg: ^2.2.4
   google_fonts: ^8.0.2
 

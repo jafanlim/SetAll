@@ -1,3 +1,5 @@
+import 'dart:io' show Platform;
+
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +8,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/auth_config.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/biometric_service.dart';
+import '../../../auth/services/apple_sign_in_service.dart';
 
 /// Login screen: Email + password with visibility toggle and Google OAuth.
 /// Mirrors the premium dark aesthetic of [RegisterScreen].
@@ -173,6 +176,30 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) setState(() { _loading = false; _message = e.message; });
     } catch (e) {
       if (mounted) setState(() { _loading = false; _message = e.toString(); });
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    _message = null;
+    setState(() => _loading = true);
+    try {
+      await AppleSignInService.signIn();
+      if (mounted) setState(() => _loading = false);
+      if (mounted) await _checkProfileExistsOrSignOut();
+    } on AuthException catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _message = e.message;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _message = e.toString();
+        });
+      }
     }
   }
 
@@ -505,6 +532,26 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+
+              // ── Apple (iOS + macOS only) ────────────────────────────────────
+              if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) ...[  
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _signInWithApple,
+                    icon: const Icon(Icons.apple, size: 22, color: _onSurface),
+                    label: const Text('Continue with Apple',
+                        style: TextStyle(color: _onSurface, fontSize: 14)),
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14)),
+                      side: BorderSide(color: _outline.withValues(alpha: 0.8)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),
