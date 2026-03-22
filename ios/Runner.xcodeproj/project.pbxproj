@@ -548,6 +548,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SetAllWidget/SetAllWidget.entitlements;
 				DEVELOPMENT_TEAM = HW799KWXD5;
+				INFOPLIST_KEY_CFBundleDisplayName = SetAll;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jafa.setall.app.SetAllWidget;
 				SDKROOT = iphoneos;
@@ -692,6 +693,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SetAllWidget/SetAllWidget.entitlements;
 				DEVELOPMENT_TEAM = HW799KWXD5;
+				INFOPLIST_KEY_CFBundleDisplayName = SetAll;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jafa.setall.app.SetAllWidget;
 				SDKROOT = iphoneos;
@@ -872,6 +874,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_ENTITLEMENTS = SetAllWidget/SetAllWidget.entitlements;
 				DEVELOPMENT_TEAM = HW799KWXD5;
+				INFOPLIST_KEY_CFBundleDisplayName = SetAll;
 				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jafa.setall.app.SetAllWidget;
 				SDKROOT = iphoneos;

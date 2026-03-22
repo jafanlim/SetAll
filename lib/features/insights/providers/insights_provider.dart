@@ -179,7 +179,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       // Detect if response includes canvas data (charts array from canvas mode).
       final hasCanvas = report?['charts'] != null && mode == 'canvas';
       final assistantContent = hasCanvas
-          ? '$replyText\n__CANVAS__:${jsonEncode(report!['charts'])}'
+          ? '$replyText\n__CANVAS__:${jsonEncode(report)}'
           : replyText;
 
       final assistantMsg = AiChatMessage.create(

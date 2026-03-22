@@ -1,7 +1,8 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, debugPrint, TargetPlatform;
+import 'package:shared_preferences_foundation/shared_preferences_foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -799,8 +800,10 @@ class SyncService {
   // FEAT-10: iOS Home Screen Widget — write net worth to shared UserDefaults
   // ---------------------------------------------------------------------------
 
-  /// Writes the current net worth to [SharedPreferences] so the iOS WidgetKit
-  /// extension can read it from the App Group UserDefaults container.
+  /// Writes the current net worth to the App Group NSUserDefaults suite so the
+  /// iOS WidgetKit extension can read it. Uses SharedPreferencesAsync with
+  /// appGroupId on iOS/macOS to target the correct suite; falls back to
+  /// default SharedPreferences on Android.
   /// This is best-effort — never blocks or fails a sync on error.
   Future<void> _writeWidgetData() async {
     if (kIsWeb) return;
@@ -808,10 +811,25 @@ class SyncService {
       final profile = await _repo.getCurrentUserProfile();
       final currency = profile?.defaultCurrency ?? 'USD';
       final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setDouble('widget_net_worth', walletNet.toDouble());
-      await prefs.setString('widget_currency', currency);
-      await prefs.setString('widget_updated', DateTime.now().toIso8601String());
+
+      const appGroup = 'group.com.jafa.setall.app.widget';
+      final isApple = !kIsWeb &&
+          (defaultTargetPlatform == TargetPlatform.iOS ||
+              defaultTargetPlatform == TargetPlatform.macOS);
+
+      if (isApple) {
+        final widgetPrefs = SharedPreferencesAsync(
+          options: SharedPreferencesAsyncFoundationOptions(suiteName: appGroup),
+        );
+        await widgetPrefs.setDouble('widget_net_worth', walletNet.toDouble());
+        await widgetPrefs.setString('widget_currency', currency);
+        await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
+      } else {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setDouble('widget_net_worth', walletNet.toDouble());
+        await prefs.setString('widget_currency', currency);
+        await prefs.setString('widget_updated', DateTime.now().toIso8601String());
+      }
     } catch (_) {
       // Widget data is best-effort — never block sync on failure.
     }
