@@ -56,11 +56,17 @@ class QuickActionsService {
     final r = _router;
     if (t == null || r == null) return;
     _pending = null;
+    // go() to dashboard first to establish a back-stack root, then
+    // push() the target after a microtask so GoRouter has settled.
+    // Without the delay, push() fires before the new stack is ready
+    // and close/back gets "nothing to pop".
     switch (t) {
       case 'action_add_expense':
-        r.go('/add-expense');
+        r.go('/');
+        Future.microtask(() => r.push('/add-expense/choose-group'));
       case 'action_wallet_entry':
-        r.go('/wallet/add');
+        r.go('/');
+        Future.microtask(() => r.push('/wallet/add'));
       case 'action_open_groups':
         r.go('/groups');
     }

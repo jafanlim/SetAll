@@ -824,14 +824,16 @@ class SyncService {
         await widgetPrefs.setDouble('widget_net_worth', walletNet.toDouble());
         await widgetPrefs.setString('widget_currency', currency);
         await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
+        debugPrint('[SyncService] widget data written: $currency $walletNet → $appGroup');
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('widget_net_worth', walletNet.toDouble());
         await prefs.setString('widget_currency', currency);
         await prefs.setString('widget_updated', DateTime.now().toIso8601String());
       }
-    } catch (_) {
+    } catch (e, st) {
       // Widget data is best-effort — never block sync on failure.
+      debugPrint('[SyncService] _writeWidgetData error: $e\n$st');
     }
   }
 }

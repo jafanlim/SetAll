@@ -140,6 +140,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       debugPrint('[AddExpense] _loadMembers: prepended current user, now ${ids.length} members');
     }
 
+    if (!mounted) return;
     setState(() {
       _memberIds   = ids;
       _memberNames = names;
