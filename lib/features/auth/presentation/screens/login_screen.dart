@@ -183,9 +183,21 @@ class _LoginScreenState extends State<LoginScreen> {
     _message = null;
     setState(() => _loading = true);
     try {
-      await AppleSignInService.signIn();
-      if (mounted) setState(() => _loading = false);
-      if (mounted) await _checkProfileExistsOrSignOut();
+      if (kIsWeb) {
+        // Web: use Supabase OAuth redirect (same pattern as Google).
+        final redirectUrl = _authRedirectUrl();
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.apple,
+          redirectTo: redirectUrl,
+          authScreenLaunchMode: LaunchMode.platformDefault,
+        );
+        if (mounted) setState(() => _loading = false);
+      } else {
+        // Native iOS/macOS: nonce flow via sign_in_with_apple package.
+        await AppleSignInService.signIn();
+        if (mounted) setState(() => _loading = false);
+        if (mounted) await _checkProfileExistsOrSignOut();
+      }
     } on AuthException catch (e) {
       if (mounted) {
         setState(() {
@@ -533,8 +545,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // ── Apple (iOS + macOS only) ────────────────────────────────────
-              if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) ...[  
+              // ── Apple (iOS, macOS, Web) ────────────────────────────────────
+              if (kIsWeb || Platform.isIOS || Platform.isMacOS) ...[  
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 52,

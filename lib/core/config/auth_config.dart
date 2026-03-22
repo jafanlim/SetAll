@@ -39,9 +39,12 @@ class AuthConfig {
   // 2. OAUTH CREDENTIALS (For Phase 0: Google Sign-In)
   // You will need these from the Google Cloud Console later when setting up Google Auth.
   
-  /// Web Client ID (Required for Android & Web Google Sign-in)
+  /// Web Client ID — used by Supabase Google provider (OAuth consent screen, web + Android server-side)
   static const String googleWebClientId = '708927430014-57bb6t8090nm2vq9nqgjqhi5ctli3poj.apps.googleusercontent.com';
-  
+
+  /// Android OAuth Client ID (client_type:3 from google-services.json — server-side client for Android sign-in)
+  static const String googleAndroidClientId = '41197170572-6nme8nkvs1mqjpgipecudgcup0v1mhnr.apps.googleusercontent.com';
+
   /// iOS Client ID (Required for iOS Google Sign-in)
   static const String googleIosClientId = '41197170572-cbv1qbr8m2s7hk3s2nc9delqsd55usil.apps.googleusercontent.com';
 
