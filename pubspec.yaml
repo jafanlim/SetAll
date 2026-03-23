@@ -46,6 +46,7 @@ dependencies:
   connectivity_plus: ^6.0.5
   shared_preferences: ^2.2.2
   shared_preferences_foundation: ^2.5.6
+  home_widget: ^0.7.0
   uuid: ^4.4.2
 
   # Money & i18n

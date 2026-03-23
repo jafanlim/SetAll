@@ -19,6 +19,7 @@ import 'core/services/quick_actions_service.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
+import 'package:home_widget/home_widget.dart';
 import 'features/insights/providers/insights_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,8 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) QuickActionsService.init(context);
     });
+    // FEAT-10: Set App Group so HomeWidget.updateWidget() targets correct suite.
+    HomeWidget.setAppGroupId('group.com.jafa.setall.app.widget');
   }
 
   @override
@@ -201,7 +204,7 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
       final db = LocalDatabase.db;
       await db.delete(
         'ai_chat_messages',
-        where: 'user_id != ? AND user_id IS NOT NULL',
+        where: 'user_id != ? OR user_id IS NULL',
         whereArgs: [uid],
       );
     } catch (e) {

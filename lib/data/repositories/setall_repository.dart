@@ -2003,7 +2003,7 @@ class SetAllRepository {
   // Expenses – CRUD
   // ---------------------------------------------------------------------------
 
-  Future<List<ExpenseModel>> getRecentExpenses({int limit = 20}) async {
+  Future<List<ExpenseModel>> getRecentExpenses({int limit = 10000}) async {
     final uid = await ensureUser();
     if (uid == null) return [];
 
@@ -2348,7 +2348,7 @@ class SetAllRepository {
   }
 
   /// Fetch personal (wallet) expenses – expenses with no group_id.
-  Future<List<ExpenseModel>> getPersonalExpenses({int limit = 50}) async {
+  Future<List<ExpenseModel>> getPersonalExpenses({int limit = 10000}) async {
     final uid = await ensureUser();
     if (uid == null) return [];
 
@@ -2526,7 +2526,7 @@ class SetAllRepository {
   }
 
   /// Stream a unified activity feed: group + personal expenses, sorted newest-first.
-  Stream<List<ExpenseModel>> watchActivityFeed({int limit = 50}) async* {
+  Stream<List<ExpenseModel>> watchActivityFeed({int limit = 10000}) async* {
     // Yield immediately from current data, then re-yield on every _notify()
     yield await _buildActivityFeed(limit);
     await for (final _ in _changeController.stream) {
@@ -2616,7 +2616,7 @@ class SetAllRepository {
 
   /// Streams a unified, chronological list of [ActivityEvent]s aggregating
   /// expenses (group + personal), group-creation events, and settlements.
-  Stream<List<ActivityEvent>> watchOmniActivity({int limit = 80}) async* {
+  Stream<List<ActivityEvent>> watchOmniActivity({int limit = 10000}) async* {
     yield await _buildOmniActivity(limit);
     await for (final _ in _changeController.stream) {
       yield await _buildOmniActivity(limit);
@@ -3633,7 +3633,7 @@ class SetAllRepository {
     final uid = await ensureUser();
     final rows = await db.query(
       'ai_chat_messages',
-      where: 'session_id = ? AND (user_id = ? OR user_id IS NULL)',
+      where: 'session_id = ? AND user_id = ?',
       whereArgs: [sessionId, uid],
       orderBy: 'created_at ASC',
     );
@@ -3646,7 +3646,7 @@ class SetAllRepository {
     final uid = await ensureUser();
     final rows = await db.rawQuery(
       'SELECT DISTINCT session_id, MAX(created_at) AS latest '
-      'FROM ai_chat_messages WHERE (user_id = ? OR user_id IS NULL) '
+      'FROM ai_chat_messages WHERE user_id = ? '
       'GROUP BY session_id ORDER BY latest DESC',
       [uid],
     );
@@ -3659,15 +3659,15 @@ class SetAllRepository {
     if (uid == null) return;
     final ids = await db.rawQuery(
       'SELECT DISTINCT session_id, MAX(created_at) AS latest '
-      'FROM ai_chat_messages WHERE (user_id = ? OR user_id IS NULL) '
+      'FROM ai_chat_messages WHERE user_id = ? '
       'GROUP BY session_id ORDER BY latest DESC',
       [uid],
     );
     if (ids.length <= maxSessions) return;
     final toDelete = ids.skip(maxSessions).map((r) => r['session_id'] as String).toList();
     for (final sid in toDelete) {
-      await db.delete('ai_chat_messages', 
-        where: 'session_id = ? AND (user_id = ? OR user_id IS NULL)', 
+      await db.delete('ai_chat_messages',
+        where: 'session_id = ? AND user_id = ?',
         whereArgs: [sid, uid]);
     }
   }

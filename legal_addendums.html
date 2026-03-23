@@ -1,0 +1,173 @@
+<!--
+  SetAll — Legal Document Addendums
+  Insert these sections into the existing privacy.html and terms.html files.
+  Each block is marked with exactly where to insert it.
+  Effective Date: March 2026
+-->
+
+
+<!-- ============================================================
+  PRIVACY POLICY ADDENDUMS
+  File: web/privacy.html
+  ============================================================ -->
+
+<!--
+  INSERT AFTER Section 2 (Information We Collect) — add to the <ul> list:
+-->
+<li><strong>Push Notification Tokens:</strong> When you enable notifications, we collect a device push token (via Firebase Cloud Messaging) used solely to deliver expense reminders and group activity alerts to your device. This token is deleted when you sign out or delete your account.</li>
+<li><strong>Local Device Storage:</strong> The app stores a local encrypted copy of your data on your device using SQLite and system secure storage (SharedPreferences / Keychain). This local data is used to enable offline access and is not shared with any third party.</li>
+
+<!--
+  INSERT AFTER Section 3 (How We Use Your Information) — add new section 3a:
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>3a. Lawful Basis for Processing (GDPR)</h2>
+  <p>For users in the European Economic Area (EEA) and United Kingdom, we process your personal data under the following lawful bases as defined in Article 6 of the GDPR:</p>
+  <ul>
+    <li><strong>Performance of a Contract (Art. 6(1)(b)):</strong> Processing your account information, ledger data, and group membership is necessary to provide the Service you signed up for.</li>
+    <li><strong>Legitimate Interests (Art. 6(1)(f)):</strong> We process crash logs, usage diagnostics, and security data to maintain the stability and security of the Service. These interests do not override your fundamental rights.</li>
+    <li><strong>Consent (Art. 6(1)(a)):</strong> Where we request your consent (e.g., push notifications), you may withdraw it at any time through your device settings or by contacting us.</li>
+  </ul>
+</div>
+
+<!--
+  REPLACE Section 4 (How We Share Your Information) — update the service providers bullet:
+-->
+<li><strong>With Service Providers:</strong> We share data with the following trusted infrastructure providers, each bound by data processing agreements, solely to operate the Service:
+  <ul style="margin-top:0.5rem">
+    <li><strong>Supabase</strong> (United States) — database hosting, authentication, and real-time sync</li>
+    <li><strong>Google / Firebase</strong> (United States) — crash reporting (Crashlytics), push notifications (FCM), and app distribution</li>
+    <li><strong>Groq, Inc.</strong> (United States) — AI language model inference for the Insights Hub feature. When you use the AI chat or Deep Analysis features, the text of your query and anonymised financial context (expense categories and totals, not individual transaction details) are transmitted to Groq's servers to generate a response. Groq does not use this data to train its models. You can opt out of AI features by not using the Insights Hub.</li>
+    <li><strong>Resend</strong> (United States) — transactional email delivery (account verification, group invitations)</li>
+    <li><strong>Netlify</strong> (United States) — web application hosting and serverless function execution</li>
+  </ul>
+</li>
+
+<!--
+  INSERT NEW SECTION after Section 4 — International Data Transfers:
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>4a. International Data Transfers</h2>
+  <p>SetAll is operated from Georgia and our service providers are primarily located in the United States. If you are located in the EEA, UK, or Switzerland, your personal data is transferred outside your jurisdiction to countries that may not provide the same level of data protection.</p>
+  <p style="margin-top:0.5rem">We rely on the following safeguards for these transfers:</p>
+  <ul>
+    <li><strong>Standard Contractual Clauses (SCCs):</strong> Our agreements with Supabase, Google/Firebase, and Resend incorporate EU Standard Contractual Clauses as approved by the European Commission.</li>
+    <li><strong>Data Processing Agreements:</strong> All third-party processors are bound by contractual obligations to protect your data and process it only on our documented instructions.</li>
+  </ul>
+  <p style="margin-top:0.5rem">You may request a copy of the relevant safeguards by contacting us at <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a>.</p>
+</div>
+
+<!--
+  REPLACE Section 6 (Data Retention and Deletion) entirely:
+-->
+<div class="legal-section">
+  <h2>6. Data Retention and Deletion</h2>
+  <p>We retain your personal data only for as long as your account is active or as needed to provide the Service. Specific retention periods are:</p>
+  <ul>
+    <li><strong>Account and ledger data:</strong> Retained for the lifetime of your account. Upon deletion, all personal data is permanently removed from our active servers within <strong>30 days</strong>.</li>
+    <li><strong>Crash logs and diagnostics:</strong> Retained for up to 90 days, then automatically purged.</li>
+    <li><strong>AI chat history:</strong> Stored locally on your device only. Not retained on our servers beyond the duration of the request. Cleared automatically when you sign out.</li>
+    <li><strong>Push notification tokens:</strong> Deleted immediately upon sign-out or account deletion.</li>
+    <li><strong>Shared group data:</strong> If you delete your account while a member of a shared group, your display name is replaced with "Deleted User" and expense records you participated in remain visible to other group members for settlement continuity. You may request full anonymisation of your contributions by contacting us before deleting your account.</li>
+    <li><strong>Legal hold:</strong> We may retain certain data longer if required by applicable law or to resolve disputes.</li>
+  </ul>
+  <p style="margin-top:0.5rem"><strong>Account Deletion:</strong> You can initiate permanent deletion of your account and all associated personal data directly within the SetAll app under <em>Settings → Delete Account</em>. You will receive a confirmation email once deletion is complete.</p>
+</div>
+
+<!--
+  REPLACE Section 7 (Your Privacy Rights) — add data portability mechanism:
+-->
+<div class="legal-section">
+  <h2>7. Your Privacy Rights (GDPR, UK GDPR &amp; CCPA)</h2>
+  <p>Depending on your location, you may have the following rights regarding your personal information:</p>
+  <ul>
+    <li><strong>Right of Access:</strong> Request a copy of the personal data we hold about you.</li>
+    <li><strong>Right to Rectification:</strong> Request correction of inaccurate or incomplete personal data.</li>
+    <li><strong>Right to Erasure ("Right to be Forgotten"):</strong> Request deletion of your personal data. You can do this directly in-app via <em>Settings → Delete Account</em>, or by contacting us.</li>
+    <li><strong>Right to Data Portability:</strong> Request a machine-readable export of your personal data. To exercise this right, email <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a> with the subject "Data Export Request". We will provide a JSON or CSV file of your data within <strong>30 days</strong>.</li>
+    <li><strong>Right to Object or Restrict Processing:</strong> Object to or request restriction of certain processing activities, including processing based on legitimate interests.</li>
+    <li><strong>Right to Withdraw Consent:</strong> Where processing is based on consent (e.g., push notifications), you may withdraw consent at any time without affecting the lawfulness of prior processing.</li>
+    <li><strong>CCPA Rights (California residents):</strong> You have the right to know what personal data we collect, the right to delete it, and the right to opt out of the sale of personal data. We do not sell personal data.</li>
+  </ul>
+  <p style="margin-top:0.5rem">To exercise any of these rights, contact us at <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a>. We will respond within <strong>30 days</strong> (or sooner as required by applicable law). We may need to verify your identity before processing your request. If you are in the EEA or UK and believe your rights have been violated, you have the right to lodge a complaint with your local supervisory authority.</p>
+</div>
+
+<!--
+  ADD NEW SECTION after Section 9 (Changes), before Section 10 (Contact):
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>9a. Automated Decision-Making</h2>
+  <p>SetAll does not use your personal data for automated decision-making or profiling that produces legal or similarly significant effects on you. The AI Insights Hub feature generates suggestions based on your data, but all financial decisions remain entirely yours.</p>
+</div>
+
+<!--
+  UPDATE Section 10 (Contact) — add DPO reference:
+-->
+<!-- Change the intro text to: -->
+<p>If you have any questions, concerns, or requests regarding this Privacy Policy or the exercise of your data protection rights, please contact us. For EEA and UK users, this contact serves as the point of contact for our Data Protection responsibilities:</p>
+<!-- Keep the email link as-is -->
+<p style="margin-top:0.5rem; font-size:0.85rem; color:#64748b">SetAll Fintech Systems · 56 Tbilisi-Kojori st, Tbilisi, Georgia · Response time: within 30 days</p>
+
+
+<!-- ============================================================
+  TERMS OF SERVICE ADDENDUMS
+  File: web/terms.html
+  ============================================================ -->
+
+<!--
+  INSERT after Section 2 (Nature of the Service) as new Section 2a:
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>2a. AI-Powered Features Disclaimer</h2>
+  <p>The Service includes an AI-powered feature ("Insights Hub") that uses a third-party large language model (Groq / Llama) to analyse your expense data and provide spending summaries, suggestions, and visualisations.</p>
+  <ul>
+    <li><strong>Not Financial Advice:</strong> All outputs from the AI Insights Hub are informational only and do not constitute financial, investment, tax, or legal advice. You should not rely on AI-generated content for financial decisions.</li>
+    <li><strong>No Guarantee of Accuracy:</strong> AI-generated responses may contain errors, omissions, or outdated information. SetAll makes no warranty as to the accuracy, completeness, or fitness of any AI-generated content.</li>
+    <li><strong>Data Transmitted:</strong> When you use AI features, the text of your query and anonymised financial context is sent to our AI infrastructure provider. See our Privacy Policy for details. You may opt out by not using the Insights Hub.</li>
+  </ul>
+</div>
+
+<!--
+  INSERT after Section 6 (User Content) as new Section 6a:
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>6a. Shared Group Data and Account Deletion</h2>
+  <p>When you participate in a shared expense group, your contributions (expense records, split amounts, and settlement history) become part of a shared ledger visible to all group members. This shared data serves a legitimate purpose for other members to track and settle debts.</p>
+  <p style="margin-top:0.5rem">If you delete your account:</p>
+  <ul>
+    <li>Your personal profile information (name, email, avatar) will be removed and replaced with "Deleted User" in group records.</li>
+    <li>Expense and split records you participated in will remain in the shared ledger to preserve settlement accuracy for remaining group members.</li>
+    <li>You may request full anonymisation of your contributions by contacting us at <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a> prior to account deletion.</li>
+  </ul>
+</div>
+
+<!--
+  REPLACE Section 12 (Governing Law) entirely:
+-->
+<div class="legal-section">
+  <h2>12. Governing Law and Dispute Resolution</h2>
+  <p>These Terms shall be governed by and construed in accordance with the laws of the <strong>Republic of Georgia</strong>, without regard to its conflict of law provisions.</p>
+  <p style="margin-top:0.5rem"><strong>Informal Resolution:</strong> Before initiating any formal proceeding, you agree to contact us at <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a> and attempt to resolve the dispute informally. We will make good faith efforts to resolve any complaint within 30 days.</p>
+  <p style="margin-top:0.5rem"><strong>Formal Disputes:</strong> If informal resolution fails, disputes shall be subject to the exclusive jurisdiction of the courts of Tbilisi, Georgia. If you are an EU consumer, you may also have the right to bring proceedings in the courts of your country of residence under applicable EU consumer protection law.</p>
+  <p style="margin-top:0.5rem"><strong>EU Online Dispute Resolution:</strong> If you are an EU resident, you may also submit a complaint to the European Commission's Online Dispute Resolution platform at <a href="https://ec.europa.eu/consumers/odr" class="contact-link" style="display:inline">ec.europa.eu/consumers/odr</a>.</p>
+</div>
+
+<!--
+  INSERT after Section 13 (Changes to Terms) as new Section 13a:
+-->
+<hr class="legal-divider">
+
+<div class="legal-section">
+  <h2>13a. Service Availability</h2>
+  <p>SetAll is provided as a free service on a best-efforts basis. We do not guarantee uninterrupted availability of the Service. We reserve the right to modify, suspend, or discontinue any part of the Service at any time with reasonable notice where practicable. SetAll shall not be liable for any service interruptions caused by circumstances beyond our reasonable control, including third-party infrastructure failures.</p>
+</div>
