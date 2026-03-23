@@ -813,6 +813,16 @@ class SyncService {
       final currency = profile?.defaultCurrency ?? 'USD';
       final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
 
+      final uid = await _repo.ensureUser() ?? '';
+      final incomeRows = await LocalDatabase.db.rawQuery(
+        'SELECT SUM(universal_usd_amount) as t FROM expenses '
+        'WHERE group_id IS NULL AND is_income = 1 AND payer_id = ?', [uid]);
+      final expenseRows = await LocalDatabase.db.rawQuery(
+        'SELECT SUM(universal_usd_amount) as t FROM expenses '
+        'WHERE group_id IS NULL AND is_income = 0 AND payer_id = ?', [uid]);
+      final income  = (incomeRows.first['t']  as num?)?.toDouble() ?? 0;
+      final expense = (expenseRows.first['t'] as num?)?.toDouble() ?? 0;
+
       const appGroup = 'group.com.jafa.setall.app.widget';
       final isApple = !kIsWeb &&
           (defaultTargetPlatform == TargetPlatform.iOS ||
@@ -823,6 +833,8 @@ class SyncService {
           options: SharedPreferencesAsyncFoundationOptions(suiteName: appGroup),
         );
         await widgetPrefs.setDouble('widget_net_worth', walletNet.toDouble());
+        await widgetPrefs.setDouble('widget_income',    income);
+        await widgetPrefs.setDouble('widget_expenses',  expense);
         await widgetPrefs.setString('widget_currency', currency);
         await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
         debugPrint('[SyncService] widget data written: $currency $walletNet → $appGroup');
@@ -830,6 +842,8 @@ class SyncService {
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('widget_net_worth', walletNet.toDouble());
+        await prefs.setDouble('widget_income',    income);
+        await prefs.setDouble('widget_expenses',  expense);
         await prefs.setString('widget_currency', currency);
         await prefs.setString('widget_updated', DateTime.now().toIso8601String());
       }
