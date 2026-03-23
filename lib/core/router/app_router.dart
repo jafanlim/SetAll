@@ -21,6 +21,7 @@ import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart
 import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
 import '../../features/dashboard/presentation/screens/group_expense_detail_screen.dart';
 import '../../data/models/expense_model.dart';
+import '../../data/models/wallet_entry_model.dart';
 import '../../features/groups/presentation/screens/create_group_screen.dart';
 import '../../features/groups/presentation/screens/edit_group_screen.dart';
 import '../../features/groups/presentation/screens/group_info_screen.dart';
@@ -61,6 +62,7 @@ final class AppRouter {
   static const String inviteFriend     = '/invite-friend';
   static const String walletEntryType       = '/wallet/add';
   static const String walletEntryDetail      = '/wallet/entry';
+  static const String walletEntryEdit        = '/wallet/entry/edit/:id';
   static const String groupExpenseDetail     = '/group-expense-detail';
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
@@ -392,7 +394,7 @@ final class AppRouter {
           name: 'walletEntryDetail',
           pageBuilder: (context, state) {
             final extra = state.extra;
-            if (extra is! ExpenseModel) {
+            if (extra is! WalletEntryModel) {
               return const NoTransitionPage(child: SizedBox.shrink());
             }
             return MaterialPage(
@@ -402,6 +404,25 @@ final class AppRouter {
               ),
             );
           },
+          routes: [
+            // ── Wallet: entry edit screen (reuses WalletEntryTypeScreen flow)
+            GoRoute(
+              path: 'edit/:id',
+              name: 'walletEntryEdit',
+              pageBuilder: (context, state) {
+                final extra = state.extra;
+                if (extra is! WalletEntryModel) {
+                  return const NoTransitionPage(child: SizedBox.shrink());
+                }
+                return MaterialPage(
+                  child: AddExpenseScreen(
+                    groupId: '',
+                    existingWalletEntry: extra,
+                  ),
+                );
+              },
+            ),
+          ],
         ),
 
         GoRoute(

@@ -315,6 +315,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
         if (mounted) setState(() => _imported = count);
       }
       if (mounted) {
+        // TODO SCHEMA-03: migrate splitwise import to invalidate walletEntriesProvider
         ref.invalidate(personalExpensesProvider);
         ref.invalidate(omniActivityProvider);
         ref.invalidate(balanceSummaryProvider);

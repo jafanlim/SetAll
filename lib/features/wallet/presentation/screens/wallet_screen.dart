@@ -9,7 +9,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
-import '../../../../data/models/expense_model.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -100,13 +100,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     if (confirmed != true || !mounted) return;
     final repo = ref.read(setAllRepositoryProvider);
     for (final id in _selected.toList()) {
-      await repo.deleteExpense(id);
+      await repo.deleteWalletEntry(id);
     }
     if (!mounted) return;
     HapticUtils.success();
-    ref.invalidate(personalExpensesProvider);
-    ref.invalidate(walletBalanceProvider);
-    ref.invalidate(walletTotalsProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
     setState(() { _editMode = false; _selected.clear(); });
@@ -129,28 +128,27 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       ),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(setAllRepositoryProvider).deleteExpense(id);
+    await ref.read(setAllRepositoryProvider).deleteWalletEntry(id);
     if (!mounted) return;
     HapticUtils.success();
-    ref.invalidate(personalExpensesProvider);
-    ref.invalidate(walletBalanceProvider);
-    ref.invalidate(walletTotalsProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
   }
 
-  void _viewExpense(ExpenseModel expense) {
-    context.push(AppRouter.walletEntryDetail, extra: expense);
+  void _viewExpense(WalletEntryModel entry) {
+    context.push(AppRouter.walletEntryDetail, extra: entry);
   }
 
-  void _editExpense(ExpenseModel expense) {
+  void _editExpense(WalletEntryModel entry) {
     context.push(
-      '/group/${expense.groupId?.isNotEmpty == true ? expense.groupId : 'wallet'}/expense/${expense.id}',
-      extra: expense,
+      '/wallet/entry/edit/${entry.id}',
+      extra: entry,
     );
   }
 
-  List<ExpenseModel> _applyFilterSort(List<ExpenseModel> all) {
+  List<WalletEntryModel> _applyFilterSort(List<WalletEntryModel> all) {
     var list = all.where((e) {
       if (_colorFilter != null) {
         final c = e.iconColor != null ? Color(e.iconColor!) : null;
@@ -174,14 +172,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         list.sort((a, b) => (a.createdAt ?? '').compareTo(b.createdAt ?? ''));
       case _WalletSort.largest:
         list.sort((a, b) {
-          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
-          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          final av = Decimal.tryParse(a.universalUsdAmount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount) ?? Decimal.zero;
           return bv.compareTo(av);
         });
       case _WalletSort.smallest:
         list.sort((a, b) {
-          final av = Decimal.tryParse(a.universalUsdAmount ?? a.amount) ?? Decimal.zero;
-          final bv = Decimal.tryParse(b.universalUsdAmount ?? b.amount) ?? Decimal.zero;
+          final av = Decimal.tryParse(a.universalUsdAmount) ?? Decimal.zero;
+          final bv = Decimal.tryParse(b.universalUsdAmount) ?? Decimal.zero;
           return av.compareTo(bv);
         });
     }
@@ -190,17 +188,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme         = Theme.of(context);
-    final walletAsync   = ref.watch(walletBalanceProvider);
-    final totalsAsync   = ref.watch(walletTotalsProvider);
-    final personalAsync = ref.watch(personalExpensesProvider);
-    final baseCcyAsync  = ref.watch(baseCurrencyProvider);
-    final baseCurrency  = baseCcyAsync.valueOrNull ?? 'USD';
+    final theme        = Theme.of(context);
+    final totalsAsync  = ref.watch(walletEntryTotalsProvider);
+    final entriesAsync = ref.watch(walletEntriesProvider);
+    final baseCcyAsync = ref.watch(baseCurrencyProvider);
+    final baseCurrency = baseCcyAsync.valueOrNull ?? 'USD';
 
-    final allExpenses  = personalAsync.valueOrNull ?? [];
-    final expenses     = _applyFilterSort(allExpenses);
-    final allIds       = expenses.map((e) => e.id).toList();
-    final allSelected  = allIds.isNotEmpty && allIds.every(_selected.contains);
+    final allExpenses = entriesAsync.valueOrNull ?? [];
+    final expenses    = _applyFilterSort(allExpenses);
+    final allIds      = expenses.map((e) => e.id).toList();
+    final allSelected = allIds.isNotEmpty && allIds.every(_selected.contains);
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -252,9 +249,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     HapticUtils.lightTap();
                     await ref.read(syncServiceProvider).performFullSync();
                     if (!mounted) return;
-                    ref.invalidate(personalExpensesProvider);
-                    ref.invalidate(walletBalanceProvider);
-                    ref.invalidate(walletTotalsProvider);
+                    ref.invalidate(walletEntriesProvider);
+                    ref.invalidate(walletEntryTotalsProvider);
                     ref.invalidate(balanceSummaryProvider);
                   },
                 ),
@@ -279,8 +275,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         color: _purple,
         onRefresh: () async {
           HapticUtils.lightTap();
-          ref.invalidate(walletBalanceProvider);
-          ref.invalidate(personalExpensesProvider);
+          ref.invalidate(walletEntriesProvider);
+          ref.invalidate(walletEntryTotalsProvider);
           ref.invalidate(balanceSummaryProvider);
           ref.invalidate(baseCurrencyProvider);
         },
@@ -290,18 +286,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                child: walletAsync.when(
+                child: totalsAsync.when(
                   skipLoadingOnReload: true,
-                  data: (walletStr) {
-                    final walletDec = Decimal.tryParse(walletStr) ?? Decimal.zero;
-                    final totals = totalsAsync.valueOrNull;
-                    return WalletHero(
-                      walletBalance: walletDec,
-                      income: totals?.income,
-                      spend: totals?.spend,
-                      currency: baseCurrency,
-                    );
-                  },
+                  data: (totals) => WalletHero(
+                    walletBalance: totals.net,
+                    income: totals.income,
+                    spend: totals.spend,
+                    currency: baseCurrency,
+                  ),
                   loading: () => WalletHero.loading(),
                   error: (_, _) => WalletHero.error(),
                 ),
@@ -337,7 +329,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       ),
                       // Color filter dots — one per unique accent color used in entries
                       ...() {
-                        final entries = personalAsync.valueOrNull ?? [];
+                        final entries = entriesAsync.valueOrNull ?? [];
                         final seen = <int>{};
                         final colors = <Color>[];
                         for (final e in entries) {
@@ -411,13 +403,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       )),
                 ),
               ),
-              personalAsync.when(
+              entriesAsync.when(
                 data: (exp) {
                   final spend = <String, Decimal>{};
                   for (final e in exp) {
                     if (e.isIncome) continue;
-                    final cat    = e.category.isEmpty ? 'General' : e.category;
-                    final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                    final cat    = e.category.isEmpty ? 'Other' : e.category;
+                    final rawUsd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
                     final entryBaseCcy = e.originalCurrency ?? e.currency;
                     final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
                         ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
@@ -462,13 +454,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                       )),
                 ),
               ),
-              personalAsync.when(
+              entriesAsync.when(
                 data: (exp) {
                   final income = <String, Decimal>{};
                   for (final e in exp) {
                     if (!e.isIncome) continue;
-                    final cat    = e.category.isEmpty ? 'General' : e.category;
-                    final rawUsd = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+                    final cat    = e.category.isEmpty ? 'Other' : e.category;
+                    final rawUsd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
                     final entryBaseCcy = e.originalCurrency ?? e.currency;
                     final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
                         ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
@@ -554,7 +546,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (ctx, i) => _WalletEntryRow(
-                    expense: expenses[i],
+                    entry: expenses[i],
                     editMode: _editMode,
                     selected: _selected.contains(expenses[i].id),
                     onToggle: () => _toggleItem(expenses[i].id),
@@ -718,7 +710,7 @@ String _fmtAmt(Decimal d) {
 
 class _WalletEntryRow extends ConsumerWidget {
   const _WalletEntryRow({
-    required this.expense,
+    required this.entry,
     required this.editMode,
     required this.selected,
     required this.onToggle,
@@ -727,7 +719,7 @@ class _WalletEntryRow extends ConsumerWidget {
     required this.onDelete,
   });
 
-  final ExpenseModel expense;
+  final WalletEntryModel entry;
   final bool         editMode;
   final bool         selected;
   final VoidCallback onToggle;
@@ -737,23 +729,23 @@ class _WalletEntryRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme      = Theme.of(context);
-    final isIncome   = expense.isIncome;
-    final amt        = Decimal.tryParse(expense.amount) ?? Decimal.zero;
-    final ccy        = expense.currency.isEmpty ? 'USD' : expense.currency;
-    final desc       = expense.description.isEmpty ? 'Wallet entry' : expense.description;
-    final baseCcy    = ref.watch(baseCurrencyProvider).valueOrNull ?? 'USD';
-    final usdAmt     = Decimal.tryParse(expense.universalUsdAmount ?? '') ?? Decimal.zero;
+    final theme     = Theme.of(context);
+    final isIncome  = entry.isIncome;
+    final amt       = Decimal.tryParse(entry.amount) ?? Decimal.zero;
+    final ccy       = entry.currency.isEmpty ? 'USD' : entry.currency;
+    final desc      = entry.description.isEmpty ? 'Wallet entry' : entry.description;
+    final baseCcy   = ref.watch(baseCurrencyProvider).valueOrNull ?? 'USD';
+    final usdAmt    = Decimal.tryParse(entry.universalUsdAmount) ?? Decimal.zero;
 
     // Prefer original currency/amount for the main display (e.g. "100 VND").
     // Fall back to the stored base-currency amount when no conversion occurred.
-    final hasOrig   = expense.originalCurrency != null &&
-        expense.originalAmount != null &&
-        expense.originalCurrency != ccy;
-    final dispAmt   = hasOrig
-        ? (Decimal.tryParse(expense.originalAmount!) ?? amt)
+    final hasOrig  = entry.originalCurrency != null &&
+        entry.originalAmount != null &&
+        entry.originalCurrency != ccy;
+    final dispAmt  = hasOrig
+        ? (Decimal.tryParse(entry.originalAmount!) ?? amt)
         : amt;
-    final dispCcy   = hasOrig ? expense.originalCurrency! : ccy;
+    final dispCcy  = hasOrig ? entry.originalCurrency! : ccy;
     final showEquiv = dispCcy != baseCcy && usdAmt > Decimal.zero;
 
     final tile = GestureDetector(
@@ -788,11 +780,11 @@ class _WalletEntryRow extends ConsumerWidget {
                   ),
                 ),
               Builder(builder: (ctx) {
-                final entryColor = expense.iconColor != null
-                    ? Color(expense.iconColor!)
+                final entryColor = entry.iconColor != null
+                    ? Color(entry.iconColor!)
                     : (isIncome ? _teal : _purple);
-                final entryIcon = expense.iconCodepoint != null
-                    ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
+                final entryIcon = entry.iconCodepoint != null
+                    ? IconData(entry.iconCodepoint!, fontFamily: 'MaterialIcons')
                     : (isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
                 return Row(
                   mainAxisSize: MainAxisSize.min,
@@ -829,7 +821,7 @@ class _WalletEntryRow extends ConsumerWidget {
                             fontWeight: FontWeight.w600, fontSize: 13),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(expense.category.isEmpty ? 'common.general'.tr() : expense.category,
+                    Text(entry.category.isEmpty ? 'common.general'.tr() : entry.category,
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                   ],
