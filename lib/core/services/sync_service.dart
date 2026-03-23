@@ -902,15 +902,13 @@ class SyncService {
       final currency = profile?.defaultCurrency ?? 'USD';
       final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
 
-      final uid = await _repo.ensureUser() ?? '';
-      final incomeRows = await LocalDatabase.db.rawQuery(
-        'SELECT SUM(universal_usd_amount) as t FROM expenses '
-        'WHERE group_id IS NULL AND is_income = 1 AND payer_id = ?', [uid]);
-      final expenseRows = await LocalDatabase.db.rawQuery(
-        'SELECT SUM(universal_usd_amount) as t FROM expenses '
-        'WHERE group_id IS NULL AND is_income = 0 AND payer_id = ?', [uid]);
-      final income  = (incomeRows.first['t']  as num?)?.toDouble() ?? 0;
-      final expense = (expenseRows.first['t'] as num?)?.toDouble() ?? 0;
+      final walletEntries = await _repo.getWalletEntries();
+      var income  = 0.0;
+      var expense = 0.0;
+      for (final e in walletEntries) {
+        final amt = double.tryParse(e.universalUsdAmount) ?? 0;
+        if (e.isIncome) { income  += amt; } else { expense += amt; }
+      }
 
       const appGroup = 'group.com.jafa.setall.app.widget';
       final isApple = !kIsWeb &&
