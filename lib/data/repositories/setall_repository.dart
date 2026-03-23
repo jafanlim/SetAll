@@ -192,6 +192,10 @@ class SetAllRepository {
     return Decimal.one;
   }
 
+  /// Public wrapper so callers outside this class (e.g. AddExpenseScreen)
+  /// can resolve a currency-to-USD rate without accessing the private method.
+  Future<Decimal> resolveRateToUsd(String currency) => _resolveRateToUsd(currency);
+
   Future<bool> get _isOnline async {
     if (kIsWeb) return _client != null;
     try {
@@ -2920,7 +2924,16 @@ class SetAllRepository {
       }
     }
 
-    // ── 6. Sort newest-first, cap at limit ───────────────────────────────────
+    // ── 6. Wallet entries (wallet_entries table) ─────────────────────────────
+    final walletEntries = await getWalletEntries(limit: limit);
+    for (final e in walletEntries) {
+      events.add(WalletActivityEvent(
+        timestamp: e.createdAt ?? e.updatedAt ?? '',
+        entry: e,
+      ));
+    }
+
+    // ── 7. Sort newest-first, cap at limit ───────────────────────────────────
     events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return events.take(limit).toList();
   }

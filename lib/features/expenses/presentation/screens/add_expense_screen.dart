@@ -343,6 +343,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       final existing = widget.existingWalletEntry;
       final entryId = existing?.id ?? const Uuid().v4();
       final now = DateTime.now().toUtc().toIso8601String();
+
+      // Compute USD equivalent for totals / sorting.
+      final rateToUsd = await repo.resolveRateToUsd(_currency);
+      final usdAmount = (amount * rateToUsd).round(scale: 6);
+
       final entry = WalletEntryModel(
         id:          entryId,
         userId:      payerId,
@@ -356,7 +361,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         notes:       _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
         createdAt:   existing?.createdAt ?? now,
         updatedAt:   now,
-        universalUsdAmount: '0',
+        universalUsdAmount: usdAmount.toString(),
       );
       await repo.upsertWalletEntry(entry);
       if (mounted) {

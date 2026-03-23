@@ -41,6 +41,10 @@ import '../../features/insights/presentation/screens/insights_screen.dart';
 final class AppRouter {
   AppRouter._();
 
+  /// Shared navigator key — allows non-widget code (e.g. DeepLinkService)
+  /// to push routes without a BuildContext.
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
   static const String login = '/login';
   static const String register = '/register';
   static const String biometricGate = '/biometric-gate';
@@ -76,6 +80,7 @@ final class AppRouter {
   static GoRouter create() {
     final bio = BiometricService.instance;
     return GoRouter(
+      navigatorKey: navigatorKey,
       initialLocation: kIsWeb ? login : dashboard,
       debugLogDiagnostics: true,
       redirect: (context, state) async {

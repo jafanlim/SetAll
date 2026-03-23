@@ -70,9 +70,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   // ── Multi-select helpers ──────────────────────────────────────────────────
   String? _eventId(ActivityEvent ev) {
-    if (ev is ExpenseEvent)        return ev.expense.id;
-    if (ev is ExpenseDeletedEvent) return 'del-${ev.expenseId}';
-    if (ev is ExpenseEditedEvent)  return 'edit-${ev.expenseId}';
+    if (ev is ExpenseEvent)          return ev.expense.id;
+    if (ev is WalletActivityEvent)   return 'wallet-${ev.entry.id}';
+    if (ev is ExpenseDeletedEvent)   return 'del-${ev.expenseId}';
+    if (ev is ExpenseEditedEvent)    return 'edit-${ev.expenseId}';
     return null;
   }
 
@@ -125,6 +126,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       if (id == null || !_selected.contains(id)) continue;
       if (ev is ExpenseEvent) {
         await repo.deleteExpense(ev.expense.id);
+      } else if (ev is WalletActivityEvent) {
+        await repo.deleteWalletEntry(ev.entry.id);
       } else if (ev is ExpenseDeletedEvent) {
         // already deleted — just skip
       } else if (ev is ExpenseEditedEvent) {
@@ -150,6 +153,10 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
           ev.groupName.toLowerCase().contains(lower) ||
           ev.payerName.toLowerCase().contains(lower);
     }
+    if (ev is WalletActivityEvent) {
+      return ev.entry.description.toLowerCase().contains(lower) ||
+          ev.entry.category.toLowerCase().contains(lower);
+    }
     if (ev is GroupCreatedEvent) return ev.groupName.toLowerCase().contains(lower);
     if (ev is GroupDeletedEvent) return ev.groupName.toLowerCase().contains(lower);
     if (ev is MemberAddedEvent)  return ev.groupName.toLowerCase().contains(lower) || ev.addedUserName.toLowerCase().contains(lower);
@@ -164,12 +171,12 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       // filter tab
       final passFilter = switch (_filter) {
         _ActivityFilter.all    => true,
-        _ActivityFilter.wallet => ev is ExpenseEvent && ev.expense.groupId == null,
+        _ActivityFilter.wallet => ev is WalletActivityEvent || (ev is ExpenseEvent && ev.expense.groupId == null),
         _ActivityFilter.groups => (ev is ExpenseEvent && ev.expense.groupId != null) ||
             ev is GroupCreatedEvent || ev is GroupDeletedEvent || ev is MemberAddedEvent ||
             (ev is ExpenseDeletedEvent && ev.groupId != null) ||
             (ev is ExpenseEditedEvent  && ev.groupId != null),
-        _ActivityFilter.income => ev is ExpenseEvent && ev.expense.isIncome,
+        _ActivityFilter.income => (ev is ExpenseEvent && ev.expense.isIncome) || (ev is WalletActivityEvent && ev.entry.isIncome),
       };
       if (!passFilter) return false;
       return _matchesSearch(ev, _search);
@@ -189,10 +196,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   }
 
   Decimal _eventAmount(ActivityEvent ev) {
-    if (ev is ExpenseEvent)      return Decimal.tryParse(ev.expense.universalUsdAmount ?? ev.expense.amount) ?? Decimal.zero;
-    if (ev is SettlementEvent)   return Decimal.tryParse(ev.amount)    ?? Decimal.zero;
-    if (ev is ExpenseDeletedEvent) return Decimal.tryParse(ev.amount)  ?? Decimal.zero;
-    if (ev is ExpenseEditedEvent)  return Decimal.tryParse(ev.newAmount) ?? Decimal.zero;
+    if (ev is ExpenseEvent)        return Decimal.tryParse(ev.expense.universalUsdAmount ?? ev.expense.amount) ?? Decimal.zero;
+    if (ev is WalletActivityEvent) return Decimal.tryParse(ev.entry.universalUsdAmount) ?? Decimal.tryParse(ev.entry.amount) ?? Decimal.zero;
+    if (ev is SettlementEvent)     return Decimal.tryParse(ev.amount)      ?? Decimal.zero;
+    if (ev is ExpenseDeletedEvent) return Decimal.tryParse(ev.amount)      ?? Decimal.zero;
+    if (ev is ExpenseEditedEvent)  return Decimal.tryParse(ev.newAmount)   ?? Decimal.zero;
     return Decimal.zero;
   }
 
@@ -213,6 +221,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
   }
 
   String _typeSectionLabel(ActivityEvent ev) {
+    if (ev is WalletActivityEvent) {
+      return ev.entry.isIncome ? 'activity_screen.type_income'.tr() : 'activity_screen.type_wallet'.tr();
+    }
     if (ev is ExpenseEvent) {
       if (ev.expense.isIncome) return 'activity_screen.type_income'.tr();
       if (ev.expense.groupId == null) return 'activity_screen.type_wallet'.tr();
@@ -360,6 +371,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                         final isSelected = evId != null && _selected.contains(evId);
                         void onSelect() { if (evId != null) _toggleSelect(evId); }
                         if (ev is ExpenseEvent)        return _ExpenseTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
+                        if (ev is WalletActivityEvent) return _WalletEntryTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
                         if (ev is GroupCreatedEvent)   return _GroupCreatedTile(event: ev);
                         if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
                         if (ev is MemberAddedEvent)    return _MemberAddedTile(event: ev);
@@ -1275,6 +1287,69 @@ class _ExpenseTile extends ConsumerWidget {
         }
       },
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wallet entry tile (wallet_entries table — personal income/expense)
+// ---------------------------------------------------------------------------
+class _WalletEntryTile extends StatelessWidget {
+  const _WalletEntryTile({
+    required this.event,
+    this.editMode = false,
+    this.selected = false,
+    this.onSelect,
+  });
+  final WalletActivityEvent event;
+  final bool editMode;
+  final bool selected;
+  final VoidCallback? onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final e = event.entry;
+    final accent = e.iconColor != null
+        ? Color(e.iconColor!)
+        : (e.isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6));
+    final icon = e.iconCodepoint != null
+        ? IconData(e.iconCodepoint!, fontFamily: 'MaterialIcons')
+        : (e.isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
+    final desc = e.description.isEmpty ? e.category : e.description;
+    final amtStr = '${e.isIncome ? '+' : ''}${e.currency} ${e.amount}';
+
+    final tile = _buildEventTile(
+      context:        context,
+      theme:          theme,
+      accent:         accent,
+      icon:           icon,
+      title:          '$desc · Wallet',
+      badge:          e.isIncome ? 'Income' : 'Expense',
+      timestamp:      e.createdAt,
+      amount:         amtStr,
+      amountPositive: e.isIncome,
+      contextActions: [
+        _ContextAction(
+          label: 'Edit',
+          icon: Icons.edit_outlined,
+          onTap: () => context.push('/wallet/entry', extra: e),
+        ),
+      ],
+      onTap: () {
+        HapticUtils.lightTap();
+        context.push('/wallet/entry', extra: e);
+      },
+    );
+
+    if (editMode) {
+      return _SelectableTileWrapper(
+        selected: selected,
+        onSelect: onSelect ?? () {},
+        accent: accent,
+        child: tile,
+      );
+    }
+    return tile;
   }
 }
 

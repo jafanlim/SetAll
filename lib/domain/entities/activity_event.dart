@@ -1,4 +1,5 @@
 import '../../data/models/expense_model.dart';
+import '../../data/models/wallet_entry_model.dart';
 
 /// Discriminated union for the Omni Activity Feed.
 /// Each variant maps to a distinct UI tile in [ActivityScreen].
@@ -143,6 +144,16 @@ class MemberAddedEvent extends ActivityEvent {
   final bool addedByYou;
   final String addedUserName;
   final bool addedYou;
+}
+
+/// A wallet entry (personal income or expense) from the wallet_entries table.
+class WalletActivityEvent extends ActivityEvent {
+  const WalletActivityEvent({
+    required super.timestamp,
+    required this.entry,
+  });
+
+  final WalletEntryModel entry;
 }
 
 /// A settlement was recorded in a group.
