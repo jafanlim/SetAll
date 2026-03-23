@@ -926,6 +926,14 @@ class SyncService {
         await widgetPrefs.setDouble('widget_expenses',  expense);
         await widgetPrefs.setString('widget_currency', currency);
         await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
+        final entries = await _repo.getWalletEntries();
+        final recent = entries.take(3).toList();
+        for (int i = 0; i < 3; i++) {
+          final e = i < recent.length ? recent[i] : null;
+          await widgetPrefs.setString('widget_entry_${i + 1}_desc',   e?.description ?? '');
+          await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', e != null ? (double.tryParse(e.universalUsdAmount) ?? 0) : 0);
+          await widgetPrefs.setBool(  'widget_entry_${i + 1}_income', e?.isIncome ?? false);
+        }
         debugPrint('[SyncService] widget data written: $currency $walletNet → $appGroup');
         await HomeWidget.updateWidget(iOSName: 'SetAllWidget');
       } else {
