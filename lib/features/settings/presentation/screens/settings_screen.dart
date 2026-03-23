@@ -634,19 +634,31 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           const SizedBox(height: 24),
 
-          // ── Splitwise Import ─────────────────────────────────────────────
+          // ── Data ─────────────────────────────────────────────────────────
           _SectionHeader(label: 'settings_ext.data'.tr()),
           const SizedBox(height: 8),
           GlassCard(
             padding: EdgeInsets.zero,
-            child: _NavRow(
-              icon: LucideIcons.fileUp,
-              iconColor: const Color(0xFF22C55E),
-              label: 'settings_ext.import_splitwise'.tr(),
-              subtitle: 'settings_ext.import_splitwise_subtitle'.tr(),
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const SplitwiseImportScreen()),
-              ),
+            child: Column(
+              children: [
+                _NavRow(
+                  icon: Icons.shield_outlined,
+                  iconColor: _teal,
+                  label: 'Data & Privacy',
+                  subtitle: 'View usage and export your data',
+                  onTap: () => context.push(AppRouter.settingsDataUsage),
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: LucideIcons.fileUp,
+                  iconColor: const Color(0xFF22C55E),
+                  label: 'settings_ext.import_splitwise'.tr(),
+                  subtitle: 'settings_ext.import_splitwise_subtitle'.tr(),
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const SplitwiseImportScreen()),
+                  ),
+                ),
+              ],
             ),
           ),
 

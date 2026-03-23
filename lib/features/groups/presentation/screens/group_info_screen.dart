@@ -8,6 +8,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../settings/services/pdf_export_service.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -196,6 +197,14 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                 style: TextStyle(color: _brandOrange)),
           ]),
         ),
+        const PopupMenuItem(
+          value: 'export_pdf',
+          child: Row(children: [
+            Icon(Icons.picture_as_pdf_outlined, size: 16, color: _teal),
+            SizedBox(width: 8),
+            Text('Export as PDF'),
+          ]),
+        ),
       ],
     );
     if (!mounted) return;
@@ -205,6 +214,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
           extra: {'groupName': group.name});
     }
     if (result == 'force_delete') _delete(force: true);
+    if (result == 'export_pdf') PdfExportService().exportGroupAsPdf(group.id, group.name);
   }
 
   @override
