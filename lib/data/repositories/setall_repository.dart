@@ -23,6 +23,7 @@ import '../models/expense_model.dart';
 import '../models/group_model.dart';
 import '../models/profile_model.dart';
 import '../models/split_model.dart';
+import '../models/wallet_entry_model.dart';
 import '../../core/services/currency_service.dart';
 import '../../features/insights/models/ai_chat_message.dart';
 
@@ -3670,6 +3671,116 @@ class SetAllRepository {
         where: 'session_id = ? AND user_id = ?',
         whereArgs: [sid, uid]);
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Wallet Entries — dedicated personal finance ledger (schema v28)
+  // ---------------------------------------------------------------------------
+
+  WalletEntryModel _rowToWalletEntry(Map<String, dynamic> row) =>
+      WalletEntryModel.fromJson(row);
+
+  Future<List<WalletEntryModel>> getWalletEntries({int limit = 10000}) async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('wallet_entries')
+          .select()
+          .eq('user_id', uid)
+          .isFilter('deleted_at', null)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      return rows.map((r) => _rowToWalletEntry(r as Map<String, dynamic>)).toList();
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'wallet_entries',
+      where: 'user_id = ? AND deleted_at IS NULL',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    return rows.map<WalletEntryModel>(_rowToWalletEntry).toList();
+  }
+
+  Stream<List<WalletEntryModel>> watchWalletEntries({int limit = 10000}) async* {
+    List<WalletEntryModel> last;
+    try { last = await getWalletEntries(limit: limit); } catch (_) { last = []; }
+    yield last;
+    await for (final _ in _changeController.stream) {
+      List<WalletEntryModel> next;
+      try { next = await getWalletEntries(limit: limit); } catch (_) { continue; }
+      if (next.length != last.length ||
+          next.any((n) => !last.any((l) => l.id == n.id && l.amount == n.amount))) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
+  Future<({Decimal income, Decimal spend, Decimal net})> getWalletEntryTotals({
+    String baseCurrency = 'USD',
+  }) async {
+    final entries = await getWalletEntries();
+    var income = Decimal.zero;
+    var spend  = Decimal.zero;
+    Decimal? cachedRate;
+    for (final e in entries) {
+      final usd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
+      Decimal amt = usd;
+      if (baseCurrency != 'USD' && _currencyService != null && usd != Decimal.zero) {
+        cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
+        amt = (usd * cachedRate).round(scale: 2);
+      }
+      if (e.isIncome) { income += amt; } else { spend += amt; }
+    }
+    return (income: income, spend: spend, net: income - spend);
+  }
+
+  Future<WalletEntryModel> upsertWalletEntry(WalletEntryModel entry) async {
+    final uid = await ensureUser();
+    if (uid == null) throw StateError('No authenticated user');
+
+    final now = _now();
+    final withUser = entry.copyWith(userId: uid, updatedAt: now);
+
+    if (_isWeb && _client != null) {
+      await _client.from('wallet_entries').upsert(withUser.toSupabaseJson());
+    } else {
+      final localData = <String, dynamic>{
+        ...withUser.toJson(),
+        'synced_at': null,
+      };
+      await LocalDatabase.db.insert(
+        'wallet_entries', localData,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    }
+    _notify();
+    return withUser;
+  }
+
+  Future<void> deleteWalletEntry(String id) async {
+    final uid = await ensureUser();
+    if (uid == null) return;
+
+    if (_isWeb && _client != null) {
+      await _client
+          .from('wallet_entries')
+          .update({'deleted_at': _now()})
+          .eq('id', id)
+          .eq('user_id', uid);
+    } else {
+      await LocalDatabase.db.update(
+        'wallet_entries',
+        {'deleted_at': _now(), 'synced_at': null},
+        where: 'id = ? AND user_id = ?',
+        whereArgs: [id, uid],
+      );
+    }
+    _notify();
   }
 
   // ---------------------------------------------------------------------------

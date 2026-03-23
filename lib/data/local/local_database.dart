@@ -78,7 +78,7 @@ class LocalDatabase {
   ///     breakdown display never needs a lossy USD back-conversion.
   /// Schema v25 adds:
   ///   • groups.default_currency – ISO 4217 code for the group's settlement currency
-  static const int _version = 27;
+  static const int _version = 28;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -430,6 +430,36 @@ class LocalDatabase {
       // Schema v27: AI chat isolated per user (BUG-01)
       await _addColumnIfNotExists(db, 'ai_chat_messages', 'user_id', 'TEXT');
     }
+    if (oldVersion < 28) {
+      // Schema v28: wallet_entries — dedicated personal finance ledger
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS wallet_entries (
+          id                    TEXT PRIMARY KEY,
+          user_id               TEXT NOT NULL,
+          amount                TEXT NOT NULL,
+          is_income             INTEGER NOT NULL DEFAULT 0,
+          description           TEXT NOT NULL DEFAULT '',
+          category              TEXT DEFAULT 'Other',
+          currency              TEXT NOT NULL DEFAULT 'USD',
+          original_amount       TEXT,
+          original_currency     TEXT,
+          exchange_rate_applied TEXT,
+          universal_usd_amount  TEXT NOT NULL DEFAULT '0',
+          icon_codepoint        INTEGER,
+          icon_color            INTEGER,
+          notes                 TEXT,
+          attachment_urls       TEXT,
+          deleted_at            TEXT,
+          created_at            TEXT,
+          updated_at            TEXT,
+          synced_at             INTEGER
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_wallet_entries_user_created '
+        'ON wallet_entries(user_id, created_at)',
+      );
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -617,6 +647,33 @@ class LocalDatabase {
         deleted_with_group_id TEXT NOT NULL  -- Schema v18
       )
     ''');
+    await db.execute('''
+      CREATE TABLE wallet_entries (
+        id                    TEXT PRIMARY KEY,
+        user_id               TEXT NOT NULL,
+        amount                TEXT NOT NULL,
+        is_income             INTEGER NOT NULL DEFAULT 0,
+        description           TEXT NOT NULL DEFAULT '',
+        category              TEXT DEFAULT 'Other',
+        currency              TEXT NOT NULL DEFAULT 'USD',
+        original_amount       TEXT,
+        original_currency     TEXT,
+        exchange_rate_applied TEXT,
+        universal_usd_amount  TEXT NOT NULL DEFAULT '0',
+        icon_codepoint        INTEGER,
+        icon_color            INTEGER,
+        notes                 TEXT,
+        attachment_urls       TEXT,
+        deleted_at            TEXT,
+        created_at            TEXT,
+        updated_at            TEXT,
+        synced_at             INTEGER
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_wallet_entries_user_created '
+      'ON wallet_entries(user_id, created_at)',
+    );
   }
 }
 
