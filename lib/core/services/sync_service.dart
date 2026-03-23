@@ -11,6 +11,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/local/local_database.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/split_model.dart';
+import '../../data/models/wallet_entry_model.dart';
 import '../../data/repositories/setall_repository.dart';
 
 /// Coordinates two-way synchronization between local SQLite and Supabase.
@@ -198,6 +199,24 @@ class SyncService {
           table: 'group_members',
           callback: onRemoteChange,
         )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.insert,
+          schema: 'public',
+          table: 'wallet_entries',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.update,
+          schema: 'public',
+          table: 'wallet_entries',
+          callback: onRemoteChange,
+        )
+        .onPostgresChanges(
+          event: PostgresChangeEvent.delete,
+          schema: 'public',
+          table: 'wallet_entries',
+          callback: onRemoteChange,
+        )
         .subscribe((status, [error]) {
           debugPrint('[SyncService] realtime status=$status error=$error');
           if (status == RealtimeSubscribeStatus.channelError) {
@@ -326,6 +345,34 @@ class SyncService {
         } else {
           debugPrint('[SyncService] expense batch push failed (${payloads.length} items): $e');
         }
+      }
+    }
+
+    // ── wallet_entries push ──────────────────────────────────────────────
+    final pendingWalletEntries = await LocalDatabase.db.query(
+      'wallet_entries',
+      where: 'user_id = ? AND synced_at IS NULL',
+      whereArgs: [uid],
+    );
+    if (pendingWalletEntries.isNotEmpty) {
+      final payloads = pendingWalletEntries
+          .map((row) => WalletEntryModel.fromJson(row).toSupabaseJson())
+          .toList();
+      try {
+        debugPrint('[Sync] wallet_entries push: ${payloads.length} rows');
+        await _client.from('wallet_entries').upsert(payloads);
+        final now = DateTime.now().millisecondsSinceEpoch;
+        await LocalDatabase.db.transaction((txn) async {
+          for (final row in pendingWalletEntries) {
+            await txn.update(
+              'wallet_entries', {'synced_at': now},
+              where: 'id = ?', whereArgs: [row['id']],
+            );
+          }
+        });
+        debugPrint('[Sync] wallet_entries push complete');
+      } catch (e) {
+        debugPrint('[SyncService] wallet_entries push failed: $e');
       }
     }
 
@@ -536,6 +583,48 @@ class SyncService {
       final orphanList = orphanPersonalIds.toList();
       final ph = orphanList.map((_) => '?').join(',');
       await LocalDatabase.db.delete('expenses', where: 'id IN ($ph)', whereArgs: orphanList);
+    }
+
+    // ── wallet_entries pull ──────────────────────────────────────────────
+    try {
+      final cloudEntries = await _client
+          .from('wallet_entries')
+          .select()
+          .eq('user_id', uid) as List;
+      debugPrint('[SyncService] pull: ${cloudEntries.length} wallet_entries');
+      final cloudWalletIds = <String>{};
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
+      for (final e in cloudEntries) {
+        final map = e as Map<String, dynamic>;
+        final entry = WalletEntryModel.fromJson(map);
+        cloudWalletIds.add(entry.id);
+        await LocalDatabase.db.insert(
+          'wallet_entries',
+          {
+            ...entry.toJson(),
+            'synced_at': nowMs,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+      // Reconcile: prune local synced rows deleted on another device.
+      final localWalletRows = await LocalDatabase.db.query(
+        'wallet_entries',
+        columns: ['id'],
+        where: 'user_id = ? AND synced_at > 0 AND deleted_at IS NULL',
+        whereArgs: [uid],
+      );
+      final orphanIds = localWalletRows
+          .map((r) => r['id'] as String)
+          .where((id) => !cloudWalletIds.contains(id))
+          .toList();
+      if (orphanIds.isNotEmpty) {
+        final ph = orphanIds.map((_) => '?').join(',');
+        await LocalDatabase.db.delete(
+          'wallet_entries', where: 'id IN ($ph)', whereArgs: orphanIds);
+      }
+    } catch (e) {
+      debugPrint('[SyncService] wallet_entries pull failed: $e');
     }
 
     if (memberIds.isEmpty) return;

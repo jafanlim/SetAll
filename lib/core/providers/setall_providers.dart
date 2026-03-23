@@ -11,6 +11,7 @@ import '../../data/repositories/setall_repository.dart';
 import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
+import '../../data/models/wallet_entry_model.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -144,6 +145,21 @@ final recentExpensesProvider = FutureProvider<List<ExpenseModel>>((ref) async {
 /// exactly like [groupExpensesProvider] for group expenses.
 final personalExpensesProvider = StreamProvider<List<ExpenseModel>>((ref) {
   return ref.watch(setAllRepositoryProvider).watchPersonalExpenses();
+});
+
+/// Wallet entries ledger stream — dedicated personal finance table (schema v28).
+final walletEntriesProvider = StreamProvider<List<WalletEntryModel>>((ref) {
+  return ref.watch(setAllRepositoryProvider).watchWalletEntries();
+});
+
+/// Wallet entry totals (income / spend / net) in the user's base currency.
+final walletEntryTotalsProvider =
+    FutureProvider<({Decimal income, Decimal spend, Decimal net})>((ref) async {
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  ref.watch(walletEntriesProvider);
+  return ref
+      .watch(setAllRepositoryProvider)
+      .getWalletEntryTotals(baseCurrency: baseCurrency);
 });
 
 /// Unified activity feed stream: group + personal expenses, sorted newest-first.
