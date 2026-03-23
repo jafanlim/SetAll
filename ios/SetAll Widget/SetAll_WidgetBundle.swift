@@ -11,7 +11,6 @@ import SwiftUI
 @main
 struct SetAll_WidgetBundle: WidgetBundle {
     var body: some Widget {
-        SetAll_Widget()
-        SetAll_WidgetControl()
+        SetAllWidget()
     }
 }

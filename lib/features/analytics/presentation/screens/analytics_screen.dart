@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../data/models/expense_model.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -105,6 +106,60 @@ class IvEPeriod {
   final double expense;
 }
 
+/// Unified row for the analytics drill-down list.
+/// Sourced from either [ExpenseModel] (group) or [WalletEntryModel] (wallet).
+class AnalyticsRow {
+  const AnalyticsRow({
+    required this.isIncome,
+    required this.amount,
+    this.originalAmount,
+    this.originalCurrency,
+    required this.currency,
+    required this.category,
+    required this.description,
+    this.createdAt,
+    this.universalUsdAmount = '0',
+    this.groupId,
+  });
+
+  final bool    isIncome;
+  final String  amount;
+  final String? originalAmount;
+  final String? originalCurrency;
+  final String  currency;
+  final String  category;
+  final String  description;
+  final String? createdAt;
+  final String  universalUsdAmount;
+  final String? groupId;
+
+  factory AnalyticsRow.fromExpense(ExpenseModel e) => AnalyticsRow(
+    isIncome:          e.isIncome,
+    amount:            e.amount,
+    originalAmount:    e.originalAmount,
+    originalCurrency:  e.originalCurrency,
+    currency:          e.currency,
+    category:          e.category,
+    description:       e.description,
+    createdAt:         e.createdAt,
+    universalUsdAmount: e.universalUsdAmount ?? '0',
+    groupId:           e.groupId,
+  );
+
+  factory AnalyticsRow.fromWalletEntry(WalletEntryModel e) => AnalyticsRow(
+    isIncome:          e.isIncome,
+    amount:            e.amount,
+    originalAmount:    e.originalAmount,
+    originalCurrency:  e.originalCurrency,
+    currency:          e.currency,
+    category:          e.category,
+    description:       e.description,
+    createdAt:         e.createdAt,
+    universalUsdAmount: e.universalUsdAmount,
+    groupId:           null,
+  );
+}
+
 class AnalyticsData {
   const AnalyticsData({
     required this.categoryTotals,
@@ -138,8 +193,8 @@ class AnalyticsData {
   final List<IvEPeriod> ivePeriods;
   // Income breakdown by category (mirrors categoryTotals but for income)
   final Map<String, double> incomeCategoryTotals;
-  // Raw filtered expenses for drill-down list
-  final List<ExpenseModel> allExpenses;
+  // Raw filtered rows for drill-down list
+  final List<AnalyticsRow> allExpenses;
 }
 
 // ---------------------------------------------------------------------------
@@ -155,35 +210,35 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
       .watch(exchangeRateProvider(baseCurrency).future)
       .then((s) => Decimal.tryParse(s) ?? Decimal.one);
 
-  // Pull raw expenses based on source
-  List<ExpenseModel> all = [];
+  // Pull raw rows based on source
+  List<AnalyticsRow> all = [];
   if (filter.source == _Source.wallet || filter.source == _Source.all) {
-    // TODO SCHEMA-03: migrate analytics to use walletEntriesProvider for wallet source
-    final personal = await ref.watch(personalExpensesProvider.future);
-    all.addAll(personal);
+    final walletEntries = await ref.watch(walletEntriesProvider.future);
+    all.addAll(walletEntries.map(AnalyticsRow.fromWalletEntry));
   }
   if (filter.source == _Source.groups || filter.source == _Source.all) {
     final recent = await ref.watch(recentExpensesProvider.future);
-    all.addAll(recent);
+    all.addAll(recent.map(AnalyticsRow.fromExpense));
   }
 
-  // De-duplicate
+  // De-duplicate by description+amount+date (rows have no shared id)
   final seen  = <String>{};
-  final dedup = <ExpenseModel>[];
+  final dedup = <AnalyticsRow>[];
   for (final e in all) {
-    if (seen.add(e.id)) dedup.add(e);
+    final key = '${e.createdAt}_${e.amount}_${e.description}';
+    if (seen.add(key)) dedup.add(e);
   }
 
   // Group filter
-  final List<ExpenseModel> filtered = filter.groupId != null
+  final List<AnalyticsRow> filtered = filter.groupId != null
       ? dedup.where((e) => e.groupId == filter.groupId).toList()
       : dedup;
 
   // Amount normalization: convert to baseCurrency.
   // 1. If the expense was originally recorded in baseCurrency, use originalAmount directly.
   // 2. Otherwise multiply the stored universalUsdAmount by the live USD→base rate.
-  double normalizedAmt(ExpenseModel e) {
-    final rawUsd   = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+  double normalizedAmt(AnalyticsRow e) {
+    final rawUsd   = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
     final entryCcy = e.originalCurrency ?? e.currency;
     if (entryCcy == baseCurrency && e.originalAmount != null) {
       return (Decimal.tryParse(e.originalAmount!) ?? rawUsd).toDouble();
@@ -203,7 +258,7 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
   final incomeMap          = <String, double>{};
   final currencyBreakdown  = <String, double>{};
   double totalIncome       = 0;
-  final windowExpenses     = <ExpenseModel>[];   // for drill-down list
+  final windowExpenses     = <AnalyticsRow>[];   // for drill-down list
 
   for (final e in filtered) {
     final dateStr = e.createdAt;
@@ -1740,7 +1795,7 @@ class _DrillDownList extends StatelessWidget {
     required this.currency,
     this.incomeOnly = false,
   });
-  final List<ExpenseModel> expenses;
+  final List<AnalyticsRow> expenses;
   final String?            drillCategory;
   final String             currency;
   final bool               incomeOnly;
