@@ -163,6 +163,7 @@ class _DesktopLayout extends ConsumerWidget {
     return Scaffold(
       backgroundColor: _kContentBg,
       body: Stack(
+        fit: StackFit.expand,
         children: [
           Row(
             children: [
@@ -185,12 +186,7 @@ class _DesktopLayout extends ConsumerWidget {
               ),
             ],
           ),
-          const Positioned(
-            right: 0,
-            top: 0,
-            bottom: 0,
-            child: Center(child: BugReportButton()),
-          ),
+          const BugReportButton(),
         ],
       ),
     );
@@ -395,6 +391,7 @@ class _MobileLayout extends StatelessWidget {
       body: SafeArea(
         bottom: false,
         child: Stack(
+          fit: StackFit.expand,
           children: [
             Row(
               children: [
@@ -402,12 +399,7 @@ class _MobileLayout extends StatelessWidget {
                 Expanded(child: child),
               ],
             ),
-            const Positioned(
-              right: 0,
-              top: 0,
-              bottom: 0,
-              child: Center(child: BugReportButton()),
-            ),
+            const BugReportButton(),
           ],
         ),
       ),

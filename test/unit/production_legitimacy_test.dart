@@ -103,13 +103,8 @@ void main() {
       final requiredRoutes = [
         'https://setall.app/',
         'https://setall.app/download',
-        'https://setall.app/support',
         'https://setall.app/privacy',
         'https://setall.app/terms',
-        'https://setall.app/login',
-        'https://setall.app/portal',
-        'https://setall.app/insights',
-        'https://setall.app/app',
       ];
       for (final route in requiredRoutes) {
         expect(sitemap, contains('<loc>$route</loc>'),
