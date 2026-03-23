@@ -9,6 +9,7 @@ import 'package:window_manager/window_manager.dart' if (dart.library.html) '../s
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
 import '../providers/desktop_providers.dart';
+import '../widgets/bug_report_button.dart';
 
 /// Breakpoint: side rail replaces bottom nav (tablet / small desktop).
 const double kAdaptiveBreakpoint = 600;
@@ -161,24 +162,34 @@ class _DesktopLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       backgroundColor: _kContentBg,
-      body: Row(
+      body: Stack(
         children: [
-          _PremiumSidebar(
-            selectedIndex: selectedIndex,
-            onTap: onTap,
-          ),
-          Expanded(
-            child: Container(
-              color: _kContentBg,
-              child: SafeArea(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
-                    child: child,
+          Row(
+            children: [
+              _PremiumSidebar(
+                selectedIndex: selectedIndex,
+                onTap: onTap,
+              ),
+              Expanded(
+                child: Container(
+                  color: _kContentBg,
+                  child: SafeArea(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
+                        child: child,
+                      ),
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
+          ),
+          const Positioned(
+            right: 0,
+            top: 0,
+            bottom: 0,
+            child: Center(child: BugReportButton()),
           ),
         ],
       ),
@@ -383,10 +394,20 @@ class _MobileLayout extends StatelessWidget {
     return Scaffold(
       body: SafeArea(
         bottom: false,
-        child: Row(
+        child: Stack(
           children: [
-            if (useRail) _buildRail(context),
-            Expanded(child: child),
+            Row(
+              children: [
+                if (useRail) _buildRail(context),
+                Expanded(child: child),
+              ],
+            ),
+            const Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Center(child: BugReportButton()),
+            ),
           ],
         ),
       ),

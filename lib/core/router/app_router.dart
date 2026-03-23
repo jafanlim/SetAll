@@ -32,6 +32,7 @@ import '../../features/settings/presentation/screens/security_screen.dart';
 import '../../features/settings/presentation/screens/notifications_screen.dart';
 import '../../features/settings/presentation/screens/regional_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
+import '../../features/settings/presentation/screens/data_usage_screen.dart';
 import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 import '../../features/web/download_screen.dart';
 import '../../features/web/legal_screen.dart';
@@ -52,6 +53,7 @@ final class AppRouter {
   static const String settings            = '/settings';
   static const String settingsSecurity     = '/settings/security';
   static const String settingsNotifications = '/settings/notifications';
+  static const String settingsDataUsage    = '/settings/data-usage';
   static const String settingsRegional     = '/settings/regional';
   static const String settingsChangePassword = '/settings/change-password';
   static const String addExpense       = '/add-expense';
@@ -284,6 +286,16 @@ final class AppRouter {
             child: Material(
               color: Theme.of(context).colorScheme.surface,
               child: const RegionalScreen(),
+            ),
+          ),
+        ),
+        GoRoute(
+          path: settingsDataUsage,
+          name: 'settingsDataUsage',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const DataUsageScreen(),
             ),
           ),
         ),

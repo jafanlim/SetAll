@@ -10,6 +10,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
+import '../../../settings/services/pdf_export_service.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -240,6 +241,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     PopupMenuItem(value: _WalletSort.largest,  child: Text('common.largest_first'.tr())),
                     PopupMenuItem(value: _WalletSort.smallest, child: Text('common.smallest_first'.tr())),
                   ],
+                ),
+                const SizedBox(width: 4),
+                AppTopButton(
+                  icon: Icons.picture_as_pdf_outlined,
+                  tooltip: 'Export as PDF',
+                  onPressed: () => PdfExportService().exportWalletAsPdf(),
                 ),
                 const SizedBox(width: 4),
                 AppTopButton(

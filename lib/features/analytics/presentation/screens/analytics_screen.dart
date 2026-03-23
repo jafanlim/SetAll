@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/wallet_entry_model.dart';
+import '../../../settings/services/pdf_export_service.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -439,6 +440,20 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        actions: [
+          analyticsAsync.whenOrNull(
+            data: (data) => IconButton(
+              icon: const Icon(Icons.picture_as_pdf_outlined),
+              tooltip: 'Export as PDF',
+              onPressed: () => PdfExportService().exportAnalyticsPdf(
+                income:   data.totalIncome,
+                expenses: data.totalSpend,
+                entries:  data.allExpenses,
+                currency: data.currency,
+              ),
+            ),
+          ) ?? const SizedBox.shrink(),
+        ],
       ),
       body: Column(
         children: [
