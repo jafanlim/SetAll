@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:home_widget/home_widget.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, kIsWeb, debugPrint, TargetPlatform;
 import 'package:shared_preferences_foundation/shared_preferences_foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -825,6 +826,7 @@ class SyncService {
         await widgetPrefs.setString('widget_currency', currency);
         await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
         debugPrint('[SyncService] widget data written: $currency $walletNet → $appGroup');
+        await HomeWidget.updateWidget(iOSName: 'SetAllWidget');
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('widget_net_worth', walletNet.toDouble());
