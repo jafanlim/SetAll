@@ -658,7 +658,7 @@ class SetAllRepository {
 
   /// Emits personal (wallet) expenses immediately, then re-emits on every
   /// local write or sync completion — same mechanism as [watchGroupExpenses].
-  Stream<List<ExpenseModel>> watchPersonalExpenses({int limit = 50}) async* {
+  Stream<List<ExpenseModel>> watchPersonalExpenses({int limit = 10000}) async* {
     List<ExpenseModel> last;
     try { last = await getPersonalExpenses(limit: limit); } catch (e) {
       debugPrint('[watchPersonalExpenses] initial load error (yielding []): $e');
