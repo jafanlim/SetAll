@@ -12,6 +12,7 @@ class AiChatMessage {
     required this.content,
     required this.createdAt,
     this.isCanvas = false,
+    this.userId,
   });
 
   final String id;
@@ -20,12 +21,14 @@ class AiChatMessage {
   final String content;
   final DateTime createdAt;
   final bool isCanvas;
+  final String? userId;
 
   static AiChatMessage create({
     required String sessionId,
     required AiChatRole role,
     required String content,
     bool isCanvas = false,
+    String? userId,
   }) {
     return AiChatMessage(
       id: const Uuid().v4(),
@@ -34,6 +37,7 @@ class AiChatMessage {
       content: content,
       createdAt: DateTime.now(),
       isCanvas: isCanvas,
+      userId: userId,
     );
   }
 
@@ -47,6 +51,7 @@ class AiChatMessage {
       content: map['content'] as String,
       createdAt: DateTime.parse(map['created_at'] as String),
       isCanvas: (map['is_canvas'] as int? ?? 0) == 1,
+      userId: map['user_id'] as String?,
     );
   }
 
@@ -58,10 +63,11 @@ class AiChatMessage {
       'content': content,
       'created_at': createdAt.toIso8601String(),
       'is_canvas': isCanvas ? 1 : 0,
+      if (userId != null) 'user_id': userId,
     };
   }
 
-  AiChatMessage copyWith({String? content, bool? isCanvas}) {
+  AiChatMessage copyWith({String? content, bool? isCanvas, String? userId}) {
     return AiChatMessage(
       id: id,
       sessionId: sessionId,
@@ -69,6 +75,7 @@ class AiChatMessage {
       content: content ?? this.content,
       createdAt: createdAt,
       isCanvas: isCanvas ?? this.isCanvas,
+      userId: userId ?? this.userId,
     );
   }
 }
