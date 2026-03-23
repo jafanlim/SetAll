@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
+import 'package:uuid/uuid.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:file_picker/file_picker.dart';
@@ -16,6 +17,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
@@ -53,13 +55,15 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
   const AddExpenseScreen({
     super.key,
     required this.groupId,
-    required this.groupName,
+    this.groupName = '',
     this.initialIsIncome = false,
+    this.existingWalletEntry,
   });
 
   final String groupId;
   final String groupName;
   final bool   initialIsIncome;
+  final WalletEntryModel? existingWalletEntry;
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -95,9 +99,28 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   @override
   void initState() {
     super.initState();
-    _isIncome = widget.initialIsIncome;
-    _entryColor = _isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6);
-    _entryIcon  = _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+    final existing = widget.existingWalletEntry;
+    if (existing != null) {
+      _isIncome = existing.isIncome;
+      _amountCtrl.text       = existing.amount;
+      _descriptionCtrl.text  = existing.description;
+      _notesCtrl.text        = existing.notes ?? '';
+      _currency              = existing.currency;
+      _category              = existing.category;
+      _entryColor = existing.iconColor != null
+          ? Color(existing.iconColor!)
+          : (_isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6));
+      _entryIcon = existing.iconCodepoint != null
+          ? IconData(existing.iconCodepoint!, fontFamily: 'MaterialIcons')
+          : (_isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
+      if (existing.createdAt != null) {
+        _selectedDate = DateTime.tryParse(existing.createdAt!) ?? DateTime.now();
+      }
+    } else {
+      _isIncome   = widget.initialIsIncome;
+      _entryColor = _isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6);
+      _entryIcon  = _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+    }
     _loadMembers();
   }
 
@@ -317,42 +340,40 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
 
     // -- Personal (wallet) mode — no splits -----------------------------------
     if (isPersonal) {
-      final expense = await repo.addExpense(
-        groupId: null,
-        payerId: payerId,
-        amount: amount,
+      final existing = widget.existingWalletEntry;
+      final entryId = existing?.id ?? const Uuid().v4();
+      final now = DateTime.now().toUtc().toIso8601String();
+      final entry = WalletEntryModel(
+        id:          entryId,
+        userId:      payerId,
+        amount:      amount.toString(),
+        isIncome:    _isIncome,
         description: InputSanitizer.sanitize(_descriptionCtrl.text.trim()),
-        currency: _currency,
-        splitType: SplitType.even,
-        splits: [],
-        category: _category,
-        isIncome: _isIncome,
+        currency:    _currency,
+        category:    _category,
         iconCodepoint: _entryIcon.codePoint,
-        iconColor: _entryColor.toARGB32(),
-        attachmentPaths: List.unmodifiable(_attachmentPaths),
-        notes: _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
+        iconColor:   _entryColor.toARGB32(),
+        notes:       _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
+        createdAt:   existing?.createdAt ?? now,
+        updatedAt:   now,
+        universalUsdAmount: '0',
       );
+      await repo.upsertWalletEntry(entry);
       if (mounted) {
         setState(() => _isSubmitting = false);
-        if (expense != null) {
-          HapticUtils.success(); // HAPTIC-01: wallet creation — heavy confirms high-value action
-          ref.invalidate(walletBalanceProvider);
-          ref.invalidate(personalExpensesProvider);
-          ref.invalidate(recentExpensesProvider);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(_isIncome ? 'add_expense.income_recorded'.tr() : 'add_expense.expense_saved'.tr()),
-              backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
-            ),
-          );
-          // For wallet (personal) entries, go directly to /wallet to clear
-          // the WalletEntryTypeScreen from the navigation stack.
-          context.go('/wallet');
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('add_expense.could_not_save'.tr())),
-          );
-        }
+        HapticUtils.success(); // HAPTIC-01: wallet creation — heavy confirms high-value action
+        ref.invalidate(walletEntriesProvider);
+        ref.invalidate(walletEntryTotalsProvider);
+        ref.invalidate(recentExpensesProvider);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isIncome ? 'add_expense.income_recorded'.tr() : 'add_expense.expense_saved'.tr()),
+            backgroundColor: const Color(0xFF8B5CF6).withValues(alpha: 0.9),
+          ),
+        );
+        // For wallet (personal) entries, go directly to /wallet to clear
+        // the WalletEntryTypeScreen from the navigation stack.
+        context.go('/wallet');
       }
       return;
     }

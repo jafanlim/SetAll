@@ -158,6 +158,7 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
   // Pull raw expenses based on source
   List<ExpenseModel> all = [];
   if (filter.source == _Source.wallet || filter.source == _Source.all) {
+    // TODO SCHEMA-03: migrate analytics to use walletEntriesProvider for wallet source
     final personal = await ref.watch(personalExpensesProvider.future);
     all.addAll(personal);
   }

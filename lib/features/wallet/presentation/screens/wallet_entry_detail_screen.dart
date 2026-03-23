@@ -13,7 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
-import '../../../../data/models/expense_model.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -56,7 +56,7 @@ class WalletEntryDetailScreen extends ConsumerStatefulWidget {
     required this.expense,
   });
 
-  final ExpenseModel expense;
+  final WalletEntryModel expense;
 
   @override
   ConsumerState<WalletEntryDetailScreen> createState() =>
@@ -89,12 +89,11 @@ class _WalletEntryDetailScreenState
       ),
     );
     if (confirmed != true || !mounted) return;
-    await ref.read(setAllRepositoryProvider).deleteExpense(widget.expense.id);
+    await ref.read(setAllRepositoryProvider).deleteWalletEntry(widget.expense.id);
     if (!mounted) return;
     HapticUtils.success();
-    ref.invalidate(personalExpensesProvider);
-    ref.invalidate(walletBalanceProvider);
-    ref.invalidate(walletTotalsProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
     if (context.canPop()) context.pop();
@@ -103,7 +102,7 @@ class _WalletEntryDetailScreenState
   void _edit() {
     HapticUtils.primaryTap();
     context.push(
-      '/group/${widget.expense.groupId ?? 'wallet'}/expense/${widget.expense.id}',
+      '/wallet/entry/edit/${widget.expense.id}',
       extra: widget.expense,
     );
   }
@@ -116,8 +115,7 @@ class _WalletEntryDetailScreenState
     final accentColor = isIncome ? _green : _purple;
 
     final amt    = Decimal.tryParse(expense.amount) ?? Decimal.zero;
-    final usdAmt = Decimal.tryParse(expense.universalUsdAmount ?? '') ??
-        Decimal.tryParse(expense.amount) ?? Decimal.zero;
+    final usdAmt = Decimal.tryParse(expense.universalUsdAmount) ?? Decimal.zero;
     final ccy    = expense.currency.isEmpty ? 'USD' : expense.currency;
 
     final baseCcyAsync = ref.watch(baseCurrencyProvider);
@@ -132,9 +130,9 @@ class _WalletEntryDetailScreenState
         ? IconData(expense.iconCodepoint!, fontFamily: 'MaterialIcons')
         : (isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded);
 
-    // Mini analytics: personal expenses for category gauge
-    final personalAsync = ref.watch(personalExpensesProvider);
-    final expenses = personalAsync.valueOrNull ?? [];
+    // Mini analytics: wallet entries for category gauge
+    final entriesAsync = ref.watch(walletEntriesProvider);
+    final expenses = entriesAsync.valueOrNull ?? [];
 
     // Monthly spend for this category
     final now        = DateTime.now();
@@ -145,7 +143,7 @@ class _WalletEntryDetailScreenState
       if (e.isIncome != isIncome) continue;  // match same type
       final createdAt = DateTime.tryParse(e.createdAt ?? '') ?? DateTime(2000);
       if (createdAt.isBefore(monthStart)) continue;
-      final eAmt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
+      final eAmt = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
       totalMonthSpend += eAmt;
       if (e.category == expense.category) catMonthSpend += eAmt;
     }
@@ -443,7 +441,7 @@ class _WalletEntryDetailScreenState
           ],
 
           // ── Attachments ──────────────────────────────────────────────────
-          if (expense.attachmentUrls != null && expense.attachmentUrls!.isNotEmpty) ...[
+          if ((expense.attachmentUrls ?? []).isNotEmpty) ...[
             _AttachmentsCard(expense: expense),
             const SizedBox(height: 12),
           ],
@@ -514,7 +512,7 @@ class _WalletEntryDetailScreenState
 
 class _AttachmentsCard extends ConsumerStatefulWidget {
   const _AttachmentsCard({required this.expense});
-  final ExpenseModel expense;
+  final WalletEntryModel expense;
 
   @override
   ConsumerState<_AttachmentsCard> createState() => _AttachmentsCardState();
