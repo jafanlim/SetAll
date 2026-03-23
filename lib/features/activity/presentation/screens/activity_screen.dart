@@ -134,8 +134,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     if (!mounted) return;
     setState(() { _deleting = false; _editMode = false; _selected.clear(); });
     ref.invalidate(omniActivityProvider);
-    // TODO SCHEMA-03: migrate activity screen to invalidate walletEntriesProvider
-    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(walletBalanceProvider);
   }
@@ -1622,8 +1622,8 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
 
   void _invalidateProviders() {
     ref.invalidate(omniActivityProvider);
-    // TODO SCHEMA-03: migrate activity screen to invalidate walletEntriesProvider
-    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(walletBalanceProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(myGroupsProvider);

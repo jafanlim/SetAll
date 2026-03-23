@@ -187,7 +187,6 @@ struct SetAllWidgetEntryView: View {
     }
 }
 
-@main
 struct SetAllWidget: Widget {
     let kind = "SetAllWidget"
     var body: some WidgetConfiguration {
