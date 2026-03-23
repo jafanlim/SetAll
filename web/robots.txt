@@ -1,4 +1,5 @@
 User-agent: *
 Allow: /
-
+Disallow: /login
+Disallow: /insights
 Sitemap: https://setall.app/sitemap.xml
