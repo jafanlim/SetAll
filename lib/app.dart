@@ -19,6 +19,7 @@ import 'core/services/quick_actions_service.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
+import 'features/insights/providers/insights_provider.dart';
 
 // ---------------------------------------------------------------------------
 // Update state — shared across app.dart and settings_screen.dart
@@ -108,7 +109,10 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
       // Migrate any entries created under the anonymous device UUID to the
       // real Supabase user ID, then reset their synced_at so they get pushed.
       await _migrateDeviceUidToRealUid(newUid);
-
+      
+      // Clean up AI chat messages from other users
+      await _cleanupOtherUsersAiChatMessages(newUid);
+      
       _lastUserId = newUid;
 
       final sync = ref.read(syncServiceProvider);
@@ -192,6 +196,20 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     }
   }
 
+  Future<void> _cleanupOtherUsersAiChatMessages(String uid) async {
+    try {
+      final db = LocalDatabase.db;
+      await db.delete(
+        'ai_chat_messages',
+        where: 'user_id != ? AND user_id IS NOT NULL',
+        whereArgs: [uid],
+      );
+    } catch (e) {
+      // Web mode or other error — ignore.
+      debugPrint('[app] _cleanupOtherUsersAiChatMessages error (non-fatal): $e');
+    }
+  }
+
   Future<void> _wipeSQLiteCache() async {
     try {
       final db = LocalDatabase.db;
@@ -216,6 +234,7 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     ref.invalidate(myGroupsProvider);
     ref.invalidate(friendGroupsProvider);
     ref.invalidate(recentExpensesProvider);
+    ref.invalidate(insightsProvider);
   }
 
   static bool get _isDesktop =>

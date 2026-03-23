@@ -105,6 +105,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       sessionId: current.sessionId,
       role: AiChatRole.user,
       content: userText.trim(),
+      userId: repo.currentUserId,
     );
     await repo.insertChatMessage(userMsg);
 
@@ -187,6 +188,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
         role: AiChatRole.assistant,
         content: assistantContent,
         isCanvas: hasCanvas,
+        userId: repo.currentUserId,
       );
       await repo.insertChatMessage(assistantMsg);
 

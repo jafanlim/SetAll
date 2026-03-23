@@ -78,7 +78,7 @@ class LocalDatabase {
   ///     breakdown display never needs a lossy USD back-conversion.
   /// Schema v25 adds:
   ///   • groups.default_currency – ISO 4217 code for the group's settlement currency
-  static const int _version = 26;
+  static const int _version = 27;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -425,6 +425,10 @@ class LocalDatabase {
       await db.execute(
         'CREATE INDEX IF NOT EXISTS idx_ai_chat_session ON ai_chat_messages(session_id)',
       );
+    }
+    if (oldVersion < 27) {
+      // Schema v27: AI chat isolated per user (BUG-01)
+      await _addColumnIfNotExists(db, 'ai_chat_messages', 'user_id', 'TEXT');
     }
   }
 
