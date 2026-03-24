@@ -355,13 +355,21 @@ class SyncService {
       whereArgs: [uid],
     );
     if (pendingWalletEntries.isNotEmpty) {
-      final payloads = pendingWalletEntries
-          .map((row) => WalletEntryModel.fromJson(row).toSupabaseJson())
-          .toList();
+      // All pending rows have synced_at IS NULL (never pushed to Supabase).
+      // Soft-deleted rows were created and deleted locally before ever reaching
+      // Supabase — they never existed remotely, so skip the remote push and just
+      // mark them synced locally.
+      final softDeleted = pendingWalletEntries.where((r) => r['deleted_at'] != null).toList();
+      final active      = pendingWalletEntries.where((r) => r['deleted_at'] == null).toList();
+      final now = DateTime.now().millisecondsSinceEpoch;
       try {
-        debugPrint('[Sync] wallet_entries push: ${payloads.length} rows');
-        await _client.from('wallet_entries').upsert(payloads);
-        final now = DateTime.now().millisecondsSinceEpoch;
+        debugPrint('[Sync] wallet_entries push: ${pendingWalletEntries.length} rows (${softDeleted.length} soft-deleted, skipping remote)');
+        if (active.isNotEmpty) {
+          final payloads = active.map((row) => WalletEntryModel.fromJson(row).toSupabaseJson()).toList();
+          await _client.from('wallet_entries').upsert(payloads);
+        }
+        // softDeleted rows: no remote push needed — never existed in Supabase.
+        // Just fall through so synced_at is stamped below.
         await LocalDatabase.db.transaction((txn) async {
           for (final row in pendingWalletEntries) {
             await txn.update(
@@ -594,10 +602,26 @@ class SyncService {
       debugPrint('[SyncService] pull: ${cloudEntries.length} wallet_entries');
       final cloudWalletIds = <String>{};
       final nowMs = DateTime.now().millisecondsSinceEpoch;
+      var walletSkipped = 0, walletUpserted = 0;
       for (final e in cloudEntries) {
         final map = e as Map<String, dynamic>;
         final entry = WalletEntryModel.fromJson(map);
         cloudWalletIds.add(entry.id);
+        // Do not overwrite a locally soft-deleted row with a cloud row.
+        // This applies whether or not synced_at has been stamped — the local
+        // delete is authoritative and must not be resurrected by the pull.
+        final localRow = await LocalDatabase.db.query(
+          'wallet_entries',
+          columns: ['deleted_at'],
+          where: 'id = ?',
+          whereArgs: [entry.id],
+          limit: 1,
+        );
+        if (localRow.isNotEmpty && localRow.first['deleted_at'] != null) {
+          walletSkipped++;
+          continue;
+        }
+        walletUpserted++;
         await LocalDatabase.db.insert(
           'wallet_entries',
           {
@@ -607,6 +631,7 @@ class SyncService {
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
+      debugPrint('[SyncService] wallet pull: skipped=$walletSkipped upserted=$walletUpserted');
       // Reconcile: prune local synced rows deleted on another device.
       final localWalletRows = await LocalDatabase.db.query(
         'wallet_entries',

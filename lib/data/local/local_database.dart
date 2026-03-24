@@ -78,7 +78,12 @@ class LocalDatabase {
   ///     breakdown display never needs a lossy USD back-conversion.
   /// Schema v25 adds:
   ///   • groups.default_currency – ISO 4217 code for the group's settlement currency
-  static const int _version = 28;
+  /// Schema v29 adds:
+  ///   • deleted_wallet_entries – snapshot table for wallet entry deletion audit log
+  /// Schema v30 adds:
+  ///   • deleted_wallet_entries.deleted_by – uid of the user who deleted the entry
+  ///     (required so restoreWalletEntry can verify ownership)
+  static const int _version = 30;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -459,6 +464,24 @@ class LocalDatabase {
         'CREATE INDEX IF NOT EXISTS idx_wallet_entries_user_created '
         'ON wallet_entries(user_id, created_at)',
       );
+    }
+    if (oldVersion < 29) {
+      // Schema v29: deleted_wallet_entries — snapshot for activity feed deletion events
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS deleted_wallet_entries (
+          entry_id    TEXT PRIMARY KEY,
+          description TEXT,
+          amount      TEXT NOT NULL,
+          currency    TEXT,
+          is_income   INTEGER NOT NULL DEFAULT 0,
+          category    TEXT,
+          deleted_at  TEXT NOT NULL
+        )
+      ''');
+    }
+    if (oldVersion < 30) {
+      // Schema v30: add deleted_by to deleted_wallet_entries
+      await _addColumnIfNotExists(db, 'deleted_wallet_entries', 'deleted_by', 'TEXT');
     }
   }
 

@@ -70,10 +70,11 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
 
   // ── Multi-select helpers ──────────────────────────────────────────────────
   String? _eventId(ActivityEvent ev) {
-    if (ev is ExpenseEvent)          return ev.expense.id;
-    if (ev is WalletActivityEvent)   return 'wallet-${ev.entry.id}';
-    if (ev is ExpenseDeletedEvent)   return 'del-${ev.expenseId}';
-    if (ev is ExpenseEditedEvent)    return 'edit-${ev.expenseId}';
+    if (ev is ExpenseEvent)              return ev.expense.id;
+    if (ev is WalletActivityEvent)       return 'wallet-${ev.entry.id}';
+    if (ev is ExpenseDeletedEvent)       return 'del-${ev.expenseId}';
+    if (ev is ExpenseEditedEvent)        return 'edit-${ev.expenseId}';
+    if (ev is WalletEntryDeletedEvent)   return 'wdel-${ev.entryId}';
     return null;
   }
 
@@ -132,6 +133,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         // already deleted — just skip
       } else if (ev is ExpenseEditedEvent) {
         await repo.deleteExpense(ev.expenseId);
+      } else if (ev is WalletEntryDeletedEvent) {
+        await repo.dismissWalletEntryDeletion(ev.entryId);
       }
     }
     if (!mounted) return;
@@ -160,8 +163,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     if (ev is GroupCreatedEvent) return ev.groupName.toLowerCase().contains(lower);
     if (ev is GroupDeletedEvent) return ev.groupName.toLowerCase().contains(lower);
     if (ev is MemberAddedEvent)  return ev.groupName.toLowerCase().contains(lower) || ev.addedUserName.toLowerCase().contains(lower);
-    if (ev is ExpenseDeletedEvent) return ev.description.toLowerCase().contains(lower) || ev.groupName.toLowerCase().contains(lower);
-    if (ev is ExpenseEditedEvent)  return ev.newDescription.toLowerCase().contains(lower) || ev.groupName.toLowerCase().contains(lower);
+    if (ev is ExpenseDeletedEvent)     return ev.description.toLowerCase().contains(lower) || ev.groupName.toLowerCase().contains(lower);
+    if (ev is ExpenseEditedEvent)      return ev.newDescription.toLowerCase().contains(lower) || ev.groupName.toLowerCase().contains(lower);
+    if (ev is WalletEntryDeletedEvent) return ev.description.toLowerCase().contains(lower) || ev.category.toLowerCase().contains(lower);
     if (ev is SettlementEvent) return ev.fromName.toLowerCase().contains(lower) || ev.toName.toLowerCase().contains(lower);
     return false;
   }
@@ -376,8 +380,9 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                         if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
                         if (ev is MemberAddedEvent)    return _MemberAddedTile(event: ev);
                         if (ev is SettlementEvent)     return _SettlementTile(event: ev);
-                        if (ev is ExpenseDeletedEvent) return _ExpenseDeletedTile(event: ev);
-                        if (ev is ExpenseEditedEvent)  return _ExpenseEditedTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
+                        if (ev is ExpenseDeletedEvent)     return _ExpenseDeletedTile(event: ev);
+                        if (ev is ExpenseEditedEvent)      return _ExpenseEditedTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
+                        if (ev is WalletEntryDeletedEvent) return _WalletEntryDeletedTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
                         return const SizedBox.shrink();
                       },
                     );
@@ -1855,6 +1860,139 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
         ),
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Wallet entry deleted event tile
+// ---------------------------------------------------------------------------
+class _WalletEntryDeletedTile extends ConsumerStatefulWidget {
+  const _WalletEntryDeletedTile({
+    required this.event,
+    this.editMode = false,
+    this.selected = false,
+    this.onSelect,
+  });
+  final WalletEntryDeletedEvent event;
+  final bool editMode;
+  final bool selected;
+  final VoidCallback? onSelect;
+
+  @override
+  ConsumerState<_WalletEntryDeletedTile> createState() => _WalletEntryDeletedTileState();
+}
+
+class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile> {
+  bool _restoring = false;
+
+  void _invalidateProviders() {
+    ref.invalidate(omniActivityProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(walletEntryTotalsProvider);
+    ref.invalidate(walletBalanceProvider);
+    ref.invalidate(balanceSummaryProvider);
+  }
+
+  Future<void> _doRestore() async {
+    setState(() => _restoring = true);
+    final ok = await ref.read(setAllRepositoryProvider).restoreWalletEntry(widget.event.entryId);
+    if (!mounted) return;
+    setState(() => _restoring = false);
+    if (ok) {
+      _invalidateProviders();
+      final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('"$label" restored'), backgroundColor: _teal.withAlpha(220)),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not restore wallet entry')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ev    = widget.event;
+    final label = ev.description.isEmpty ? ev.category : ev.description;
+    final amountStr = '${ev.currency} ${formatAmount(ev.amount)}';
+    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 30;
+
+    final tile = Padding(
+      padding: EdgeInsets.fromLTRB(widget.editMode ? 52 : 16, 4, 16, 4),
+      child: _lookbookCard(
+        context: context,
+        child: Row(
+          children: [
+            _DefaultLeading(accent: _red, icon: Icons.delete_outline_rounded),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'You deleted "$label"',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600, fontSize: 13,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _red.withAlpha(22),
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                      child: Text(
+                        ev.isIncome ? 'Wallet Income' : 'Wallet',
+                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _red),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(_fmtTime(ev.timestamp),
+                        style: const TextStyle(fontSize: 10, color: _slate)),
+                  ]),
+                ],
+              ),
+            ),
+            Text(amountStr,
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13, color: _red)),
+            if (!widget.editMode && withinWindow) ...[
+              const SizedBox(width: 8),
+              _restoring
+                  ? const SizedBox(
+                      width: 20, height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+                    )
+                  : TextButton(
+                      onPressed: _doRestore,
+                      style: TextButton.styleFrom(
+                        foregroundColor: _teal,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('RESTORE',
+                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                    ),
+            ],
+          ],
+        ),
+      ),
+    );
+
+    if (widget.editMode) {
+      return _SelectableTileWrapper(
+        selected: widget.selected,
+        onSelect: widget.onSelect ?? () {},
+        accent: _red,
+        child: tile,
+      );
+    }
+    return tile;
   }
 }
 

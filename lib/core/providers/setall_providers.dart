@@ -178,8 +178,9 @@ final omniActivityProvider = StreamProvider<List<ActivityEvent>>((ref) {
 final walletBalanceProvider = FutureProvider<String>((ref) async {
   // Watch base currency — invalidates this provider when the user changes it.
   final baseCurrency = await ref.watch(baseCurrencyProvider.future);
-  // Watch the personal expenses stream — recomputes on every sync/write.
+  // Watch both expense streams — recomputes on every sync/write.
   ref.watch(personalExpensesProvider);
+  ref.watch(walletEntriesProvider);
   final balance = await ref
       .watch(setAllRepositoryProvider)
       .getWalletOnlyBalance(baseCurrency: baseCurrency);

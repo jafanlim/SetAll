@@ -1,4 +1,4 @@
-package com.setall.setall
+package com.setall.app
 
 import io.flutter.embedding.android.FlutterActivity
 

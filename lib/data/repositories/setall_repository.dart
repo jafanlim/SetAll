@@ -2501,33 +2501,18 @@ class SetAllRepository {
   }
 
   /// Wallet-only balance: personal income − personal spend, expressed in
-  /// [baseCurrency]. Delegates to [getWalletTotals] to avoid duplicate logic.
+  /// [baseCurrency]. Delegates to [getWalletEntryTotals] which reads wallet_entries.
   Future<Decimal> getWalletOnlyBalance({String baseCurrency = 'USD'}) async {
-    final totals = await getWalletTotals(baseCurrency: baseCurrency);
+    final totals = await getWalletEntryTotals(baseCurrency: baseCurrency);
     return totals.net;
   }
 
   /// Returns wallet income, spend, and net separately in [baseCurrency].
-  /// The UI uses this to display Income and Expenses pills independently.
+  /// Delegates to [getWalletEntryTotals] which reads the wallet_entries table.
   Future<({Decimal income, Decimal spend, Decimal net})> getWalletTotals({
     String baseCurrency = 'USD',
   }) async {
-    final uid = await ensureUser();
-    if (uid == null) return (income: Decimal.zero, spend: Decimal.zero, net: Decimal.zero);
-    final personalRows = await getPersonalExpenses(limit: 1000);
-    Decimal income = Decimal.zero;
-    Decimal spend  = Decimal.zero;
-    Decimal? cachedRate;
-    for (final e in personalRows) {
-      final usdAmt = Decimal.tryParse(e.universalUsdAmount ?? e.amount) ?? Decimal.zero;
-      Decimal amt = usdAmt;
-      if (baseCurrency != 'USD' && _currencyService != null && usdAmt != Decimal.zero) {
-        cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
-        amt = (usdAmt * cachedRate).round(scale: 2);
-      }
-      if (e.isIncome) { income += amt; } else { spend += amt; }
-    }
-    return (income: income, spend: spend, net: income - spend);
+    return getWalletEntryTotals(baseCurrency: baseCurrency);
   }
 
   /// Stream a unified activity feed: group + personal expenses, sorted newest-first.
@@ -2933,7 +2918,33 @@ class SetAllRepository {
       ));
     }
 
-    // ── 7. Sort newest-first, cap at limit ───────────────────────────────────
+    // ── 7. Deleted wallet entry events ──────────────────────────────────────
+    if (!_isWeb) {
+      try {
+        final delRows = await LocalDatabase.db.query(
+          'deleted_wallet_entries',
+          orderBy: 'deleted_at DESC',
+          limit: limit,
+        );
+        for (final r in delRows) {
+          final ts = r['deleted_at'] as String? ?? '';
+          events.add(WalletEntryDeletedEvent(
+            timestamp:   ts,
+            entryId:     r['entry_id'] as String,
+            description: r['description'] as String? ?? '',
+            amount:      r['amount'] as String? ?? '0',
+            currency:    r['currency'] as String? ?? 'USD',
+            isIncome:    (r['is_income'] as int? ?? 0) == 1,
+            category:    r['category'] as String? ?? 'Other',
+            deletedAt:   DateTime.tryParse(ts) ?? DateTime.now(),
+          ));
+        }
+      } catch (e) {
+        debugPrint('[_buildOmniActivity] deleted_wallet_entries query failed: $e');
+      }
+    }
+
+    // ── 8. Sort newest-first, cap at limit ───────────────────────────────────
     events.sort((a, b) => b.timestamp.compareTo(a.timestamp));
     return events.take(limit).toList();
   }
@@ -3779,16 +3790,38 @@ class SetAllRepository {
     final uid = await ensureUser();
     if (uid == null) return;
 
+    final deletedAt = _now();
+
     if (_isWeb && _client != null) {
       await _client
           .from('wallet_entries')
-          .update({'deleted_at': _now()})
+          .update({'deleted_at': deletedAt})
           .eq('id', id)
           .eq('user_id', uid);
     } else {
+      // Snapshot the entry so the activity feed can show a deletion event.
+      final entryRows = await LocalDatabase.db.query(
+        'wallet_entries', where: 'id = ? AND user_id = ?', whereArgs: [id, uid]);
+      if (entryRows.isNotEmpty) {
+        final r = entryRows.first;
+        await LocalDatabase.db.insert(
+          'deleted_wallet_entries',
+          {
+            'entry_id':    id,
+            'description': r['description'],
+            'amount':      r['universal_usd_amount'] ?? r['amount'],
+            'currency':    r['original_currency'] ?? r['currency'] ?? 'USD',
+            'is_income':   r['is_income'] ?? 0,
+            'category':    r['category'] ?? 'Other',
+            'deleted_at':  deletedAt,
+            'deleted_by':  uid,
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
       await LocalDatabase.db.update(
         'wallet_entries',
-        {'deleted_at': _now(), 'synced_at': null},
+        {'deleted_at': deletedAt, 'synced_at': null},
         where: 'id = ? AND user_id = ?',
         whereArgs: [id, uid],
       );
@@ -3808,6 +3841,75 @@ class SetAllRepository {
       ExpenseModel.fromJson(row);
 
   SplitModel _rowToSplit(Map<String, dynamic> row) => SplitModel.fromJson(row);
+
+  /// Dismisses a wallet entry deletion event from the activity feed without restoring the entry.
+  Future<void> dismissWalletEntryDeletion(String entryId) async {
+    if (_isWeb) return;
+    await LocalDatabase.db.delete(
+      'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
+    _notify();
+  }
+
+  /// Restores a previously-deleted wallet entry from the [deleted_wallet_entries] snapshot.
+  /// Re-inserts it into the local [wallet_entries] table and removes the deletion record.
+  /// Best-effort re-push to Supabase when online.
+  Future<bool> restoreWalletEntry(String entryId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    final snapRows = await LocalDatabase.db.query(
+      'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
+    if (snapRows.isEmpty) return false;
+    final snap = snapRows.first;
+
+    final now = _now();
+    final restoredEntry = {
+      'id':                   entryId,
+      'user_id':              uid,
+      'amount':               snap['amount'],
+      'is_income':            snap['is_income'] ?? 0,
+      'description':          snap['description'] ?? '',
+      'category':             snap['category'] ?? 'Other',
+      'currency':             snap['currency'] ?? 'USD',
+      'universal_usd_amount': snap['amount'],
+      'deleted_at':           null,
+      'created_at':           now,
+      'updated_at':           now,
+      'synced_at':            null,
+    };
+
+    await LocalDatabase.db.insert(
+      'wallet_entries', restoredEntry,
+      conflictAlgorithm: ConflictAlgorithm.replace);
+
+    // Remove from deletion log.
+    await LocalDatabase.db.delete(
+      'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
+
+    // Best-effort re-push to Supabase.
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('wallet_entries').upsert({
+          'id':                   entryId,
+          'user_id':              uid,
+          'amount':               double.tryParse(snap['amount'].toString()) ?? 0,
+          'is_income':            (snap['is_income'] as int?) == 1,
+          'description':          snap['description'] ?? '',
+          'category':             snap['category'] ?? 'Other',
+          'currency':             snap['currency'] ?? 'USD',
+          'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
+        });
+        await LocalDatabase.db.update(
+          'wallet_entries', {'synced_at': DateTime.now().millisecondsSinceEpoch},
+          where: 'id = ?', whereArgs: [entryId]);
+      } catch (e) {
+        debugPrint('[restoreWalletEntry] Supabase upsert failed (will sync later): $e');
+      }
+    }
+
+    _notify();
+    return true;
+  }
 }
 
 // ---------------------------------------------------------------------------

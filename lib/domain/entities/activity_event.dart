@@ -146,6 +146,28 @@ class MemberAddedEvent extends ActivityEvent {
   final bool addedYou;
 }
 
+/// A wallet entry was deleted by the current user — snapshot preserved for display.
+class WalletEntryDeletedEvent extends ActivityEvent {
+  const WalletEntryDeletedEvent({
+    required super.timestamp,
+    required this.entryId,
+    required this.description,
+    required this.amount,
+    required this.currency,
+    required this.isIncome,
+    required this.category,
+    required this.deletedAt,
+  });
+
+  final String   entryId;
+  final String   description;
+  final String   amount;
+  final String   currency;
+  final bool     isIncome;
+  final String   category;
+  final DateTime deletedAt;
+}
+
 /// A wallet entry (personal income or expense) from the wallet_entries table.
 class WalletActivityEvent extends ActivityEvent {
   const WalletActivityEvent({
