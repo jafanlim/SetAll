@@ -3769,22 +3769,47 @@ class SetAllRepository {
     if (uid == null) throw StateError('No authenticated user');
 
     final now = _now();
-    final withUser = entry.copyWith(userId: uid, updatedAt: now);
+    final createdAt = entry.createdAt ?? now;
+
+    // Build an ExpenseModel so the entry is stored in the `expenses` table
+    // (group_id IS NULL = personal wallet entry). This is the canonical store
+    // after the PROMPT-34 revert; wallet_entries is no longer written to.
+    final expense = ExpenseModel(
+      id:                  entry.id,
+      groupId:             null,
+      payerId:             uid,
+      amount:              entry.amount,
+      isIncome:            entry.isIncome,
+      description:         entry.description,
+      category:            entry.category,
+      currency:            entry.currency,
+      originalAmount:      entry.originalAmount,
+      originalCurrency:    entry.originalCurrency,
+      exchangeRateApplied: entry.exchangeRateApplied,
+      universalUsdAmount:  entry.universalUsdAmount,
+      iconCodepoint:       entry.iconCodepoint,
+      iconColor:           entry.iconColor,
+      notes:               entry.notes,
+      attachmentUrls:      entry.attachmentUrls,
+      createdAt:           createdAt,
+      createdBy:           uid,
+    );
 
     if (_isWeb && _client != null) {
-      await _client.from('wallet_entries').upsert(withUser.toSupabaseJson());
+      final supabaseData = Map<String, dynamic>.from(expense.toJson())
+        ..remove('created_by')
+        ..['is_income']  = expense.isIncome
+        ..['icon_color'] = (expense.iconColor)?.toSigned(32);
+      await _client.from('expenses').upsert(supabaseData);
     } else {
-      final localData = <String, dynamic>{
-        ...withUser.toJson(),
-        'synced_at': null,
-      };
       await LocalDatabase.db.insert(
-        'wallet_entries', localData,
+        'expenses',
+        {...expense.toJson(), 'synced_at': null},
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
     _notify();
-    return withUser;
+    return entry.copyWith(userId: uid);
   }
 
   Future<void> deleteWalletEntry(String id) async {
@@ -3795,37 +3820,62 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       await _client
-          .from('wallet_entries')
+          .from('expenses')
           .update({'deleted_at': deletedAt})
           .eq('id', id)
-          .eq('user_id', uid);
+          .eq('payer_id', uid)
+          .isFilter('group_id', null);
     } else {
-      // Snapshot the entry so the activity feed can show a deletion event.
-      final entryRows = await LocalDatabase.db.query(
-        'wallet_entries', where: 'id = ? AND user_id = ?', whereArgs: [id, uid]);
-      if (entryRows.isNotEmpty) {
-        final r = entryRows.first;
+      // Snapshot into deleted_expenses so the activity feed can show a
+      // deletion event with a Restore button (mirrors deleteExpense logic).
+      final expRows = await LocalDatabase.db.query(
+        'expenses',
+        where: 'id = ? AND payer_id = ? AND group_id IS NULL',
+        whereArgs: [id, uid],
+      );
+      if (expRows.isNotEmpty) {
+        final r = expRows.first;
+        String deletedByName = 'You';
+        final pRows = await LocalDatabase.db.query(
+          'profiles', columns: ['name', 'nickname'], where: 'id = ?', whereArgs: [uid]);
+        if (pRows.isNotEmpty) {
+          deletedByName = (pRows.first['nickname'] as String?)?.trim().isNotEmpty == true
+              ? pRows.first['nickname'] as String
+              : (pRows.first['name'] as String? ?? 'You');
+        }
         await LocalDatabase.db.insert(
-          'deleted_wallet_entries',
+          'deleted_expenses',
           {
-            'entry_id':    id,
-            'description': r['description'],
-            'amount':      r['universal_usd_amount'] ?? r['amount'],
-            'currency':    r['original_currency'] ?? r['currency'] ?? 'USD',
-            'is_income':   r['is_income'] ?? 0,
-            'category':    r['category'] ?? 'Other',
-            'deleted_at':  deletedAt,
-            'deleted_by':  uid,
+            'expense_id':      id,
+            'description':     r['description'],
+            'original_amount': r['amount'],
+            'amount':          r['universal_usd_amount'] ?? r['amount'],
+            'currency':        r['original_currency'] ?? r['currency'] ?? 'USD',
+            'group_id':        null,
+            'group_name':      '',
+            'is_income':       r['is_income'] ?? 0,
+            'category':        r['category'] ?? 'Other',
+            'deleted_by':      uid,
+            'deleted_by_name': deletedByName,
+            'deleted_at':      deletedAt,
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
       }
-      await LocalDatabase.db.update(
-        'wallet_entries',
-        {'deleted_at': deletedAt, 'synced_at': null},
-        where: 'id = ? AND user_id = ?',
+      // Hard-delete from expenses (consistent with deleteExpense).
+      await LocalDatabase.db.delete(
+        'expenses',
+        where: 'id = ? AND payer_id = ? AND group_id IS NULL',
         whereArgs: [id, uid],
       );
+      // Also remove from Supabase if online.
+      if (await _isOnline && _client != null) {
+        try {
+          await _client.from('expenses').delete().eq('id', id);
+        } catch (e) {
+          debugPrint('[deleteWalletEntry] Supabase delete failed: $e');
+        }
+      }
     }
     _notify();
   }
@@ -3851,48 +3901,92 @@ class SetAllRepository {
     _notify();
   }
 
-  /// Restores a previously-deleted wallet entry from the [deleted_wallet_entries] snapshot.
-  /// Re-inserts it into the local [wallet_entries] table and removes the deletion record.
-  /// Best-effort re-push to Supabase when online.
+  /// Restores a previously-deleted wallet entry from the [deleted_expenses] snapshot
+  /// (personal entries with group_id IS NULL). Falls back to [deleted_wallet_entries]
+  /// for entries deleted before HOTFIX-07 so existing snapshots still restore.
   Future<bool> restoreWalletEntry(String entryId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
 
+    // ── Try deleted_expenses first (new path after HOTFIX-07) ──────────────
+    final newSnapRows = await LocalDatabase.db.query(
+      'deleted_expenses', where: 'expense_id = ?', whereArgs: [entryId]);
+    if (newSnapRows.isNotEmpty) {
+      final snap = newSnapRows.first;
+      if ((snap['deleted_by'] as String?) != uid) return false;
+      final now = _now();
+      final restoredExpense = {
+        'id':                   entryId,
+        'group_id':             null,
+        'payer_id':             uid,
+        'amount':               snap['original_amount'] ?? snap['amount'],
+        'is_income':            snap['is_income'] ?? 0,
+        'description':          snap['description'] ?? '',
+        'currency':             snap['currency'] ?? 'USD',
+        'category':             snap['category'] ?? 'Other',
+        'universal_usd_amount': snap['amount'],
+        'created_at':           now,
+        'updated_at':           now,
+        'synced_at':            null,
+      };
+      await LocalDatabase.db.insert(
+        'expenses', restoredExpense,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+      await LocalDatabase.db.delete(
+        'deleted_expenses', where: 'expense_id = ?', whereArgs: [entryId]);
+      if (await _isOnline && _client != null) {
+        try {
+          await _client.from('expenses').upsert({
+            'id':                   entryId,
+            'group_id':             null,
+            'payer_id':             uid,
+            'amount':               double.tryParse((snap['original_amount'] ?? snap['amount']).toString()) ?? 0,
+            'is_income':            (snap['is_income'] as int?) == 1,
+            'description':          snap['description'] ?? '',
+            'category':             snap['category'] ?? 'Other',
+            'currency':             snap['currency'] ?? 'USD',
+            'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
+          });
+        } catch (e) {
+          debugPrint('[restoreWalletEntry] Supabase upsert failed (expenses): $e');
+        }
+      }
+      _notify();
+      return true;
+    }
+
+    // ── Fall back to deleted_wallet_entries (legacy path pre-HOTFIX-07) ────
     final snapRows = await LocalDatabase.db.query(
       'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
     if (snapRows.isEmpty) return false;
     final snap = snapRows.first;
 
     final now = _now();
-    final restoredEntry = {
+    final restoredExpense = {
       'id':                   entryId,
-      'user_id':              uid,
+      'group_id':             null,
+      'payer_id':             uid,
       'amount':               snap['amount'],
       'is_income':            snap['is_income'] ?? 0,
       'description':          snap['description'] ?? '',
       'category':             snap['category'] ?? 'Other',
       'currency':             snap['currency'] ?? 'USD',
       'universal_usd_amount': snap['amount'],
-      'deleted_at':           null,
       'created_at':           now,
       'updated_at':           now,
       'synced_at':            null,
     };
-
     await LocalDatabase.db.insert(
-      'wallet_entries', restoredEntry,
+      'expenses', restoredExpense,
       conflictAlgorithm: ConflictAlgorithm.replace);
-
-    // Remove from deletion log.
     await LocalDatabase.db.delete(
       'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
-
-    // Best-effort re-push to Supabase.
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('wallet_entries').upsert({
+        await _client.from('expenses').upsert({
           'id':                   entryId,
-          'user_id':              uid,
+          'group_id':             null,
+          'payer_id':             uid,
           'amount':               double.tryParse(snap['amount'].toString()) ?? 0,
           'is_income':            (snap['is_income'] as int?) == 1,
           'description':          snap['description'] ?? '',
@@ -3900,11 +3994,8 @@ class SetAllRepository {
           'currency':             snap['currency'] ?? 'USD',
           'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
         });
-        await LocalDatabase.db.update(
-          'wallet_entries', {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?', whereArgs: [entryId]);
       } catch (e) {
-        debugPrint('[restoreWalletEntry] Supabase upsert failed (will sync later): $e');
+        debugPrint('[restoreWalletEntry] Supabase upsert failed (legacy): $e');
       }
     }
 
