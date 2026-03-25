@@ -1,16 +1,20 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart' show Share, XFile;
+import 'package:share_plus/share_plus.dart' show XFile;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../../core/utils/share_utils.dart';
 import '../../../../data/local/local_database.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../settings/services/pdf_export_service.dart';
 
 const _teal = Color(0xFF14B8A6);
 
@@ -35,6 +39,7 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
 
   bool _cloudLoading = true;
   bool _exporting    = false;
+  final _exportKey   = GlobalKey();
 
   @override
   void initState() {
@@ -44,80 +49,137 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
   }
 
   Future<void> _loadLocal() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
     final db = LocalDatabase.db;
-    final wallet   = await db.rawQuery('SELECT COUNT(*) as c FROM wallet_entries WHERE is_deleted = 0');
-    final expenses = await db.rawQuery('SELECT COUNT(*) as c FROM expenses WHERE is_deleted = 0');
-    final groups   = await db.rawQuery('SELECT COUNT(*) as c FROM groups WHERE is_deleted = 0');
-    final chats    = await db.rawQuery('SELECT COUNT(DISTINCT session_id) as c FROM ai_chat_messages');
+    int wallet = 0, expenses = 0, groups = 0, chats = 0;
+    try {
+      final r = await db.rawQuery(
+          'SELECT COUNT(*) as c FROM expenses WHERE deleted_at IS NULL AND group_id IS NULL AND payer_id = ?', [uid]);
+      wallet = (r.first['c'] as int?) ?? 0;
+    } catch (_) {}
+    try {
+      final r = await db.rawQuery(
+          'SELECT COUNT(*) as c FROM expenses WHERE deleted_at IS NULL AND group_id IS NOT NULL AND payer_id = ?', [uid]);
+      expenses = (r.first['c'] as int?) ?? 0;
+    } catch (_) {}
+    try {
+      final r = await db.rawQuery('SELECT COUNT(*) as c FROM groups WHERE is_deleted = 0');
+      groups = (r.first['c'] as int?) ?? 0;
+    } catch (_) {}
+    try {
+      final r = await db.rawQuery(
+          'SELECT COUNT(DISTINCT session_id) as c FROM ai_chat_messages WHERE user_id = ?', [uid]);
+      chats = (r.first['c'] as int?) ?? 0;
+    } catch (_) {}
     if (!mounted) return;
     setState(() {
-      _localWallet   = (wallet.first['c']   as int?) ?? 0;
-      _localExpenses = (expenses.first['c'] as int?) ?? 0;
-      _localGroups   = (groups.first['c']   as int?) ?? 0;
-      _localChats    = (chats.first['c']    as int?) ?? 0;
+      _localWallet   = wallet;
+      _localExpenses = expenses;
+      _localGroups   = groups;
+      _localChats    = chats;
     });
   }
 
   Future<void> _loadCloud() async {
+    final client = Supabase.instance.client;
+    final uid = client.auth.currentUser?.id;
+    if (uid == null) { if (mounted) setState(() => _cloudLoading = false); return; }
+    int wallet = 0, expenses = 0, groups = 0;
     try {
-      final client = Supabase.instance.client;
-      final uid = client.auth.currentUser?.id;
-      if (uid == null) { setState(() => _cloudLoading = false); return; }
-
-      final wallet   = await client.from('wallet_entries').select('id').eq('user_id', uid).eq('is_deleted', false);
-      final expenses = await client.from('expenses').select('id').eq('payer_id', uid);
-      final groups   = await client.from('groups').select('id').eq('creator_id', uid);
-
-      if (!mounted) return;
-      setState(() {
-        _cloudWallet   = (wallet as List).length;
-        _cloudExpenses = (expenses as List).length;
-        _cloudGroups   = (groups as List).length;
-        _cloudLoading  = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _cloudLoading = false);
-    }
+      final r = await client.from('expenses').select('id').eq('payer_id', uid).isFilter('group_id', null);
+      wallet = (r as List).length;
+    } catch (_) {}
+    try {
+      final r = await client.from('expenses').select('id').eq('payer_id', uid).not('group_id', 'is', null);
+      expenses = (r as List).length;
+    } catch (_) {}
+    try {
+      final r = await client.from('groups').select('id').eq('creator_id', uid).eq('is_deleted', false);
+      groups = (r as List).length;
+    } catch (_) {}
+    if (!mounted) return;
+    setState(() {
+      _cloudWallet   = wallet;
+      _cloudExpenses = expenses;
+      _cloudGroups   = groups;
+      _cloudLoading  = false;
+    });
   }
 
-  Future<void> _exportJson() async {
+  Future<void> _exportData(String format) async {
     setState(() => _exporting = true);
     try {
+      if (format == 'pdf') {
+        await PdfExportService().exportWalletAsPdf(
+            originKey: _exportKey, context: context);
+        return;
+      }
       final repo   = ref.read(setAllRepositoryProvider);
       final client = Supabase.instance.client;
       final uid    = client.auth.currentUser?.id ?? '';
-
-      final profile       = await repo.getCurrentUserProfile();
       final walletEntries = await repo.getWalletEntries();
-      final memberships   = await client.from('group_members').select().eq('user_id', uid);
-      final groupExpenses = await client.from('expenses').select().eq('payer_id', uid);
-      final settlements   = await client
-          .from('settlements')
-          .select()
-          .or('from_user_id.eq.$uid,to_user_id.eq.$uid');
 
-      final data = {
-        'exported_at': DateTime.now().toUtc().toIso8601String(),
-        'account': {
-          'id':    uid,
-          'email': client.auth.currentUser?.email,
-          'name':  profile?.name,
-          'currency': profile?.defaultCurrency,
-        },
-        'wallet_entries': walletEntries.map((e) => e.toJson()).toList(),
-        'group_memberships': memberships,
-        'group_expenses': groupExpenses,
-        'settlements': settlements,
-      };
+      final dir = await getTemporaryDirectory();
+      late File file;
+      late String subject;
 
-      final dir  = await getTemporaryDirectory();
-      final file = File('${dir.path}/setall_export.json');
-      await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data), flush: true);
+      if (format == 'csv') {
+        final rows = <List<dynamic>>[
+          ['Date', 'Description', 'Category', 'Amount', 'Currency', 'Type'],
+        ];
+        for (final e in walletEntries) {
+          rows.add([
+            e.createdAt != null
+                ? DateFormat('yyyy-MM-dd').format(DateTime.tryParse(e.createdAt!)?.toLocal() ?? DateTime.now())
+                : '',
+            e.description,
+            e.category.isEmpty ? 'Other' : e.category,
+            e.amount,
+            e.currency,
+            e.isIncome ? 'Income' : 'Expense',
+          ]);
+        }
+        final csv = const ListToCsvConverter().convert(rows);
+        file = File('${dir.path}/setall_wallet_export.csv');
+        await file.writeAsString(csv, flush: true);
+        subject = 'SetAll Wallet CSV Export';
+      } else {
+        final profile     = await repo.getCurrentUserProfile();
+        final memberships = await client.from('group_members').select().eq('user_id', uid);
+        // Fetch ALL expenses in groups the user belongs to (not just payer)
+        final groupIds = (memberships as List)
+            .map((m) => (m as Map<String, dynamic>)['group_id'] as String?)
+            .whereType<String>()
+            .toList();
+        final groupExpenses = groupIds.isNotEmpty
+            ? await client.from('expenses').select().inFilter('group_id', groupIds)
+            : <dynamic>[];
+        final settlements = await client
+            .from('settlements')
+            .select()
+            .or('from_user_id.eq.$uid,to_user_id.eq.$uid');
+        final data = {
+          'exported_at': DateTime.now().toUtc().toIso8601String(),
+          'account': {
+            'id':       uid,
+            'email':    client.auth.currentUser?.email,
+            'name':     profile?.name,
+            'currency': profile?.defaultCurrency,
+          },
+          'wallet_entries':    walletEntries.map((e) => e.toJson()).toList(),
+          'group_memberships': memberships,
+          'group_expenses':    groupExpenses,
+          'settlements':       settlements,
+        };
+        file = File('${dir.path}/setall_export.json');
+        await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data), flush: true);
+        subject = 'SetAll Data Export';
+      }
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'SetAll Data Export',
-      );
+      // ignore: use_build_context_synchronously
+      await shareFiles([XFile(file.path)], context: context,
+          subject: subject, originKey: _exportKey);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -196,21 +258,32 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
           const SizedBox(height: 32),
 
           // ── Actions ───────────────────────────────────────────────────
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: _exporting
-                  ? const SizedBox(width: 16, height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.download_outlined, size: 18),
-              label: const Text('Export My Data (JSON)'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _teal,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          PopupMenuButton<String>(
+            enabled: !_exporting,
+            onSelected: _exportData,
+            offset: const Offset(0, -120),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON — full export')])),
+              const PopupMenuItem(value: 'csv',  child: Row(children: [Icon(Icons.table_chart_outlined, size: 18), SizedBox(width: 10), Text('CSV — spreadsheet')])),
+              const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.picture_as_pdf_outlined, size: 18), SizedBox(width: 10), Text('PDF — readable report')])),
+            ],
+            child: SizedBox(
+              key: _exportKey,
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: _exporting
+                    ? const SizedBox(width: 16, height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    : const Icon(Icons.download_outlined, size: 18),
+                label: const Text('Export My Data ▾'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _teal,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                onPressed: null,
               ),
-              onPressed: _exporting ? null : _exportJson,
             ),
           ),
           const SizedBox(height: 12),

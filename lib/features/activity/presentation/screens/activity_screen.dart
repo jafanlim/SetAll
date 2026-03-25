@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/widgets/app_top_button.dart';
@@ -1240,6 +1241,36 @@ class _ExpenseTile extends ConsumerWidget {
           }
         },
       ),
+      _ContextAction(
+        label: 'Delete',
+        icon: Icons.delete_outlined,
+        onTap: () async {
+          final confirmed = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: const Text('Delete expense?'),
+              content: const Text('This cannot be undone.'),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                FilledButton(
+                  style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                  onPressed: () => Navigator.pop(ctx, true),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          );
+          if (confirmed != true) return;
+          final ctx = context;
+          if (!ctx.mounted) return;
+          final container = ProviderScope.containerOf(ctx);
+          await container.read(setAllRepositoryProvider).deleteExpense(e.id);
+          container.invalidate(omniActivityProvider);
+          container.invalidate(walletEntriesProvider);
+          container.invalidate(walletEntryTotalsProvider);
+          container.invalidate(balanceSummaryProvider);
+        },
+      ),
     ];
 
     if (editMode) {
@@ -1263,6 +1294,105 @@ class _ExpenseTile extends ConsumerWidget {
         ),
       );
     }
+    void navigateToDetail() {
+      HapticUtils.lightTap();
+      if (e.groupId != null) {
+        context.push('/group-expense-detail', extra: {
+          'expense':   e,
+          'groupId':   e.groupId,
+          'groupName': event.groupName,
+        });
+      } else {
+        context.push('/wallet/entry', extra: e);
+      }
+    }
+
+    if (e.groupId != null) {
+      // Group expenses: modal bottom sheet with View / Delete(payer only)
+      final currentUid = Supabase.instance.client.auth.currentUser?.id;
+      final isPayer    = e.payerId == currentUid;
+
+      void showGroupMenu() {
+        HapticUtils.selection();
+        showModalBottomSheet<void>(
+          context: context,
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 8),
+                Container(width: 36, height: 4,
+                    margin: const EdgeInsets.only(bottom: 12),
+                    decoration: BoxDecoration(
+                        color: Colors.grey.withAlpha(80),
+                        borderRadius: BorderRadius.circular(2))),
+                ListTile(
+                  leading: const Icon(Icons.open_in_new_outlined),
+                  title: const Text('View details'),
+                  onTap: () { Navigator.pop(ctx); navigateToDetail(); },
+                ),
+                if (isPayer)
+                  ListTile(
+                    leading: const Icon(Icons.delete_outlined, color: Colors.redAccent),
+                    title: const Text('Delete', style: TextStyle(color: Colors.redAccent)),
+                    onTap: () async {
+                      Navigator.pop(ctx);
+                      final confirmed = await showDialog<bool>(
+                        context: context,
+                        builder: (d) => AlertDialog(
+                          title: const Text('Delete expense?'),
+                          content: const Text('This cannot be undone.'),
+                          actions: [
+                            TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
+                            FilledButton(
+                              style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                              onPressed: () => Navigator.pop(d, true),
+                              child: const Text('Delete'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmed != true) return;
+                      if (!ctx.mounted) return;
+                      final container = ProviderScope.containerOf(ctx);
+                      await container.read(setAllRepositoryProvider).deleteExpense(e.id);
+                      container.invalidate(omniActivityProvider);
+                      container.invalidate(balanceSummaryProvider);
+                    },
+                  ),
+                ListTile(
+                  leading: const Icon(Icons.close),
+                  title: const Text('Cancel'),
+                  onTap: () => Navigator.pop(ctx),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        );
+      }
+
+      return GestureDetector(
+        onLongPress:     showGroupMenu,
+        onSecondaryTap:  showGroupMenu,
+        child: _buildEventTile(
+          context:         context,
+          theme:           theme,
+          accent:          accent,
+          icon:            icon,
+          leadingOverride: leadingOverride,
+          title:           title,
+          badge:           badge,
+          timestamp:       e.createdAt,
+          amount:          amountStr,
+          amountSub:       amountSub,
+          amountPositive:  e.isIncome || isSettlement,
+          onTap:           navigateToDetail,
+        ),
+      );
+    }
+
+    // Personal expenses: keep existing popup context menu
     return _buildEventTile(
       context:         context,
       theme:           theme,
@@ -1276,21 +1406,7 @@ class _ExpenseTile extends ConsumerWidget {
       amountSub:       amountSub,
       amountPositive:  e.isIncome || isSettlement,
       contextActions:  actions,
-      onTap: () {
-        HapticUtils.lightTap();
-        if (e.groupId != null) {
-          context.push(
-            '/group-expense-detail',
-            extra: {
-              'expense':   e,
-              'groupId':   e.groupId,
-              'groupName': event.groupName,
-            },
-          );
-        } else {
-          context.push('/wallet/entry', extra: e);
-        }
-      },
+      onTap:           navigateToDetail,
     );
   }
 }
@@ -1338,6 +1454,36 @@ class _WalletEntryTile extends StatelessWidget {
           label: 'Edit',
           icon: Icons.edit_outlined,
           onTap: () => context.push('/wallet/entry', extra: e),
+        ),
+        _ContextAction(
+          label: 'Delete',
+          icon: Icons.delete_outlined,
+          onTap: () async {
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                title: const Text('Delete entry?'),
+                content: const Text('This cannot be undone.'),
+                actions: [
+                  TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+                  FilledButton(
+                    style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                    onPressed: () => Navigator.pop(ctx, true),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              ),
+            );
+            if (confirmed != true) return;
+            final ctx = context;
+            if (!ctx.mounted) return;
+            final container = ProviderScope.containerOf(ctx);
+            await container.read(setAllRepositoryProvider).deleteWalletEntry(e.id);
+            container.invalidate(omniActivityProvider);
+            container.invalidate(walletEntriesProvider);
+            container.invalidate(walletEntryTotalsProvider);
+            container.invalidate(balanceSummaryProvider);
+          },
         ),
       ],
       onTap: () {

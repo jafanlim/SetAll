@@ -446,6 +446,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               icon: const Icon(Icons.picture_as_pdf_outlined),
               tooltip: 'Export as PDF',
               onPressed: () => PdfExportService().exportAnalyticsPdf(
+                context:  context,
                 income:   data.totalIncome,
                 expenses: data.totalSpend,
                 entries:  data.allExpenses,

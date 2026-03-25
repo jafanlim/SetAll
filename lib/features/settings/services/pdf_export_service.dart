@@ -1,13 +1,15 @@
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart' show Share, XFile;
+import 'package:share_plus/share_plus.dart' show XFile;
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-import '../../../data/models/wallet_entry_model.dart';
+import '../../../core/utils/share_utils.dart';
+import '../../../data/repositories/setall_repository.dart';
 import '../../../features/analytics/presentation/screens/analytics_screen.dart';
 
 const _brandTeal   = PdfColor.fromInt(0xFF14B8A6);
@@ -28,12 +30,19 @@ String _fmtAmount(String currency, String amount, {bool isIncome = false}) {
   return '$sign$currency ${double.tryParse(amount)?.toStringAsFixed(2) ?? amount}';
 }
 
-Future<void> _shareFile(pw.Document pdf, String filename) async {
+Future<void> _shareFile(
+  pw.Document pdf,
+  String filename,
+  BuildContext context, {
+  GlobalKey? originKey,
+}) async {
   final bytes = await pdf.save();
   final dir   = await getTemporaryDirectory();
   final file  = File('${dir.path}/$filename');
   await file.writeAsBytes(bytes, flush: true);
-  await Share.shareXFiles([XFile(file.path)], subject: filename);
+  // ignore: use_build_context_synchronously
+  await shareFiles([XFile(file.path)], context: context,
+      subject: filename, originKey: originKey);
 }
 
 pw.Widget _header(String title, String subtitle) => pw.Column(
@@ -75,21 +84,16 @@ pw.Widget _summaryRow(String label, String value, {PdfColor? valueColor}) =>
 
 class PdfExportService {
   // ── Wallet PDF ─────────────────────────────────────────────────────────────
-  Future<void> exportWalletAsPdf() async {
-    final client  = Supabase.instance.client;
-    final email   = client.auth.currentUser?.email ?? '';
-    final uid     = client.auth.currentUser?.id ?? '';
+  Future<void> exportWalletAsPdf({
+    BuildContext? context,
+    GlobalKey? originKey,
+    SetAllRepository? repository,
+  }) async {
+    final client = Supabase.instance.client;
+    final email  = client.auth.currentUser?.email ?? '';
 
-    final List rawEntries = await client
-        .from('wallet_entries')
-        .select()
-        .eq('user_id', uid)
-        .eq('is_deleted', false)
-        .order('created_at', ascending: false);
-
-    final entries = rawEntries
-        .map((r) => WalletEntryModel.fromJson(r as Map<String, dynamic>))
-        .toList();
+    final repo    = repository ?? SetAllRepository();
+    final entries = await repo.getWalletEntries();
 
     double totalIncome   = 0;
     double totalExpenses = 0;
@@ -172,11 +176,19 @@ class PdfExportService {
       ],
     ));
 
-    await _shareFile(pdf, 'setall_wallet_report.pdf');
+    if (context == null) return;
+    // ignore: use_build_context_synchronously
+    await _shareFile(pdf, 'setall_wallet_report.pdf', context,
+        originKey: originKey);
   }
 
   // ── Group PDF ──────────────────────────────────────────────────────────────
-  Future<void> exportGroupAsPdf(String groupId, String groupName) async {
+  Future<void> exportGroupAsPdf(
+    String groupId,
+    String groupName, {
+    BuildContext? context,
+    GlobalKey? originKey,
+  }) async {
     final client = Supabase.instance.client;
     final now    = DateFormat('d MMM yyyy, HH:mm').format(DateTime.now());
 
@@ -299,11 +311,16 @@ class PdfExportService {
       ],
     ));
 
-    await _shareFile(pdf, 'setall_${groupName.replaceAll(' ', '_')}_report.pdf');
+    if (context == null) return;
+    // ignore: use_build_context_synchronously
+    await _shareFile(pdf, 'setall_${groupName.replaceAll(' ', '_')}_report.pdf', context,
+        originKey: originKey);
   }
 
   // ── Analytics PDF ──────────────────────────────────────────────────────────
   Future<void> exportAnalyticsPdf({
+    BuildContext? context,
+    GlobalKey? originKey,
     required double income,
     required double expenses,
     required List<AnalyticsRow> entries,
@@ -391,7 +408,10 @@ class PdfExportService {
       ],
     ));
 
-    await _shareFile(pdf, 'setall_analytics_report.pdf');
+    if (context == null) return;
+    // ignore: use_build_context_synchronously
+    await _shareFile(pdf, 'setall_analytics_report.pdf', context,
+        originKey: originKey);
   }
 }
 

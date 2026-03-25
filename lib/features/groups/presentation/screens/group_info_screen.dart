@@ -214,7 +214,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
           extra: {'groupName': group.name});
     }
     if (result == 'force_delete') _delete(force: true);
-    if (result == 'export_pdf') PdfExportService().exportGroupAsPdf(group.id, group.name);
+    if (result == 'export_pdf') PdfExportService().exportGroupAsPdf(group.id, group.name, context: context);
   }
 
   @override

@@ -55,12 +55,46 @@ jobs:
           flutter config --enable-macos-desktop
           flutter build macos --release --no-tree-shake-icons
 
-      - name: Ad-hoc sign & package macOS DMG
+      - name: Import Developer ID certificate
         if: matrix.os == 'macos-latest'
+        env:
+          CERT_P12_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 }}
+          CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
         run: |
-          find build/macos/Build/Products/Release/SetAll.app \
-            -type f -name "*" \
-            -exec codesign --force --deep --sign - {} +
+          # Create a temporary keychain and import the Developer ID Application cert
+          KEYCHAIN_PATH=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=$(openssl rand -hex 16)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN_PATH"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+          echo "$CERT_P12_B64" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" \
+            -k "$KEYCHAIN_PATH" \
+            -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign
+          security list-keychain -d user -s "$KEYCHAIN_PATH"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
+
+      - name: Sign, notarize & package macOS DMG
+        if: matrix.os == 'macos-latest'
+        env:
+          APPLE_ID:       ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          APP=build/macos/Build/Products/Release/SetAll.app
+
+          # Deep-sign with hardened runtime (required for notarization)
+          codesign --force --deep --options runtime \
+            --sign "Developer ID Application" \
+            "$APP"
+
+          # Verify signature
+          codesign --verify --deep --strict "$APP"
+
+          # Create DMG from the signed .app
           brew install create-dmg
           create-dmg \
             --volname "SetAll Installer" \
@@ -70,11 +104,20 @@ jobs:
             --icon "SetAll.app" 150 185 \
             --hide-extension "SetAll.app" \
             --app-drop-link 450 185 \
-            --background "/System/Library/Desktop Pictures/Solid Colors/Stone.png" \
             "SetAll-macOS.dmg" \
-            "build/macos/Build/Products/Release/SetAll.app" \
+            "$APP" \
             || true
           test -f SetAll-macOS.dmg
+
+          # Notarize the DMG
+          xcrun notarytool submit SetAll-macOS.dmg \
+            --apple-id      "$APPLE_ID" \
+            --team-id       "$APPLE_TEAM_ID" \
+            --password      "$APPLE_APP_PASSWORD" \
+            --wait
+
+          # Staple the notarization ticket
+          xcrun stapler staple SetAll-macOS.dmg
 
       # ── Windows Build & Package ────────────────────────────────────────────
       - name: Install Inno Setup
