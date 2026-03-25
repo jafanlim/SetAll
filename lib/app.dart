@@ -16,6 +16,8 @@ import 'core/providers/theme_mode_provider.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/quick_actions_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:go_router/go_router.dart';
 import 'core/services/update_service.dart';
 import 'core/utils/scaling_utility.dart';
 import 'data/local/local_database.dart';
@@ -59,6 +61,37 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     // FEAT-10: Set App Group so HomeWidget.updateWidget() targets correct suite.
     try { HomeWidget.setAppGroupId('group.com.jafa.setall.app.widget'); }
     catch (_) { /* not available in this build config */ }
+    // FEAT-20: Wire FCM foreground + tap handlers.
+    _initFcmHandlers();
+  }
+
+  void _initFcmHandlers() {
+    try {
+      // Foreground messages → SnackBar
+      FirebaseMessaging.onMessage.listen((msg) {
+        final title = msg.notification?.title ?? '';
+        final body  = msg.notification?.body  ?? '';
+        if (title.isNotEmpty && mounted) {
+          final ctx = AppRouter.navigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) {
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              SnackBar(
+                content: Text('$title: $body'),
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      });
+      // Notification tap when app is in background/terminated
+      FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+        final route = msg.data['route'] as String?;
+        if (route != null) {
+          final ctx = AppRouter.navigatorKey.currentContext;
+          if (ctx != null && ctx.mounted) ctx.push(route);
+        }
+      });
+    } catch (_) { /* Firebase not configured in this build */ }
   }
 
   @override

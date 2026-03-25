@@ -12,6 +12,7 @@ import '../../data/models/group_model.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
 import '../../data/models/wallet_entry_model.dart';
+import '../../data/models/ai_insight_model.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -366,4 +367,25 @@ final searchUsersProvider =
     FutureProvider.family<List<ProfileModel>, String>((ref, query) async {
   if (query.trim().length < 2) return [];
   return ref.watch(setAllRepositoryProvider).searchUsers(query);
+});
+
+// ---------------------------------------------------------------------------
+// FEAT-19: AI Insights
+// ---------------------------------------------------------------------------
+
+/// Latest AI weekly/monthly/on_demand insights for the current user.
+final aiInsightsProvider = FutureProvider<List<AiInsightModel>>((ref) async {
+  final uid = Supabase.instance.client.auth.currentUser?.id;
+  if (uid == null) return [];
+  try {
+    final rows = await Supabase.instance.client
+        .from('ai_insights')
+        .select()
+        .eq('user_id', uid)
+        .order('created_at', ascending: false)
+        .limit(5) as List;
+    return rows.map((r) => AiInsightModel.fromMap(r as Map<String, dynamic>)).toList();
+  } catch (_) {
+    return [];
+  }
 });

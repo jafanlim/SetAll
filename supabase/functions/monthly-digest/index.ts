@@ -99,6 +99,29 @@ serve(async (req) => {
 
       const fmt = (v: number) => `${currency} ${Math.abs(v).toFixed(2)}`
 
+      // Fetch last 4 weekly insights for this user
+      const { data: weeklyInsights } = await admin
+        .from('ai_insights')
+        .select('summary, top_category, period_start, created_at')
+        .eq('user_id', uid)
+        .eq('analysis_type', 'weekly')
+        .order('created_at', { ascending: false })
+        .limit(4)
+
+      const weeklySection = (weeklyInsights && weeklyInsights.length > 0)
+        ? `<tr><td style="padding:0 32px 28px">
+          <p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#0F172A">Weekly Highlights</p>
+          ${weeklyInsights.map((w: any) => {
+            const d = new Date(w.period_start)
+            const wLabel = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+            return `<div style="border-left:3px solid #14B8A6;padding:8px 12px;margin-bottom:8px;background:#F8FAFC;border-radius:0 8px 8px 0">
+              <p style="margin:0 0 2px;font-size:11px;color:#64748B">Week of ${wLabel}${w.top_category ? ` · ${w.top_category}` : ''}</p>
+              <p style="margin:0;font-size:12px;color:#1E293B;line-height:1.5">${w.summary}</p>
+            </div>`
+          }).join('')}
+        </td></tr>`
+        : ''
+
       const html = `<!DOCTYPE html>
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -144,6 +167,9 @@ serve(async (req) => {
             <strong style="font-size:13px;color:#0F172A">${topCatName}</strong>
             <span style="font-size:13px;color:#64748B"> — ${currency} ${topCatAmt}</span>
           </div>` : ''}
+
+          <!-- Weekly highlights injected dynamically -->
+          ${weeklySection}
 
           <!-- CTA -->
           <div align="center" style="margin-bottom:24px">
