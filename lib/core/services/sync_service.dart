@@ -809,17 +809,18 @@ class SyncService {
   Future<void> _writeWidgetData() async {
     if (kIsWeb) return;
     try {
-      final profile = await _repo.getCurrentUserProfile();
+      final profile  = await _repo.getCurrentUserProfile();
       final currency = profile?.defaultCurrency ?? 'USD';
-      final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
 
       final walletEntries = await _repo.getPersonalExpenses();
       var income  = 0.0;
       var expense = 0.0;
       for (final e in walletEntries) {
         final amt = double.tryParse(e.universalUsdAmount ?? '0') ?? 0;
-        if (e.isIncome) { income += amt; } else { expense += amt; }
+        if (e.isIncome == true) { income += amt; } else { expense += amt; }
       }
+      final walletNet = income - expense;
+      debugPrint('[_writeWidgetData] ${walletEntries.length} entries: income=$income expense=$expense net=$walletNet');
 
       // Group balances (best-effort — ignore if unavailable)
       double sharedOwed = 0;
@@ -829,7 +830,7 @@ class SyncService {
         sharedOwed = double.tryParse(summary.youAreOwed) ?? 0;
         sharedOwe  = double.tryParse(summary.youOwe)     ?? 0;
       } catch (_) {}
-      final trueNetWorth = walletNet.toDouble() + sharedOwed - sharedOwe;
+      final trueNetWorth = walletNet + sharedOwed - sharedOwe;
 
       const appGroup = 'group.com.jafa.setall.app.widget';
       final isApple = !kIsWeb &&
@@ -840,7 +841,7 @@ class SyncService {
         final widgetPrefs = SharedPreferencesAsync(
           options: SharedPreferencesAsyncFoundationOptions(suiteName: appGroup),
         );
-        await widgetPrefs.setDouble('widget_net_worth',    walletNet.toDouble());
+        await widgetPrefs.setDouble('widget_net_worth',    walletNet);
         await widgetPrefs.setDouble('widget_true_net',     trueNetWorth);
         await widgetPrefs.setDouble('widget_shared_owed',  sharedOwed);
         await widgetPrefs.setDouble('widget_shared_owe',   sharedOwe);
@@ -865,7 +866,7 @@ class SyncService {
         catch (_) { /* not available in this build config */ }
       } else {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setDouble('widget_net_worth',   walletNet.toDouble());
+        await prefs.setDouble('widget_net_worth',   walletNet);
         await prefs.setDouble('widget_true_net',    trueNetWorth);
         await prefs.setDouble('widget_shared_owed', sharedOwed);
         await prefs.setDouble('widget_shared_owe',  sharedOwe);
