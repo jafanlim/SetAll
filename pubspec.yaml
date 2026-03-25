@@ -92,6 +92,9 @@ dependencies:
   # QR code generation (FEAT-03)
   qr_flutter: ^4.1.0
 
+  # CSV export
+  csv: ^6.0.0
+
   # PDF generation (wallet/group/analytics reports)
   pdf: ^3.11.0
 

@@ -1,12 +1,19 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:csv/csv.dart';
 import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart' show XFile;
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
@@ -36,8 +43,9 @@ class WalletScreen extends ConsumerStatefulWidget {
 }
 
 class _WalletScreenState extends ConsumerState<WalletScreen> {
-  bool _editMode = false;
-  final Set<String> _selected = {};
+  bool   _editMode   = false;
+  final  Set<String> _selected   = {};
+  final  _exportKey  = GlobalKey();
   _WalletFilter _filter      = _WalletFilter.all;
   _WalletSort   _sort        = _WalletSort.newest;
   String?       _catFilter;   // non-null → show only this category
@@ -136,6 +144,62 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(walletEntryTotalsProvider);
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
+  }
+
+  Future<void> _exportData(String format) async {
+    try {
+      final entries = ref.read(walletEntriesProvider).valueOrNull ?? [];
+      if (format == 'pdf') {
+        if (!mounted) return;
+        final confirmed = await showModalBottomSheet<bool>(
+          context: context,
+          builder: (ctx) => _PdfOptionsSheet(),
+        );
+        if (confirmed != true || !mounted) return;
+        await PdfExportService().exportWalletAsPdf(
+            context: context, originKey: _exportKey,
+            repository: ref.read(setAllRepositoryProvider));
+        return;
+      }
+      final dir = await getTemporaryDirectory();
+      late File file;
+      late String subject;
+      if (format == 'csv') {
+        final rows = <List<dynamic>>[
+          ['Date', 'Description', 'Category', 'Amount', 'Currency', 'Type'],
+        ];
+        for (final e in entries) {
+          rows.add([
+            e.createdAt != null
+                ? DateFormat('yyyy-MM-dd').format(DateTime.tryParse(e.createdAt!)?.toLocal() ?? DateTime.now())
+                : '',
+            e.description,
+            e.category.isEmpty ? 'Other' : e.category,
+            e.amount,
+            e.currency,
+            e.isIncome ? 'Income' : 'Expense',
+          ]);
+        }
+        final csv = const ListToCsvConverter().convert(rows);
+        file    = File('${dir.path}/setall_wallet.csv');
+        subject = 'SetAll Wallet CSV';
+        await file.writeAsString(csv, flush: true);
+      } else {
+        final json = entries.map((e) => e.toJson()).toList();
+        file    = File('${dir.path}/setall_wallet.json');
+        subject = 'SetAll Wallet JSON';
+        await file.writeAsString(
+            const JsonEncoder.withIndent('  ').convert(json), flush: true);
+      }
+      if (!mounted) return;
+      await shareFiles([XFile(file.path)], context: context,
+          subject: subject, originKey: _exportKey);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   void _viewExpense(WalletEntryModel entry) {
@@ -243,10 +307,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   ],
                 ),
                 const SizedBox(width: 4),
-                AppTopButton(
-                  icon: Icons.picture_as_pdf_outlined,
-                  tooltip: 'Export as PDF',
-                  onPressed: () => PdfExportService().exportWalletAsPdf(),
+                PopupMenuButton<String>(
+                  key: _exportKey,
+                  icon: const Icon(Icons.ios_share_rounded),
+                  tooltip: 'Export',
+                  onSelected: _exportData,
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON')])),
+                    const PopupMenuItem(value: 'csv',  child: Row(children: [Icon(Icons.table_chart_outlined, size: 18), SizedBox(width: 10), Text('CSV')])),
+                    const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.picture_as_pdf_outlined, size: 18), SizedBox(width: 10), Text('PDF')])),
+                  ],
                 ),
                 const SizedBox(width: 4),
                 AppTopButton(
@@ -755,21 +825,26 @@ class _WalletEntryRow extends ConsumerWidget {
     final dispCcy  = hasOrig ? entry.originalCurrency! : ccy;
     final showEquiv = dispCcy != baseCcy && usdAmt > Decimal.zero;
 
+    Future<void> showContextMenu(Offset pos) async {
+      final result = await showMenu<_EntryAction>(
+        context: context,
+        position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
+        items: [
+          PopupMenuItem(value: _EntryAction.edit,   child: _MenuRow(icon: Icons.edit_outlined,   label: 'common.edit'.tr())),
+          PopupMenuItem(value: _EntryAction.delete, child: _MenuRow(icon: Icons.delete_outlined, label: 'common.delete'.tr())),
+        ],
+      );
+      if (result == _EntryAction.edit)   onEdit();
+      if (result == _EntryAction.delete) onDelete();
+    }
+
     final tile = GestureDetector(
       onTap: editMode ? onToggle : onView,
-      onSecondaryTapUp: (details) async {
-        final pos = details.globalPosition;
-        final result = await showMenu<_EntryAction>(
-          context: context,
-          position: RelativeRect.fromLTRB(pos.dx, pos.dy, pos.dx + 1, pos.dy + 1),
-          items: [
-            PopupMenuItem(value: _EntryAction.edit,   child: _MenuRow(icon: Icons.edit_outlined,   label: 'common.edit'.tr())),
-            PopupMenuItem(value: _EntryAction.delete, child: _MenuRow(icon: Icons.delete_outlined, label: 'common.delete'.tr())),
-          ],
-        );
-        if (result == _EntryAction.edit)   onEdit();
-        if (result == _EntryAction.delete) onDelete();
+      onLongPressStart: editMode ? null : (details) {
+        HapticUtils.selection();
+        showContextMenu(details.globalPosition);
       },
+      onSecondaryTapUp: (details) => showContextMenu(details.globalPosition),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: GlassCard(
@@ -1027,6 +1102,78 @@ class _FilterChip extends StatelessWidget {
               ),
             ),
             if (trailing != null) ...[const SizedBox(width: 4), trailing!],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── PDF options bottom sheet ─────────────────────────────────────────────────
+class _PdfOptionsSheet extends StatefulWidget {
+  @override
+  State<_PdfOptionsSheet> createState() => _PdfOptionsSheetState();
+}
+
+class _PdfOptionsSheetState extends State<_PdfOptionsSheet> {
+  bool _entryList   = true;
+  bool _categories  = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('PDF Report Options',
+                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
+            const SizedBox(height: 4),
+            Text('Choose what to include in the report',
+                style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant)),
+            const SizedBox(height: 16),
+            CheckboxListTile(
+              value: _entryList,
+              onChanged: (v) => setState(() => _entryList = v ?? true),
+              title: const Text('Entry list'),
+              subtitle: const Text('All wallet transactions'),
+              activeColor: _teal,
+              contentPadding: EdgeInsets.zero,
+            ),
+            CheckboxListTile(
+              value: _categories,
+              onChanged: (v) => setState(() => _categories = v ?? true),
+              title: const Text('Category breakdown'),
+              subtitle: const Text('Spending by category'),
+              activeColor: _teal,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _teal,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: () => Navigator.pop(context, true),
+                    child: const Text('Export PDF'),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

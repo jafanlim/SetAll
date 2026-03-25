@@ -57,7 +57,8 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
       if (mounted) QuickActionsService.init(context);
     });
     // FEAT-10: Set App Group so HomeWidget.updateWidget() targets correct suite.
-    HomeWidget.setAppGroupId('group.com.jafa.setall.app.widget');
+    try { HomeWidget.setAppGroupId('group.com.jafa.setall.app.widget'); }
+    catch (_) { /* not available in this build config */ }
   }
 
   @override

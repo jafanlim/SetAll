@@ -11,7 +11,6 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../data/local/local_database.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/split_model.dart';
-import '../../data/models/wallet_entry_model.dart';
 import '../../data/repositories/setall_repository.dart';
 
 /// Coordinates two-way synchronization between local SQLite and Supabase.
@@ -199,24 +198,6 @@ class SyncService {
           table: 'group_members',
           callback: onRemoteChange,
         )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.insert,
-          schema: 'public',
-          table: 'wallet_entries',
-          callback: onRemoteChange,
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.update,
-          schema: 'public',
-          table: 'wallet_entries',
-          callback: onRemoteChange,
-        )
-        .onPostgresChanges(
-          event: PostgresChangeEvent.delete,
-          schema: 'public',
-          table: 'wallet_entries',
-          callback: onRemoteChange,
-        )
         .subscribe((status, [error]) {
           debugPrint('[SyncService] realtime status=$status error=$error');
           if (status == RealtimeSubscribeStatus.channelError) {
@@ -345,42 +326,6 @@ class SyncService {
         } else {
           debugPrint('[SyncService] expense batch push failed (${payloads.length} items): $e');
         }
-      }
-    }
-
-    // ── wallet_entries push ──────────────────────────────────────────────
-    final pendingWalletEntries = await LocalDatabase.db.query(
-      'wallet_entries',
-      where: 'user_id = ? AND synced_at IS NULL',
-      whereArgs: [uid],
-    );
-    if (pendingWalletEntries.isNotEmpty) {
-      // All pending rows have synced_at IS NULL (never pushed to Supabase).
-      // Soft-deleted rows were created and deleted locally before ever reaching
-      // Supabase — they never existed remotely, so skip the remote push and just
-      // mark them synced locally.
-      final softDeleted = pendingWalletEntries.where((r) => r['deleted_at'] != null).toList();
-      final active      = pendingWalletEntries.where((r) => r['deleted_at'] == null).toList();
-      final now = DateTime.now().millisecondsSinceEpoch;
-      try {
-        debugPrint('[Sync] wallet_entries push: ${pendingWalletEntries.length} rows (${softDeleted.length} soft-deleted, skipping remote)');
-        if (active.isNotEmpty) {
-          final payloads = active.map((row) => WalletEntryModel.fromJson(row).toSupabaseJson()).toList();
-          await _client.from('wallet_entries').upsert(payloads);
-        }
-        // softDeleted rows: no remote push needed — never existed in Supabase.
-        // Just fall through so synced_at is stamped below.
-        await LocalDatabase.db.transaction((txn) async {
-          for (final row in pendingWalletEntries) {
-            await txn.update(
-              'wallet_entries', {'synced_at': now},
-              where: 'id = ?', whereArgs: [row['id']],
-            );
-          }
-        });
-        debugPrint('[Sync] wallet_entries push complete');
-      } catch (e) {
-        debugPrint('[SyncService] wallet_entries push failed: $e');
       }
     }
 
@@ -591,65 +536,6 @@ class SyncService {
       final orphanList = orphanPersonalIds.toList();
       final ph = orphanList.map((_) => '?').join(',');
       await LocalDatabase.db.delete('expenses', where: 'id IN ($ph)', whereArgs: orphanList);
-    }
-
-    // ── wallet_entries pull ──────────────────────────────────────────────
-    try {
-      final cloudEntries = await _client
-          .from('wallet_entries')
-          .select()
-          .eq('user_id', uid) as List;
-      debugPrint('[SyncService] pull: ${cloudEntries.length} wallet_entries');
-      final cloudWalletIds = <String>{};
-      final nowMs = DateTime.now().millisecondsSinceEpoch;
-      var walletSkipped = 0, walletUpserted = 0;
-      for (final e in cloudEntries) {
-        final map = e as Map<String, dynamic>;
-        final entry = WalletEntryModel.fromJson(map);
-        cloudWalletIds.add(entry.id);
-        // Do not overwrite a locally soft-deleted row with a cloud row.
-        // This applies whether or not synced_at has been stamped — the local
-        // delete is authoritative and must not be resurrected by the pull.
-        final localRow = await LocalDatabase.db.query(
-          'wallet_entries',
-          columns: ['deleted_at'],
-          where: 'id = ?',
-          whereArgs: [entry.id],
-          limit: 1,
-        );
-        if (localRow.isNotEmpty && localRow.first['deleted_at'] != null) {
-          walletSkipped++;
-          continue;
-        }
-        walletUpserted++;
-        await LocalDatabase.db.insert(
-          'wallet_entries',
-          {
-            ...entry.toJson(),
-            'synced_at': nowMs,
-          },
-          conflictAlgorithm: ConflictAlgorithm.replace,
-        );
-      }
-      debugPrint('[SyncService] wallet pull: skipped=$walletSkipped upserted=$walletUpserted');
-      // Reconcile: prune local synced rows deleted on another device.
-      final localWalletRows = await LocalDatabase.db.query(
-        'wallet_entries',
-        columns: ['id'],
-        where: 'user_id = ? AND synced_at > 0 AND deleted_at IS NULL',
-        whereArgs: [uid],
-      );
-      final orphanIds = localWalletRows
-          .map((r) => r['id'] as String)
-          .where((id) => !cloudWalletIds.contains(id))
-          .toList();
-      if (orphanIds.isNotEmpty) {
-        final ph = orphanIds.map((_) => '?').join(',');
-        await LocalDatabase.db.delete(
-          'wallet_entries', where: 'id IN ($ph)', whereArgs: orphanIds);
-      }
-    } catch (e) {
-      debugPrint('[SyncService] wallet_entries pull failed: $e');
     }
 
     if (memberIds.isEmpty) return;
@@ -932,8 +818,18 @@ class SyncService {
       var expense = 0.0;
       for (final e in walletEntries) {
         final amt = double.tryParse(e.universalUsdAmount) ?? 0;
-        if (e.isIncome) { income  += amt; } else { expense += amt; }
+        if (e.isIncome) { income += amt; } else { expense += amt; }
       }
+
+      // Group balances (best-effort — ignore if unavailable)
+      double sharedOwed = 0;
+      double sharedOwe  = 0;
+      try {
+        final summary = await _repo.getBalanceSummary();
+        sharedOwed = double.tryParse(summary.youAreOwed) ?? 0;
+        sharedOwe  = double.tryParse(summary.youOwe)     ?? 0;
+      } catch (_) {}
+      final trueNetWorth = walletNet.toDouble() + sharedOwed - sharedOwe;
 
       const appGroup = 'group.com.jafa.setall.app.widget';
       final isApple = !kIsWeb &&
@@ -944,28 +840,34 @@ class SyncService {
         final widgetPrefs = SharedPreferencesAsync(
           options: SharedPreferencesAsyncFoundationOptions(suiteName: appGroup),
         );
-        await widgetPrefs.setDouble('widget_net_worth', walletNet.toDouble());
-        await widgetPrefs.setDouble('widget_income',    income);
-        await widgetPrefs.setDouble('widget_expenses',  expense);
-        await widgetPrefs.setString('widget_currency', currency);
-        await widgetPrefs.setString('widget_updated', DateTime.now().toIso8601String());
-        final entries = await _repo.getWalletEntries();
-        final recent = entries.take(3).toList();
+        await widgetPrefs.setDouble('widget_net_worth',    walletNet.toDouble());
+        await widgetPrefs.setDouble('widget_true_net',     trueNetWorth);
+        await widgetPrefs.setDouble('widget_shared_owed',  sharedOwed);
+        await widgetPrefs.setDouble('widget_shared_owe',   sharedOwe);
+        await widgetPrefs.setDouble('widget_income',       income);
+        await widgetPrefs.setDouble('widget_expenses',     expense);
+        await widgetPrefs.setString('widget_currency',     currency);
+        await widgetPrefs.setString('widget_updated',      DateTime.now().toIso8601String());
+        final recent = walletEntries.take(3).toList();
         for (int i = 0; i < 3; i++) {
           final e = i < recent.length ? recent[i] : null;
           await widgetPrefs.setString('widget_entry_${i + 1}_desc',   e?.description ?? '');
           await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', e != null ? (double.tryParse(e.universalUsdAmount) ?? 0) : 0);
           await widgetPrefs.setBool(  'widget_entry_${i + 1}_income', e?.isIncome ?? false);
         }
-        debugPrint('[SyncService] widget data written: $currency $walletNet → $appGroup');
-        await HomeWidget.updateWidget(iOSName: 'SetAllWidget');
+        debugPrint('[SyncService] widget data written: $currency wallet=$walletNet true=$trueNetWorth owed=$sharedOwed owe=$sharedOwe → $appGroup');
+        try { await HomeWidget.updateWidget(iOSName: 'SetAllWidget'); }
+        catch (_) { /* not available in this build config */ }
       } else {
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setDouble('widget_net_worth', walletNet.toDouble());
-        await prefs.setDouble('widget_income',    income);
-        await prefs.setDouble('widget_expenses',  expense);
-        await prefs.setString('widget_currency', currency);
-        await prefs.setString('widget_updated', DateTime.now().toIso8601String());
+        await prefs.setDouble('widget_net_worth',   walletNet.toDouble());
+        await prefs.setDouble('widget_true_net',    trueNetWorth);
+        await prefs.setDouble('widget_shared_owed', sharedOwed);
+        await prefs.setDouble('widget_shared_owe',  sharedOwe);
+        await prefs.setDouble('widget_income',      income);
+        await prefs.setDouble('widget_expenses',    expense);
+        await prefs.setString('widget_currency',    currency);
+        await prefs.setString('widget_updated',     DateTime.now().toIso8601String());
       }
     } catch (e, st) {
       // Widget data is best-effort — never block sync on failure.
