@@ -2916,14 +2916,9 @@ class SetAllRepository {
       }
     }
 
-    // ── 6. Wallet entries (wallet_entries table) ─────────────────────────────
-    final walletEntries = await getWalletEntries(limit: limit);
-    for (final e in walletEntries) {
-      events.add(WalletActivityEvent(
-        timestamp: e.createdAt ?? e.updatedAt ?? '',
-        entry: e,
-      ));
-    }
+    // ── 6. Wallet entries — personal expenses (group_id IS NULL) are already
+    //    included in step 3 above as ExpenseEvent. Adding them again here as
+    //    WalletActivityEvent would duplicate every entry. Skipped intentionally.
 
     // ── 7. Deleted wallet entry events ──────────────────────────────────────
     if (!_isWeb) {
