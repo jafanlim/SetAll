@@ -118,7 +118,7 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
       final repo   = ref.read(setAllRepositoryProvider);
       final client = Supabase.instance.client;
       final uid    = client.auth.currentUser?.id ?? '';
-      final walletEntries = await repo.getWalletEntries();
+      final walletEntries = await repo.getPersonalExpenses();
 
       final dir = await getTemporaryDirectory();
       late File file;

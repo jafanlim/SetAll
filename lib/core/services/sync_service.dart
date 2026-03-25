@@ -813,11 +813,11 @@ class SyncService {
       final currency = profile?.defaultCurrency ?? 'USD';
       final walletNet = await _repo.getWalletOnlyBalance(baseCurrency: currency);
 
-      final walletEntries = await _repo.getWalletEntries();
+      final walletEntries = await _repo.getPersonalExpenses();
       var income  = 0.0;
       var expense = 0.0;
       for (final e in walletEntries) {
-        final amt = double.tryParse(e.universalUsdAmount) ?? 0;
+        final amt = double.tryParse(e.universalUsdAmount ?? '0') ?? 0;
         if (e.isIncome) { income += amt; } else { expense += amt; }
       }
 
@@ -848,11 +848,16 @@ class SyncService {
         await widgetPrefs.setDouble('widget_expenses',     expense);
         await widgetPrefs.setString('widget_currency',     currency);
         await widgetPrefs.setString('widget_updated',      DateTime.now().toIso8601String());
-        final recent = walletEntries.take(3).toList();
+        // Prefer entries with real descriptions; fall back to most-recent 3.
+        final withDesc = walletEntries
+            .where((e) => e.description.trim().isNotEmpty)
+            .take(3)
+            .toList();
+        final recent = withDesc.length >= 3 ? withDesc : walletEntries.take(3).toList();
         for (int i = 0; i < 3; i++) {
           final e = i < recent.length ? recent[i] : null;
           await widgetPrefs.setString('widget_entry_${i + 1}_desc',   e?.description ?? '');
-          await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', e != null ? (double.tryParse(e.universalUsdAmount) ?? 0) : 0);
+          await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', e != null ? (double.tryParse(e.universalUsdAmount ?? '0') ?? 0) : 0);
           await widgetPrefs.setBool(  'widget_entry_${i + 1}_income', e?.isIncome ?? false);
         }
         debugPrint('[SyncService] widget data written: $currency wallet=$walletNet true=$trueNetWorth owed=$sharedOwed owe=$sharedOwe → $appGroup');
