@@ -80,13 +80,16 @@ class _AnalyticsPdfPayload {
 Future<Uint8List> _buildWalletPdf(_WalletPdfPayload p) async {
   double totalIncome   = 0;
   double totalExpenses = 0;
-  final currency = p.entries.isNotEmpty ? (p.entries.first['currency'] as String? ?? 'USD') : 'USD';
+  // Always sum the USD anchor so multi-currency entries produce correct totals.
+  const currency = 'USD';
   for (final e in p.entries) {
-    final amt = double.tryParse(e['amount'] as String? ?? '0') ?? 0;
+    final usd = double.tryParse(
+            (e['universal_usd_amount'] as String?) ??
+            (e['amount']              as String?) ?? '0') ?? 0;
     if (e['is_income'] == true || e['is_income'] == 1) {
-      totalIncome += amt;
+      totalIncome += usd;
     } else {
-      totalExpenses += amt;
+      totalExpenses += usd;
     }
   }
   final net = totalIncome - totalExpenses;
@@ -144,13 +147,23 @@ Future<Uint8List> _buildWalletPdf(_WalletPdfPayload p) async {
                       .toList(),
                 ),
                 ...p.entries.map((e) {
-                  final isIncome = e['is_income'] == true || e['is_income'] == 1;
-                  final cur      = e['currency'] as String? ?? currency;
-                  final amt      = e['amount']   as String? ?? '0';
-                  final cat      = (e['category'] as String?)?.trim();
+                  final isIncome  = e['is_income'] == true || e['is_income'] == 1;
+                  // Prefer original currency/amount (e.g. 15000 VND),
+                  // fall back to entry currency / stored amount.
+                  final origCur   = e['original_currency'] as String?;
+                  final origAmt   = e['original_amount']   as String?;
+                  final cur       = (origCur != null && origCur.isNotEmpty)
+                      ? origCur
+                      : (e['currency'] as String? ?? 'USD');
+                  final amt       = (origAmt != null && origAmt.isNotEmpty)
+                      ? origAmt
+                      : (e['amount'] as String? ?? '0');
+                  final cat       = (e['category'] as String?)?.trim();
                   return pw.TableRow(children: [
                     _cell(_fmtDate(e['created_at'] as String?)),
-                    _cell(e['description'] as String? ?? ''),
+                    _cell((e['description'] as String?)?.isNotEmpty == true
+                        ? e['description'] as String
+                        : 'Wallet entry'),
                     _cell((cat == null || cat.isEmpty) ? 'Other' : cat),
                     _cell(_fmtAmount(cur, amt, isIncome: isIncome),
                         color: isIncome ? _green : _red),
