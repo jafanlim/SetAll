@@ -2,6 +2,10 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../models/ai_chat_message.dart';
 import '../../models/canvas_data.dart';
@@ -171,6 +175,7 @@ class _MobileLayout extends ConsumerWidget {
       children: [
         Column(
           children: [
+            const _LatestAnalysisCard(),
             Expanded(child: _ChatPanel(scrollCtrl: scrollCtrl)),
             _InputBar(
               controller: inputCtrl,
@@ -1116,5 +1121,174 @@ class _InputBar extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FEAT-19: Latest AI analysis card — shown at top of InsightsScreen chat
+// ---------------------------------------------------------------------------
+class _LatestAnalysisCard extends ConsumerStatefulWidget {
+  const _LatestAnalysisCard();
+
+  @override
+  ConsumerState<_LatestAnalysisCard> createState() => _LatestAnalysisCardState();
+}
+
+class _LatestAnalysisCardState extends ConsumerState<_LatestAnalysisCard> {
+  bool _generating = false;
+
+  Future<void> _generate() async {
+    final uid = Supabase.instance.client.auth.currentUser?.id;
+    if (uid == null) return;
+    setState(() => _generating = true);
+    try {
+      await Supabase.instance.client.functions.invoke(
+        'weekly-analysis',
+        body: {'userId': uid, 'onDemand': true},
+      );
+      ref.invalidate(aiInsightsProvider);
+    } catch (_) {} finally {
+      if (mounted) setState(() => _generating = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme    = Theme.of(context);
+    final insights = ref.watch(aiInsightsProvider);
+
+    return insights.when(
+      loading: () => _buildShimmer(theme),
+      error:   (_, __) => const SizedBox.shrink(),
+      data: (list) {
+        if (list.isEmpty) return _buildEmpty(theme);
+        final latest = list.first;
+        return _buildCard(theme, latest.summary, latest.topCategory, _fmtDate(latest.createdAt));
+      },
+    );
+  }
+
+  Widget _buildShimmer(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Container(
+        height: 72,
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 20, height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmpty(ThemeData theme) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: _teal.withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(12),
+          color: _teal.withValues(alpha: 0.04),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.auto_awesome, size: 16, color: _teal),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                'No analysis yet — tap Generate',
+                style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
+              ),
+            ),
+            _generating
+                ? const SizedBox(width: 16, height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: _teal))
+                : TextButton(
+                    style: TextButton.styleFrom(
+                      foregroundColor: _teal,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    onPressed: () { HapticUtils.primaryTap(); _generate(); },
+                    child: const Text('Generate',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCard(ThemeData theme, String summary, String? topCat, String date) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: _teal.withValues(alpha: 0.25)),
+          borderRadius: BorderRadius.circular(12),
+          color: _teal.withValues(alpha: 0.04),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 14, color: _teal),
+                const SizedBox(width: 6),
+                Text('Latest Analysis · $date',
+                    style: const TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w700,
+                        color: _teal, letterSpacing: 0.3)),
+                const Spacer(),
+                if (topCat != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _teal.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(topCat,
+                        style: const TextStyle(
+                            fontSize: 10, fontWeight: FontWeight.w600, color: _teal)),
+                  ),
+                  const SizedBox(width: 8),
+                ],
+                _generating
+                    ? const SizedBox(width: 14, height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: _teal))
+                    : GestureDetector(
+                        onTap: () { HapticUtils.lightTap(); _generate(); },
+                        child: const Icon(Icons.refresh_rounded, size: 16, color: _teal),
+                      ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(summary,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                    fontSize: 12, color: theme.colorScheme.onSurface, height: 1.4)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _fmtDate(String? raw) {
+    if (raw == null) return '';
+    try {
+      return DateFormat('d MMM').format(DateTime.parse(raw).toLocal());
+    } catch (_) {
+      return '';
+    }
   }
 }

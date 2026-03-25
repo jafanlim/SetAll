@@ -15,7 +15,8 @@ const _amber = Color(0xFFF59E0B);
 const _kPushExpense      = 'notif_push_expense';
 const _kPushSettlement   = 'notif_push_settlement';
 const _kPushGroupEvent   = 'notif_push_group_event';
-const _kPushDigest       = 'notif_push_digest';
+const _kPushDigest          = 'notif_push_digest';
+const _kPushGroupActivity   = 'notif_push_group_activity';
 
 const _kEmailExpense     = 'notif_email_expense';
 const _kEmailSettlement  = 'notif_email_settlement';
@@ -37,7 +38,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   bool _pushExpense    = true;
   bool _pushSettlement = true;
   bool _pushGroupEvent = true;
-  bool _pushDigest     = false;
+  bool _pushDigest        = false;
+  bool _pushGroupActivity  = true;
 
   // Email defaults: OFF
   bool _emailExpense    = false;
@@ -60,7 +62,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       _pushExpense    = p.getBool(_kPushExpense)    ?? true;
       _pushSettlement = p.getBool(_kPushSettlement) ?? true;
       _pushGroupEvent = p.getBool(_kPushGroupEvent) ?? true;
-      _pushDigest     = p.getBool(_kPushDigest)     ?? false;
+      _pushDigest        = p.getBool(_kPushDigest)        ?? false;
+      _pushGroupActivity = p.getBool(_kPushGroupActivity) ?? true;
       _emailExpense    = p.getBool(_kEmailExpense)    ?? false;
       _emailSettlement = p.getBool(_kEmailSettlement) ?? false;
       _emailGroupEvent = p.getBool(_kEmailGroupEvent) ?? false;
@@ -183,6 +186,17 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                         emailValue: _emailGroupEvent,
                         onPushChanged: (v) { setState(() => _pushGroupEvent = v);  _set(_kPushGroupEvent, v); },
                         onEmailChanged: (v) { setState(() => _emailGroupEvent = v); _set(_kEmailGroupEvent, v); },
+                      ),
+                      const Divider(height: 1, indent: 52, endIndent: 0),
+                      _NotifRow(
+                        icon: LucideIcons.bell,
+                        iconColor: _teal,
+                        title: 'Group activity',
+                        subtitle: 'When members add or change expenses',
+                        pushValue: _pushGroupActivity,
+                        emailValue: false,
+                        onPushChanged: (v) { setState(() => _pushGroupActivity = v); _set(_kPushGroupActivity, v); },
+                        onEmailChanged: (_) {},
                       ),
                       const Divider(height: 1, indent: 52, endIndent: 0),
                       _NotifRow(
