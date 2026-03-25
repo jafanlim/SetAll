@@ -14,6 +14,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../domain/entities/activity_event.dart';
 
 // ---------------------------------------------------------------------------
@@ -1303,7 +1304,24 @@ class _ExpenseTile extends ConsumerWidget {
           'groupName': event.groupName,
         });
       } else {
-        context.push('/wallet/entry', extra: e);
+        context.push('/wallet/entry', extra: WalletEntryModel(
+          id:                  e.id,
+          userId:              e.payerId,
+          amount:              e.amount,
+          isIncome:            e.isIncome,
+          description:         e.description,
+          category:            e.category,
+          currency:            e.currency,
+          originalAmount:      e.originalAmount,
+          originalCurrency:    e.originalCurrency,
+          exchangeRateApplied: e.exchangeRateApplied,
+          universalUsdAmount:  e.universalUsdAmount ?? '0',
+          iconCodepoint:       e.iconCodepoint,
+          iconColor:           e.iconColor,
+          notes:               e.notes,
+          attachmentUrls:      e.attachmentUrls,
+          createdAt:           e.createdAt,
+        ));
       }
     }
 

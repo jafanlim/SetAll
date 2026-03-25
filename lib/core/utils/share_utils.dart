@@ -15,9 +15,17 @@ Future<void> shareFiles(
       originRect = pos & box.size;
     }
   }
+  if (originRect == null || originRect == Rect.zero) {
+    final size = MediaQuery.sizeOf(context);
+    originRect = Rect.fromCenter(
+      center: Offset(size.width / 2, size.height / 4),
+      width: 1,
+      height: 1,
+    );
+  }
   await Share.shareXFiles(
     files,
     subject: subject,
-    sharePositionOrigin: originRect ?? Rect.zero,
+    sharePositionOrigin: originRect,
   );
 }

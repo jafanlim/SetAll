@@ -103,35 +103,33 @@ struct ActionButtons: View {
 struct MediumView: View {
     let data: WidgetData
     var body: some View {
-        ZStack {
-            bgDark.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text("SetAll").font(.caption2.weight(.bold)).foregroundColor(teal)
-                    Spacer()
-                    Text("Net Worth").font(.caption2).foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("SetAll").font(.caption2.weight(.bold)).foregroundColor(teal)
+                Spacer()
+                Text("Net Worth").font(.caption2).foregroundColor(.secondary)
+            }
+            Text(data.fmt(data.netWorth))
+                .font(.title2.bold()).foregroundColor(data.netColor)
+                .minimumScaleFactor(0.6).lineLimit(1)
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Income").font(.caption2).foregroundColor(.secondary)
+                    Text(data.fmt(data.income)).font(.caption.bold()).foregroundColor(.green)
+                        .minimumScaleFactor(0.7).lineLimit(1)
                 }
-                Text(data.fmt(data.netWorth))
-                    .font(.title2.bold()).foregroundColor(data.netColor)
-                    .minimumScaleFactor(0.6).lineLimit(1)
-                HStack(spacing: 12) {
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Income").font(.caption2).foregroundColor(.secondary)
-                        Text(data.fmt(data.income)).font(.caption.bold()).foregroundColor(.green)
-                            .minimumScaleFactor(0.7).lineLimit(1)
-                    }
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Expenses").font(.caption2).foregroundColor(.secondary)
-                        Text(data.fmt(data.expenses)).font(.caption.bold()).foregroundColor(.red)
-                            .minimumScaleFactor(0.7).lineLimit(1)
-                    }
-                    Spacer()
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Expenses").font(.caption2).foregroundColor(.secondary)
+                    Text(data.fmt(data.expenses)).font(.caption.bold()).foregroundColor(.red)
+                        .minimumScaleFactor(0.7).lineLimit(1)
                 }
                 Spacer()
-                ActionButtons()
             }
-            .padding(14)
+            Spacer()
+            ActionButtons()
         }
+        .padding(14)
+        .containerBackground(bgDark, for: .widget)
     }
 }
 
@@ -140,66 +138,64 @@ struct MediumView: View {
 struct LargeView: View {
     let data: WidgetData
     var body: some View {
-        ZStack {
-            bgDark.ignoresSafeArea()
-            VStack(alignment: .leading, spacing: 0) {
-                // Header
-                HStack {
-                    Text("SetAll").font(.caption2.weight(.bold)).foregroundColor(teal)
-                    Spacer()
-                    Text("Wallet summary").font(.caption2).foregroundColor(.secondary)
-                }.padding(.bottom, 8)
-
-                // Net worth hero
-                Text(data.fmt(data.netWorth))
-                    .font(.largeTitle.bold()).foregroundColor(data.netColor)
-                    .minimumScaleFactor(0.5).lineLimit(1)
-                Text("Net Worth").font(.caption).foregroundColor(.secondary)
-                    .padding(.bottom, 12)
-
-                // Income / expenses row
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Label(data.fmt(data.income), systemImage: "arrow.down.circle.fill")
-                            .font(.caption.bold()).foregroundColor(.green).lineLimit(1)
-                        Text("Income").font(.caption2).foregroundColor(.secondary)
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Label(data.fmt(data.expenses), systemImage: "arrow.up.circle.fill")
-                            .font(.caption.bold()).foregroundColor(.red).lineLimit(1)
-                        Text("Expenses").font(.caption2).foregroundColor(.secondary)
-                    }
-                }.padding(.bottom, 12)
-
-                // Divider
-                Rectangle().fill(teal.opacity(0.2)).frame(height: 1).padding(.bottom, 8)
-
-                // Recent entries
-                Text("Recent").font(.caption2.weight(.semibold)).foregroundColor(.secondary)
-                    .padding(.bottom, 4)
-                ForEach(Array(data.recent.enumerated()), id: \.offset) { _, e in
-                    HStack {
-                        Image(systemName: e.isIncome ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                            .font(.caption).foregroundColor(e.isIncome ? .green : .red)
-                        Text(e.desc.isEmpty ? "Entry" : e.desc)
-                            .font(.caption).foregroundColor(.white).lineLimit(1)
-                        Spacer()
-                        Text(String(format: "%@%.2f", e.isIncome ? "+" : "-", e.amount))
-                            .font(.caption.bold())
-                            .foregroundColor(e.isIncome ? .green : .red)
-                    }.padding(.vertical, 2)
-                }
-                if data.recent.isEmpty {
-                    Text("No entries yet — open the app to sync")
-                        .font(.caption2).foregroundColor(.secondary)
-                }
-
+        VStack(alignment: .leading, spacing: 0) {
+            // Header
+            HStack {
+                Text("SetAll").font(.caption2.weight(.bold)).foregroundColor(teal)
                 Spacer()
-                ActionButtons()
+                Text("Wallet summary").font(.caption2).foregroundColor(.secondary)
+            }.padding(.bottom, 8)
+
+            // Net worth hero
+            Text(data.fmt(data.netWorth))
+                .font(.largeTitle.bold()).foregroundColor(data.netColor)
+                .minimumScaleFactor(0.5).lineLimit(1)
+            Text("Net Worth").font(.caption).foregroundColor(.secondary)
+                .padding(.bottom, 12)
+
+            // Income / expenses row
+            HStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Label(data.fmt(data.income), systemImage: "arrow.down.circle.fill")
+                        .font(.caption.bold()).foregroundColor(.green).lineLimit(1)
+                    Text("Income").font(.caption2).foregroundColor(.secondary)
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    Label(data.fmt(data.expenses), systemImage: "arrow.up.circle.fill")
+                        .font(.caption.bold()).foregroundColor(.red).lineLimit(1)
+                    Text("Expenses").font(.caption2).foregroundColor(.secondary)
+                }
+            }.padding(.bottom, 12)
+
+            // Divider
+            Rectangle().fill(teal.opacity(0.2)).frame(height: 1).padding(.bottom, 8)
+
+            // Recent entries
+            Text("Recent").font(.caption2.weight(.semibold)).foregroundColor(.secondary)
+                .padding(.bottom, 4)
+            ForEach(Array(data.recent.enumerated()), id: \.offset) { _, e in
+                HStack {
+                    Image(systemName: e.isIncome ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
+                        .font(.caption).foregroundColor(e.isIncome ? .green : .red)
+                    Text(e.desc.isEmpty ? "Entry" : e.desc)
+                        .font(.caption).foregroundColor(.white).lineLimit(1)
+                    Spacer()
+                    Text(String(format: "%@%.2f", e.isIncome ? "+" : "-", e.amount))
+                        .font(.caption.bold())
+                        .foregroundColor(e.isIncome ? .green : .red)
+                }.padding(.vertical, 2)
             }
-            .padding(14)
+            if data.recent.isEmpty {
+                Text("No entries yet — open the app to sync")
+                    .font(.caption2).foregroundColor(.secondary)
+            }
+
+            Spacer()
+            ActionButtons()
         }
+        .padding(14)
+        .containerBackground(bgDark, for: .widget)
     }
 }
 

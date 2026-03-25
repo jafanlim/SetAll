@@ -113,8 +113,7 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
       if (format == 'pdf') {
         await PdfExportService().exportWalletAsPdf(
             originKey: _exportKey, context: context);
-        return;
-      }
+      } else {
       final repo   = ref.read(setAllRepositoryProvider);
       final client = Supabase.instance.client;
       final uid    = client.auth.currentUser?.id ?? '';
@@ -180,6 +179,7 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
       // ignore: use_build_context_synchronously
       await shareFiles([XFile(file.path)], context: context,
           subject: subject, originKey: _exportKey);
+      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
