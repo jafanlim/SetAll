@@ -2355,7 +2355,10 @@ class SetAllRepository {
   /// Fetch personal (wallet) expenses – expenses with no group_id.
   Future<List<ExpenseModel>> getPersonalExpenses({int limit = 10000}) async {
     final uid = await ensureUser();
-    if (uid == null) return [];
+    if (uid == null) {
+      debugPrint('[getPersonalExpenses] uid=null — returning []');
+      return [];
+    }
 
     if (_isWeb && _client != null) {
       final rows = await _client
@@ -2365,7 +2368,9 @@ class SetAllRepository {
           .eq('payer_id', uid)
           .order('created_at', ascending: false)
           .limit(limit) as List;
-      return rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
+      final result = rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
+      debugPrint('[getPersonalExpenses] web uid=$uid returned ${result.length} entries');
+      return result;
     }
 
     final rows = await LocalDatabase.db.query(
@@ -2375,7 +2380,9 @@ class SetAllRepository {
       orderBy: 'created_at DESC',
       limit: limit,
     );
-    return rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
+    final result = rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
+    debugPrint('[getPersonalExpenses] sqlite uid=$uid returned ${result.length} entries');
+    return result;
   }
 
   // ---------------------------------------------------------------------------
@@ -3698,61 +3705,55 @@ class SetAllRepository {
   }
 
   // ---------------------------------------------------------------------------
-  // Wallet Entries — dedicated personal finance ledger (schema v28)
+  // Wallet Entries — personal finance ledger, backed by expenses table
   // ---------------------------------------------------------------------------
 
-  WalletEntryModel _rowToWalletEntry(Map<String, dynamic> row) =>
-      WalletEntryModel.fromJson(row);
+  /// Converts an [ExpenseModel] (personal, group_id IS NULL) to a
+  /// [WalletEntryModel] so that the Wallet screen keeps its existing type.
+  static WalletEntryModel _expenseToWalletEntry(ExpenseModel e) =>
+      WalletEntryModel(
+        id:                  e.id,
+        userId:              e.payerId,
+        amount:              e.amount,
+        isIncome:            e.isIncome,
+        description:         e.description,
+        category:            e.category,
+        currency:            e.currency,
+        originalAmount:      e.originalAmount,
+        originalCurrency:    e.originalCurrency,
+        exchangeRateApplied: e.exchangeRateApplied,
+        universalUsdAmount:  e.universalUsdAmount ?? '0',
+        iconCodepoint:       e.iconCodepoint,
+        iconColor:           e.iconColor,
+        notes:               e.notes,
+        attachmentUrls:      e.attachmentUrls,
+        createdAt:           e.createdAt,
+      );
 
+  /// Returns personal wallet entries from the [expenses] table
+  /// (group_id IS NULL, payer_id = uid). Converts to [WalletEntryModel]
+  /// so existing callers require no changes.
   Future<List<WalletEntryModel>> getWalletEntries({int limit = 10000}) async {
-    final uid = await ensureUser();
-    if (uid == null) return [];
-
-    if (_isWeb && _client != null) {
-      final rows = await _client
-          .from('wallet_entries')
-          .select()
-          .eq('user_id', uid)
-          .isFilter('deleted_at', null)
-          .order('created_at', ascending: false)
-          .limit(limit) as List;
-      return rows.map((r) => _rowToWalletEntry(r as Map<String, dynamic>)).toList();
-    }
-
-    final rows = await LocalDatabase.db.query(
-      'wallet_entries',
-      where: 'user_id = ? AND deleted_at IS NULL',
-      whereArgs: [uid],
-      orderBy: 'created_at DESC',
-      limit: limit,
-    );
-    return rows.map<WalletEntryModel>(_rowToWalletEntry).toList();
+    final expenses = await getPersonalExpenses(limit: limit);
+    return expenses.map(_expenseToWalletEntry).toList();
   }
 
+  /// Streams personal wallet entries from the [expenses] table.
   Stream<List<WalletEntryModel>> watchWalletEntries({int limit = 10000}) async* {
-    List<WalletEntryModel> last;
-    try { last = await getWalletEntries(limit: limit); } catch (_) { last = []; }
-    yield last;
-    await for (final _ in _changeController.stream) {
-      List<WalletEntryModel> next;
-      try { next = await getWalletEntries(limit: limit); } catch (_) { continue; }
-      if (next.length != last.length ||
-          next.any((n) => !last.any((l) => l.id == n.id && l.amount == n.amount))) {
-        last = next;
-        yield next;
-      }
+    await for (final expenses in watchPersonalExpenses(limit: limit)) {
+      yield expenses.map(_expenseToWalletEntry).toList();
     }
   }
 
   Future<({Decimal income, Decimal spend, Decimal net})> getWalletEntryTotals({
     String baseCurrency = 'USD',
   }) async {
-    final entries = await getWalletEntries();
+    final entries = await getPersonalExpenses();
     var income = Decimal.zero;
     var spend  = Decimal.zero;
     Decimal? cachedRate;
     for (final e in entries) {
-      final usd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
+      final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
       Decimal amt = usd;
       if (baseCurrency != 'USD' && _currencyService != null && usd != Decimal.zero) {
         cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
