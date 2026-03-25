@@ -98,6 +98,7 @@ struct SetAllWidgetEntryView: View {
         }
         .padding()
         .containerBackground(.ultraThinMaterial, for: .widget)
+        .widgetURL(URL(string: "com.jafa.setall.app://wallet")!)
     }
 
     var mediumView: some View {
@@ -132,6 +133,7 @@ struct SetAllWidgetEntryView: View {
         }
         .padding()
         .containerBackground(.ultraThinMaterial, for: .widget)
+        .widgetURL(URL(string: "com.jafa.setall.app://wallet/add")!)
     }
 
     func balanceRow(label: String, value: Double, color: Color, prefix: String) -> some View {
