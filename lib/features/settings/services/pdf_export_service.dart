@@ -93,7 +93,7 @@ class PdfExportService {
     final email  = client.auth.currentUser?.email ?? '';
 
     final repo    = repository ?? SetAllRepository();
-    final entries = await repo.getWalletEntries();
+    final entries = await repo.getPersonalExpenses();
 
     double totalIncome   = 0;
     double totalExpenses = 0;
