@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 const _teal = Color(0xFF14B8A6);
 
@@ -81,15 +82,35 @@ class _BugReportScreenState extends State<BugReportScreen> {
           ? BugReportService.breadcrumbs.join('\n')
           : '';
 
-      // 1. Crashlytics non-fatal
+      // 1. PRIMARY: open mail app with pre-filled bug report
+      final expected = _expectedCtrl.text.trim();
+      final bodyLines = [
+        'Version: $appVersion',
+        if (_includeDevice && deviceInfo.isNotEmpty) 'Device: $deviceInfo',
+        '',
+        'Severity: $_severity',
+        '',
+        'What happened:',
+        desc,
+        if (expected.isNotEmpty) ...['' ,'Expected:', expected],
+        if (_includeLogs && logs.isNotEmpty) ...['' , 'Recent logs:', logs],
+      ];
+      final subject = Uri.encodeComponent('Bug Report — SetAll $appVersion');
+      final body    = Uri.encodeComponent(bodyLines.join('\n'));
+      final mailUri = Uri.parse('mailto:contact@setall.app?subject=$subject&body=$body');
+      if (await canLaunchUrl(mailUri)) {
+        await launchUrl(mailUri);
+      }
+
+      // 2. SECONDARY: Crashlytics non-fatal
       if (!kIsWeb) {
         await FirebaseCrashlytics.instance.recordError(
           Exception('Bug report: $desc'),
-          null,
-          reason: desc,
+          StackTrace.current,
+          reason: 'user_bug_report',
           information: [
             DiagnosticsNode.message('severity: $_severity'),
-            DiagnosticsNode.message('expected: ${_expectedCtrl.text.trim()}'),
+            DiagnosticsNode.message('expected: $expected'),
             DiagnosticsNode.message('device: $deviceInfo'),
             DiagnosticsNode.message('version: $appVersion'),
           ],
@@ -97,19 +118,21 @@ class _BugReportScreenState extends State<BugReportScreen> {
         );
       }
 
-      // 2. Supabase bug_reports table
-      final client = Supabase.instance.client;
-      final uid    = client.auth.currentUser?.id;
-      await client.from('bug_reports').insert({
-        'user_id':     uid,
-        'description': desc,
-        'expected':    _expectedCtrl.text.trim().isEmpty ? null : _expectedCtrl.text.trim(),
-        'severity':    _severity,
-        'device_info': _includeDevice ? deviceInfo : null,
-        'logs':        _includeLogs   ? logs        : null,
-        'app_version': appVersion,
-        'created_at':  DateTime.now().toUtc().toIso8601String(),
-      });
+      // 3. SECONDARY: Supabase bug_reports table (best-effort backup)
+      try {
+        final client = Supabase.instance.client;
+        final uid    = client.auth.currentUser?.id;
+        await client.from('bug_reports').insert({
+          'user_id':     uid,
+          'description': desc,
+          'expected':    expected.isEmpty ? null : expected,
+          'severity':    _severity,
+          'device_info': _includeDevice ? deviceInfo : null,
+          'logs':        _includeLogs   ? logs        : null,
+          'app_version': appVersion,
+          'created_at':  DateTime.now().toUtc().toIso8601String(),
+        });
+      } catch (_) {}
 
       if (mounted) {
         Navigator.of(context).pop();
