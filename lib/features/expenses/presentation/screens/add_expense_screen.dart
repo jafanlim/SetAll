@@ -498,7 +498,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             backgroundColor: _teal.withValues(alpha: 0.9),
           ),
         );
-        context.pop();
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
       } else {
         HapticUtils.lightTap();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -536,7 +540,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           icon: const Icon(Icons.close),
           onPressed: () {
             HapticUtils.lightTap();
-            context.pop();
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
           },
         ),
       ),

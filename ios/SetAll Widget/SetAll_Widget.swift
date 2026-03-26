@@ -11,11 +11,14 @@ private let bgDark = Color(red: 0.059, green: 0.090, blue: 0.165)
 struct WidgetData {
     struct RecentEntry { let desc: String; let amount: Double; let isIncome: Bool }
 
-    let netWorth: Double
-    let income:   Double
-    let expenses: Double
-    let currency: String
-    let recent:   [RecentEntry]
+    let netWorth:   Double
+    let trueNet:    Double
+    let income:     Double
+    let expenses:   Double
+    let sharedOwed: Double
+    let sharedOwe:  Double
+    let currency:   String
+    let recent:     [RecentEntry]
 
     static func load() -> WidgetData {
         let d = UserDefaults(suiteName: appGroup)
@@ -29,16 +32,20 @@ struct WidgetData {
             }
         }
         return WidgetData(
-            netWorth: d?.double(forKey: "widget_net_worth") ?? 0,
-            income:   d?.double(forKey: "widget_income")    ?? 0,
-            expenses: d?.double(forKey: "widget_expenses")  ?? 0,
-            currency: d?.string(forKey: "widget_currency")  ?? "USD",
-            recent:   entries
+            netWorth:   d?.double(forKey: "widget_net_worth")   ?? 0,
+            trueNet:    d?.double(forKey: "widget_true_net")    ?? 0,
+            income:     d?.double(forKey: "widget_income")      ?? 0,
+            expenses:   d?.double(forKey: "widget_expenses")    ?? 0,
+            sharedOwed: d?.double(forKey: "widget_shared_owed") ?? 0,
+            sharedOwe:  d?.double(forKey: "widget_shared_owe")  ?? 0,
+            currency:   d?.string(forKey: "widget_currency")    ?? "USD",
+            recent:     entries
         )
     }
 
     func fmt(_ v: Double) -> String { String(format: "%@ %.2f", currency, v) }
-    var netColor: Color { netWorth >= 0 ? teal : .red }
+    var netColor:     Color { netWorth >= 0 ? teal : .red }
+    var trueNetColor: Color { trueNet  >= 0 ? teal : .red }
 }
 
 struct SAEntry: TimelineEntry { let date: Date; let data: WidgetData }
@@ -48,7 +55,8 @@ struct SAEntry: TimelineEntry { let date: Date; let data: WidgetData }
 struct SAProvider: TimelineProvider {
     func placeholder(in context: Context) -> SAEntry {
         SAEntry(date: Date(), data: WidgetData(
-            netWorth: 1234.56, income: 2000, expenses: 765.44, currency: "USD",
+            netWorth: 1234.56, trueNet: 1360.56, income: 2000, expenses: 765.44,
+            sharedOwed: 200, sharedOwe: 74, currency: "USD",
             recent: [
                 .init(desc: "Coffee",    amount: 4.50,  isIncome: false),
                 .init(desc: "Salary",    amount: 1500,  isIncome: true),
@@ -69,29 +77,30 @@ struct SAProvider: TimelineProvider {
 
 struct ActionButtons: View {
     var body: some View {
-        HStack(spacing: 8) {
-            Link(destination: URL(string: "\(urlScheme)://add-expense")!) {
-                HStack(spacing: 4) {
+        HStack(spacing: 10) {
+            Link(destination: URL(string: "\(urlScheme):///add-expense")!) {
+                HStack(spacing: 5) {
                     Image(systemName: "plus.circle.fill")
-                    Text("Expense")
+                    Text("Add Expense").lineLimit(1)
                 }
-                .font(.caption.bold())
+                .fixedSize()
+                .font(.footnote.bold())
                 .foregroundColor(bgDark)
-                .padding(.horizontal, 12).padding(.vertical, 7)
+                .padding(.horizontal, 14).padding(.vertical, 9)
                 .background(teal)
-                .cornerRadius(8)
+                .cornerRadius(10)
             }
-            Link(destination: URL(string: "\(urlScheme)://wallet/add")!) {
-                HStack(spacing: 4) {
-                    Image(systemName: "wallet.pass.fill")
-                    Text("Wallet")
+            Link(destination: URL(string: "\(urlScheme):///wallet/add")!) {
+                HStack(spacing: 5) {
+                    Image(systemName: "creditcard.fill")
+                    Text("Wallet Entry").lineLimit(1)
                 }
-                .font(.caption.bold())
-                .foregroundColor(teal)
-                .padding(.horizontal, 12).padding(.vertical, 7)
-                .background(teal.opacity(0.15))
-                .cornerRadius(8)
-                .overlay(RoundedRectangle(cornerRadius: 8).stroke(teal.opacity(0.5), lineWidth: 1))
+                .fixedSize()
+                .font(.footnote.bold())
+                .foregroundColor(bgDark)
+                .padding(.horizontal, 14).padding(.vertical, 9)
+                .background(teal)
+                .cornerRadius(10)
             }
             Spacer()
         }
@@ -130,6 +139,7 @@ struct MediumView: View {
         }
         .padding(14)
         .containerBackground(bgDark, for: .widget)
+        .widgetURL(URL(string: "\(urlScheme):///"))
     }
 }
 
@@ -143,52 +153,26 @@ struct LargeView: View {
             HStack {
                 Text("SetAll").font(.caption2.weight(.bold)).foregroundColor(teal)
                 Spacer()
-                Text("Wallet summary").font(.caption2).foregroundColor(.secondary)
-            }.padding(.bottom, 8)
+                Text("Dashboard").font(.caption2).foregroundColor(.secondary)
+            }.padding(.bottom, 10)
 
-            // Net worth hero
-            Text(data.fmt(data.netWorth))
-                .font(.largeTitle.bold()).foregroundColor(data.netColor)
+            // True net worth hero
+            Text(data.fmt(data.trueNet))
+                .font(.largeTitle.bold()).foregroundColor(data.trueNetColor)
                 .minimumScaleFactor(0.5).lineLimit(1)
-            Text("Net Worth").font(.caption).foregroundColor(.secondary)
-                .padding(.bottom, 12)
-
-            // Income / expenses row
-            HStack(spacing: 0) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Label(data.fmt(data.income), systemImage: "arrow.down.circle.fill")
-                        .font(.caption.bold()).foregroundColor(.green).lineLimit(1)
-                    Text("Income").font(.caption2).foregroundColor(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 2) {
-                    Label(data.fmt(data.expenses), systemImage: "arrow.up.circle.fill")
-                        .font(.caption.bold()).foregroundColor(.red).lineLimit(1)
-                    Text("Expenses").font(.caption2).foregroundColor(.secondary)
-                }
-            }.padding(.bottom, 12)
+            Text("True Net Worth").font(.caption).foregroundColor(.secondary)
+                .padding(.bottom, 14)
 
             // Divider
-            Rectangle().fill(teal.opacity(0.2)).frame(height: 1).padding(.bottom, 8)
+            Rectangle().fill(teal.opacity(0.2)).frame(height: 1).padding(.bottom, 12)
 
-            // Recent entries
-            Text("Recent").font(.caption2.weight(.semibold)).foregroundColor(.secondary)
-                .padding(.bottom, 4)
-            ForEach(Array(data.recent.enumerated()), id: \.offset) { _, e in
-                HStack {
-                    Image(systemName: e.isIncome ? "arrow.down.circle.fill" : "arrow.up.circle.fill")
-                        .font(.caption).foregroundColor(e.isIncome ? .green : .red)
-                    Text(e.desc.isEmpty ? "Entry" : e.desc)
-                        .font(.caption).foregroundColor(.white).lineLimit(1)
-                    Spacer()
-                    Text(String(format: "%@%.2f", e.isIncome ? "+" : "-", e.amount))
-                        .font(.caption.bold())
-                        .foregroundColor(e.isIncome ? .green : .red)
-                }.padding(.vertical, 2)
-            }
-            if data.recent.isEmpty {
-                Text("No entries yet — open the app to sync")
-                    .font(.caption2).foregroundColor(.secondary)
+            // Dashboard totals grid
+            VStack(spacing: 10) {
+                dashRow(label: "Wallet Net",    value: data.netWorth,    color: data.netColor,     prefix: data.netWorth >= 0 ? "+" : "")
+                dashRow(label: "Income",        value: data.income,      color: Color(red: 0.133, green: 0.773, blue: 0.369), prefix: "+")
+                dashRow(label: "Expenses",      value: data.expenses,    color: Color(red: 0.957, green: 0.247, blue: 0.369), prefix: "-")
+                dashRow(label: "Shared Owed",   value: data.sharedOwed,  color: Color(red: 0.133, green: 0.773, blue: 0.369), prefix: "+")
+                dashRow(label: "You Owe",       value: data.sharedOwe,   color: Color(red: 0.957, green: 0.247, blue: 0.369), prefix: "-")
             }
 
             Spacer()
@@ -196,6 +180,16 @@ struct LargeView: View {
         }
         .padding(14)
         .containerBackground(bgDark, for: .widget)
+        .widgetURL(URL(string: "\(urlScheme):///"))
+    }
+
+    func dashRow(label: String, value: Double, color: Color, prefix: String) -> some View {
+        HStack {
+            Text(label).font(.caption).foregroundColor(.secondary)
+            Spacer()
+            Text("\(prefix)\(data.fmt(value))")
+                .font(.caption.bold()).foregroundColor(color).lineLimit(1)
+        }
     }
 }
 

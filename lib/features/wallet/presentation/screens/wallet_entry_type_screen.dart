@@ -38,7 +38,11 @@ class WalletEntryTypeScreen extends StatelessWidget {
           icon: const Icon(Icons.close),
           onPressed: () {
             HapticUtils.lightTap();
-            context.pop();
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
           },
         ),
       ),

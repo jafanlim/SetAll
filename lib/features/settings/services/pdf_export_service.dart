@@ -101,79 +101,66 @@ Future<Uint8List> _buildWalletPdf(_WalletPdfPayload p) async {
     build: (ctx) => [
       _header('Wallet Report', 'Generated ${p.now}  •  ${p.email}'),
       pw.Padding(
+        padding: const pw.EdgeInsets.fromLTRB(20, 0, 20, 8),
+        child: pw.Container(
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: _brandTeal, width: 0.5),
+            borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
+          ),
+          child: pw.Column(
+            children: [
+              _summaryRow('Total income',   '+$currency ${totalIncome.toStringAsFixed(2)}',  valueColor: _green),
+              pw.SizedBox(height: 4),
+              _summaryRow('Total expenses', '-$currency ${totalExpenses.toStringAsFixed(2)}', valueColor: _red),
+              pw.Divider(color: _brandSlate),
+              _summaryRow('Net balance',    '${net >= 0 ? '+' : ''}$currency ${net.toStringAsFixed(2)}',
+                  valueColor: net >= 0 ? _green : _red),
+            ],
+          ),
+        ),
+      ),
+      pw.Padding(
+        padding: const pw.EdgeInsets.fromLTRB(20, 8, 20, 4),
+        child: pw.Text('Entries', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
+      ),
+      pw.Padding(
         padding: const pw.EdgeInsets.symmetric(horizontal: 20),
-        child: pw.Column(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Container(
-              padding: const pw.EdgeInsets.all(12),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: _brandTeal, width: 0.5),
-                borderRadius: const pw.BorderRadius.all(pw.Radius.circular(6)),
-              ),
-              child: pw.Column(
-                children: [
-                  _summaryRow('Total income',   '+$currency ${totalIncome.toStringAsFixed(2)}',  valueColor: _green),
-                  pw.SizedBox(height: 4),
-                  _summaryRow('Total expenses', '-$currency ${totalExpenses.toStringAsFixed(2)}', valueColor: _red),
-                  pw.Divider(color: _brandSlate),
-                  _summaryRow('Net balance',    '${net >= 0 ? '+' : ''}$currency ${net.toStringAsFixed(2)}',
-                      valueColor: net >= 0 ? _green : _red),
-                ],
-              ),
-            ),
-            pw.SizedBox(height: 16),
-            pw.Text('Entries', style: pw.TextStyle(fontSize: 12, fontWeight: pw.FontWeight.bold)),
-            pw.SizedBox(height: 8),
-            pw.Table(
-              border: pw.TableBorder.all(color: PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
-              columnWidths: {
-                0: const pw.FlexColumnWidth(2),
-                1: const pw.FlexColumnWidth(3),
-                2: const pw.FlexColumnWidth(2),
-                3: const pw.FlexColumnWidth(2),
-                4: const pw.FlexColumnWidth(1.2),
-              },
-              children: [
-                pw.TableRow(
-                  decoration: const pw.BoxDecoration(color: _brandDark),
-                  children: ['Date', 'Description', 'Category', 'Amount', 'Type']
-                      .map((h) => pw.Padding(
-                            padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-                            child: pw.Text(h, style: pw.TextStyle(
-                              color: PdfColors.white, fontSize: 9,
-                              fontWeight: pw.FontWeight.bold)),
-                          ))
-                      .toList(),
-                ),
-                ...p.entries.map((e) {
-                  final isIncome  = e['is_income'] == true || e['is_income'] == 1;
-                  // Prefer original currency/amount (e.g. 15000 VND),
-                  // fall back to entry currency / stored amount.
-                  final origCur   = e['original_currency'] as String?;
-                  final origAmt   = e['original_amount']   as String?;
-                  final cur       = (origCur != null && origCur.isNotEmpty)
-                      ? origCur
-                      : (e['currency'] as String? ?? 'USD');
-                  final amt       = (origAmt != null && origAmt.isNotEmpty)
-                      ? origAmt
-                      : (e['amount'] as String? ?? '0');
-                  final cat       = (e['category'] as String?)?.trim();
-                  return pw.TableRow(children: [
-                    _cell(_fmtDate(e['created_at'] as String?)),
-                    _cell((e['description'] as String?)?.isNotEmpty == true
-                        ? e['description'] as String
-                        : 'Wallet entry'),
-                    _cell((cat == null || cat.isEmpty) ? 'Other' : cat),
-                    _cell(_fmtAmount(cur, amt, isIncome: isIncome),
-                        color: isIncome ? _green : _red),
-                    _cell(isIncome ? 'Income' : 'Expense',
-                        color: isIncome ? _green : _red),
-                  ]);
-                }),
-              ],
-            ),
-          ],
+        child: pw.TableHelper.fromTextArray(
+          border: pw.TableBorder.all(color: PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+          headerDecoration: const pw.BoxDecoration(color: _brandDark),
+          headerStyle: pw.TextStyle(color: PdfColors.white, fontSize: 9, fontWeight: pw.FontWeight.bold),
+          cellStyle: const pw.TextStyle(fontSize: 9),
+          cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          columnWidths: {
+            0: const pw.FlexColumnWidth(2),
+            1: const pw.FlexColumnWidth(3),
+            2: const pw.FlexColumnWidth(2),
+            3: const pw.FlexColumnWidth(2),
+            4: const pw.FlexColumnWidth(1.2),
+          },
+          headers: ['Date', 'Description', 'Category', 'Amount', 'Type'],
+          data: p.entries.map((e) {
+            final isIncome = e['is_income'] == true || e['is_income'] == 1;
+            final origCur  = e['original_currency'] as String?;
+            final origAmt  = e['original_amount']   as String?;
+            final cur      = (origCur != null && origCur.isNotEmpty)
+                ? origCur
+                : (e['currency'] as String? ?? 'USD');
+            final amt      = (origAmt != null && origAmt.isNotEmpty)
+                ? origAmt
+                : (e['amount'] as String? ?? '0');
+            final cat      = (e['category'] as String?)?.trim();
+            return [
+              _fmtDate(e['created_at'] as String?),
+              (e['description'] as String?)?.isNotEmpty == true
+                  ? e['description'] as String
+                  : 'Wallet entry',
+              (cat == null || cat.isEmpty) ? 'Other' : cat,
+              _fmtAmount(cur, amt, isIncome: isIncome),
+              isIncome ? 'Income' : 'Expense',
+            ];
+          }).toList(),
         ),
       ),
     ],
