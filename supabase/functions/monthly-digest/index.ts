@@ -114,8 +114,8 @@ async function sendDigestForUser(
     : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
   const label       = monthName(periodStart)
 
-  // ── Expense data ────────────────────────────────────────────────────────────
-  const { data: rows } = await supabaseAdmin
+  // ── Personal wallet expenses (group_id IS NULL) ──────────────────────────
+  const { data: walletRows } = await supabaseAdmin
     .from('expenses')
     .select('amount, is_income, category, universal_usd_amount, currency')
     .eq('payer_id', profile.id)
@@ -124,22 +124,38 @@ async function sendDigestForUser(
     .gte('created_at', periodStart.toISOString())
     .lte('created_at', periodEnd.toISOString())
 
-  const incomeRows  = (rows ?? []).filter((r: any) => r.is_income === true  || r.is_income === 1)
-  const expenseRows = (rows ?? []).filter((r: any) => r.is_income === false || r.is_income === 0)
+  // ── Group expenses (group_id IS NOT NULL, user is payer) ────────────────
+  const { data: groupRows } = await supabaseAdmin
+    .from('expenses')
+    .select('amount, is_income, category, universal_usd_amount, currency')
+    .eq('payer_id', profile.id)
+    .not('group_id', 'is', null)
+    .is('deleted_at', null)
+    .gte('created_at', periodStart.toISOString())
+    .lte('created_at', periodEnd.toISOString())
 
-  const totalIncome   = incomeRows.reduce((s: number, r: any) =>
-    s + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
-  const totalExpenses = expenseRows.reduce((s: number, r: any) =>
-    s + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
+  const toAmt = (r: any) => parseFloat(r.universal_usd_amount ?? r.amount ?? '0')
+  const isExp = (r: any) => r.is_income === false || r.is_income === 0
+  const isInc = (r: any) => r.is_income === true  || r.is_income === 1
+
+  const walletExpRows = (walletRows ?? []).filter(isExp)
+  const groupExpRows  = (groupRows  ?? []).filter(isExp)
+
+  const walletTotal = walletExpRows.reduce((s: number, r: any) => s + toAmt(r), 0)
+  const groupTotal  = groupExpRows.reduce((s: number,  r: any) => s + toAmt(r), 0)
+
+  const totalIncome   = [...(walletRows ?? []), ...(groupRows ?? [])].filter(isInc)
+    .reduce((s: number, r: any) => s + toAmt(r), 0)
+  const totalExpenses = walletTotal + groupTotal
   const net           = totalIncome - totalExpenses
   // Clamp near-zero to avoid -0.00
   const displayNet    = Math.abs(net) < 0.005 ? 0 : net
 
-  // Top 5 categories by expense total
+  // Top 5 categories — combined wallet + group
   const catTotals: Record<string, number> = {}
-  for (const r of expenseRows) {
+  for (const r of [...walletExpRows, ...groupExpRows]) {
     const cat = (r.category as string) || 'Other'
-    catTotals[cat] = (catTotals[cat] ?? 0) + parseFloat(r.universal_usd_amount ?? r.amount ?? '0')
+    catTotals[cat] = (catTotals[cat] ?? 0) + toAmt(r)
   }
   const topCategories = Object.entries(catTotals)
     .sort((a, b) => b[1] - a[1])
@@ -160,6 +176,7 @@ async function sendDigestForUser(
   const html = buildDigestHtml({
     profile, label,
     totalIncome, totalExpenses, displayNet,
+    walletTotal, groupTotal,
     topCategories, insight: insight ?? null,
   })
 
@@ -197,10 +214,12 @@ function buildDigestHtml(p: {
   totalIncome:   number
   totalExpenses: number
   displayNet:    number
+  walletTotal:   number
+  groupTotal:    number
   topCategories: { name: string; total: number }[]
   insight:       { summary: string; top_category?: string; recommendation?: string } | null
 }): string {
-  const { profile, label, totalIncome, totalExpenses, displayNet, topCategories, insight } = p
+  const { profile, label, totalIncome, totalExpenses, displayNet, walletTotal, groupTotal, topCategories, insight } = p
 
   const firstName  = (profile.full_name ?? '').split(' ')[0] || 'there'
   const netColor   = displayNet >= 0 ? '#14B8A6' : '#F87171'
@@ -226,19 +245,30 @@ function buildDigestHtml(p: {
       options: {
         plugins: { legend: { display: false } },
         scales: {
-          x: { ticks: { color: '#94A3B8' }, grid: { color: '#1E293B' } },
-          y: { ticks: { color: '#94A3B8' }, grid: { color: '#1E293B' } },
+          x: {
+            ticks: { color: '#94A3B8', font: { size: 11 } },
+            grid:  { color: '#1E293B' },
+          },
+          y: {
+            min: 0,
+            ticks: {
+              color: '#94A3B8',
+              font: { size: 11 },
+              callback: 'function(v){return "USD "+v.toFixed(0)}',
+            },
+            grid: { color: '#1E293B' },
+          },
         },
       },
     }
-    const chartUrl = 'https://quickchart.io/chart?w=500&h=220&bkg=%230F172A&c='
+    const chartUrl = 'https://quickchart.io/chart?w=500&h=200&bkg=%230F172A&c='
       + encodeURIComponent(JSON.stringify(chartConfig))
     return `
               <!-- Chart -->
               <tr>
                 <td style="padding:0 0 24px;">
                   <p style="margin:0 0 12px;font-size:12px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;">Spending by Category</p>
-                  <img src="${chartUrl}" width="440" height="194" alt="Spending by category"
+                  <img src="${chartUrl}" width="440" height="175" alt="Spending by category"
                     style="display:block;border-radius:12px;margin:0 auto;max-width:100%;" />
                 </td>
               </tr>`
@@ -355,11 +385,11 @@ function buildDigestHtml(p: {
 
               ${aiSection}
 
-              <!-- CTA — matches welcome email button exactly -->
+              <!-- CTA — deep link opens app on device -->
               <tr>
                 <td style="padding:0 0 8px;" align="center">
-                  <a href="${APP_URL}"
-                     style="display:inline-block;background:#14B8A6;color:#0F172A;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
+                  <a href="com.jafa.setall.app:///"
+                     style="display:inline-block;background-color:#14B8A6;color:#0F172A;font-weight:700;font-size:16px;padding:16px 40px;border-radius:12px;text-decoration:none;">
                     Open SetAll →
                   </a>
                 </td>
