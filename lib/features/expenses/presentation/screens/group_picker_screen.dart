@@ -41,7 +41,14 @@ class GroupPickerScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text('group_picker.title'.tr()),
         leading: IconButton(
-            icon: const Icon(Icons.close), onPressed: () => context.pop()),
+            icon: const Icon(Icons.close),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/');
+              }
+            }),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCreateGroup(context),

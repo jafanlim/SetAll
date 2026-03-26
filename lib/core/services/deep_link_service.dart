@@ -74,30 +74,43 @@ class DeepLinkService {
 
     // ── In-app navigation link (e.g. from home widget buttons) ──────────────
     // Map the URI host+path to a GoRouter path.
-    final path = _uriToRoutePath(uri);
-    if (path != null) {
-      if (kDebugMode) debugPrint('[DeepLinkService] navigating to $path');
-      // Use the navigator key to push without a BuildContext.
+    final nav = _uriToNavAction(uri);
+    if (nav != null) {
+      if (kDebugMode) debugPrint('[DeepLinkService] navigating to ${nav.path}');
+      // Delay navigation so FlutterDeepLinkingEnabled finishes processing the
+      // incoming URI before we replace the stack. Without this, the URI itself
+      // lands as a GoRouter route and stays under our pushed screen, causing
+      // "nothing to pop" when the screen's close button calls context.pop().
       final ctx = AppRouter.navigatorKey.currentContext;
-      if (ctx != null) {
-        GoRouter.of(ctx).go(path);
-      }
+      if (ctx == null) return;
+      final router = GoRouter.of(ctx);
+      Future.delayed(const Duration(milliseconds: 200), () {
+        if (nav.pushFromRoot) {
+          router.go('/');
+          Future.microtask(() => router.push(nav.path));
+        } else {
+          router.go(nav.path);
+        }
+      });
     }
   }
 
-  /// Maps a deep-link [Uri] to a GoRouter path string, or null if unknown.
-  String? _uriToRoutePath(Uri uri) {
-    // The widget uses host-style paths: com.jafa.setall.app://wallet/add
-    // → uri.host = 'wallet', uri.path = '/add'   (or uri.path = 'add')
-    // Build a combined path from host + path.
-    final combined = '/${uri.host}${uri.path}'.replaceAll('//', '/');
+  /// Maps a deep-link [Uri] to a [_NavAction], or null if unknown.
+  _NavAction? _uriToNavAction(Uri uri) {
+    // Triple-slash form: com.jafa.setall.app:///wallet/add
+    // → uri.host = '', uri.path = '/wallet/add'  ← preferred
+    // Legacy host form: com.jafa.setall.app://wallet/add
+    // → uri.host = 'wallet', uri.path = '/add'
+    final combined = uri.host.isEmpty
+        ? uri.path
+        : '/${uri.host}${uri.path}'.replaceAll('//', '/');
     return switch (combined) {
-      '/wallet/add'   => AppRouter.walletEntryType,
-      '/add-expense'  => AppRouter.addExpense,
-      '/wallet'       => AppRouter.wallet,
-      '/activity'     => AppRouter.activity,
-      '/'             => AppRouter.dashboard,
-      _               => null,
+      '/wallet/add'  => _NavAction(AppRouter.walletEntryType, pushFromRoot: true),
+      '/add-expense' => _NavAction(AppRouter.groupPicker,     pushFromRoot: true),
+      '/wallet'      => _NavAction(AppRouter.wallet),
+      '/activity'    => _NavAction(AppRouter.activity),
+      '/'            => _NavAction(AppRouter.dashboard),
+      _              => null,
     };
   }
 
@@ -112,4 +125,10 @@ class DeepLinkService {
   @visibleForTesting
   bool isSetAllSchemeUri(Uri uri) =>
       uri.scheme == 'setall' || uri.scheme == 'com.setall.app' || uri.scheme == 'com.jafa.setall.app';
+}
+
+class _NavAction {
+  const _NavAction(this.path, {this.pushFromRoot = false});
+  final String path;
+  final bool pushFromRoot;
 }
