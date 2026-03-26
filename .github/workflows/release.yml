@@ -56,7 +56,7 @@ jobs:
           flutter build macos --release --no-tree-shake-icons
 
       - name: Import Developer ID certificate
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 != ''
         env:
           CERT_P12_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
@@ -78,7 +78,7 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Sign, notarize & package macOS DMG
-        if: matrix.os == 'macos-latest'
+        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 != ''
         env:
           APPLE_ID:       ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
@@ -118,6 +118,24 @@ jobs:
 
           # Staple the notarization ticket
           xcrun stapler staple SetAll-macOS.dmg
+
+      - name: Package macOS DMG (unsigned)
+        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 == ''
+        run: |
+          APP=build/macos/Build/Products/Release/SetAll.app
+          brew install create-dmg
+          create-dmg \
+            --volname "SetAll Installer" \
+            --window-pos 200 120 \
+            --window-size 600 400 \
+            --icon-size 100 \
+            --icon "SetAll.app" 150 185 \
+            --hide-extension "SetAll.app" \
+            --app-drop-link 450 185 \
+            "SetAll-macOS.dmg" \
+            "$APP" \
+            || true
+          test -f SetAll-macOS.dmg
 
       # ── Windows Build & Package ────────────────────────────────────────────
       - name: Install Inno Setup
