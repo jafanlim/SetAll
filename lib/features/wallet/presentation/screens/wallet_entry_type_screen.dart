@@ -83,9 +83,10 @@ class WalletEntryTypeScreen extends StatelessWidget {
                   context.push(
                     AppRouter.addExpense,
                     extra: {
-                      'groupId':   '',
-                      'groupName': '',
-                      'isIncome':  true,
+                      'groupId':       '',
+                      'groupName':     '',
+                      'isIncome':      true,
+                      'isWalletEntry': true,
                     },
                   );
                 },
@@ -106,9 +107,10 @@ class WalletEntryTypeScreen extends StatelessWidget {
                   context.push(
                     AppRouter.addExpense,
                     extra: {
-                      'groupId':   '',
-                      'groupName': '',
-                      'isIncome':  false,
+                      'groupId':       '',
+                      'groupName':     '',
+                      'isIncome':      false,  // ← fixed: expense is not income
+                      'isWalletEntry': true,
                     },
                   );
                 },

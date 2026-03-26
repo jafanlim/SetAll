@@ -445,15 +445,6 @@ final class AppRouter {
         GoRoute(
           path: addExpense,
           name: 'addExpense',
-          redirect: (context, state) {
-            final extra = state.extra as Map<String, dynamic>?;
-            final groupId = extra?['groupId'] as String?;
-            // Widget deep link hits /add-expense with no extra — go to group
-            // picker. This prevents the double-page push that occurred when
-            // FlutterDeepLinkingEnabled + DeepLinkService both handled the URI.
-            if (groupId == null || groupId.isEmpty) return groupPicker;
-            return null;
-          },
           pageBuilder: (context, state) {
             final extra = state.extra as Map<String, dynamic>?;
             return NoTransitionPage(
