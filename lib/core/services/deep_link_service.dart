@@ -23,6 +23,14 @@ class DeepLinkService {
   final _appLinks = AppLinks();
   StreamSubscription<Uri>? _sub;
 
+  // Deduplication: FlutterDeepLinkingEnabled causes the same navigation URI
+  // to arrive via app_links stream more than once (once from our handler, once
+  // from Flutter's own GoRouter deep-link processing). Ignore repeats within
+  // _dedupWindow to prevent pushing the same screen twice.
+  String? _lastNavUri;
+  DateTime? _lastNavTime;
+  static const _dedupWindow = Duration(milliseconds: 1000);
+
   /// Start listening for deep links.
   /// Safe to call multiple times — subsequent calls are no-ops.
   Future<void> init() async {
@@ -76,15 +84,27 @@ class DeepLinkService {
     // Map the URI host+path to a GoRouter path.
     final nav = _uriToNavAction(uri);
     if (nav != null) {
+      // Dedup: FlutterDeepLinkingEnabled fires the same URI through app_links
+      // stream multiple times. Ignore repeats within the dedup window.
+      final uriKey = uri.toString();
+      final now = DateTime.now();
+      if (_lastNavUri == uriKey &&
+          _lastNavTime != null &&
+          now.difference(_lastNavTime!) < _dedupWindow) {
+        if (kDebugMode) debugPrint('[DeepLinkService] dedup skip: $uriKey');
+        return;
+      }
+      _lastNavUri = uriKey;
+      _lastNavTime = now;
+
       if (kDebugMode) debugPrint('[DeepLinkService] navigating to ${nav.path}');
-      // Delay navigation so FlutterDeepLinkingEnabled finishes processing the
-      // incoming URI before we replace the stack. Without this, the URI itself
-      // lands as a GoRouter route and stays under our pushed screen, causing
-      // "nothing to pop" when the screen's close button calls context.pop().
+      // Delay 400 ms so FlutterDeepLinkingEnabled finishes processing the
+      // incoming URI before we replace the stack. Without this, Flutter's own
+      // GoRouter deep-link push lands after ours, creating a duplicate page.
       final ctx = AppRouter.navigatorKey.currentContext;
       if (ctx == null) return;
       final router = GoRouter.of(ctx);
-      Future.delayed(const Duration(milliseconds: 200), () {
+      Future.delayed(const Duration(milliseconds: 400), () {
         if (nav.pushFromRoot) {
           router.go('/');
           Future.microtask(() => router.push(nav.path));
@@ -109,7 +129,10 @@ class DeepLinkService {
       '/add-expense' => _NavAction(AppRouter.groupPicker,     pushFromRoot: true),
       '/wallet'      => _NavAction(AppRouter.wallet),
       '/activity'    => _NavAction(AppRouter.activity),
-      '/'            => _NavAction(AppRouter.dashboard),
+      // '/' (dashboard root / widgetURL body tap) is intentionally NOT mapped:
+      // FlutterDeepLinkingEnabled fires this URI on every widget body tap and
+      // after our own navigation (e.g. post-save go('/wallet')), so handling it
+      // here would reset the nav bar to Dashboard unexpectedly.
       _              => null,
     };
   }

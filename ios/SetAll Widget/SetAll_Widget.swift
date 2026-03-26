@@ -43,7 +43,7 @@ struct WidgetData {
         )
     }
 
-    func fmt(_ v: Double) -> String { String(format: "%@ %.2f", currency, v) }
+    func fmt(_ v: Double) -> String { String(format: "%@ %.2f", currency, abs(v) < 0.005 ? 0 : v) }
     var netColor:     Color { netWorth >= 0 ? teal : .red }
     var trueNetColor: Color { trueNet  >= 0 ? teal : .red }
 }
