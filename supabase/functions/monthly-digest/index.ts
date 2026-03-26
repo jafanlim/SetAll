@@ -1,9 +1,10 @@
 // Supabase Edge Function: send monthly spending digest emails.
 // Scheduled via pg_cron: 0 9 1 * * (1st of each month, 09:00 UTC)
-// Deploy: supabase functions deploy monthly-digest
+// Deploy: supabase functions deploy monthly-digest --no-verify-jwt
 // Requires secrets: RESEND_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 //
-// ?test=email@address.com — send to ONE user using current month data
+// ?test=email@address.com — send to EXACTLY ONE user, uses current month data.
+//   Returns early — cron path never runs in test mode.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -20,6 +21,8 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, content-type',
 }
 
+type Profile = { id: string; email: string; full_name: string }
+
 const monthName = (d: Date) =>
   d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
 
@@ -29,143 +32,65 @@ serve(async (req) => {
   }
 
   try {
-    const admin = createClient(SUPABASE_URL, SERVICE_KEY)
+    const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY)
+    const url           = new URL(req.url)
+    const testEmail     = url.searchParams.get('test')
 
-    // ?test=email@address.com — send to ONE user only, use current month
-    const url       = new URL(req.url)
-    const testEmail = url.searchParams.get('test')
-    const isTest    = !!testEmail
-
-    // Period: test mode = current month, cron = previous calendar month
-    const now          = new Date()
-    const periodStart  = isTest
-      ? new Date(now.getFullYear(), now.getMonth(), 1)
-      : new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const periodEnd    = isTest
-      ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
-      : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
-    const label        = monthName(periodStart)
-
-    // ── Resolve users ──────────────────────────────────────────────────────────
-    // profiles table has no email column — email lives in auth.users
-    type UserRow = { id: string; name: string | null; email: string }
-    let users: UserRow[] = []
-
-    if (isTest) {
-      // Find the single auth user with this exact email
-      const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
-      const authUser = (authData?.users ?? []).find((u: any) => u.email === testEmail)
+    // ── TEST MODE ──────────────────────────────────────────────────────────────
+    // Sends to exactly ONE user. Returns early — cron logic never runs.
+    if (testEmail) {
+      const { data: { users: allUsers } } = await supabaseAdmin.auth.admin.listUsers()
+      const authUser = (allUsers ?? []).find((u: any) => u.email === testEmail)
       if (!authUser) {
         return new Response(
-          JSON.stringify({ error: 'User not found: ' + testEmail }),
+          JSON.stringify({ error: 'User not found', email: testEmail }),
           { status: 404, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
         )
       }
-      const { data: prof } = await admin
-        .from('profiles')
-        .select('id, name')
-        .eq('id', authUser.id)
-        .maybeSingle()
-      users = [{ id: authUser.id, name: prof?.name ?? null, email: testEmail! }]
-    } else {
-      // Normal cron — only users with monthly_digest enabled
-      const { data: profRows, error: profErr } = await admin
-        .from('profiles')
-        .select('id, name, notification_preferences')
-        .filter("notification_preferences->>'monthly_digest'", 'eq', 'true')
-      if (profErr) throw profErr
-
-      const { data: authData } = await admin.auth.admin.listUsers({ perPage: 1000 })
-      const emailMap: Record<string, string> = {}
-      for (const u of authData?.users ?? []) {
-        if (u.email) emailMap[u.id] = u.email
+      const testProfile: Profile = {
+        id:        authUser.id,
+        email:     authUser.email ?? testEmail,
+        full_name: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? testEmail,
       }
-      users = (profRows ?? [])
-        .filter((p: any) => emailMap[p.id])
-        .map((p: any) => ({ id: p.id, name: p.name ?? null, email: emailMap[p.id] }))
+      const ok = await sendDigestForUser(supabaseAdmin, testProfile, true)
+      return new Response(
+        JSON.stringify({ sent: ok ? 1 : 0, test: true, email: testEmail }),
+        { headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
+      )
+      // STOP HERE — cron logic never runs in test mode
     }
 
-    if (users.length === 0) {
-      return new Response(JSON.stringify({ sent: 0 }), {
-        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-      })
+    // ── CRON MODE ──────────────────────────────────────────────────────────────
+    // Only runs when ?test= is absent.
+    // notification_preferences->>'monthly_digest' stored in profiles table.
+    const { data: profRows, error: profErr } = await supabaseAdmin
+      .from('profiles')
+      .select('id, name, notification_preferences')
+      .filter("notification_preferences->>'monthly_digest'", 'eq', 'true')
+    if (profErr) throw profErr
+
+    const { data: { users: cronUsers } } = await supabaseAdmin.auth.admin.listUsers()
+    const emailMap: Record<string, string> = {}
+    for (const u of cronUsers ?? []) {
+      if (u.email) emailMap[u.id] = u.email
     }
 
     let sent = 0
-
-    for (const user of users) {
-      const uid  = user.id
-      const name = (user.name ?? '').split(' ')[0] || 'there'
-
-      // ── Expense data from expenses table ──────────────────────────────────
-      const { data: rows } = await admin
-        .from('expenses')
-        .select('amount, is_income, category, universal_usd_amount, currency')
-        .eq('payer_id', uid)
-        .is('group_id', null)
-        .is('deleted_at', null)
-        .gte('created_at', periodStart.toISOString())
-        .lte('created_at', periodEnd.toISOString())
-
-      const income   = (rows ?? []).filter((r: any) => r.is_income === true  || r.is_income === 1)
-      const expenses = (rows ?? []).filter((r: any) => r.is_income === false || r.is_income === 0)
-
-      const totalIncome   = income.reduce((sum: number, r: any) =>
-        sum + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
-      const totalExpenses = expenses.reduce((sum: number, r: any) =>
-        sum + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
-      const net = totalIncome - totalExpenses
-
-      // Top categories (max 5)
-      const catTotals: Record<string, number> = {}
-      for (const r of expenses) {
-        const cat = (r.category as string) || 'Other'
-        catTotals[cat] = (catTotals[cat] ?? 0) + parseFloat(r.universal_usd_amount ?? r.amount ?? '0')
+    for (const p of profRows ?? []) {
+      if (!emailMap[p.id]) continue
+      const profile: Profile = {
+        id:        p.id,
+        email:     emailMap[p.id],
+        full_name: p.name ?? emailMap[p.id],
       }
-      const sortedCats = Object.entries(catTotals).sort((a, b) => b[1] - a[1]).slice(0, 5)
-
-      const fmt = (v: number) => `USD ${Math.abs(v).toFixed(2)}`
-
-      // ── Latest AI insight ─────────────────────────────────────────────────
-      const { data: aiRows } = await admin
-        .from('ai_insights')
-        .select('summary')
-        .eq('user_id', uid)
-        .eq('analysis_type', 'weekly')
-        .order('created_at', { ascending: false })
-        .limit(1)
-      const aiSummary = aiRows?.[0]?.summary ?? null
-
-      // ── Build HTML ────────────────────────────────────────────────────────
-      const html = buildDigestHtml({
-        name, label, email: user.email,
-        totalIncome, totalExpenses, net,
-        sortedCats, aiSummary, fmt,
-      })
-
-      const res = await fetch('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${RESEND_API_KEY}`,
-          'Content-Type':  'application/json',
-        },
-        body: JSON.stringify({
-          from:    `SetAll <${FROM_ADDRESS}>`,
-          to:      [user.email],
-          subject: `Your SetAll summary for ${label}`,
-          html,
-        }),
-      })
-
-      if (res.ok) sent++
+      const ok = await sendDigestForUser(supabaseAdmin, profile, false)
+      if (ok) sent++
     }
 
-    const result = isTest
-      ? { sent, test: true }
-      : { sent, total: users.length }
-    return new Response(JSON.stringify(result), {
-      headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
-    })
+    return new Response(
+      JSON.stringify({ sent, total: (profRows ?? []).length }),
+      { headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
+    )
   } catch (err) {
     return new Response(JSON.stringify({ error: String(err) }), {
       status:  500,
@@ -174,43 +99,182 @@ serve(async (req) => {
   }
 })
 
+// ── Per-user digest logic ─────────────────────────────────────────────────────
+async function sendDigestForUser(
+  supabaseAdmin: any,
+  profile: Profile,
+  isTest: boolean
+): Promise<boolean> {
+  const now         = new Date()
+  const periodStart = isTest
+    ? new Date(now.getFullYear(), now.getMonth(), 1)
+    : new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const periodEnd   = isTest
+    ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
+    : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
+  const label       = monthName(periodStart)
+
+  // ── Expense data ────────────────────────────────────────────────────────────
+  const { data: rows } = await supabaseAdmin
+    .from('expenses')
+    .select('amount, is_income, category, universal_usd_amount, currency')
+    .eq('payer_id', profile.id)
+    .is('group_id', null)
+    .is('deleted_at', null)
+    .gte('created_at', periodStart.toISOString())
+    .lte('created_at', periodEnd.toISOString())
+
+  const incomeRows  = (rows ?? []).filter((r: any) => r.is_income === true  || r.is_income === 1)
+  const expenseRows = (rows ?? []).filter((r: any) => r.is_income === false || r.is_income === 0)
+
+  const totalIncome   = incomeRows.reduce((s: number, r: any) =>
+    s + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
+  const totalExpenses = expenseRows.reduce((s: number, r: any) =>
+    s + parseFloat(r.universal_usd_amount ?? r.amount ?? '0'), 0)
+  const net           = totalIncome - totalExpenses
+  // Clamp near-zero to avoid -0.00
+  const displayNet    = Math.abs(net) < 0.005 ? 0 : net
+
+  // Top 5 categories by expense total
+  const catTotals: Record<string, number> = {}
+  for (const r of expenseRows) {
+    const cat = (r.category as string) || 'Other'
+    catTotals[cat] = (catTotals[cat] ?? 0) + parseFloat(r.universal_usd_amount ?? r.amount ?? '0')
+  }
+  const topCategories = Object.entries(catTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([name, total]) => ({ name, total }))
+
+  // ── Latest AI insight ────────────────────────────────────────────────────────
+  const { data: insight } = await supabaseAdmin
+    .from('ai_insights')
+    .select('summary, top_category, recommendation')
+    .eq('user_id', profile.id)
+    .eq('analysis_type', 'weekly')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // ── Build + send HTML ────────────────────────────────────────────────────────
+  const html = buildDigestHtml({
+    profile, label,
+    totalIncome, totalExpenses, displayNet,
+    topCategories, insight: insight ?? null,
+  })
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${RESEND_API_KEY}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      from:    `SetAll <${FROM_ADDRESS}>`,
+      to:      [profile.email],
+      subject: `Your SetAll summary for ${label}`,
+      html,
+    }),
+  })
+
+  return res.ok
+}
+
 // ── Email template ────────────────────────────────────────────────────────────
+// Colors match send-welcome-email exactly:
+//   Page bg:       #0F172A
+//   Card:          #1E293B, border 1px solid #334155
+//   Header:        linear-gradient(135deg,#0F172A 0%,#1a2744 100%)
+//   Text primary:  #F1F5F9
+//   Text body:     #CBD5E1
+//   Text muted:    #94A3B8, #64748B
+//   Teal accent:   #14B8A6
+//   CTA:           bg #14B8A6, color #0F172A, border-radius 10px
+//   Footer border: 1px solid #334155, text #475569
 function buildDigestHtml(p: {
-  name:          string
+  profile:       Profile
   label:         string
-  email:         string
   totalIncome:   number
   totalExpenses: number
-  net:           number
-  sortedCats:    [string, number][]
-  aiSummary:     string | null
-  fmt:           (v: number) => string
+  displayNet:    number
+  topCategories: { name: string; total: number }[]
+  insight:       { summary: string; top_category?: string; recommendation?: string } | null
 }): string {
-  const { name, label, email, totalIncome, totalExpenses, net, sortedCats, aiSummary, fmt } = p
+  const { profile, label, totalIncome, totalExpenses, displayNet, topCategories, insight } = p
 
-  const netColor  = net >= 0 ? '#14B8A6' : '#F87171'
-  const netSign   = net >= 0 ? '+' : '-'
-  const netBg     = net >= 0 ? '#0D2B28' : '#2D1515'
+  const firstName  = (profile.full_name ?? '').split(' ')[0] || 'there'
+  const netColor   = displayNet >= 0 ? '#14B8A6' : '#F87171'
+  const netBg      = displayNet >= 0 ? '#0D2B28' : '#2D1515'
+  const netBorder  = displayNet >= 0 ? '#134e4a' : '#DC2626'
+  const netSign    = displayNet >= 0 ? '+' : '-'
+  const fmt        = (v: number) => `USD ${Math.abs(v).toFixed(2)}`
+  const netFmt     = `${netSign}${fmt(displayNet)}`
 
-  const catRows = sortedCats.length > 0
-    ? sortedCats.map(([cat, amt]) =>
+  // ── QuickChart bar chart (only when categories exist) ──────────────────────
+  const chartSection = topCategories.length > 0 ? (() => {
+    const chartConfig = {
+      type: 'bar',
+      data: {
+        labels:   topCategories.map(c => c.name),
+        datasets: [{
+          label:           'USD',
+          data:            topCategories.map(c => parseFloat(c.total.toFixed(2))),
+          backgroundColor: '#14B8A6',
+          borderRadius:    6,
+        }],
+      },
+      options: {
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#94A3B8' }, grid: { color: '#1E293B' } },
+          y: { ticks: { color: '#94A3B8' }, grid: { color: '#1E293B' } },
+        },
+      },
+    }
+    const chartUrl = 'https://quickchart.io/chart?w=500&h=220&bkg=%230F172A&c='
+      + encodeURIComponent(JSON.stringify(chartConfig))
+    return `
+              <!-- Chart -->
+              <tr>
+                <td style="padding:0 0 24px;">
+                  <p style="margin:0 0 12px;font-size:12px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;">Spending by Category</p>
+                  <img src="${chartUrl}" width="440" height="194" alt="Spending by category"
+                    style="display:block;border-radius:12px;margin:0 auto;max-width:100%;" />
+                </td>
+              </tr>`
+  })() : `
+              <!-- No data -->
+              <tr>
+                <td style="padding:0 0 24px;text-align:center;">
+                  <p style="margin:0;font-size:14px;color:#475569;">No expenses recorded for ${label}.</p>
+                </td>
+              </tr>`
+
+  // ── Category table (top 5 rows) ─────────────────────────────────────────────
+  const catRows = topCategories.length > 0
+    ? topCategories.map(({ name: cat, total: amt }, i) =>
         `<tr>
-          <td style="padding:8px 0;font-size:13px;color:#CBD5E1;border-bottom:1px solid #1E293B;">${cat}</td>
-          <td style="padding:8px 0;font-size:13px;color:#F1F5F9;font-weight:600;text-align:right;border-bottom:1px solid #1E293B;">USD ${amt.toFixed(2)}</td>
+          <td style="padding:9px 12px;font-size:13px;color:#CBD5E1;background:${i % 2 === 0 ? '#1E293B' : '#0F172A'};">${cat}</td>
+          <td style="padding:9px 12px;font-size:13px;color:#14B8A6;font-weight:600;text-align:right;background:${i % 2 === 0 ? '#1E293B' : '#0F172A'};">USD ${amt.toFixed(2)}</td>
         </tr>`
       ).join('')
-    : `<tr><td colspan="2" style="padding:12px 0;font-size:13px;color:#475569;text-align:center;">No expense data for this period.</td></tr>`
+    : ''
 
-  const aiSection = aiSummary
-    ? `<!-- AI Insight -->
-        <tr>
-          <td style="padding:0 0 24px;">
-            <div style="border-left:3px solid #14B8A6;background:#0F172A;border-radius:0 8px 8px 0;padding:14px 16px;">
-              <p style="margin:0 0 6px;font-size:10px;font-weight:700;color:#14B8A6;letter-spacing:1.5px;text-transform:uppercase;">AI Insight</p>
-              <p style="margin:0;font-size:13px;color:#CBD5E1;line-height:1.6;">${aiSummary}</p>
-            </div>
-          </td>
-        </tr>`
+  // ── AI insight section ──────────────────────────────────────────────────────
+  const aiSection = insight
+    ? `
+              <!-- AI Insight -->
+              <tr>
+                <td style="padding:0 0 24px;">
+                  <div style="border-left:3px solid #14B8A6;padding:16px 20px;background:#0D2B1E;border-radius:0 8px 8px 0;">
+                    <div style="color:#14B8A6;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">AI Insight</div>
+                    <div style="color:#F1F5F9;font-size:15px;line-height:1.6;">${insight.summary}</div>
+                    ${insight.recommendation
+                      ? `<div style="color:#94A3B8;font-size:14px;margin-top:8px;">💡 ${insight.recommendation}</div>`
+                      : ''}
+                  </div>
+                </td>
+              </tr>`
     : ''
 
   return `<!DOCTYPE html>
@@ -225,11 +289,12 @@ function buildDigestHtml(p: {
     <tr><td align="center">
       <table width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#1E293B;border:1px solid #334155;border-radius:16px;overflow:hidden;">
 
-        <!-- Header -->
+        <!-- Header — matches send-welcome-email gradient exactly -->
         <tr>
           <td style="background:linear-gradient(135deg,#0F172A 0%,#1a2744 100%);padding:40px 40px 32px;text-align:center;border-bottom:1px solid #334155;">
-            <div style="font-size:13px;font-weight:700;color:#14B8A6;letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;">SetAll</div>
-            <div style="font-size:22px;font-weight:800;color:#F1F5F9;letter-spacing:-0.5px;">Your ${label} Summary</div>
+            <div style="font-size:36px;margin-bottom:8px;">⚖️</div>
+            <div style="font-size:24px;font-weight:800;color:#F1F5F9;letter-spacing:-0.5px;">SetAll</div>
+            <div style="font-size:12px;color:#64748B;margin-top:4px;letter-spacing:0.5px;text-transform:uppercase;">${label} Summary</div>
           </td>
         </tr>
 
@@ -240,58 +305,62 @@ function buildDigestHtml(p: {
 
               <!-- Greeting -->
               <tr>
-                <td style="padding:0 0 24px;">
-                  <p style="margin:0;font-size:16px;font-weight:600;color:#F1F5F9;">Hi ${name},</p>
-                  <p style="margin:8px 0 0;font-size:14px;color:#94A3B8;line-height:1.6;">Here's your personal spending summary for <strong style="color:#CBD5E1;">${label}</strong>.</p>
+                <td style="padding:0 0 28px;">
+                  <h1 style="margin:0 0 12px;font-size:22px;font-weight:800;color:#F1F5F9;line-height:1.3;">Hi ${firstName},</h1>
+                  <p style="margin:0;font-size:15px;color:#CBD5E1;line-height:1.7;">
+                    Here's your personal spending summary for <strong style="color:#F1F5F9;">${label}</strong>.
+                  </p>
                 </td>
               </tr>
 
-              <!-- Stat cards -->
+              <!-- Stat cards — 3 side by side -->
               <tr>
-                <td style="padding:0 0 24px;">
+                <td style="padding:0 0 28px;">
                   <table width="100%" cellpadding="0" cellspacing="0">
                     <tr>
                       <!-- Income -->
-                      <td width="31%" align="center" style="background:#0D2B1E;border:1px solid #166534;border-radius:12px;padding:16px 8px;">
-                        <p style="margin:0;font-size:10px;font-weight:700;color:#4ADE80;letter-spacing:1px;text-transform:uppercase;">Income</p>
-                        <p style="margin:6px 0 0;font-size:15px;font-weight:800;color:#4ADE80;">+${fmt(totalIncome)}</p>
+                      <td width="31%" align="center" style="background:#0D2B1E;border:1px solid #16A34A;border-radius:12px;padding:18px 8px;">
+                        <div style="font-size:10px;font-weight:700;color:#4ADE80;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Income</div>
+                        <div style="font-size:16px;font-weight:800;color:#4ADE80;">+${fmt(totalIncome)}</div>
                       </td>
                       <td width="3%"></td>
                       <!-- Expenses -->
-                      <td width="31%" align="center" style="background:#2D1515;border:1px solid #7F1D1D;border-radius:12px;padding:16px 8px;">
-                        <p style="margin:0;font-size:10px;font-weight:700;color:#F87171;letter-spacing:1px;text-transform:uppercase;">Expenses</p>
-                        <p style="margin:6px 0 0;font-size:15px;font-weight:800;color:#F87171;">-${fmt(totalExpenses)}</p>
+                      <td width="31%" align="center" style="background:#2D1515;border:1px solid #DC2626;border-radius:12px;padding:18px 8px;">
+                        <div style="font-size:10px;font-weight:700;color:#F87171;letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Expenses</div>
+                        <div style="font-size:16px;font-weight:800;color:#F87171;">-${fmt(totalExpenses)}</div>
                       </td>
                       <td width="3%"></td>
                       <!-- Net -->
-                      <td width="31%" align="center" style="background:${netBg};border:1px solid ${net >= 0 ? '#134e4a' : '#7F1D1D'};border-radius:12px;padding:16px 8px;">
-                        <p style="margin:0;font-size:10px;font-weight:700;color:${netColor};letter-spacing:1px;text-transform:uppercase;">Net</p>
-                        <p style="margin:6px 0 0;font-size:15px;font-weight:800;color:${netColor};">${netSign}${fmt(net)}</p>
+                      <td width="31%" align="center" style="background:${netBg};border:1px solid ${netBorder};border-radius:12px;padding:18px 8px;">
+                        <div style="font-size:10px;font-weight:700;color:${netColor};letter-spacing:1px;text-transform:uppercase;margin-bottom:6px;">Net</div>
+                        <div style="font-size:16px;font-weight:800;color:${netColor};">${netFmt}</div>
                       </td>
                     </tr>
                   </table>
                 </td>
               </tr>
 
-              <!-- Top categories -->
+              ${chartSection}
+
+              ${topCategories.length > 0 ? `
+              <!-- Top categories table -->
               <tr>
-                <td style="padding:0 0 24px;">
-                  <p style="margin:0 0 12px;font-size:12px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;">Top Categories</p>
-                  <table width="100%" cellpadding="0" cellspacing="0">
+                <td style="padding:0 0 28px;">
+                  <p style="margin:0 0 0;font-size:12px;font-weight:700;color:#64748B;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px;">Top Categories</p>
+                  <table width="100%" cellpadding="0" cellspacing="0" style="border-radius:8px;overflow:hidden;border:1px solid #334155;">
                     ${catRows}
                   </table>
                 </td>
-              </tr>
+              </tr>` : ''}
 
-              <!-- AI insight -->
               ${aiSection}
 
-              <!-- CTA -->
+              <!-- CTA — matches welcome email button exactly -->
               <tr>
-                <td style="padding:0 0 24px;" align="center">
+                <td style="padding:0 0 8px;" align="center">
                   <a href="${APP_URL}"
                      style="display:inline-block;background:#14B8A6;color:#0F172A;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
-                    Open SetAll ↗
+                    Open SetAll →
                   </a>
                 </td>
               </tr>
@@ -300,14 +369,14 @@ function buildDigestHtml(p: {
           </td>
         </tr>
 
-        <!-- Footer -->
+        <!-- Footer — matches welcome email footer exactly -->
         <tr>
           <td style="padding:24px 40px;border-top:1px solid #334155;text-align:center;">
             <p style="margin:0;font-size:12px;color:#475569;line-height:1.6;">
               To stop receiving these emails, go to <strong style="color:#64748B;">Settings → Notifications</strong> in the SetAll app.
             </p>
-            <p style="margin:8px 0 0;font-size:11px;color:#334155;">
-              Sent to ${email} · <a href="${APP_URL}" style="color:#475569;text-decoration:underline;">setall.app</a>
+            <p style="margin:8px 0 0;font-size:12px;color:#475569;">
+              Sent to ${profile.email} · <a href="${APP_URL}" style="color:#475569;text-decoration:underline;">setall.app</a>
             </p>
           </td>
         </tr>
