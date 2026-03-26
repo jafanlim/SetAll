@@ -5,7 +5,7 @@
  * called with { userId, onDemand: true } in the request body.
  *
  * Secrets required:
- *   supabase secrets set GEMINI_API_KEY="AIza..."
+ *   supabase secrets set GROQ_API_KEY="gsk_..."
  *
  * Deploy:
  *   supabase functions deploy weekly-analysis
@@ -14,11 +14,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? ''
-const GEMINI_MODEL   = 'gemini-2.5-flash'
-const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
-const SUPABASE_URL   = Deno.env.get('SUPABASE_URL')              ?? ''
-const SERVICE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY') ?? ''
+const GROQ_MODEL   = 'llama-3.3-70b-versatile'
+const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions'
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? ''
+const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -95,26 +95,32 @@ serve(async (req) => {
 
       const fmt = (v: number) => `${currency} ${Math.abs(v).toFixed(2)}`
 
-      // Call Gemini
+      // Call Groq
       const prompt = `Income: ${fmt(totalIncome)}, Expenses: ${fmt(totalExpenses)}, Net: ${netChange >= 0 ? '+' : ''}${fmt(netChange)}. Top spending categories: ${catSummary || 'none'}.`
 
-      const geminiRes = await fetch(GEMINI_URL, {
+      const groqRes = await fetch(GROQ_URL, {
         method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
         body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `You are a personal finance analyst. Given this week's transactions, provide: (1) 2-3 sentence summary, (2) top category, (3) one actionable tip. Respond ONLY in valid JSON with keys: summary, top_category, tip, sentiment (one of: positive, neutral, negative).\n\n${prompt}`,
-            }],
-          }],
-          generationConfig: { responseMimeType: 'application/json', temperature: 0.4 },
+          model: GROQ_MODEL,
+          temperature: 0.4,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a personal finance analyst. Given this week\'s transactions, provide: (1) 2-3 sentence summary, (2) top category, (3) one actionable tip. Respond ONLY in valid JSON with keys: summary, top_category, tip, sentiment (one of: positive, neutral, negative).',
+            },
+            { role: 'user', content: prompt },
+          ],
         }),
       })
 
       let structured: any = {}
       try {
-        const geminiJson = await geminiRes.json()
-        const text = geminiJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}'
+        const groqJson = await groqRes.json()
+        const text = groqJson?.choices?.[0]?.message?.content ?? '{}'
         structured = JSON.parse(text)
       } catch (_) {
         structured = { summary: `You spent ${fmt(totalExpenses)} this week.`, top_category: topCategory, tip: null, sentiment: 'neutral' }

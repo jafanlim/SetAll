@@ -35,33 +35,54 @@ serve(async (req) => {
     const end   = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
     const label = monthName(start)
 
-    // Fetch profiles that opted in
-    const { data: profiles, error: profErr } = await admin
-      .from('profiles')
-      .select('id, name, notification_preferences')
-      .filter('notification_preferences->>monthly_digest', 'eq', 'true')
+    // ?test=email@address.com — send to one user only (skip subscription check)
+    const url       = new URL(req.url)
+    const testEmail = url.searchParams.get('test')
 
-    if (profErr) throw profErr
-    if (!profiles || profiles.length === 0) {
-      return new Response(JSON.stringify({ sent: 0 }), {
-        headers: { 'Content-Type': 'application/json' },
-      })
+    let profiles: Array<{ id: string; name: string | null; email: string }> = []
+
+    if (testEmail) {
+      // Look up the single user by email via auth admin API
+      const { data: authUsers } = await admin.auth.admin.listUsers()
+      const authUser = authUsers?.users?.find((u: any) => u.email === testEmail)
+      if (authUser) {
+        const { data: prof } = await admin
+          .from('profiles')
+          .select('id, name')
+          .eq('id', authUser.id)
+          .single()
+        if (prof) profiles = [{ id: prof.id, name: prof.name ?? null, email: testEmail }]
+      }
+    } else {
+      // Normal cron run — fetch all opted-in profiles
+      const { data: profRows, error: profErr } = await admin
+        .from('profiles')
+        .select('id, name, notification_preferences')
+        .filter("notification_preferences->>'monthly_digest'", 'eq', 'true')
+      if (profErr) throw profErr
+
+      const { data: authUsers } = await admin.auth.admin.listUsers()
+      const emailMap: Record<string, string> = {}
+      for (const u of authUsers?.users ?? []) {
+        if (u.email) emailMap[u.id] = u.email
+      }
+      profiles = (profRows ?? [])
+        .filter((p: any) => emailMap[p.id])
+        .map((p: any) => ({ id: p.id, name: p.name ?? null, email: emailMap[p.id] }))
     }
 
-    // Fetch user emails from auth.users (service role only)
-    const { data: authUsers } = await admin.auth.admin.listUsers()
-    const emailMap: Record<string, string> = {}
-    for (const u of authUsers?.users ?? []) {
-      if (u.email) emailMap[u.id] = u.email
+    if (profiles.length === 0) {
+      return new Response(JSON.stringify({ sent: 0 }), {
+        headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+      })
     }
 
     let sent = 0
 
     for (const profile of profiles) {
-      const uid   = profile.id as string
-      const name  = (profile.name as string | null) ?? 'there'
-      const email = emailMap[uid]
-      if (!email) continue
+      const uid   = profile.id
+      const name  = profile.name ?? 'there'
+      const email = profile.email
 
       // Wallet stats for prev month
       const { data: incomeRows } = await admin
@@ -206,7 +227,10 @@ serve(async (req) => {
       if (res.ok) sent++
     }
 
-    return new Response(JSON.stringify({ sent, total: profiles.length }), {
+    const result = testEmail
+      ? { sent, test: true }
+      : { sent, total: profiles.length }
+    return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
     })
   } catch (err) {
