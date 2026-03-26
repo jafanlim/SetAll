@@ -58,12 +58,16 @@ class AddExpenseScreen extends ConsumerStatefulWidget {
     this.groupName = '',
     this.initialIsIncome = false,
     this.existingWalletEntry,
+    this.initialCurrency,
   });
 
   final String groupId;
   final String groupName;
   final bool   initialIsIncome;
   final WalletEntryModel? existingWalletEntry;
+  /// Pre-selected currency — set to the group's defaultCurrency when navigating
+  /// from a group screen so new expenses default to the group currency.
+  final String? initialCurrency;
 
   @override
   ConsumerState<AddExpenseScreen> createState() => _AddExpenseScreenState();
@@ -120,6 +124,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _isIncome   = widget.initialIsIncome;
       _entryColor = _isIncome ? const Color(0xFF22C55E) : const Color(0xFF8B5CF6);
       _entryIcon  = _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
+      if (widget.initialCurrency != null && widget.initialCurrency!.isNotEmpty) {
+        _currency = widget.initialCurrency!;
+      }
     }
     _loadMembers();
   }

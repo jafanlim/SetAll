@@ -14,8 +14,12 @@ class GroupPickerScreen extends ConsumerWidget {
 
   void _openAddExpense(BuildContext context, GroupModel group) {
     context.pop();
-    context.push(AppRouter.addExpense,
-        extra: {'groupId': group.id, 'groupName': group.name});
+    context.push(AppRouter.addExpense, extra: {
+      'groupId': group.id,
+      'groupName': group.name,
+      if (group.defaultCurrency != null)
+        'groupCurrency': group.defaultCurrency!,
+    });
   }
 
   void _openCreateGroup(BuildContext context) {

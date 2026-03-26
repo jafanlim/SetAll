@@ -126,7 +126,11 @@ class DeepLinkService {
         : '/${uri.host}${uri.path}'.replaceAll('//', '/');
     return switch (combined) {
       '/wallet/add'  => _NavAction(AppRouter.walletEntryType, pushFromRoot: true),
-      '/add-expense' => _NavAction(AppRouter.groupPicker,     pushFromRoot: true),
+      // '/add-expense' is intentionally NOT mapped here:
+      // FlutterDeepLinkingEnabled already handles it via GoRouter, and the
+      // addExpense route redirects to groupPicker when no groupId is present.
+      // Mapping it here too caused a double-page push (one from Flutter's own
+      // deep-link processing, one from this service 400 ms later).
       '/wallet'      => _NavAction(AppRouter.wallet),
       '/activity'    => _NavAction(AppRouter.activity),
       // '/' (dashboard root / widgetURL body tap) is intentionally NOT mapped:

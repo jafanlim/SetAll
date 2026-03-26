@@ -510,7 +510,12 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           HapticUtils.primaryTap();
           context.push(
             AppRouter.addExpense,
-            extra: {'groupId': groupId, 'groupName': groupName},
+            extra: {
+              'groupId': groupId,
+              'groupName': groupName,
+              if (group?.defaultCurrency != null)
+                'groupCurrency': group!.defaultCurrency!,
+            },
           );
         },
         backgroundColor: _teal,
@@ -1375,13 +1380,41 @@ class _GroupHeroBar extends ConsumerWidget {
                     ),
                   ),
                   const SizedBox(height: 2),
-                  Text(
-                    group.type.name == 'direct' ? 'Direct' : 'Group',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: accentColor,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Text(
+                        group.type.name == 'direct' ? 'Direct' : 'Group',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: accentColor,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      if (group.defaultCurrency != null) ...
+                        [
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: accentColor.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
+                                color: accentColor.withValues(alpha: 0.4),
+                                width: 0.8,
+                              ),
+                            ),
+                            child: Text(
+                              group.defaultCurrency!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: accentColor,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                          ),
+                        ],
+                    ],
                   ),
                 ],
               ),
