@@ -574,7 +574,7 @@ class PdfExportService {
     await Share.shareXFiles(
       [XFile(file.path)],
       subject: filename,
-      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 100, 100),
     );
   }
 

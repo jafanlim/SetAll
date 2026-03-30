@@ -308,8 +308,8 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 const SizedBox(width: 4),
                 PopupMenuButton<String>(
                   key: _exportKey,
-                  icon: const Icon(Icons.ios_share_rounded),
-                  tooltip: 'Export',
+                  icon: const Icon(Icons.download_outlined),
+                  tooltip: 'Download report',
                   onSelected: _exportData,
                   itemBuilder: (_) => [
                     const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON')])),
