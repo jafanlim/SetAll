@@ -549,54 +549,16 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           },
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-        child: Row(
-          children: [
-            if (_step > 0)
-              TextButton.icon(
-                onPressed: _prevStep,
-                icon: const Icon(Icons.arrow_back),
-                label: Text('add_expense.back'.tr()),
-              ),
-            const Spacer(),
-            if (_step < _effectiveTotalSteps - 1)
-              FilledButton.icon(
-                onPressed: _nextStep,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _teal,
-                  foregroundColor: Colors.black,
-                ),
-                icon: const Icon(Icons.arrow_forward),
-                label: Text('add_expense.next'.tr()),
-              )
-            else
-              FilledButton.icon(
-                onPressed: _isSubmitting ? null : _submit,
-                style: FilledButton.styleFrom(
-                  backgroundColor: _teal,
-                  foregroundColor: Colors.black,
-                ),
-                icon: _isSubmitting
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.black54,
-                        ),
-                      )
-                    : const Icon(Icons.check),
-                label: Text(_isSubmitting ? 'add_expense.saving'.tr() : (_isIncome ? 'add_expense.save_income'.tr() : 'add_expense.save_expense'.tr())),
-              ),
-          ],
-        ),
-      ),
       body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Column(
           children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
             if (widget.groupName.isNotEmpty)
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
@@ -622,6 +584,60 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           if (_step == 1 && widget.groupId.isNotEmpty) _buildStepSplit(theme),
           if ((_step == 1 && widget.groupId.isEmpty) || _step == 2) _buildStepDetails(theme),
             const SizedBox(height: 16),
+                  ],
+                ),
+              ),
+            ),
+            SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                child: Row(
+                  children: [
+                    if (_step > 0)
+                      TextButton.icon(
+                        onPressed: _prevStep,
+                        icon: const Icon(Icons.arrow_back),
+                        label: Text('add_expense.back'.tr()),
+                      ),
+                    const Spacer(),
+                    if (_step < _effectiveTotalSteps - 1)
+                      FilledButton.icon(
+                        onPressed: _nextStep,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _teal,
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: const Icon(Icons.arrow_forward),
+                        label: Text('add_expense.next'.tr()),
+                      )
+                    else
+                      FilledButton.icon(
+                        onPressed: _isSubmitting ? null : _submit,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: _teal,
+                          foregroundColor: Colors.black,
+                        ),
+                        icon: _isSubmitting
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.black54,
+                                ),
+                              )
+                            : const Icon(Icons.check),
+                        label: Text(_isSubmitting
+                            ? 'add_expense.saving'.tr()
+                            : (_isIncome
+                                ? 'add_expense.save_income'.tr()
+                                : 'add_expense.save_expense'.tr())),
+                      ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),

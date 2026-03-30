@@ -6,8 +6,8 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../../data/repositories/setall_repository.dart';
 import '../../../features/analytics/presentation/screens/analytics_screen.dart';
@@ -488,10 +488,10 @@ class PdfExportService {
       ),
     );
 
-    final dir  = await getApplicationDocumentsDirectory();
+    final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_wallet_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await launchUrl(Uri.file(file.path));
+    await Share.shareXFiles([XFile(file.path)], subject: 'setall_wallet_report.pdf');
   }
 
   // ── Group PDF ──────────────────────────────────────────────────────────────
@@ -529,11 +529,11 @@ class PdfExportService {
       ),
     );
 
-    final dir  = await getApplicationDocumentsDirectory();
+    final dir  = await getTemporaryDirectory();
     final filename = 'setall_${groupName.replaceAll(' ', '_')}_report.pdf';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await launchUrl(Uri.file(file.path));
+    await Share.shareXFiles([XFile(file.path)], subject: filename);
   }
 
   // ── All Groups PDF ────────────────────────────────────────────────────────
@@ -587,10 +587,10 @@ class PdfExportService {
       _AllGroupsPdfPayload(groups: groups, now: now),
     );
 
-    final dir  = await getApplicationDocumentsDirectory();
+    final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_groups_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await launchUrl(Uri.file(file.path));
+    await Share.shareXFiles([XFile(file.path)], subject: 'setall_groups_report.pdf');
   }
 
   // ── Analytics PDF ──────────────────────────────────────────────────────────
@@ -617,10 +617,10 @@ class PdfExportService {
       ),
     );
 
-    final dir  = await getApplicationDocumentsDirectory();
+    final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_analytics_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await launchUrl(Uri.file(file.path));
+    await Share.shareXFiles([XFile(file.path)], subject: 'setall_analytics_report.pdf');
   }
 
   // ── Helper: resolve from/to display names for settlements ─────────────────
