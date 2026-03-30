@@ -157,7 +157,6 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
         );
         if (confirmed != true || !mounted) return;
         await PdfExportService().exportWalletAsPdf(
-            context: context, originKey: _exportKey,
             repository: ref.read(setAllRepositoryProvider));
         return;
       }

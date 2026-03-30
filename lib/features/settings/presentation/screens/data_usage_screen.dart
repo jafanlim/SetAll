@@ -112,7 +112,6 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
     try {
       if (format == 'pdf') {
         await PdfExportService().exportWalletAsPdf(
-            originKey: _exportKey, context: context,
             repository: ref.read(setAllRepositoryProvider));
       } else {
       final repo   = ref.read(setAllRepositoryProvider);
