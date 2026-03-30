@@ -51,4 +51,14 @@ post_install do |installer|
   installer.pods_project.build_configurations.each do |config|
     config.build_settings['DEAD_CODE_STRIPPING'] = 'YES'
   end
+  # Fix duplicate symbol: file_picker defines FileUtils which clashes with
+  # DKPhotoGallery/DKImagePickerController. Rename it to FPFileUtils.
+  fp_sources = Dir.glob(File.join(installer.sandbox.root,
+      'file_picker', 'Sources', 'file_picker', '**', '*.{h,m}'))
+  fp_sources.each do |f|
+    content = File.read(f)
+    if content.include?('FileUtils')
+      File.write(f, content.gsub('FileUtils', 'FPFileUtils'))
+    end
+  end
 end

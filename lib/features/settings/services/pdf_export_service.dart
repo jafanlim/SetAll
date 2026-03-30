@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
 import 'package:flutter/foundation.dart' show compute;
 import 'package:intl/intl.dart';
@@ -106,7 +107,7 @@ Future<Uint8List> _buildWalletPdf(_WalletPdfPayload p) async {
     pageFormat: PdfPageFormat.a4,
     margin: const pw.EdgeInsets.all(0),
     build: (ctx) => [
-      _header('Wallet Report', 'Generated ${p.now}  •  ${p.email}'),
+      _header('Wallet Report', 'Generated ${p.now} | ${p.email}'),
       pw.Padding(
         padding: const pw.EdgeInsets.fromLTRB(20, 0, 20, 8),
         child: pw.Container(
@@ -491,7 +492,11 @@ class PdfExportService {
     final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_wallet_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], subject: 'setall_wallet_report.pdf');
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: 'setall_wallet_report.pdf',
+      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+    );
   }
 
   // ── Group PDF ──────────────────────────────────────────────────────────────
@@ -504,13 +509,46 @@ class PdfExportService {
 
     final List membersRaw     = await client
         .from('group_members')
-        .select('user_id, profiles(display_name, email)')
+        .select('user_id')
         .eq('group_id', groupId);
+    // Resolve member profile names separately to avoid profiles_1 alias crash
+    final memberUserIds = membersRaw
+        .cast<Map<String, dynamic>>()
+        .map((m) => m['user_id'] as String)
+        .toList();
+    final List memberProfilesRaw = memberUserIds.isNotEmpty
+        ? await client.from('profiles').select('id, name, email').inFilter('id', memberUserIds)
+        : [];
+    final memberProfileMap = <String, Map<String, dynamic>>{
+      for (final p in memberProfilesRaw.cast<Map<String, dynamic>>())
+        p['id'] as String: p,
+    };
+    final membersEnriched = membersRaw.cast<Map<String, dynamic>>().map((m) {
+      final prof = memberProfileMap[m['user_id'] as String] ?? {};
+      return {...m, 'profiles': {'display_name': prof['name'], 'email': prof['email']}};
+    }).toList();
     final List expensesRaw    = await client
         .from('expenses')
-        .select('*, profiles!payer_id(display_name)')
+        .select()
         .eq('group_id', groupId)
         .order('created_at', ascending: false);
+    // Resolve payer names separately
+    final payerIds = expensesRaw
+        .cast<Map<String, dynamic>>()
+        .map((e) => e['payer_id'] as String?)
+        .whereType<String>()
+        .toSet()
+        .toList();
+    final List payerProfilesRaw = payerIds.isNotEmpty
+        ? await client.from('profiles').select('id, name').inFilter('id', payerIds)
+        : [];
+    final payerNameMap = <String, String>{
+      for (final p in payerProfilesRaw.cast<Map<String, dynamic>>())
+        p['id'] as String: (p['name'] as String?) ?? '—',
+    };
+    final expensesEnriched = expensesRaw.cast<Map<String, dynamic>>().map((e) {
+      return {...e, 'profiles': {'display_name': payerNameMap[e['payer_id'] as String?] ?? '—'}};
+    }).toList();
     final List settlementsRaw = await client
         .from('settlements')
         .select('from_user_id, to_user_id, amount, currency, group_id')
@@ -523,8 +561,8 @@ class PdfExportService {
       _GroupPdfPayload(
         groupName:   groupName,
         now:         now,
-        members:     membersRaw.cast<Map<String, dynamic>>(),
-        expenses:    expensesRaw.cast<Map<String, dynamic>>(),
+        members:     membersEnriched,
+        expenses:    expensesEnriched,
         settlements: settlements,
       ),
     );
@@ -533,7 +571,11 @@ class PdfExportService {
     final filename = 'setall_${groupName.replaceAll(' ', '_')}_report.pdf';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], subject: filename);
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: filename,
+      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+    );
   }
 
   // ── All Groups PDF ────────────────────────────────────────────────────────
@@ -566,9 +608,26 @@ class PdfExportService {
       final gid = g['id'] as String;
       final List expRaw = await client
           .from('expenses')
-          .select('*, profiles!payer_id(display_name)')
+          .select()
           .eq('group_id', gid)
           .order('created_at', ascending: false);
+      // Resolve payer names for this group separately
+      final gPayerIds = expRaw
+          .cast<Map<String, dynamic>>()
+          .map((e) => e['payer_id'] as String?)
+          .whereType<String>()
+          .toSet()
+          .toList();
+      final List gPayerProfilesRaw = gPayerIds.isNotEmpty
+          ? await client.from('profiles').select('id, name').inFilter('id', gPayerIds)
+          : [];
+      final gPayerNameMap = <String, String>{
+        for (final p in gPayerProfilesRaw.cast<Map<String, dynamic>>())
+          p['id'] as String: (p['name'] as String?) ?? '—',
+      };
+      final expEnriched = expRaw.cast<Map<String, dynamic>>().map((e) {
+        return {...e, 'profiles': {'display_name': gPayerNameMap[e['payer_id'] as String?] ?? '—'}};
+      }).toList();
       final List setRaw = await client
           .from('settlements')
           .select('from_user_id, to_user_id, amount, currency, group_id')
@@ -577,7 +636,7 @@ class PdfExportService {
           client, setRaw.cast<Map<String, dynamic>>());
       groups.add({
         'name':        g['name'],
-        'expenses':    expRaw.cast<Map<String, dynamic>>(),
+        'expenses':    expEnriched,
         'settlements': settlements,
       });
     }
@@ -590,7 +649,11 @@ class PdfExportService {
     final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_groups_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], subject: 'setall_groups_report.pdf');
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: 'setall_groups_report.pdf',
+      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+    );
   }
 
   // ── Analytics PDF ──────────────────────────────────────────────────────────
@@ -620,7 +683,11 @@ class PdfExportService {
     final dir  = await getTemporaryDirectory();
     final file = File('${dir.path}/setall_analytics_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    await Share.shareXFiles([XFile(file.path)], subject: 'setall_analytics_report.pdf');
+    await Share.shareXFiles(
+      [XFile(file.path)],
+      subject: 'setall_analytics_report.pdf',
+      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+    );
   }
 
   // ── Helper: resolve from/to display names for settlements ─────────────────
@@ -636,11 +703,11 @@ class PdfExportService {
     if (ids.isEmpty) return rows;
     final List profilesRaw = await client
         .from('profiles')
-        .select('id, display_name')
+        .select('id, name')
         .inFilter('id', ids.toList());
     final nameMap = <String, String>{
       for (final p in profilesRaw.cast<Map<String, dynamic>>())
-        p['id'] as String: (p['display_name'] as String?) ?? '—',
+        p['id'] as String: (p['name'] as String?) ?? '—',
     };
     return rows.map((r) => {
       ...r,
