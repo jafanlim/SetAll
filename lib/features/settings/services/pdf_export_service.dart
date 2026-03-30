@@ -60,6 +60,15 @@ class _GroupPdfPayload {
   final List<Map<String, dynamic>> settlements;
 }
 
+class _AllGroupsPdfPayload {
+  const _AllGroupsPdfPayload({
+    required this.groups,
+    required this.now,
+  });
+  final List<Map<String, dynamic>> groups;
+  final String now;
+}
+
 class _AnalyticsPdfPayload {
   const _AnalyticsPdfPayload({
     required this.income,
@@ -272,6 +281,80 @@ List<pw.Widget> _buildSettlementsSection(List<Map<String, dynamic>> settlements)
   ),
 ];
 
+Future<Uint8List> _buildAllGroupsPdf(_AllGroupsPdfPayload p) async {
+  final doc = pw.Document();
+  doc.addPage(pw.MultiPage(
+    pageFormat: PdfPageFormat.a4,
+    margin: const pw.EdgeInsets.all(0),
+    build: (ctx) {
+      final widgets = <pw.Widget>[
+        _header('Groups Report', 'Generated ${p.now}'),
+      ];
+      for (final g in p.groups) {
+        final groupName = g['name'] as String? ?? 'Group';
+        final expenses  = (g['expenses'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        final settlements = (g['settlements'] as List?)?.cast<Map<String, dynamic>>() ?? [];
+        widgets.add(pw.Padding(
+          padding: const pw.EdgeInsets.fromLTRB(20, 0, 20, 4),
+          child: pw.Container(
+            padding: const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: const pw.BoxDecoration(color: _brandDark),
+            child: pw.Text(groupName, style: pw.TextStyle(
+              color: _brandTeal, fontSize: 13, fontWeight: pw.FontWeight.bold)),
+          ),
+        ));
+        if (expenses.isEmpty) {
+          widgets.add(pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(20, 6, 20, 12),
+            child: pw.Text('No expenses', style: const pw.TextStyle(fontSize: 9, color: _brandSlate)),
+          ));
+        } else {
+          widgets.add(pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(20, 6, 20, 0),
+            child: pw.TableHelper.fromTextArray(
+              border: pw.TableBorder.all(color: PdfColor.fromInt(0xFFE2E8F0), width: 0.5),
+              headerDecoration: const pw.BoxDecoration(color: _brandDark),
+              headerStyle: pw.TextStyle(color: PdfColors.white, fontSize: 9, fontWeight: pw.FontWeight.bold),
+              cellStyle: const pw.TextStyle(fontSize: 9),
+              cellPadding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+              columnWidths: {
+                0: const pw.FlexColumnWidth(2),
+                1: const pw.FlexColumnWidth(3),
+                2: const pw.FlexColumnWidth(2),
+                3: const pw.FlexColumnWidth(2),
+              },
+              headers: ['Date', 'Description', 'Amount', 'Paid by'],
+              data: expenses.map((e) {
+                final payer = (e['profiles'] as Map?)?['display_name'] as String? ?? '—';
+                return [
+                  _fmtDate(e['created_at'] as String?),
+                  (e['description'] as String?)?.isNotEmpty == true ? e['description'] as String : '—',
+                  '${e['currency'] ?? ''} ${e['amount'] ?? ''}',
+                  payer,
+                ];
+              }).toList(),
+            ),
+          ));
+        }
+        if (settlements.isNotEmpty) {
+          widgets.add(pw.Padding(
+            padding: const pw.EdgeInsets.fromLTRB(20, 8, 20, 0),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                ..._buildSettlementsSection(settlements),
+              ],
+            ),
+          ));
+        }
+        widgets.add(pw.SizedBox(height: 16));
+      }
+      return widgets;
+    },
+  ));
+  return doc.save();
+}
+
 Future<Uint8List> _buildAnalyticsPdf(_AnalyticsPdfPayload p) async {
   final net = p.income - p.expenses;
   final catMap = <String, double>{};
@@ -461,6 +544,67 @@ class PdfExportService {
     // ignore: use_build_context_synchronously
     await shareFiles([XFile(file.path)], context: context,
         subject: filename, originKey: originKey);
+  }
+
+  // ── All Groups PDF ────────────────────────────────────────────────────────
+  Future<void> exportAllGroupsAsPdf({
+    BuildContext? context,
+    GlobalKey? originKey,
+  }) async {
+    final client = Supabase.instance.client;
+    final uid    = client.auth.currentUser?.id;
+    if (uid == null) return;
+    final now    = DateFormat('d MMM yyyy, HH:mm').format(DateTime.now());
+
+    final List memberRowsRaw = await client
+        .from('group_members')
+        .select('group_id')
+        .eq('user_id', uid);
+    final memberGroupIds = memberRowsRaw
+        .cast<Map<String, dynamic>>()
+        .map((r) => r['group_id'] as String)
+        .toList();
+
+    final List allGroupsRaw = await client
+        .from('groups')
+        .select('id, name')
+        .eq('is_deleted', false);
+    final groupsRaw = allGroupsRaw
+        .cast<Map<String, dynamic>>()
+        .where((g) => memberGroupIds.contains(g['id'] as String))
+        .toList();
+
+    final groups = <Map<String, dynamic>>[];
+    for (final g in groupsRaw) {
+      final gid = g['id'] as String;
+      final List expRaw = await client
+          .from('expenses')
+          .select('*, profiles!payer_id(display_name)')
+          .eq('group_id', gid)
+          .order('created_at', ascending: false);
+      final List setRaw = await client
+          .from('settlements')
+          .select('*, from:profiles!from_user_id(display_name), to:profiles!to_user_id(display_name)')
+          .eq('group_id', gid);
+      groups.add({
+        'name':        g['name'],
+        'expenses':    expRaw.cast<Map<String, dynamic>>(),
+        'settlements': setRaw.cast<Map<String, dynamic>>(),
+      });
+    }
+
+    final pdfBytes = await compute(
+      _buildAllGroupsPdf,
+      _AllGroupsPdfPayload(groups: groups, now: now),
+    );
+
+    if (context == null) return;
+    final dir  = await getTemporaryDirectory();
+    final file = File('${dir.path}/setall_groups_report.pdf');
+    await file.writeAsBytes(pdfBytes, flush: true);
+    // ignore: use_build_context_synchronously
+    await shareFiles([XFile(file.path)], context: context,
+        subject: 'setall_groups_report.pdf', originKey: originKey);
   }
 
   // ── Analytics PDF ──────────────────────────────────────────────────────────

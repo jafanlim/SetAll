@@ -16,6 +16,7 @@ import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../settings/services/pdf_export_service.dart';
 
 const _teal       = Color(0xFF00D9B0);
 const _tealDim    = Color(0x2600D9B0);
@@ -326,6 +327,17 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                     PopupMenuItem(value: _ActivitySort.largest,  child: Text('common.largest_first'.tr())),
                     PopupMenuItem(value: _ActivitySort.smallest, child: Text('common.smallest_first'.tr())),
                   ],
+                ),
+                const SizedBox(width: 4),
+                AppTopButton(
+                  icon: Icons.picture_as_pdf_outlined,
+                  tooltip: 'Export all groups as PDF',
+                  onPressed: () async {
+                    HapticUtils.lightTap();
+                    await PdfExportService().exportAllGroupsAsPdf(
+                      context: context,
+                    );
+                  },
                 ),
                 const SizedBox(width: 4),
                 AppTopPopupButton<_GroupSort>(

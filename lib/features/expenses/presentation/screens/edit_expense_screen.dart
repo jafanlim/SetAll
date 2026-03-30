@@ -588,6 +588,25 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
           onPressed: () => context.pop(),
         ),
       ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+          child: FilledButton(
+            onPressed: _isSubmitting ? null : _submit,
+            style: FilledButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+              minimumSize: const Size.fromHeight(52),
+            ),
+            child: _isSubmitting
+                ? const SizedBox(
+                    height: 22, width: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
+                  )
+                : Text('edit_expense.save_changes'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -938,22 +957,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             // ── Split mode + per-member inputs ───────────────────────────
             if (widget.groupId.isNotEmpty && _members.length > 1) ..._buildSplitSection(theme),
 
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: _isSubmitting ? null : _submit,
-              style: FilledButton.styleFrom(
-                backgroundColor: _teal,
-                foregroundColor: Colors.black,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-              ),
-              child: _isSubmitting
-                  ? const SizedBox(
-                      height: 22, width: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black54),
-                    )
-                  : Text('edit_expense.save_changes'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
-            ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 16),
           ],
         ),
       ),
