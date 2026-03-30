@@ -1,3 +1,5 @@
+import 'dart:ui' as ui;
+
 import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
@@ -55,6 +57,7 @@ class GroupsScreen extends ConsumerStatefulWidget {
 
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   bool _editMode = false;
+  bool _isExportingPdf = false;
   final Set<String> _selected = {};
   _GroupSort        _groupSort   = _GroupSort.nameAZ;
   _ActivityFilter   _actFilter   = _ActivityFilter.all;
@@ -62,6 +65,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   String?           _actCatFilter;
   Set<String>       _groupNameFilter  = {};
   final Set<int>    _groupColorFilter = {};
+  final _exportBtnKey = GlobalKey();
 
   @override
   void initState() {
@@ -329,13 +333,43 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   ],
                 ),
                 const SizedBox(width: 4),
-                AppTopButton(
-                  icon: Icons.picture_as_pdf_outlined,
-                  tooltip: 'Export all groups as PDF',
-                  onPressed: () async {
-                    HapticUtils.lightTap();
-                    await PdfExportService().exportAllGroupsAsPdf();
-                  },
+                IgnorePointer(
+                  ignoring: _isExportingPdf,
+                  child: AppTopButton(
+                    key: _exportBtnKey,
+                    icon: _isExportingPdf
+                        ? Icons.hourglass_top_rounded
+                        : Icons.download_outlined,
+                    tooltip: 'Download groups report',
+                    onPressed: () async {
+                      HapticUtils.lightTap();
+                      setState(() => _isExportingPdf = true);
+                      final messenger = ScaffoldMessenger.of(context);
+                      try {
+                        final box = _exportBtnKey.currentContext
+                            ?.findRenderObject() as RenderBox?;
+                        final origin = box != null
+                            ? ui.Rect.fromLTWH(
+                                box.localToGlobal(Offset.zero).dx,
+                                box.localToGlobal(Offset.zero).dy,
+                                box.size.width,
+                                box.size.height,
+                              )
+                            : const ui.Rect.fromLTWH(0, 0, 100, 100);
+                        await PdfExportService().exportAllGroupsAsPdf(
+                            sharePositionOrigin: origin);
+                      } catch (e) {
+                        messenger.showSnackBar(
+                          SnackBar(
+                            content: Text('Export failed: $e'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      } finally {
+                        if (mounted) setState(() => _isExportingPdf = false);
+                      }
+                    },
+                  ),
                 ),
                 const SizedBox(width: 4),
                 AppTopPopupButton<_GroupSort>(
