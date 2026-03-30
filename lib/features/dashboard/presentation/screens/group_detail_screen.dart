@@ -13,7 +13,6 @@ import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/swipe_action_card.dart';
-import '../../../groups/widgets/settle_qr_sheet.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
 import '../../../../domain/entities/expense.dart' show SplitType;
@@ -1148,37 +1147,84 @@ class _SettleButton extends ConsumerStatefulWidget {
 }
 
 class _SettleButtonState extends ConsumerState<_SettleButton> {
+  bool _loading = false;
+
   Future<void> _settle() async {
-    // HAPTIC-01: settle sheet open feedback
     HapticUtils.primaryTap();
-    await showModalBottomSheet<void>(
+    final confirmed = await showDialog<bool>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => SettleQrSheet(
-        groupId: widget.groupId,
-        fromUserId: widget.debt.fromUserId,
-        toUserId: widget.debt.toUserId,
-        amount: widget.debt.amount,
-        currency: widget.debt.currency,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as settled?'),
+        content: Text(
+            'Record that you paid ${widget.amountStr} to clear this debt?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: _teal),
+            child: const Text('Settle'),
+          ),
+        ],
       ),
     );
+    if (confirmed != true) return;
+    if (!mounted) return;
+    setState(() => _loading = true);
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final ok = await ref.read(setAllRepositoryProvider).recordSettlement(
+        groupId:    widget.groupId,
+        fromUserId: widget.debt.fromUserId,
+        toUserId:   widget.debt.toUserId,
+        amount:     widget.debt.amount.toString(),
+        currency:   widget.debt.currency,
+      );
+      if (!mounted) return;
+      if (ok) {
+        ref.invalidate(simplifiedDebtsProvider(widget.groupId));
+        ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
+        ref.invalidate(groupExpensesProvider(widget.groupId));
+        HapticUtils.success();
+      } else {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('Settlement failed. Please try again.'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        messenger.showSnackBar(SnackBar(
+          content: Text('Settlement failed: $e'),
+          backgroundColor: Colors.red,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return TextButton(
-      onPressed: _settle,
+      onPressed: _loading ? null : _settle,
       style: TextButton.styleFrom(
         foregroundColor: _teal,
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         minimumSize: Size.zero,
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
       ),
-      child: const Text(
-        'Settle',
-        style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-      ),
+      child: _loading
+          ? const SizedBox(
+              width: 14, height: 14,
+              child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+            )
+          : const Text(
+              'Settle',
+              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
     );
   }
 }

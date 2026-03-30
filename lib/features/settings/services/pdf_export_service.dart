@@ -549,12 +549,19 @@ class PdfExportService {
     final expensesEnriched = expensesRaw.cast<Map<String, dynamic>>().map((e) {
       return {...e, 'profiles': {'display_name': payerNameMap[e['payer_id'] as String?] ?? '—'}};
     }).toList();
-    final List settlementsRaw = await client
-        .from('settlements')
-        .select('from_user_id, to_user_id, amount, currency, group_id')
-        .eq('group_id', groupId);
-    final settlements = await _resolveSettlementNames(
-        client, settlementsRaw.cast<Map<String, dynamic>>());
+    final List settlementsExpRaw = await client
+        .from('expenses')
+        .select('payer_id, amount, currency, group_id')
+        .eq('group_id', groupId)
+        .eq('category', 'Settlement');
+    final settlements = settlementsExpRaw.cast<Map<String, dynamic>>().map((e) => {
+      'from_user_id': e['payer_id'],
+      'to_user_id':   null,
+      'amount':       e['amount'],
+      'currency':     e['currency'],
+    }).toList();
+    final settlementsNamed = await _resolveSettlementNames(
+        client, settlements);
 
     final pdfBytes = await compute(
       _buildGroupPdf,
@@ -563,7 +570,7 @@ class PdfExportService {
         now:         now,
         members:     membersEnriched,
         expenses:    expensesEnriched,
-        settlements: settlements,
+        settlements: settlementsNamed,
       ),
     );
 
@@ -629,12 +636,19 @@ class PdfExportService {
       final expEnriched = expRaw.cast<Map<String, dynamic>>().map((e) {
         return {...e, 'profiles': {'display_name': gPayerNameMap[e['payer_id'] as String?] ?? '—'}};
       }).toList();
-      final List setRaw = await client
-          .from('settlements')
-          .select('from_user_id, to_user_id, amount, currency, group_id')
-          .eq('group_id', gid);
+      final List setExpRaw = await client
+          .from('expenses')
+          .select('payer_id, amount, currency, group_id')
+          .eq('group_id', gid)
+          .eq('category', 'Settlement');
       final settlements = await _resolveSettlementNames(
-          client, setRaw.cast<Map<String, dynamic>>());
+          client,
+          setExpRaw.cast<Map<String, dynamic>>().map((e) => {
+            'from_user_id': e['payer_id'],
+            'to_user_id':   null,
+            'amount':       e['amount'],
+            'currency':     e['currency'],
+          }).toList());
       groups.add({
         'name':        g['name'],
         'expenses':    expEnriched,
