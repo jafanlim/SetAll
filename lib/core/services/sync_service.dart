@@ -571,9 +571,10 @@ class SyncService {
           'updated_at': map['updated_at']?.toString(),
           'synced_at': DateTime.now().millisecondsSinceEpoch,
           'is_deleted': 0,
-          'icon_name':   map['icon_name']   ?? ex['icon_name'],
-          'color_value': map['color_value'] ?? ex['color_value'],
-          'avatar_url':  sanitizeAvatarUrl(map['avatar_url'] as String?) ?? sanitizeAvatarUrl(ex['avatar_url'] as String?),
+          'icon_name':       map['icon_name']       ?? ex['icon_name'],
+          'color_value':     map['color_value']     ?? ex['color_value'],
+          'avatar_url':      sanitizeAvatarUrl(map['avatar_url'] as String?) ?? sanitizeAvatarUrl(ex['avatar_url'] as String?),
+          'default_currency': map['default_currency'] ?? ex['default_currency'],
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
