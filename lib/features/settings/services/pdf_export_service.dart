@@ -2,15 +2,13 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart' show compute;
-import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:share_plus/share_plus.dart' show XFile;
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
-import '../../../core/utils/share_utils.dart';
 import '../../../data/repositories/setall_repository.dart';
 import '../../../features/analytics/presentation/screens/analytics_screen.dart';
 
@@ -474,8 +472,6 @@ pw.Widget _summaryRow(String label, String value, {PdfColor? valueColor}) =>
 class PdfExportService {
   // ── Wallet PDF ─────────────────────────────────────────────────────────────
   Future<void> exportWalletAsPdf({
-    BuildContext? context,
-    GlobalKey? originKey,
     SetAllRepository? repository,
   }) async {
     final email   = Supabase.instance.client.auth.currentUser?.email ?? '';
@@ -492,22 +488,17 @@ class PdfExportService {
       ),
     );
 
-    if (context == null) return;
-    final dir  = await getTemporaryDirectory();
+    final dir  = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/setall_wallet_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    // ignore: use_build_context_synchronously
-    await shareFiles([XFile(file.path)], context: context,
-        subject: 'setall_wallet_report.pdf', originKey: originKey);
+    await launchUrl(Uri.file(file.path));
   }
 
   // ── Group PDF ──────────────────────────────────────────────────────────────
   Future<void> exportGroupAsPdf(
     String groupId,
-    String groupName, {
-    BuildContext? context,
-    GlobalKey? originKey,
-  }) async {
+    String groupName,
+  ) async {
     final client = Supabase.instance.client;
     final now    = DateFormat('d MMM yyyy, HH:mm').format(DateTime.now());
 
@@ -522,8 +513,10 @@ class PdfExportService {
         .order('created_at', ascending: false);
     final List settlementsRaw = await client
         .from('settlements')
-        .select('*, from:profiles!from_user_id(display_name), to:profiles!to_user_id(display_name)')
+        .select('from_user_id, to_user_id, amount, currency, group_id')
         .eq('group_id', groupId);
+    final settlements = await _resolveSettlementNames(
+        client, settlementsRaw.cast<Map<String, dynamic>>());
 
     final pdfBytes = await compute(
       _buildGroupPdf,
@@ -532,25 +525,19 @@ class PdfExportService {
         now:         now,
         members:     membersRaw.cast<Map<String, dynamic>>(),
         expenses:    expensesRaw.cast<Map<String, dynamic>>(),
-        settlements: settlementsRaw.cast<Map<String, dynamic>>(),
+        settlements: settlements,
       ),
     );
 
-    if (context == null) return;
-    final dir  = await getTemporaryDirectory();
+    final dir  = await getApplicationDocumentsDirectory();
     final filename = 'setall_${groupName.replaceAll(' ', '_')}_report.pdf';
     final file = File('${dir.path}/$filename');
     await file.writeAsBytes(pdfBytes, flush: true);
-    // ignore: use_build_context_synchronously
-    await shareFiles([XFile(file.path)], context: context,
-        subject: filename, originKey: originKey);
+    await launchUrl(Uri.file(file.path));
   }
 
   // ── All Groups PDF ────────────────────────────────────────────────────────
-  Future<void> exportAllGroupsAsPdf({
-    BuildContext? context,
-    GlobalKey? originKey,
-  }) async {
+  Future<void> exportAllGroupsAsPdf() async {
     final client = Supabase.instance.client;
     final uid    = client.auth.currentUser?.id;
     if (uid == null) return;
@@ -584,12 +571,14 @@ class PdfExportService {
           .order('created_at', ascending: false);
       final List setRaw = await client
           .from('settlements')
-          .select('*, from:profiles!from_user_id(display_name), to:profiles!to_user_id(display_name)')
+          .select('from_user_id, to_user_id, amount, currency, group_id')
           .eq('group_id', gid);
+      final settlements = await _resolveSettlementNames(
+          client, setRaw.cast<Map<String, dynamic>>());
       groups.add({
         'name':        g['name'],
         'expenses':    expRaw.cast<Map<String, dynamic>>(),
-        'settlements': setRaw.cast<Map<String, dynamic>>(),
+        'settlements': settlements,
       });
     }
 
@@ -598,19 +587,14 @@ class PdfExportService {
       _AllGroupsPdfPayload(groups: groups, now: now),
     );
 
-    if (context == null) return;
-    final dir  = await getTemporaryDirectory();
+    final dir  = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/setall_groups_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    // ignore: use_build_context_synchronously
-    await shareFiles([XFile(file.path)], context: context,
-        subject: 'setall_groups_report.pdf', originKey: originKey);
+    await launchUrl(Uri.file(file.path));
   }
 
   // ── Analytics PDF ──────────────────────────────────────────────────────────
   Future<void> exportAnalyticsPdf({
-    BuildContext? context,
-    GlobalKey? originKey,
     required double income,
     required double expenses,
     required List<AnalyticsRow> entries,
@@ -633,13 +617,36 @@ class PdfExportService {
       ),
     );
 
-    if (context == null) return;
-    final dir  = await getTemporaryDirectory();
+    final dir  = await getApplicationDocumentsDirectory();
     final file = File('${dir.path}/setall_analytics_report.pdf');
     await file.writeAsBytes(pdfBytes, flush: true);
-    // ignore: use_build_context_synchronously
-    await shareFiles([XFile(file.path)], context: context,
-        subject: 'setall_analytics_report.pdf', originKey: originKey);
+    await launchUrl(Uri.file(file.path));
+  }
+
+  // ── Helper: resolve from/to display names for settlements ─────────────────
+  static Future<List<Map<String, dynamic>>> _resolveSettlementNames(
+    SupabaseClient client,
+    List<Map<String, dynamic>> rows,
+  ) async {
+    final ids = <String>{};
+    for (final r in rows) {
+      if (r['from_user_id'] != null) ids.add(r['from_user_id'] as String);
+      if (r['to_user_id']   != null) ids.add(r['to_user_id']   as String);
+    }
+    if (ids.isEmpty) return rows;
+    final List profilesRaw = await client
+        .from('profiles')
+        .select('id, display_name')
+        .inFilter('id', ids.toList());
+    final nameMap = <String, String>{
+      for (final p in profilesRaw.cast<Map<String, dynamic>>())
+        p['id'] as String: (p['display_name'] as String?) ?? '—',
+    };
+    return rows.map((r) => {
+      ...r,
+      'from': {'display_name': nameMap[r['from_user_id'] as String? ?? ''] ?? '—'},
+      'to':   {'display_name': nameMap[r['to_user_id']   as String? ?? ''] ?? '—'},
+    }).toList();
   }
 }
 

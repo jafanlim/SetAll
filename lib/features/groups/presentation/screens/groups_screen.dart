@@ -334,9 +334,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                   tooltip: 'Export all groups as PDF',
                   onPressed: () async {
                     HapticUtils.lightTap();
-                    await PdfExportService().exportAllGroupsAsPdf(
-                      context: context,
-                    );
+                    await PdfExportService().exportAllGroupsAsPdf();
                   },
                 ),
                 const SizedBox(width: 4),
