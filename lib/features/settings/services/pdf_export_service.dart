@@ -579,7 +579,7 @@ class PdfExportService {
   }
 
   // ── All Groups PDF ────────────────────────────────────────────────────────
-  Future<void> exportAllGroupsAsPdf() async {
+  Future<void> exportAllGroupsAsPdf({ui.Rect? sharePositionOrigin}) async {
     final client = Supabase.instance.client;
     final uid    = client.auth.currentUser?.id;
     if (uid == null) return;
@@ -594,14 +594,15 @@ class PdfExportService {
         .map((r) => r['group_id'] as String)
         .toList();
 
+    if (memberGroupIds.isEmpty) {
+      throw Exception('You are not a member of any groups.');
+    }
+
     final List allGroupsRaw = await client
         .from('groups')
         .select('id, name')
-        .eq('is_deleted', false);
-    final groupsRaw = allGroupsRaw
-        .cast<Map<String, dynamic>>()
-        .where((g) => memberGroupIds.contains(g['id'] as String))
-        .toList();
+        .inFilter('id', memberGroupIds);
+    final groupsRaw = allGroupsRaw.cast<Map<String, dynamic>>();
 
     final groups = <Map<String, dynamic>>[];
     for (final g in groupsRaw) {
@@ -652,7 +653,7 @@ class PdfExportService {
     await Share.shareXFiles(
       [XFile(file.path)],
       subject: 'setall_groups_report.pdf',
-      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 1, 1),
+      sharePositionOrigin: sharePositionOrigin ?? const ui.Rect.fromLTWH(0, 0, 100, 100),
     );
   }
 

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:csv/csv.dart';
 import 'package:flutter/material.dart';
@@ -107,13 +108,85 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
     });
   }
 
+  Future<void> _showPdfBottomSheet() async {
+    final messenger = ScaffoldMessenger.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Download report',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.account_balance_wallet_outlined, color: _teal),
+              title: const Text('Wallet report'),
+              subtitle: const Text('Your personal wallet entries as PDF'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                setState(() => _exporting = true);
+                try {
+                  await PdfExportService().exportWalletAsPdf(
+                      repository: ref.read(setAllRepositoryProvider));
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: $e'),
+                      backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _exporting = false);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.group_outlined, color: Color(0xFF0EA5E9)),
+              title: const Text('Groups report'),
+              subtitle: const Text('All your group expenses as PDF'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                setState(() => _exporting = true);
+                try {
+                  await PdfExportService().exportAllGroupsAsPdf(
+                      sharePositionOrigin: const ui.Rect.fromLTWH(0, 0, 100, 100));
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: $e'),
+                      backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _exporting = false);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportData(String format) async {
+    if (format == 'pdf') {
+      await _showPdfBottomSheet();
+      return;
+    }
     setState(() => _exporting = true);
     try {
-      if (format == 'pdf') {
-        await PdfExportService().exportWalletAsPdf(
-            repository: ref.read(setAllRepositoryProvider));
-      } else {
       final repo   = ref.read(setAllRepositoryProvider);
       final client = Supabase.instance.client;
       final uid    = client.auth.currentUser?.id ?? '';
@@ -179,7 +252,6 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
       // ignore: use_build_context_synchronously
       await shareFiles([XFile(file.path)], context: context,
           subject: subject, originKey: _exportKey);
-      }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -265,7 +337,7 @@ class _DataUsageScreenState extends ConsumerState<DataUsageScreen> {
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON — full export')])),
               const PopupMenuItem(value: 'csv',  child: Row(children: [Icon(Icons.table_chart_outlined, size: 18), SizedBox(width: 10), Text('CSV — spreadsheet')])),
-              const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.picture_as_pdf_outlined, size: 18), SizedBox(width: 10), Text('PDF — readable report')])),
+              const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.download_outlined, size: 18), SizedBox(width: 10), Text('PDF report')])),
             ],
             child: SizedBox(
               key: _exportKey,

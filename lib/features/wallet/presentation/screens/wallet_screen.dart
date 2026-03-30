@@ -314,7 +314,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   itemBuilder: (_) => [
                     const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON')])),
                     const PopupMenuItem(value: 'csv',  child: Row(children: [Icon(Icons.table_chart_outlined, size: 18), SizedBox(width: 10), Text('CSV')])),
-                    const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.picture_as_pdf_outlined, size: 18), SizedBox(width: 10), Text('PDF')])),
+                    const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.download_outlined, size: 18), SizedBox(width: 10), Text('PDF')])),
                   ],
                 ),
                 const SizedBox(width: 4),

@@ -200,9 +200,9 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
         const PopupMenuItem(
           value: 'export_pdf',
           child: Row(children: [
-            Icon(Icons.picture_as_pdf_outlined, size: 16, color: _teal),
+            Icon(Icons.download_outlined, size: 16, color: _teal),
             SizedBox(width: 8),
-            Text('Export as PDF'),
+            Text('Download report'),
           ]),
         ),
       ],

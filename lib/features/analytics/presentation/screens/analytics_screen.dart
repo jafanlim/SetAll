@@ -443,8 +443,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         actions: [
           analyticsAsync.whenOrNull(
             data: (data) => IconButton(
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'Export as PDF',
+              icon: const Icon(Icons.download_outlined),
+              tooltip: 'Download report',
               onPressed: () => PdfExportService().exportAnalyticsPdf(
                 income:   data.totalIncome,
                 expenses: data.totalSpend,
