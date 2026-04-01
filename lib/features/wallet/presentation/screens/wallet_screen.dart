@@ -45,7 +45,7 @@ class WalletScreen extends ConsumerStatefulWidget {
 class _WalletScreenState extends ConsumerState<WalletScreen> {
   bool   _editMode   = false;
   final  Set<String> _selected   = {};
-  final  _exportKey  = GlobalKey();
+  final  _exportBtnKey = GlobalKey();
   _WalletFilter _filter      = _WalletFilter.all;
   _WalletSort   _sort        = _WalletSort.newest;
   String?       _catFilter;   // non-null → show only this category
@@ -146,6 +146,58 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(omniActivityProvider);
   }
 
+  Future<void> _showExportSheet() async {
+    HapticUtils.lightTap();
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Download wallet report',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.download_outlined, color: _purple),
+              title: const Text('PDF report'),
+              subtitle: const Text('Full wallet report as PDF'),
+              onTap: () { Navigator.of(ctx).pop(); _exportData('pdf'); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF0EA5E9)),
+              title: const Text('CSV export'),
+              subtitle: const Text('All wallet entries as spreadsheet'),
+              onTap: () { Navigator.of(ctx).pop(); _exportData('csv'); },
+            ),
+            ListTile(
+              leading: const Icon(Icons.data_object_outlined, color: Color(0xFFF97316)),
+              title: const Text('JSON export'),
+              subtitle: const Text('All wallet entries as JSON'),
+              onTap: () { Navigator.of(ctx).pop(); _exportData('json'); },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _exportData(String format) async {
     try {
       final entries = ref.read(walletEntriesProvider).valueOrNull ?? [];
@@ -192,7 +244,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       }
       if (!mounted) return;
       await shareFiles([XFile(file.path)], context: context,
-          subject: subject, originKey: _exportKey);
+          subject: subject, originKey: _exportBtnKey);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -306,16 +358,11 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   ],
                 ),
                 const SizedBox(width: 4),
-                PopupMenuButton<String>(
-                  key: _exportKey,
-                  icon: const Icon(Icons.download_outlined),
+                AppTopButton(
+                  key: _exportBtnKey,
+                  icon: Icons.download_outlined,
                   tooltip: 'Download report',
-                  onSelected: _exportData,
-                  itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'json', child: Row(children: [Icon(Icons.data_object_outlined, size: 18), SizedBox(width: 10), Text('JSON')])),
-                    const PopupMenuItem(value: 'csv',  child: Row(children: [Icon(Icons.table_chart_outlined, size: 18), SizedBox(width: 10), Text('CSV')])),
-                    const PopupMenuItem(value: 'pdf',  child: Row(children: [Icon(Icons.download_outlined, size: 18), SizedBox(width: 10), Text('PDF')])),
-                  ],
+                  onPressed: _showExportSheet,
                 ),
                 const SizedBox(width: 4),
                 AppTopButton(

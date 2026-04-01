@@ -1309,6 +1309,11 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
               onTap: () => Navigator.of(ctx).pop('rename'),
             ),
             ListTile(
+              leading: const Icon(Icons.download_outlined, color: _teal),
+              title: const Text('Download report'),
+              onTap: () => Navigator.of(ctx).pop('download'),
+            ),
+            ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
               title: const Text('Delete group', style: TextStyle(color: Colors.redAccent)),
               onTap: () => Navigator.of(ctx).pop('delete'),
@@ -1326,6 +1331,59 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     if (result == 'rename') _rename();
     if (result == 'delete') _delete();
     if (result == 'force_delete') _delete(force: true);
+    if (result == 'download') {
+      if (!context.mounted) return;
+      _downloadReport(context);
+    }
+  }
+
+  Future<void> _downloadReport(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Download "${widget.group.name}" report',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.download_outlined, color: _teal),
+              title: const Text('PDF report'),
+              subtitle: const Text('Group expenses as PDF'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                try {
+                  await PdfExportService().exportGroupAsPdf(widget.group.id, widget.group.name);
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: $e'),
+                      backgroundColor: Colors.red));
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _showRightClickMenu(BuildContext context, Offset position) async {
