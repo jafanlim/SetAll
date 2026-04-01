@@ -37,7 +37,6 @@ class GroupDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
-  bool _manuallySettled = false;
   bool _editMode = false;
   final Set<String> _selected = {};
   late String _groupName;
@@ -165,6 +164,63 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     }
   }
 
+  Future<void> _settleAllDebts() async {
+    HapticUtils.primaryTap();
+    final debts = ref.read(simplifiedDebtsProvider(widget.groupId)).valueOrNull ?? [];
+    if (debts.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No outstanding debts to settle.')),
+      );
+      return;
+    }
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Settle all debts?'),
+        content: Text(
+          'Record ${debts.length} debt${debts.length == 1 ? '' : 's'} as fully settled? '
+          'This creates settlement entries visible to all group members.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Settle all'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    bool anyOk = false;
+    for (final debt in debts) {
+      final ok = await repo.recordSettlement(
+        groupId:    widget.groupId,
+        fromUserId: debt.fromUserId,
+        toUserId:   debt.toUserId,
+        amount:     debt.amount.toString(),
+        currency:   debt.currency,
+      );
+      if (ok) anyOk = true;
+    }
+    if (!mounted) return;
+    if (anyOk) {
+      ref.invalidate(simplifiedDebtsProvider(widget.groupId));
+      ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
+      ref.invalidate(groupExpensesProvider(widget.groupId));
+      ref.invalidate(recentExpensesProvider);
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('All debts settled ✓')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settlement failed. Please try again.'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
   Future<void> _deleteGroup(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
@@ -268,43 +324,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   ),
               ]
             : [
-                if (_manuallySettled)
-                  TextButton.icon(
-                    icon: const Icon(Icons.undo, size: 16),
-                    label: const Text('Reopen'),
-                    style: TextButton.styleFrom(foregroundColor: _teal),
-                    onPressed: () {
-                      HapticUtils.selection();
-                      setState(() => _manuallySettled = false);
-                    },
-                  )
-                else
-                  TextButton.icon(
+                TextButton.icon(
                     icon: const Icon(Icons.check_circle_outline, size: 16),
                     label: const Text('Settle'),
                     style: TextButton.styleFrom(foregroundColor: _teal),
-                    onPressed: () async {
-                      HapticUtils.primaryTap();
-                      final confirm = await showDialog<bool>(
-                        context: context,
-                        builder: (ctx) => AlertDialog(
-                          title: const Text('Mark as settled?'),
-                          content: const Text(
-                            'This hides the outstanding balance for this group. '
-                            'Existing expenses are kept. You can reopen it anytime.',
-                          ),
-                          actions: [
-                            TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-                            FilledButton(
-                              style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
-                              onPressed: () => Navigator.of(ctx).pop(true),
-                              child: const Text('Settle'),
-                            ),
-                          ],
-                        ),
-                      );
-                      if (confirm == true && mounted) setState(() => _manuallySettled = true);
-                    },
+                    onPressed: _settleAllDebts,
                   ),
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined),
@@ -358,23 +382,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                child: _manuallySettled
-                    ? GlassCard(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        child: Row(
-                          children: [
-                            const Icon(Icons.check_circle_outline, color: _teal, size: 18),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Marked as settled',
-                                style: const TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : balanceAsync.when(
+                child: balanceAsync.when(
                         skipLoadingOnReload: true,
                         data: (s) => _GroupBalanceCard(summary: s),
                         loading: () => const SizedBox.shrink(),
@@ -384,10 +392,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             ),
 
             // ── Settlement Plan section ──────────────────────────────────
-            if (!_manuallySettled)
-              SliverToBoxAdapter(
-                child: _SettlementPlanSection(groupId: groupId),
-              ),
+            SliverToBoxAdapter(
+              child: _SettlementPlanSection(groupId: groupId),
+            ),
 
             // ── Members section ──────────────────────────────────────────
             SliverToBoxAdapter(
@@ -1207,11 +1214,13 @@ class _SettleButton extends ConsumerStatefulWidget {
     required this.groupId,
     required this.debt,
     required this.amountStr,
+    this.isCreditor = false,
   });
 
   final String groupId;
   final SettlementTransaction debt;
   final String amountStr;
+  final bool isCreditor;
 
   @override
   ConsumerState<_SettleButton> createState() => _SettleButtonState();
@@ -1225,9 +1234,10 @@ class _SettleButtonState extends ConsumerState<_SettleButton> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark as settled?'),
-        content: Text(
-            'Record that you paid ${widget.amountStr} to clear this debt?'),
+        title: Text(widget.isCreditor ? 'Mark as received?' : 'Mark as settled?'),
+        content: Text(widget.isCreditor
+            ? 'Confirm you received ${widget.amountStr} from the other member?'
+            : 'Record that you paid ${widget.amountStr} to clear this debt?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -1292,9 +1302,9 @@ class _SettleButtonState extends ConsumerState<_SettleButton> {
               width: 14, height: 14,
               child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
             )
-          : const Text(
-              'Settle',
-              style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+          : Text(
+              widget.isCreditor ? 'Mark received' : 'Settle',
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
             ),
     );
   }
@@ -1401,11 +1411,12 @@ class _SettlementPlanSection extends ConsumerWidget {
                           ],
                         ),
                       ),
-                      trailing: isCurrentUserDebtor
+                      trailing: (isCurrentUserDebtor || debt.toUserId == currentUid)
                           ? _SettleButton(
                               groupId: groupId,
                               debt: debt,
                               amountStr: amountStr,
+                              isCreditor: debt.toUserId == currentUid && !isCurrentUserDebtor,
                             )
                           : Text(
                               amountStr,
