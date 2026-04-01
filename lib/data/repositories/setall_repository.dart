@@ -530,10 +530,15 @@ class SetAllRepository {
 
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})?>
       _getGroupBalanceRawDataWeb(String uid, String groupId) async {
-    final expenseRows = await _client!
+    // Exclude Settlement-category expenses — they are bookkeeping entries
+    // written by recordSettlement and must not inflate balances.
+    final allRows = await _client!
         .from('expenses')
         .select()
         .eq('group_id', groupId) as List;
+    final expenseRows = allRows
+        .where((r) => (r as Map<String, dynamic>)['category'] != 'Settlement')
+        .toList();
     if (expenseRows.isEmpty) return null;
 
     final expenseIds = expenseRows
@@ -545,14 +550,15 @@ class SetAllRepository {
         .inFilter('expense_id', expenseIds) as List;
     final expenseById = {
       for (final e in expenseRows)
-        (e as Map<String, dynamic>)['id'] as String: e
+        (e as Map<String, dynamic>)['id'] as String: e as Map<String, dynamic>  // ignore: unnecessary_cast
     };
 
     final youOwe = <BalanceEntry>[];
     final youAreOwed = <BalanceEntry>[];
     for (final s in splitsRaw) {
       final sMap = s as Map<String, dynamic>;
-      final ex = expenseById[sMap['expense_id'] as String] as Map<String, dynamic>;
+      final ex = expenseById[sMap['expense_id'] as String];
+      if (ex == null) continue;
       final entry = _makeEntry(sMap, ex);
       if (sMap['user_id'] == uid && ex['payer_id'] != uid) youOwe.add(entry);
       if (ex['payer_id'] == uid && sMap['user_id'] != uid) youAreOwed.add(entry);
@@ -563,9 +569,10 @@ class SetAllRepository {
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})?>
       _getGroupBalanceRawDataLocal(String uid, String groupId) async {
     await _db;
+    // Exclude Settlement-category expenses — bookkeeping only; not real debts.
     final expenseRows = await LocalDatabase.db.query(
       'expenses',
-      where: 'group_id = ?',
+      where: "group_id = ? AND (category IS NULL OR category != 'Settlement')",
       whereArgs: [groupId],
     );
     if (expenseRows.isEmpty) return null;

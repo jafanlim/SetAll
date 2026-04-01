@@ -20,7 +20,7 @@ const _green       = PdfColor.fromInt(0xFF22C55E);
 const _red         = PdfColor.fromInt(0xFFF43F5E);
 
 String _fmtDate(String? raw) {
-  if (raw == null) return '—';
+  if (raw == null) return 'N/A';
   final d = DateTime.tryParse(raw);
   if (d == null) { return raw; }
   return DateFormat('d MMM yyyy').format(d.toLocal());
@@ -194,7 +194,7 @@ Future<Uint8List> _buildGroupPdf(_GroupPdfPayload p) async {
               spacing: 8, runSpacing: 4,
               children: p.members.map<pw.Widget>((m) {
                 final prof = m['profiles'] as Map? ?? {};
-                final name = prof['display_name'] as String? ?? prof['email'] as String? ?? '—';
+                final name = prof['display_name'] as String? ?? prof['email'] as String? ?? 'N/A';
                 return pw.Container(
                   padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: pw.BoxDecoration(
@@ -229,7 +229,7 @@ Future<Uint8List> _buildGroupPdf(_GroupPdfPayload p) async {
                       .toList(),
                 ),
                 ...p.expenses.map((e) {
-                  final payer = (e['profiles'] as Map?)?['display_name'] as String? ?? '—';
+                  final payer = (e['profiles'] as Map?)?['display_name'] as String? ?? 'N/A';
                   return pw.TableRow(children: [
                     _cell(_fmtDate(e['created_at'] as String?)),
                     _cell(e['description'] as String? ?? ''),
@@ -272,8 +272,8 @@ List<pw.Widget> _buildSettlementsSection(List<Map<String, dynamic>> settlements)
             .toList(),
       ),
       ...settlements.map((s) => pw.TableRow(children: [
-        _cell((s['from'] as Map?)?['display_name'] as String? ?? '—'),
-        _cell((s['to']   as Map?)?['display_name'] as String? ?? '—'),
+        _cell((s['from'] as Map?)?['display_name'] as String? ?? 'N/A'),
+        _cell((s['to']   as Map?)?['display_name'] as String? ?? 'N/A'),
         _cell('${s['currency'] ?? ''} ${s['amount'] ?? ''}'),
       ])),
     ],
@@ -324,7 +324,7 @@ Future<Uint8List> _buildAllGroupsPdf(_AllGroupsPdfPayload p) async {
               },
               headers: ['Date', 'Description', 'Amount', 'Paid by'],
               data: expenses.map((e) {
-                final payer = (e['profiles'] as Map?)?['display_name'] as String? ?? '—';
+                final payer = (e['profiles'] as Map?)?['display_name'] as String? ?? 'N/A';
                 return [
                   _fmtDate(e['created_at'] as String?),
                   (e['description'] as String?)?.isNotEmpty == true ? e['description'] as String : '—',
@@ -544,10 +544,10 @@ class PdfExportService {
         : [];
     final payerNameMap = <String, String>{
       for (final p in payerProfilesRaw.cast<Map<String, dynamic>>())
-        p['id'] as String: (p['name'] as String?) ?? '—',
+        p['id'] as String: (p['name'] as String?) ?? 'N/A',
     };
     final expensesEnriched = expensesRaw.cast<Map<String, dynamic>>().map((e) {
-      return {...e, 'profiles': {'display_name': payerNameMap[e['payer_id'] as String?] ?? '—'}};
+      return {...e, 'profiles': {'display_name': payerNameMap[e['payer_id'] as String?] ?? 'N/A'}};
     }).toList();
     final List settlementsExpRaw = await client
         .from('expenses')
@@ -631,10 +631,10 @@ class PdfExportService {
           : [];
       final gPayerNameMap = <String, String>{
         for (final p in gPayerProfilesRaw.cast<Map<String, dynamic>>())
-          p['id'] as String: (p['name'] as String?) ?? '—',
+          p['id'] as String: (p['name'] as String?) ?? 'N/A',
       };
       final expEnriched = expRaw.cast<Map<String, dynamic>>().map((e) {
-        return {...e, 'profiles': {'display_name': gPayerNameMap[e['payer_id'] as String?] ?? '—'}};
+        return {...e, 'profiles': {'display_name': gPayerNameMap[e['payer_id'] as String?] ?? 'N/A'}};
       }).toList();
       final List setExpRaw = await client
           .from('expenses')
@@ -722,12 +722,12 @@ class PdfExportService {
         .inFilter('id', ids.toList());
     final nameMap = <String, String>{
       for (final p in profilesRaw.cast<Map<String, dynamic>>())
-        p['id'] as String: (p['name'] as String?) ?? '—',
+        p['id'] as String: (p['name'] as String?) ?? 'N/A',
     };
     return rows.map((r) => {
       ...r,
-      'from': {'display_name': nameMap[r['from_user_id'] as String? ?? ''] ?? '—'},
-      'to':   {'display_name': nameMap[r['to_user_id']   as String? ?? ''] ?? '—'},
+      'from': {'display_name': nameMap[r['from_user_id'] as String? ?? ''] ?? 'N/A'},
+      'to':   {'display_name': nameMap[r['to_user_id']   as String? ?? ''] ?? 'N/A'},
     }).toList();
   }
 }

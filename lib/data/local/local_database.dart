@@ -83,7 +83,10 @@ class LocalDatabase {
   /// Schema v30 adds:
   ///   • deleted_wallet_entries.deleted_by – uid of the user who deleted the entry
   ///     (required so restoreWalletEntry can verify ownership)
-  static const int _version = 30;
+  /// Schema v31 adds:
+  ///   • ai_chat_messages.user_id – retroactive fix for devices whose _onCreate
+  ///     pre-dated the v27 migration that added the column
+  static const int _version = 31;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -483,6 +486,15 @@ class LocalDatabase {
       // Schema v30: add deleted_by to deleted_wallet_entries
       await _addColumnIfNotExists(db, 'deleted_wallet_entries', 'deleted_by', 'TEXT');
     }
+    if (oldVersion < 31) {
+      // Schema v31: retroactive guard — devices whose _onCreate ran before v27
+      // created ai_chat_messages without user_id. _addColumnIfNotExists is safe
+      // to call even if the column already exists.
+      await _addColumnIfNotExists(db, 'ai_chat_messages', 'user_id', 'TEXT');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_ai_chat_user ON ai_chat_messages(user_id)',
+      );
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -654,11 +666,15 @@ class LocalDatabase {
         role       TEXT NOT NULL,
         content    TEXT NOT NULL,
         created_at TEXT NOT NULL,
-        is_canvas  INTEGER DEFAULT 0
+        is_canvas  INTEGER DEFAULT 0,
+        user_id    TEXT
       )
     ''');
     await db.execute(
       'CREATE INDEX IF NOT EXISTS idx_ai_chat_session ON ai_chat_messages(session_id)',
+    );
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_ai_chat_user ON ai_chat_messages(user_id)',
     );
     await db.execute('''
       CREATE TABLE deleted_splits (

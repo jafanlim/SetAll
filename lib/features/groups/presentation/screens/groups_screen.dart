@@ -1,3 +1,5 @@
+import 'dart:convert';
+import 'dart:io';
 import 'dart:ui' as ui;
 
 import 'package:decimal/decimal.dart';
@@ -6,6 +8,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
@@ -57,7 +62,7 @@ class GroupsScreen extends ConsumerStatefulWidget {
 
 class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   bool _editMode = false;
-  bool _isExportingPdf = false;
+  bool _isExporting = false;
   final Set<String> _selected = {};
   _GroupSort        _groupSort   = _GroupSort.nameAZ;
   _ActivityFilter   _actFilter   = _ActivityFilter.all;
@@ -66,6 +71,173 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
   Set<String>       _groupNameFilter  = {};
   final Set<int>    _groupColorFilter = {};
   final _exportBtnKey = GlobalKey();
+
+  Future<void> _showExportSheet() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final box = _exportBtnKey.currentContext?.findRenderObject() as RenderBox?;
+    final origin = box != null
+        ? ui.Rect.fromLTWH(
+            box.localToGlobal(Offset.zero).dx,
+            box.localToGlobal(Offset.zero).dy,
+            box.size.width,
+            box.size.height,
+          )
+        : const ui.Rect.fromLTWH(0, 0, 100, 100);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Download groups report',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.download_outlined, color: _teal),
+              title: const Text('PDF report'),
+              subtitle: const Text('Full groups report as PDF'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                if (!mounted) return;
+                setState(() => _isExporting = true);
+                try {
+                  await PdfExportService().exportAllGroupsAsPdf(
+                      sharePositionOrigin: origin);
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: \$e'),
+                      backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _isExporting = false);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF0EA5E9)),
+              title: const Text('CSV export'),
+              subtitle: const Text('All group expenses as spreadsheet'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                if (!mounted) return;
+                setState(() => _isExporting = true);
+                try {
+                  await _exportGroupsCsv(messenger);
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: \$e'),
+                      backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _isExporting = false);
+                }
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.data_object_outlined, color: Color(0xFFF97316)),
+              title: const Text('JSON export'),
+              subtitle: const Text('All group expenses as JSON'),
+              onTap: () async {
+                Navigator.of(ctx).pop();
+                if (!mounted) return;
+                setState(() => _isExporting = true);
+                try {
+                  await _exportGroupsJson(messenger);
+                } catch (e) {
+                  messenger.showSnackBar(SnackBar(
+                      content: Text('Export failed: \$e'),
+                      backgroundColor: Colors.red));
+                } finally {
+                  if (mounted) setState(() => _isExporting = false);
+                }
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _exportGroupsCsv(ScaffoldMessengerState messenger) async {
+    final data = await _fetchAllGroupsData();
+    final rows = <List<String>>[['Date', 'Group', 'Description', 'Amount', 'Currency', 'Paid by']];
+    for (final g in data) {
+      final gName = g['name'] as String? ?? '';
+      for (final e in (g['expenses'] as List<Map<String, dynamic>>)) {
+        rows.add([
+          e['created_at'] as String? ?? '',
+          gName,
+          e['description'] as String? ?? '',
+          e['amount'] as String? ?? '',
+          e['currency'] as String? ?? '',
+          (e['profiles'] as Map?)?['display_name'] as String? ?? '',
+        ]);
+      }
+    }
+    final csv = rows.map((r) => r.map((c) => '"${c.replaceAll('"', '""')}"').join(',')).join('\n');
+    final dir = await getTemporaryDirectory();
+    final ts = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final filename = 'setall_groups_$ts.csv';
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(csv, flush: true);
+    await Share.shareXFiles([XFile(file.path)], subject: filename);
+  }
+
+  Future<void> _exportGroupsJson(ScaffoldMessengerState messenger) async {
+    final data = await _fetchAllGroupsData();
+    final dir = await getTemporaryDirectory();
+    final ts = DateFormat('yyyyMMdd_HHmm').format(DateTime.now());
+    final filename = 'setall_groups_$ts.json';
+    final file = File('${dir.path}/$filename');
+    await file.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(data), flush: true);
+    await Share.shareXFiles([XFile(file.path)], subject: filename);
+  }
+
+  Future<List<Map<String, dynamic>>> _fetchAllGroupsData() async {
+    final client = Supabase.instance.client;
+    final uid    = client.auth.currentUser?.id;
+    if (uid == null) throw Exception('Not signed in');
+    final memberRows = await client.from('group_members').select('group_id').eq('user_id', uid);
+    final memberGroupIds = (memberRows as List).map((r) => r['group_id'] as String).toList();
+    if (memberGroupIds.isEmpty) throw Exception('You are not a member of any groups.');
+    final groupsRaw = await client.from('groups').select('id, name').inFilter('id', memberGroupIds);
+    final result = <Map<String, dynamic>>[];
+    for (final g in groupsRaw as List) {
+      final gMap = g as Map<String, dynamic>;
+      final gid  = gMap['id'] as String;
+      final expRaw = (await client.from('expenses').select().eq('group_id', gid).order('created_at', ascending: false)) as List;
+      final payerIds = expRaw.map((e) => (e as Map<String, dynamic>)['payer_id'] as String?).whereType<String>().toSet().toList();
+      final profRaw = payerIds.isNotEmpty
+          ? (await client.from('profiles').select('id, name').inFilter('id', payerIds)) as List
+          : <dynamic>[];
+      final nameMap = <String, String>{
+        for (final p in profRaw) (p as Map<String, dynamic>)['id'] as String: (p['name'] as String?) ?? '',
+      };
+      final expenses = expRaw.map<Map<String, dynamic>>((e) {
+        final eMap = e as Map<String, dynamic>;
+        return {...eMap, 'profiles': {'display_name': nameMap[eMap['payer_id'] as String?] ?? ''}};
+      }).toList();
+      result.add({'name': gMap['name'], 'expenses': expenses});
+    }
+    return result;
+  }
 
   @override
   void initState() {
@@ -334,40 +506,16 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
                 ),
                 const SizedBox(width: 4),
                 IgnorePointer(
-                  ignoring: _isExportingPdf,
+                  ignoring: _isExporting,
                   child: AppTopButton(
                     key: _exportBtnKey,
-                    icon: _isExportingPdf
+                    icon: _isExporting
                         ? Icons.hourglass_top_rounded
                         : Icons.download_outlined,
                     tooltip: 'Download groups report',
-                    onPressed: () async {
+                    onPressed: () {
                       HapticUtils.lightTap();
-                      setState(() => _isExportingPdf = true);
-                      final messenger = ScaffoldMessenger.of(context);
-                      try {
-                        final box = _exportBtnKey.currentContext
-                            ?.findRenderObject() as RenderBox?;
-                        final origin = box != null
-                            ? ui.Rect.fromLTWH(
-                                box.localToGlobal(Offset.zero).dx,
-                                box.localToGlobal(Offset.zero).dy,
-                                box.size.width,
-                                box.size.height,
-                              )
-                            : const ui.Rect.fromLTWH(0, 0, 100, 100);
-                        await PdfExportService().exportAllGroupsAsPdf(
-                            sharePositionOrigin: origin);
-                      } catch (e) {
-                        messenger.showSnackBar(
-                          SnackBar(
-                            content: Text('Export failed: $e'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                      } finally {
-                        if (mounted) setState(() => _isExportingPdf = false);
-                      }
+                      _showExportSheet();
                     },
                   ),
                 ),
