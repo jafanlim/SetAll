@@ -126,6 +126,13 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       _entryIcon  = _isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded;
       if (widget.initialCurrency != null && widget.initialCurrency!.isNotEmpty) {
         _currency = widget.initialCurrency!;
+      } else if (widget.groupId.isEmpty) {
+        // Wallet entry: default to user's base currency instead of hardcoded USD.
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          if (!mounted) return;
+          final base = await ref.read(baseCurrencyProvider.future);
+          if (mounted && base.isNotEmpty) setState(() => _currency = base);
+        });
       }
     }
     _loadMembers();
