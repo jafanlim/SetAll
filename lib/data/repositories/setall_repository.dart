@@ -3706,33 +3706,35 @@ class SetAllRepository {
     String baseCurrency = 'USD',
   }) async {
     if (_isWeb && _client != null) {
-      final expenseRows = await _client
+      final allRows = await _client
           .from('expenses')
           .select()
           .eq('group_id', groupId) as List;
+      // Exclude Settlement bookkeeping entries so they cancel debts correctly.
+      final expenseRows = allRows
+          .where((r) => (r as Map<String, dynamic>)['category'] != 'Settlement')
+          .cast<Map<String, dynamic>>()
+          .toList();
       if (expenseRows.isEmpty) return [];
-      final expenseIds =
-          expenseRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
+      final expenseIds = expenseRows.map((r) => r['id'] as String).toList();
       final splitRows = await _client
           .from('splits')
           .select()
           .inFilter('expense_id', expenseIds) as List;
-      // Convert raw split data to SplitModel objects
-      final splitModels = splitRows.map((row) {
-        final splitMap = row as Map<String, dynamic>;
-        return SplitModel.fromJson(splitMap);
-      }).toList();
-      
+      final splitModels = splitRows
+          .map((row) => SplitModel.fromJson(row as Map<String, dynamic>))
+          .toList();
       return SettlementEngine.simplify(
         groupId: groupId,
         currency: baseCurrency,
-        expenses: expenseRows.cast<Map<String, dynamic>>(),
+        expenses: expenseRows,
         splits: splitModels,
       );
     }
+    // Local SQLite path — exclude Settlement bookkeeping rows.
     final expenseRows = await LocalDatabase.db.query(
       'expenses',
-      where: 'group_id = ?',
+      where: "group_id = ? AND (category IS NULL OR category != 'Settlement')",
       whereArgs: [groupId],
     );
     if (expenseRows.isEmpty) return [];
@@ -3743,12 +3745,9 @@ class SetAllRepository {
       where: 'expense_id IN ($placeholders)',
       whereArgs: expenseIds,
     );
-    // Convert raw split data to SplitModel objects
-    final splitModels = splitRows.map((row) {
-      final splitMap = row as Map<String, dynamic>;
-      return SplitModel.fromJson(splitMap);
-    }).toList();
-    
+    final splitModels = splitRows
+        .map((row) => SplitModel.fromJson(Map<String, dynamic>.from(row)))
+        .toList();
     return SettlementEngine.simplify(
       groupId: groupId,
       currency: baseCurrency,
