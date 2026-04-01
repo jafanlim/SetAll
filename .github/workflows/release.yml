@@ -8,24 +8,8 @@ permissions:
   contents: write
 
 jobs:
-  check:
-    name: Check trigger
-    runs-on: ubuntu-latest
-    outputs:
-      is_tag: ${{ steps.check.outputs.is_tag }}
-    steps:
-      - id: check
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
-            echo "is_tag=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_tag=false" >> $GITHUB_OUTPUT
-          fi
-
   build:
     name: Build & Package
-    needs: check
-    if: needs.check.outputs.is_tag == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -185,8 +169,7 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [check, build]
-    if: needs.check.outputs.is_tag == 'true'
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS artifact
