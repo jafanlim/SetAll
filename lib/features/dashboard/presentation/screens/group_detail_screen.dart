@@ -1096,6 +1096,13 @@ class _ExpenseTile extends ConsumerWidget {
 
   Future<void> _showContextMenu(BuildContext context, WidgetRef ref) async {
     HapticUtils.primaryTap();
+    final uid = await ref.read(setAllRepositoryProvider).ensureUser();
+    if (!context.mounted) return;
+    final canSettle = uid != null &&
+        expense.payerId == uid &&
+        expense.groupId != null &&
+        expense.category != 'Settlement';
+
     final result = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -1107,6 +1114,13 @@ class _ExpenseTile extends ConsumerWidget {
               title: const Text('Edit expense'),
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
+            if (canSettle)
+              ListTile(
+                leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+                title: const Text('Mark as settled'),
+                subtitle: Text('${expense.currency} ${expense.amount} owed to you'),
+                onTap: () => Navigator.of(ctx).pop('settle'),
+              ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
               title: const Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
@@ -1121,6 +1135,63 @@ class _ExpenseTile extends ConsumerWidget {
       context.push('/group/$groupId/expense/${expense.id}', extra: {'groupName': groupName});
     } else if (result == 'delete') {
       _confirmDelete(context, ref);
+    } else if (result == 'settle' && uid != null) {
+      await _settleExpense(context, ref, uid);
+    }
+  }
+
+  Future<void> _settleExpense(BuildContext context, WidgetRef ref, String uid) async {
+    final displayAmt = '${expense.currency} ${expense.amount}';
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Mark as settled?'),
+        content: Text('Record $displayAmt as fully settled?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: _teal),
+            child: const Text('Settle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final repo = ref.read(setAllRepositoryProvider);
+    // Fetch splits for this expense to find all debtors.
+    final splits = await repo.getSplitsForExpense(expense.id);
+    bool anyOk = false;
+    for (final split in splits) {
+      if (split.userId == uid) continue; // skip payer's own split
+      final ok = await repo.recordSettlement(
+        groupId:    expense.groupId!,
+        fromUserId: split.userId,
+        toUserId:   uid,
+        amount:     split.universalUsdOwed,
+        currency:   expense.currency,
+      );
+      if (ok) anyOk = true;
+    }
+    if (!context.mounted) return;
+    if (anyOk) {
+      ref.invalidate(simplifiedDebtsProvider(expense.groupId!));
+      ref.invalidate(groupBalanceSummaryProvider(expense.groupId!));
+      ref.invalidate(groupExpensesProvider(expense.groupId!));
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Settled ✓')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Settlement failed. Please try again.'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 }

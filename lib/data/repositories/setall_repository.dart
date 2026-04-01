@@ -15,6 +15,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
+import '../../core/config/auth_config.dart';
 import '../../domain/services/settlement_engine.dart';
 import '../../domain/entities/activity_event.dart';
 import '../../domain/entities/expense.dart';
@@ -114,6 +115,55 @@ class SetAllRepository {
   void notifySyncComplete() => _notify();
 
   bool get isConfigured => _client != null;
+
+  /// Fire-and-forget push notification to all group members except [excludeUid].
+  /// Calls the `send-group-notification` Supabase edge function via plain HTTPS.
+  /// Never throws — errors are logged only.
+  Future<void> _sendGroupNotification({
+    required String groupId,
+    required String excludeUid,
+    required String title,
+    required String body,
+  }) async {
+    if (_client == null) return;
+    try {
+      // Fetch group member user IDs.
+      final rows = await _client
+          .from('group_members')
+          .select('user_id')
+          .eq('group_id', groupId) as List;
+      final recipients = rows
+          .map((r) => (r as Map<String, dynamic>)['user_id'] as String?)
+          .whereType<String>()
+          .where((id) => id != excludeUid)
+          .toList();
+      if (recipients.isEmpty) return;
+
+      final fnUrl = '${AuthConfig.supabaseUrl}/functions/v1/send-group-notification';
+
+      // Call edge function with anon key.
+      await io_lib.HttpClient().postUrl(Uri.parse(fnUrl)).then((req) async {
+        req.headers.set('Content-Type', 'application/json');
+        req.headers.set('Authorization', 'Bearer ${AuthConfig.supabaseAnonKey}');
+        req.write('{"recipientUserIds":${_jsonStringify(recipients)},'
+            '"title":${_jsonQuote(title)},'
+            '"body":${_jsonQuote(body)},'
+            '"data":{"route":"/group/$groupId","groupId":"$groupId"}}');
+        final res = await req.close();
+        await res.drain<void>();
+      });
+    } catch (e) {
+      debugPrint('[_sendGroupNotification] $e');
+    }
+  }
+
+  /// Minimal JSON array serialiser for a list of strings.
+  static String _jsonStringify(List<String> items) =>
+      '[${items.map((s) => '"${s.replaceAll('"', '\\"')}"').join(',')}]';
+
+  /// Wraps a string in JSON double-quotes, escaping special characters.
+  static String _jsonQuote(String s) =>
+      '"${s.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('\n', '\\n')}"';
 
   bool get _isWeb => LocalDatabase.isWeb;
 
@@ -1452,6 +1502,23 @@ class SetAllRepository {
     final uid = await ensureUser();
     if (uid == null) return false;
 
+    // Capture group_id before deletion for notification (best-effort).
+    String? notifyGroupId;
+    if (!_isWeb) {
+      try {
+        final placeholder = ids.map((_) => '?').join(',');
+        final rows = await LocalDatabase.db.query(
+          'expenses',
+          columns: ['group_id', 'description'],
+          where: 'id IN ($placeholder)',
+          whereArgs: ids,
+        );
+        notifyGroupId = rows.isNotEmpty
+            ? rows.first['group_id'] as String?
+            : null;
+      } catch (_) {}
+    }
+
     // ── Supabase (web or online native) ──────────────────────────────────
     if (_isWeb && _client != null) {
       try {
@@ -1483,6 +1550,18 @@ class SetAllRepository {
     });
 
     _notify();
+
+    // Push notification to other group members (fire-and-forget).
+    if (notifyGroupId != null && notifyGroupId.isNotEmpty && await _isOnline) {
+      final count = ids.length;
+      unawaited(_sendGroupNotification(
+        groupId:    notifyGroupId,
+        excludeUid: uid,
+        title:      'Expense${count > 1 ? 's' : ''} deleted',
+        body:       '$count expense${count > 1 ? 's were' : ' was'} removed from the group',
+      ));
+    }
+
     return true;
   }
 
@@ -2356,6 +2435,18 @@ class SetAllRepository {
     }
 
     _notify();
+
+    // Push notification to other group members (fire-and-forget).
+    if (groupId != null && groupId.isNotEmpty && await _isOnline) {
+      final label = description.isNotEmpty ? description : category;
+      unawaited(_sendGroupNotification(
+        groupId:    groupId,
+        excludeUid: uid,
+        title:      'New expense',
+        body:       '$label · $currency ${amount.toStringAsFixed(2)}',
+      ));
+    }
+
     return expense;
   }
 
@@ -3232,6 +3323,18 @@ class SetAllRepository {
     if (updatedRow.isEmpty) return null;
     final result = ExpenseModel.fromJson(updatedRow.first);
     _notify();
+
+    // Push notification to other group members (fire-and-forget).
+    if (effectiveGroupId != null && await _isOnline) {
+      final label = description.isNotEmpty ? description : category;
+      unawaited(_sendGroupNotification(
+        groupId:    effectiveGroupId,
+        excludeUid: uid,
+        title:      'Expense updated',
+        body:       '$label · $currency ${amount.toStringAsFixed(2)}',
+      ));
+    }
+
     return result;
   }
 
@@ -3460,6 +3563,17 @@ class SetAllRepository {
     }
 
     _notify();
+
+    // Notify the creditor (toUserId) that settlement was made (fire-and-forget).
+    if (await _isOnline) {
+      unawaited(_sendGroupNotification(
+        groupId:    groupId,
+        excludeUid: fromUserId,
+        title:      'Settlement received',
+        body:       '$currency $amount has been settled',
+      ));
+    }
+
     return true;
   }
 
