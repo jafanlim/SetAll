@@ -56,7 +56,7 @@ jobs:
           flutter build macos --release --no-tree-shake-icons
 
       - name: Import Developer ID certificate
-        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 != ''
+        if: matrix.os == 'macos-latest' && env.CERT_P12_B64 != ''
         env:
           CERT_P12_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 }}
           CERT_PASSWORD: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_PASSWORD }}
@@ -78,8 +78,9 @@ jobs:
             -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
 
       - name: Sign, notarize & package macOS DMG
-        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 != ''
+        if: matrix.os == 'macos-latest' && env.CERT_P12_B64 != ''
         env:
+          CERT_P12_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 }}
           APPLE_ID:       ${{ secrets.APPLE_ID }}
           APPLE_TEAM_ID:  ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
@@ -120,7 +121,9 @@ jobs:
           xcrun stapler staple SetAll-macOS.dmg
 
       - name: Package macOS DMG (unsigned)
-        if: matrix.os == 'macos-latest' && secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 == ''
+        if: matrix.os == 'macos-latest' && env.CERT_P12_B64 == ''
+        env:
+          CERT_P12_B64: ${{ secrets.APPLE_DEVELOPER_CERTIFICATE_P12_B64 }}
         run: |
           APP=build/macos/Build/Products/Release/SetAll.app
           brew install create-dmg
