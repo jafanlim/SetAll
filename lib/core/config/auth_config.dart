@@ -52,4 +52,10 @@ class AuthConfig {
   // No caller auth required — Gemini key is a Netlify env var, handled server-side.
   static const String netlifyAiUrl =
       'https://setall.app/.netlify/functions/ai-analyst';
+
+  // FEAT-VOICE: Voice entry parser endpoint.
+  // Preview deploy: https://69cf7714e9be247ec3ec3398--setall.netlify.app
+  // Switch to prod URL ('https://setall.app/.netlify/functions/voice-entry') when merging to main.
+  static const String netlifyVoiceEntryUrl =
+      'https://69cf7714e9be247ec3ec3398--setall.netlify.app/.netlify/functions/voice-entry';
 }

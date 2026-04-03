@@ -12,6 +12,8 @@ class Group {
     this.colorValue,
     this.avatarUrl,
     this.defaultCurrency,
+    this.settledAt,
+    this.settledBy,
   });
 
   final String id;
@@ -33,5 +35,14 @@ class Group {
   /// Default settlement currency for this group. NULL = use user's base currency.
   final String? defaultCurrency;
 
+  /// ISO-8601 timestamp when this group was marked as settled. NULL = not settled.
+  final String? settledAt;
+
+  /// UID of the user who triggered the settlement. NULL = not settled.
+  final String? settledBy;
+
   bool get isDirect => type == GroupType.direct;
+
+  /// True when the group has been marked as fully settled.
+  bool get isSettled => settledAt != null;
 }

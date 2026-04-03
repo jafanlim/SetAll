@@ -575,6 +575,8 @@ class SyncService {
           'color_value':     map['color_value']     ?? ex['color_value'],
           'avatar_url':      sanitizeAvatarUrl(map['avatar_url'] as String?) ?? sanitizeAvatarUrl(ex['avatar_url'] as String?),
           'default_currency': map['default_currency'] ?? ex['default_currency'],
+          'settled_at':      map['settled_at']?.toString(),
+          'settled_by':      map['settled_by']?.toString(),
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );

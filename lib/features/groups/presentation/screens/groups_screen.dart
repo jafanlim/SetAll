@@ -1164,6 +1164,11 @@ class _GroupCardSelectable extends ConsumerWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 3),
+                        if (group.isSettled)
+                          Text('Settled up',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                  color: _teal, fontSize: 11, fontWeight: FontWeight.w600))
+                        else
                         balanceAsync.when(
                           data: (s) {
                             final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;
@@ -1251,6 +1256,48 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     }
   }
 
+  Future<void> _settleGroup() async {
+    HapticUtils.primaryTap();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Settle group?'),
+        content: Text('Mark "${widget.group.name}" as settled? All debts will show as zero.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Settle'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(setAllRepositoryProvider).setGroupSettled(widget.group.id);
+    if (!mounted) return;
+    ref.invalidate(myGroupsProvider);
+    ref.invalidate(groupBalanceSummaryProvider(widget.group.id));
+    ref.invalidate(balanceSummaryProvider);
+    HapticUtils.success();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Group settled up!')),
+    );
+  }
+
+  Future<void> _reopenGroup() async {
+    HapticUtils.primaryTap();
+    await ref.read(setAllRepositoryProvider).clearGroupSettled(widget.group.id);
+    if (!mounted) return;
+    ref.invalidate(myGroupsProvider);
+    ref.invalidate(groupBalanceSummaryProvider(widget.group.id));
+    ref.invalidate(balanceSummaryProvider);
+    HapticUtils.success();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Group reopened.')),
+    );
+  }
+
   Future<void> _delete({bool force = false}) async {
     HapticUtils.primaryTap();
     final confirmed = await showDialog<bool>(
@@ -1297,6 +1344,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
 
   Future<void> _showContextMenu(BuildContext context) async {
     HapticUtils.primaryTap();
+    final isSettled = widget.group.isSettled;
     final result = await showModalBottomSheet<String>(
       context: context,
       builder: (ctx) => SafeArea(
@@ -1307,6 +1355,17 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
               leading: const Icon(Icons.edit_outlined, color: _teal),
               title: const Text('Rename group'),
               onTap: () => Navigator.of(ctx).pop('rename'),
+            ),
+            ListTile(
+              leading: Icon(
+                isSettled ? Icons.undo_rounded : Icons.check_circle_outline,
+                color: isSettled ? _orange : _teal,
+              ),
+              title: Text(
+                isSettled ? 'Reopen group' : 'Settle group',
+                style: TextStyle(color: isSettled ? _orange : _teal, fontWeight: FontWeight.w600),
+              ),
+              onTap: () => Navigator.of(ctx).pop(isSettled ? 'reopen' : 'settle'),
             ),
             ListTile(
               leading: const Icon(Icons.download_outlined, color: _teal),
@@ -1329,6 +1388,8 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       ),
     );
     if (result == 'rename') _rename();
+    if (result == 'settle') _settleGroup();
+    if (result == 'reopen') _reopenGroup();
     if (result == 'delete') _delete();
     if (result == 'force_delete') _delete(force: true);
     if (result == 'download') {
@@ -1387,6 +1448,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
   }
 
   Future<void> _showRightClickMenu(BuildContext context, Offset position) async {
+    final isSettled = widget.group.isSettled;
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -1398,6 +1460,21 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             const Icon(Icons.edit_outlined, size: 16, color: _teal),
             const SizedBox(width: 8),
             const Text('Rename group'),
+          ]),
+        ),
+        PopupMenuItem(
+          value: isSettled ? 'reopen' : 'settle',
+          child: Row(children: [
+            Icon(
+              isSettled ? Icons.undo_rounded : Icons.check_circle_outline,
+              size: 16,
+              color: isSettled ? _orange : _teal,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isSettled ? 'Reopen group' : 'Settle group',
+              style: TextStyle(color: isSettled ? _orange : _teal),
+            ),
           ]),
         ),
         const PopupMenuItem(
@@ -1419,6 +1496,8 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       ],
     );
     if (result == 'rename') _rename();
+    if (result == 'settle') _settleGroup();
+    if (result == 'reopen') _reopenGroup();
     if (result == 'delete') _delete();
     if (result == 'force_delete') _delete(force: true);
   }
@@ -1558,6 +1637,16 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                             error: (_, _) => const SizedBox.shrink(),
                           ),
                           const SizedBox(height: 4),
+                          if (group.isSettled)
+                            Text(
+                              'Settled up',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: _teal,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            )
+                          else
                           balanceAsync.when(
                             data: (s) {
                               final owed = Decimal.tryParse(s.youAreOwed) ?? Decimal.zero;

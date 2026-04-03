@@ -178,6 +178,40 @@ class WalletActivityEvent extends ActivityEvent {
   final WalletEntryModel entry;
 }
 
+/// A group was marked as fully settled.
+class GroupSettledEvent extends ActivityEvent {
+  const GroupSettledEvent({
+    required super.timestamp,
+    required this.groupId,
+    required this.groupName,
+    required this.settledByUid,
+    required this.settledByName,
+    required this.settledByYou,
+  });
+
+  final String groupId;
+  final String groupName;
+  final String settledByUid;
+  final String settledByName;
+  final bool settledByYou;
+}
+
+/// A group's settled status was cleared (reopened).
+class GroupReopenedEvent extends ActivityEvent {
+  const GroupReopenedEvent({
+    required super.timestamp,
+    required this.groupId,
+    required this.groupName,
+    required this.reopenedByYou,
+    required this.reopenedByName,
+  });
+
+  final String groupId;
+  final String groupName;
+  final bool reopenedByYou;
+  final String reopenedByName;
+}
+
 /// A settlement was recorded in a group.
 class SettlementEvent extends ActivityEvent {
   const SettlementEvent({

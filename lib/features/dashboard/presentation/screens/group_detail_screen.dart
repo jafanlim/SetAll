@@ -164,59 +164,79 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     }
   }
 
-  Future<void> _settleAllDebts() async {
+  Future<void> _settleGroup() async {
     HapticUtils.primaryTap();
-    final debts = ref.read(simplifiedDebtsProvider(widget.groupId)).valueOrNull ?? [];
-    if (debts.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No outstanding debts to settle.')),
-      );
-      return;
-    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Settle all debts?'),
-        content: Text(
-          'Record ${debts.length} debt${debts.length == 1 ? '' : 's'} as fully settled? '
-          'This creates settlement entries visible to all group members.',
+        title: const Text('Mark group as settled?'),
+        content: const Text(
+          'This marks all debts in the group as settled. '
+          'No payments are recorded — you can reopen the group at any time.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Settle all'),
+            child: const Text('Settle'),
           ),
         ],
       ),
     );
     if (confirm != true || !mounted) return;
-    final repo = ref.read(setAllRepositoryProvider);
-    bool anyOk = false;
-    for (final debt in debts) {
-      final ok = await repo.recordSettlement(
-        groupId:    widget.groupId,
-        fromUserId: debt.fromUserId,
-        toUserId:   debt.toUserId,
-        amount:     debt.amount.toString(),
-        currency:   debt.currency,
-      );
-      if (ok) anyOk = true;
-    }
+    final ok = await ref.read(setAllRepositoryProvider).setGroupSettled(widget.groupId);
     if (!mounted) return;
-    if (anyOk) {
+    if (ok) {
+      ref.invalidate(myGroupsProvider);
       ref.invalidate(simplifiedDebtsProvider(widget.groupId));
       ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
-      ref.invalidate(groupExpensesProvider(widget.groupId));
-      ref.invalidate(recentExpensesProvider);
+      ref.invalidate(omniActivityProvider);
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('All debts settled ✓')),
+        const SnackBar(content: Text('Group marked as settled ✓')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settlement failed. Please try again.'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  Future<void> _reopenGroup() async {
+    HapticUtils.primaryTap();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reopen group?'),
+        content: const Text(
+          'This restores all outstanding debts. Members will owe each other as before.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Reopen'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !mounted) return;
+    final ok = await ref.read(setAllRepositoryProvider).clearGroupSettled(widget.groupId);
+    if (!mounted) return;
+    if (ok) {
+      ref.invalidate(myGroupsProvider);
+      ref.invalidate(simplifiedDebtsProvider(widget.groupId));
+      ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
+      ref.invalidate(omniActivityProvider);
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Group reopened')),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not reopen group. Please try again.'), backgroundColor: Colors.red),
       );
     }
   }
@@ -324,11 +344,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   ),
               ]
             : [
-                TextButton.icon(
+                if (group?.isSettled == true)
+                  TextButton.icon(
+                    icon: const Icon(Icons.lock_open_outlined, size: 16),
+                    label: const Text('Reopen'),
+                    style: TextButton.styleFrom(foregroundColor: _orange),
+                    onPressed: _reopenGroup,
+                  )
+                else
+                  TextButton.icon(
                     icon: const Icon(Icons.check_circle_outline, size: 16),
                     label: const Text('Settle'),
                     style: TextButton.styleFrom(foregroundColor: _teal),
-                    onPressed: _settleAllDebts,
+                    onPressed: _settleGroup,
                   ),
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined),
@@ -348,11 +376,17 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     if (value == 'editGroup' && group != null) context.push('/group/$groupId/edit', extra: group);
                     if (value == 'delete') _deleteGroup(context);
                     if (value == 'editExpenses') _toggleEditMode();
+                    if (value == 'settle') _settleGroup();
+                    if (value == 'reopen') _reopenGroup();
                   },
                   itemBuilder: (_) => [
                     const PopupMenuItem(value: 'editGroup', child: Text('Edit group')),
                     const PopupMenuItem(value: 'rename', child: Text('Rename group')),
                     const PopupMenuItem(value: 'editExpenses', child: Text('Select expenses')),
+                    if (group?.isSettled == true)
+                      const PopupMenuItem(value: 'reopen', child: Text('Reopen group'))
+                    else
+                      const PopupMenuItem(value: 'settle', child: Text('Settle group')),
                     const PopupMenuItem(
                       value: 'delete',
                       child: Text('Delete group', style: TextStyle(color: Colors.redAccent)),
@@ -376,6 +410,48 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
             if (group != null)
               SliverToBoxAdapter(
                 child: _GroupHeroBar(group: group),
+              ),
+
+            // ── Settled banner ───────────────────────────────────────────
+            if (group?.isSettled == true)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: _tealDim,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: _teal.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: _teal, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'This group is settled up — no one owes anything.',
+                            style: TextStyle(
+                              color: _teal,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _reopenGroup,
+                          style: TextButton.styleFrom(
+                            foregroundColor: _orange,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Reopen', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
 
             // ── Balance summary ──────────────────────────────────────────
@@ -1148,12 +1224,14 @@ class _ExpenseTile extends ConsumerWidget {
   }
 
   Future<void> _settleExpense(BuildContext context, WidgetRef ref, String uid) async {
-    final displayAmt = '${expense.currency} ${expense.amount}';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark as settled?'),
-        content: Text('Record $displayAmt as fully settled?'),
+        title: const Text('Mark group as settled?'),
+        content: const Text(
+          'This marks the whole group as settled up. '
+          'No one will owe anything. You can reopen it at any time.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -1169,28 +1247,16 @@ class _ExpenseTile extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     final repo = ref.read(setAllRepositoryProvider);
-    // Fetch splits for this expense to find all debtors.
-    final splits = await repo.getSplitsForExpense(expense.id);
-    bool anyOk = false;
-    for (final split in splits) {
-      if (split.userId == uid) continue; // skip payer's own split
-      final ok = await repo.recordSettlement(
-        groupId:    expense.groupId!,
-        fromUserId: split.userId,
-        toUserId:   uid,
-        amount:     split.universalUsdOwed,
-        currency:   expense.currency,
-      );
-      if (ok) anyOk = true;
-    }
+    final ok = await repo.setGroupSettled(expense.groupId!);
     if (!context.mounted) return;
-    if (anyOk) {
+    if (ok) {
+      ref.invalidate(myGroupsProvider);
       ref.invalidate(simplifiedDebtsProvider(expense.groupId!));
       ref.invalidate(groupBalanceSummaryProvider(expense.groupId!));
-      ref.invalidate(groupExpensesProvider(expense.groupId!));
+      ref.invalidate(omniActivityProvider);
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settled ✓')),
+        const SnackBar(content: Text('Group marked as settled ✓')),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1234,10 +1300,11 @@ class _SettleButtonState extends ConsumerState<_SettleButton> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(widget.isCreditor ? 'Mark as received?' : 'Mark as settled?'),
-        content: Text(widget.isCreditor
-            ? 'Confirm you received ${widget.amountStr} from the other member?'
-            : 'Record that you paid ${widget.amountStr} to clear this debt?'),
+        title: const Text('Mark group as settled?'),
+        content: const Text(
+          'This marks the whole group as settled up. No one will owe anything. '
+          'You can reopen it at any time.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -1256,18 +1323,13 @@ class _SettleButtonState extends ConsumerState<_SettleButton> {
     setState(() => _loading = true);
     final messenger = ScaffoldMessenger.of(context);
     try {
-      final ok = await ref.read(setAllRepositoryProvider).recordSettlement(
-        groupId:    widget.groupId,
-        fromUserId: widget.debt.fromUserId,
-        toUserId:   widget.debt.toUserId,
-        amount:     widget.debt.amount.toString(),
-        currency:   widget.debt.currency,
-      );
+      final ok = await ref.read(setAllRepositoryProvider).setGroupSettled(widget.groupId);
       if (!mounted) return;
       if (ok) {
+        ref.invalidate(myGroupsProvider);
         ref.invalidate(simplifiedDebtsProvider(widget.groupId));
         ref.invalidate(groupBalanceSummaryProvider(widget.groupId));
-        ref.invalidate(groupExpensesProvider(widget.groupId));
+        ref.invalidate(omniActivityProvider);
         HapticUtils.success();
       } else {
         messenger.showSnackBar(const SnackBar(

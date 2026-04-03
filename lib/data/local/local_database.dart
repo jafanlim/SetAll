@@ -86,7 +86,10 @@ class LocalDatabase {
   /// Schema v31 adds:
   ///   • ai_chat_messages.user_id – retroactive fix for devices whose _onCreate
   ///     pre-dated the v27 migration that added the column
-  static const int _version = 31;
+  /// Schema v32 adds:
+  ///   • groups.settled_at – ISO-8601 timestamp when the group was marked settled
+  ///   • groups.settled_by – uid of the user who triggered settlement
+  static const int _version = 32;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -495,6 +498,11 @@ class LocalDatabase {
         'CREATE INDEX IF NOT EXISTS idx_ai_chat_user ON ai_chat_messages(user_id)',
       );
     }
+    if (oldVersion < 32) {
+      // Schema v32: group settlement status (pure flag — no expense entries).
+      await _addColumnIfNotExists(db, 'groups', 'settled_at', 'TEXT');
+      await _addColumnIfNotExists(db, 'groups', 'settled_by', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -527,6 +535,8 @@ class LocalDatabase {
         color_value      INTEGER, -- Schema v23
         avatar_url       TEXT,    -- Schema v23
         default_currency TEXT,    -- Schema v25
+        settled_at       TEXT,     -- Schema v32: ISO-8601 when settled
+        settled_by       TEXT,     -- Schema v32: uid who settled
         created_at  TEXT,
         updated_at  TEXT,
         synced_at   INTEGER
