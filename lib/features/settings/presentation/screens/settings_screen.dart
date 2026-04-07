@@ -1520,41 +1520,43 @@ class _LanguageRow extends StatelessWidget {
       ),
       builder: (ctx) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 12),
-              Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: Theme.of(ctx).colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(2),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40, height: 4,
+                  decoration: BoxDecoration(
+                    color: Theme.of(ctx).colorScheme.outlineVariant,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              Text('settings.language'.tr(),
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              ..._langs.map((l) => ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
-                title: Text(l.label,
-                    style: TextStyle(
-                      fontWeight: l.code == current
-                          ? FontWeight.w700
-                          : FontWeight.w500,
-                    )),
-                trailing: l.code == current
-                    ? const Icon(Icons.check_rounded, color: _teal, size: 20)
-                    : null,
-                onTap: () {
-                  ctx.setLocale(Locale(l.code));
-                  Navigator.of(ctx).pop();
-                },
-              )),
-              const SizedBox(height: 8),
-            ],
+                const SizedBox(height: 16),
+                Text('settings.language'.tr(),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                ..._langs.map((l) => ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 0),
+                  title: Text(l.label,
+                      style: TextStyle(
+                        fontWeight: l.code == current
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                      )),
+                  trailing: l.code == current
+                      ? const Icon(Icons.check_rounded, color: _teal, size: 20)
+                      : null,
+                  onTap: () {
+                    ctx.setLocale(Locale(l.code));
+                    Navigator.of(ctx).pop();
+                  },
+                )),
+                const SizedBox(height: 8),
+              ],
+            ),
           ),
         );
       },

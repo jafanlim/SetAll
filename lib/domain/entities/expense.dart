@@ -30,6 +30,7 @@ class Expense {
     this.originalCurrency,
     this.exchangeRateApplied,
     this.universalUsdAmount,
+    this.baseCurrencyAmount,
     this.iconCodepoint,
     this.iconColor,
     this.attachmentUrls,
@@ -74,6 +75,13 @@ class Expense {
   /// It is immune to future rate changes.
   /// NULL for expenses created before schema v8.
   final String? universalUsdAmount;
+
+  /// Frozen total in the user's base currency at entry time (schema v33+).
+  ///
+  /// Eliminates USD-rate drift in wallet totals: wallet total = SUM of this
+  /// field instead of re-converting [universalUsdAmount] at live rates.
+  /// NULL for group expenses and for wallet entries created before schema v33.
+  final String? baseCurrencyAmount;
 
   /// Icon codepoint (e.g. IconData.codePoint). NULL means use default.
   final int? iconCodepoint;

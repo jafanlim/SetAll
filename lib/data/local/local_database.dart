@@ -86,7 +86,13 @@ class LocalDatabase {
   /// Schema v31 adds:
   ///   • ai_chat_messages.user_id – retroactive fix for devices whose _onCreate
   ///     pre-dated the v27 migration that added the column
-  static const int _version = 31;
+  /// Schema v32 adds:
+  ///   • groups.settled_at – ISO-8601 timestamp when the group was marked settled
+  ///   • groups.settled_by – uid of the user who triggered settlement
+  /// Schema v33 adds:
+  ///   • expenses.base_currency_amount – frozen total in user's base currency at
+  ///     entry time; eliminates USD-rate drift in wallet totals
+  static const int _version = 33;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -559,6 +565,7 @@ class LocalDatabase {
         original_currency     TEXT,
         exchange_rate_applied TEXT,
         universal_usd_amount  TEXT,
+        base_currency_amount  TEXT,
         created_at            TEXT,
         updated_at            TEXT,
         synced_at             INTEGER,

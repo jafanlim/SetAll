@@ -19,6 +19,7 @@ class ExpenseModel extends Expense {
     super.originalCurrency,
     super.exchangeRateApplied,
     super.universalUsdAmount,
+    super.baseCurrencyAmount,
     super.iconCodepoint,
     super.iconColor,
     super.attachmentUrls,
@@ -59,6 +60,7 @@ class ExpenseModel extends Expense {
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
       // 'universal_usd_amount' is the USD anchor
       universalUsdAmount: (json['universal_usd_amount'])?.toString(),
+      baseCurrencyAmount: json['base_currency_amount']?.toString(),
       iconCodepoint: json['icon_codepoint'] as int?,
       iconColor: json['icon_color'] as int?,
       attachmentUrls: _parseAttachmentUrls(json['attachment_urls']),
@@ -79,6 +81,7 @@ class ExpenseModel extends Expense {
         'created_at': createdAt,
         if (createdBy != null) 'created_by': createdBy,
         'universal_usd_amount': universalUsdAmount, // Key MUST be universal_usd_amount
+        if (baseCurrencyAmount != null) 'base_currency_amount': baseCurrencyAmount,
         if (originalAmount != null) 'original_amount': originalAmount,
         if (originalCurrency != null) 'original_currency': originalCurrency,
         if (exchangeRateApplied != null) 'exchange_rate_applied': exchangeRateApplied,

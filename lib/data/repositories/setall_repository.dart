@@ -3868,11 +3868,19 @@ class SetAllRepository {
     var spend  = Decimal.zero;
     Decimal? cachedRate;
     for (final e in entries) {
-      final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
-      Decimal amt = usd;
-      if (baseCurrency != 'USD' && _currencyService != null && usd != Decimal.zero) {
-        cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
-        amt = (usd * cachedRate).round(scale: 2);
+      Decimal amt;
+      final frozen = e.baseCurrencyAmount;
+      if (frozen != null && frozen.isNotEmpty) {
+        // v33+: use frozen base-currency amount — immune to rate drift.
+        amt = Decimal.tryParse(frozen) ?? Decimal.zero;
+      } else {
+        // Legacy fallback for pre-v33 rows without base_currency_amount.
+        final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
+        amt = usd;
+        if (baseCurrency != 'USD' && _currencyService != null && usd != Decimal.zero) {
+          cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
+          amt = (usd * cachedRate).round(scale: 2);
+        }
       }
       if (e.isIncome) { income += amt; } else { spend += amt; }
     }
@@ -3885,6 +3893,34 @@ class SetAllRepository {
 
     final now = _now();
     final createdAt = entry.createdAt ?? now;
+
+    // Compute frozen base-currency amount at save time (schema v33+).
+    // This prevents USD-rate drift: wallet totals read this field directly
+    // instead of re-converting universalUsdAmount at live rates.
+    String? baseCurrencyAmount;
+    try {
+      final profile = await getCurrentUserProfile();
+      final baseCurrency = profile?.defaultCurrency ?? 'USD';
+      final entryCurrency = entry.currency;
+      if (entryCurrency == baseCurrency) {
+        // Same currency — amount IS the base amount, no conversion needed.
+        baseCurrencyAmount = entry.amount;
+      } else if (_currencyService != null) {
+        // Cross-currency — convert via USD pivot using rates already in cache.
+        final rateToUsd = await _resolveRateToUsd(entryCurrency);
+        final usdAmount = Decimal.tryParse(entry.amount) ?? Decimal.zero;
+        final usd = (usdAmount * rateToUsd).round(scale: 6);
+        if (baseCurrency == 'USD') {
+          baseCurrencyAmount = usd.toStringAsFixed(6);
+        } else {
+          final usdToBase = await _currencyService.getRate('USD', baseCurrency);
+          baseCurrencyAmount = (usd * usdToBase).round(scale: 6).toStringAsFixed(6);
+        }
+      }
+    } catch (_) {
+      // Non-fatal — fall back to null; getWalletEntryTotals will use live
+      // conversion as it did before v33 for this entry only.
+    }
 
     // Build an ExpenseModel so the entry is stored in the `expenses` table
     // (group_id IS NULL = personal wallet entry). This is the canonical store
@@ -3902,6 +3938,7 @@ class SetAllRepository {
       originalCurrency:    entry.originalCurrency,
       exchangeRateApplied: entry.exchangeRateApplied,
       universalUsdAmount:  entry.universalUsdAmount,
+      baseCurrencyAmount:  baseCurrencyAmount,
       iconCodepoint:       entry.iconCodepoint,
       iconColor:           entry.iconColor,
       notes:               entry.notes,
