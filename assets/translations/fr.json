@@ -396,7 +396,7 @@
   "wallet_entry": {
     "title": "Ajouter une entrée de portefeuille",
     "what_type": "Quel type d'entrée ?",
-    "choose_direction": "Choisissez la direction de cette entrée de portefeuille.",
+    "choose_direction": "Choisissez le sens de cette entrée dans le portefeuille.",
     "add_income": "AJOUTER UN REVENU",
     "income_subtitle": "Salaire, freelance, cadeau, rendement d'investissement…",
     "add_expense": "AJOUTER UNE DÉPENSE",
