@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -98,10 +99,12 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
     _pulseCtrl.repeat(reverse: true);
 
     try {
+      final locale = EasyLocalization.of(context)?.locale.toString();
       final transcript = await VoiceEntryService.instance.listen(
         onPartial: (p) {
           if (mounted) setState(() => _partial = p);
         },
+        preferredLocale: locale,
       );
       if (transcript.trim().isEmpty) {
         // STT returned empty — likely error_no_match or error_speech_timeout.

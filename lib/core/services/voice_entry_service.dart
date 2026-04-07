@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io' show Platform;
 
+import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
@@ -27,11 +29,28 @@ class VoiceEntryService {
   /// Listen until silence or 30s timeout. Returns transcript.
   Future<String> listen({
     void Function(String partial)? onPartial,
+    String? preferredLocale,
   }) async {
     if (!await initialize()) throw Exception('STT not available');
 
     final completer = Completer<String>();
     String lastResult = '';
+
+    // Determine best locale
+    String? localeToUse = preferredLocale;
+    if (localeToUse == null) {
+      try {
+        final available = await _stt.locales();
+        // Try to match device locale (e.g. 'ru_RU' → find 'ru-RU' or 'ru_RU')
+        final deviceLang = Platform.localeName.split('_').first.toLowerCase();
+        final match = available.firstWhereOrNull(
+          (l) => l.localeId.toLowerCase().startsWith(deviceLang),
+        );
+        localeToUse = match?.localeId; // null = engine default
+      } catch (_) {
+        localeToUse = null; // fallback to engine default
+      }
+    }
 
     await _stt.listen(
       onResult: (result) {
@@ -44,12 +63,12 @@ class VoiceEntryService {
       },
       listenFor: const Duration(seconds: 30),
       pauseFor: const Duration(seconds: 3),
-      localeId: 'en_US',
+      localeId: localeToUse,
       listenOptions: SpeechListenOptions(cancelOnError: true),
     );
 
     // Timeout fallback
-    Future.delayed(const Duration(seconds: 30), () {
+    Future.delayed(const Duration(seconds: 31), () {
       if (!completer.isCompleted) {
         _stt.stop();
         completer.complete(lastResult);
