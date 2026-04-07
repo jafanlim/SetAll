@@ -9,6 +9,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/wallet_entry_model.dart';
 import '../../../settings/services/pdf_export_service.dart';
@@ -1094,7 +1095,7 @@ class _PieOrDonut extends StatelessWidget {
               children: [
                 Text(
                   selectedEntry != null
-                      ? selectedEntry.key
+                      ? categoryTr(selectedEntry.key)
                       : 'analytics.total'.tr(),
                   style: const TextStyle(
                     fontSize: 11, fontWeight: FontWeight.w600,
@@ -1227,7 +1228,7 @@ class _BarChart extends StatelessWidget {
               SizedBox(
                 width: 88,
                 child: Text(
-                  e.key,
+                  categoryTr(e.key),
                   style: const TextStyle(
                     fontSize: 11, color: _kLabel,
                     fontWeight: FontWeight.w500),
@@ -1324,7 +1325,7 @@ class _CategoryLegend extends StatelessWidget {
                 ),
                 const SizedBox(width: 5),
                 Text(
-                  entries[i].key,
+                  categoryTr(entries[i].key),
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
@@ -1550,7 +1551,7 @@ class _VitalSignsRow extends StatelessWidget {
           label: 'analytics.top_category'.tr(),
           icon: Icons.star_outline_rounded,
           iconColor: _gold,
-          value: data.topCategory.isEmpty ? '—' : data.topCategory,
+          value: data.topCategory.isEmpty ? '—' : categoryTr(data.topCategory),
           valueCurrency: null,
           valueColor: Colors.white,
           sub: data.topCategoryPct > 0

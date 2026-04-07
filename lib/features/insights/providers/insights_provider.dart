@@ -166,7 +166,12 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       final httpRes = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': query, 'mode': mode, 'currency': baseCurrency}),
+        body: jsonEncode({
+          'query': query,
+          'mode': mode,
+          'currency': baseCurrency,
+          'language': ref.read(localeProvider).languageCode,
+        }),
       );
 
       if (httpRes.statusCode != 200) {

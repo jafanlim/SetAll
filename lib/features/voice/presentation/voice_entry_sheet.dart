@@ -161,10 +161,12 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           .map((g) => {'id': g.id, 'name': g.name})
           .toList();
 
+      final langCode = EasyLocalization.of(context)?.locale.languageCode ?? 'en';
       final result = await VoiceEntryService.instance.parse(
         transcript,
         groupMaps,
         widget.defaultCurrency,
+        language: langCode,
       );
 
       if (!mounted) return;
@@ -389,7 +391,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         ),
         const SizedBox(height: 8),
         Text(
-          _partial.isEmpty ? 'Speak your expense or income' : _partial,
+          _partial.isEmpty ? 'voice_entry.listening_hint'.tr() : _partial,
           style: TextStyle(
             fontSize: 14,
             color: _partial.isEmpty ? Colors.white38 : Colors.white70,

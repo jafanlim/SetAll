@@ -482,6 +482,7 @@
     "error_retry": "Попробовать снова",
     "couldnt_hear": "Не расслышал, пробую снова…",
     "group_label": "Группа",
-    "wallet_label": "Кошелёк"
+    "wallet_label": "Кошелёк",
+    "listening_hint": "Произнесите ваш расход или доход"
   }
 }

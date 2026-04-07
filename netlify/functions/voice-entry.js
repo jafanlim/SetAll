@@ -14,7 +14,7 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    const { transcript, groups = [], defaultCurrency = 'USD', knownCategories = [] } =
+    const { transcript, groups = [], defaultCurrency = 'USD', knownCategories = [], language = 'en' } =
       JSON.parse(event.body || '{}');
 
     if (!transcript || transcript.trim() === '') {
@@ -46,7 +46,7 @@ Rules:
   "dirham" → AED. If not mentioned, use defaultCurrency.
 - isIncome: true ONLY if user says "received", "got paid", "salary",
   "income", "earned", "credited", "deposited". Default false.
-- description: clean title-case phrase describing what was purchased or paid for.
+- description: short label for the entry IN THE USER'S INPUT LANGUAGE. Do NOT translate.
   Keep it short (3-6 words). Never include currency or amounts.
 - category: pick exactly one from knownCategories list provided.
 - groupNameHint: the group name as the user said it (fuzzy). null if type=wallet.

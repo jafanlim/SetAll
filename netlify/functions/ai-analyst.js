@@ -16,11 +16,13 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
-    const { query, mode = 'chat', currency = 'USD' } = JSON.parse(event.body);
+    const { query, mode = 'chat', currency = 'USD', language = 'en' } = JSON.parse(event.body);
     const apiKey = process.env.GROQ_API_KEY || process.env.Gemini || process.env.GEMINI_API_KEY;
     if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GROQ_API_KEY not configured' }) };
 
     const isCanvas = mode === 'canvas';
+    const langNames = { ru: 'Russian', de: 'German', es: 'Spanish', fr: 'French', ka: 'Georgian' };
+    const langLine = language !== 'en' ? `\nRespond entirely in ${langNames[language] || 'English'}.` : '';
 
     const systemPrompt = isCanvas
       ? `You are SetAll Analyst — a ruthlessly precise financial data scientist.
@@ -46,7 +48,7 @@ Rules:
 - backgroundColor must be an array of hex colours, one per data point.
 - Be brutally specific with numbers. Call out waste. Flag anomalies.
 - actions can contain "ADD_TREND" or "ADD_DONUT" to push extra widgets to the canvas.
-- IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.`
+- IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.${langLine}`
       : `You are SetAll AI — a direct, sharp financial strategist. Talk like a brilliant CFO to a peer. You have access to the user's real spending data in the message.
 Rules:
 - Be human. Be specific. Use the actual numbers from their data.
@@ -56,7 +58,7 @@ Rules:
 - Give real actionable advice, not generic financial tips.
 - You may ask one follow-up question if genuinely useful.
 - Respond in plain conversational text. No bullet points unless explicitly asked.
-- IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.`;
+- IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.${langLine}`;
 
     const maxTokens  = isCanvas ? 4096 : 1024;
     const temperature = isCanvas ? 0.2 : 0.9;

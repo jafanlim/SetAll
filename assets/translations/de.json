@@ -482,6 +482,7 @@
     "error_retry": "Erneut versuchen",
     "couldnt_hear": "Nicht gehört, versuche es erneut…",
     "group_label": "Gruppe",
-    "wallet_label": "Geldbörse"
+    "wallet_label": "Geldbörse",
+    "listening_hint": "Spreche deine Ausgabe oder Einnahme"
   }
 }

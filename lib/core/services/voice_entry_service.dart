@@ -87,8 +87,9 @@ class VoiceEntryService {
   Future<VoiceEntryResult> parse(
     String transcript,
     List<Map<String, dynamic>> groups,
-    String defaultCurrency,
-  ) async {
+    String defaultCurrency, {
+    String language = 'en',
+  }) async {
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyVoiceEntryUrl),
       headers: {'Content-Type': 'application/json'},
@@ -96,6 +97,7 @@ class VoiceEntryService {
         'transcript': transcript,
         'groups': groups,
         'defaultCurrency': defaultCurrency,
+        'language': language,
         'knownCategories': [
           'Food & drink',
           'Transport',

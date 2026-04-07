@@ -482,6 +482,7 @@
     "error_retry": "Intentar de nuevo",
     "couldnt_hear": "No te escuché, reintentando…",
     "group_label": "Grupo",
-    "wallet_label": "Cartera"
+    "wallet_label": "Cartera",
+    "listening_hint": "Di tu gasto o ingreso"
   }
 }

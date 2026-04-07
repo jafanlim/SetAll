@@ -28,6 +28,8 @@ const Color _kContentBg     = Color(0xFF020617);
 const Color _kTeal          = Color(0xFF14B8A6);
 const Color _kBorderColor   = Color(0x0DFFFFFF); // white @ 5 % opacity
 
+final _voiceSheetOpenProvider = StateProvider<bool>((ref) => false);
+
 /// Adaptive shell:
 ///   < 600dp  → BottomNavigationBar (mobile)
 ///  600–900dp → NavigationRail compact (tablet)
@@ -392,6 +394,10 @@ class _MobileLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(localeProvider.notifier).state = context.locale;
+    });
+    final voiceSheetOpen = ref.watch(_voiceSheetOpenProvider);
     final showFab = currentPath == '/' ||
         currentPath == '/wallet' ||
         currentPath == '/activity' ||
@@ -413,14 +419,15 @@ class _MobileLayout extends ConsumerWidget {
           ],
         ),
       ),
-      floatingActionButton: showFab
+      floatingActionButton: (showFab && !voiceSheetOpen)
           ? FloatingActionButton(
               heroTag: 'voiceMicFab',
-              onPressed: () {
+              onPressed: () async {
                 HapticUtils.primaryTap();
                 final groups       = ref.read(myGroupsProvider).value ?? [];
                 final baseCurrency = ref.read(baseCurrencyProvider).value ?? 'USD';
-                showModalBottomSheet<void>(
+                ref.read(_voiceSheetOpenProvider.notifier).state = true;
+                await showModalBottomSheet<void>(
                   context: context,
                   isScrollControlled: true,
                   backgroundColor: Colors.transparent,
@@ -429,6 +436,7 @@ class _MobileLayout extends ConsumerWidget {
                     defaultCurrency: baseCurrency,
                   ),
                 );
+                ref.read(_voiceSheetOpenProvider.notifier).state = false;
               },
               backgroundColor: const Color(0xFF7C3AED),
               tooltip: 'Add by voice',

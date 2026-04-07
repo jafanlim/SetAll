@@ -482,6 +482,7 @@
     "error_retry": "Réessayer",
     "couldnt_hear": "Je n'ai pas entendu, nouvel essai…",
     "group_label": "Groupe",
-    "wallet_label": "Portefeuille"
+    "wallet_label": "Portefeuille",
+    "listening_hint": "Dites votre dépense ou revenu"
   }
 }

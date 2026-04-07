@@ -482,6 +482,7 @@
     "error_retry": "Try Again",
     "couldnt_hear": "Couldn't hear you, trying again…",
     "group_label": "Group",
-    "wallet_label": "Wallet"
+    "wallet_label": "Wallet",
+    "listening_hint": "Speak your expense or income"
   }
 }

@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:flutter/material.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -391,3 +392,7 @@ final aiInsightsProvider = FutureProvider<List<AiInsightModel>>((ref) async {
     return [];
   }
 });
+
+/// Tracks the active app locale so providers without BuildContext can read languageCode.
+/// Updated by adaptive_shell on every build.
+final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));

@@ -482,6 +482,7 @@
     "error_retry": "ხელახლა ცდა",
     "couldnt_hear": "ვერ გავიგე, ვცდი ხელახლა…",
     "group_label": "ჯგუფი",
-    "wallet_label": "საფულე"
+    "wallet_label": "საფულე",
+    "listening_hint": "წარმოთქვით თქვენი ხარჯი ან შემოსავალი"
   }
 }
