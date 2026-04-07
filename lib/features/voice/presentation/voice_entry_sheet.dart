@@ -48,6 +48,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   String _partial   = '';
   String _transcript = '';
   String _errorMsg  = '';
+  int    _retryCount = 0;
   VoiceEntryResult? _result;
 
   // Inline edit state (initialised when entering confirming)
@@ -102,6 +103,28 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           if (mounted) setState(() => _partial = p);
         },
       );
+      if (transcript.trim().isEmpty) {
+        // STT returned empty — likely error_no_match or error_speech_timeout.
+        // Transient: show a brief hint and retry automatically (up to 3 times).
+        if (_retryCount < 3) {
+          _retryCount++;
+          if (mounted) {
+            setState(() => _partial = "Couldn't hear that, try again…");
+          }
+          await Future.delayed(const Duration(milliseconds: 1500));
+          await _startListening();
+        } else {
+          _retryCount = 0;
+          if (mounted) {
+            setState(() {
+              _state    = VoiceEntryState.error;
+              _errorMsg = "Couldn't hear anything. Check microphone and try again.";
+            });
+          }
+        }
+        return;
+      }
+      _retryCount = 0;
       _transcript = transcript;
       await _parse(_transcript);
     } catch (e) {

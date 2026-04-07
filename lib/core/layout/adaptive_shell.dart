@@ -414,6 +414,7 @@ class _MobileLayout extends ConsumerWidget {
       ),
       floatingActionButton: showFab
           ? FloatingActionButton(
+              heroTag: 'voiceMicFab',
               onPressed: () {
                 HapticUtils.primaryTap();
                 final groups       = ref.read(myGroupsProvider).value ?? [];
