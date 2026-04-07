@@ -426,5 +426,23 @@
     "body": "Your device language is {language}. Continue or choose another?",
     "keep": "Continue in {language}",
     "change": "Choose language"
+  },
+  "voice_entry": {
+    "listening": "Listening…",
+    "tap_to_stop": "Tap to stop",
+    "processing": "Understanding your entry…",
+    "clarify_prompt": "What did you mean?",
+    "confirm_title": "Confirm Entry",
+    "amount_label": "Amount",
+    "description_label": "Description",
+    "confirm_btn": "Confirm",
+    "cancel_btn": "Cancel",
+    "saving": "Saving…",
+    "saved": "Saved!",
+    "error_title": "Couldn't process that",
+    "error_retry": "Try Again",
+    "couldnt_hear": "Couldn't hear you, trying again…",
+    "group_label": "Group",
+    "wallet_label": "Wallet"
   }
 }

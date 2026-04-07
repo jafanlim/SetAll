@@ -426,5 +426,23 @@
     "body": "გამოვლინდა ენა: {language}. გაგრძელება თუ სხვის არჩევა?",
     "keep": "გაგრძელება {language}-ზე",
     "change": "ენის არჩევა"
+  },
+  "voice_entry": {
+    "listening": "ვუსმენ…",
+    "tap_to_stop": "შეჩერებისთვის შეეხეთ",
+    "processing": "ვამუშავებ ჩანაწერს…",
+    "clarify_prompt": "რას გულისხმობდით?",
+    "confirm_title": "ჩანაწერის დადასტურება",
+    "amount_label": "თანხა",
+    "description_label": "აღწერა",
+    "confirm_btn": "დადასტურება",
+    "cancel_btn": "გაუქმება",
+    "saving": "ინახება…",
+    "saved": "შენახულია!",
+    "error_title": "დამუშავება ვერ მოხდა",
+    "error_retry": "ხელახლა ცდა",
+    "couldnt_hear": "ვერ გავიგე, ვცდი ხელახლა…",
+    "group_label": "ჯგუფი",
+    "wallet_label": "საფულე"
   }
 }

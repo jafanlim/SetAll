@@ -426,5 +426,23 @@
     "body": "Erkannte Sprache: {language}. Weiter oder andere wählen?",
     "keep": "Weiter auf {language}",
     "change": "Sprache wählen"
+  },
+  "voice_entry": {
+    "listening": "Höre zu…",
+    "tap_to_stop": "Tippen zum Stoppen",
+    "processing": "Eintrag wird verarbeitet…",
+    "clarify_prompt": "Was meintest du?",
+    "confirm_title": "Eintrag bestätigen",
+    "amount_label": "Betrag",
+    "description_label": "Beschreibung",
+    "confirm_btn": "Bestätigen",
+    "cancel_btn": "Abbrechen",
+    "saving": "Speichern…",
+    "saved": "Gespeichert!",
+    "error_title": "Verarbeitung fehlgeschlagen",
+    "error_retry": "Erneut versuchen",
+    "couldnt_hear": "Nicht gehört, versuche es erneut…",
+    "group_label": "Gruppe",
+    "wallet_label": "Geldbörse"
   }
 }

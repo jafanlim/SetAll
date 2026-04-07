@@ -426,5 +426,23 @@
     "body": "Idioma {language} detectado. ¿Continuar o elegir otro?",
     "keep": "Continuar en {language}",
     "change": "Elegir idioma"
+  },
+  "voice_entry": {
+    "listening": "Escuchando…",
+    "tap_to_stop": "Toca para detener",
+    "processing": "Procesando entrada…",
+    "clarify_prompt": "¿Qué quisiste decir?",
+    "confirm_title": "Confirmar entrada",
+    "amount_label": "Importe",
+    "description_label": "Descripción",
+    "confirm_btn": "Confirmar",
+    "cancel_btn": "Cancelar",
+    "saving": "Guardando…",
+    "saved": "¡Guardado!",
+    "error_title": "No se pudo procesar",
+    "error_retry": "Intentar de nuevo",
+    "couldnt_hear": "No te escuché, reintentando…",
+    "group_label": "Grupo",
+    "wallet_label": "Cartera"
   }
 }

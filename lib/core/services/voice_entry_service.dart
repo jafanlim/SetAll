@@ -21,7 +21,9 @@ class VoiceEntryService {
   Future<bool> initialize() async {
     if (_initialized) return true;
     _initialized = await _stt.initialize(
-      onError: (error) => debugPrint('[VoiceEntry] STT error: $error'),
+      onError: (error) {
+        if (kDebugMode) debugPrint('[VoiceEntry] STT error: $error');
+      },
     );
     return _initialized;
   }

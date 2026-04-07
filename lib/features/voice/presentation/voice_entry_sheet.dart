@@ -112,7 +112,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         if (_retryCount < 3) {
           _retryCount++;
           if (mounted) {
-            setState(() => _partial = "Couldn't hear that, try again…");
+            setState(() => _partial = 'voice_entry.couldnt_hear'.tr());
           }
           await Future.delayed(const Duration(milliseconds: 1500));
           await _startListening();
@@ -121,7 +121,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           if (mounted) {
             setState(() {
               _state    = VoiceEntryState.error;
-              _errorMsg = "Couldn't hear anything. Check microphone and try again.";
+              _errorMsg = 'voice_entry.couldnt_hear'.tr();
             });
           }
         }
@@ -134,7 +134,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       if (mounted) {
         setState(() {
           _state    = VoiceEntryState.error;
-          _errorMsg = 'Could not access microphone. Check permissions.';
+          _errorMsg = 'voice_entry.error_title'.tr();
         });
       }
     }
@@ -379,9 +379,9 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           ),
         ),
         const SizedBox(height: 24),
-        const Text(
-          'Listening...',
-          style: TextStyle(
+        Text(
+          'voice_entry.listening'.tr(),
+          style: const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
             color: Colors.white,
@@ -402,6 +402,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           width: 64,
           height: 64,
           child: FloatingActionButton(
+            heroTag: 'voiceStopFab',
             onPressed: _stopEarly,
             backgroundColor: Colors.white12,
             elevation: 0,
@@ -409,7 +410,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           ),
         ),
         const SizedBox(height: 8),
-        const Text('Tap to stop', style: TextStyle(fontSize: 11, color: Colors.white38)),
+        Text('voice_entry.tap_to_stop'.tr(), style: const TextStyle(fontSize: 11, color: Colors.white38)),
       ],
     );
   }
@@ -417,16 +418,16 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   // ── PROCESSING ───────────────────────────────────────────────────────────
 
   Widget _buildProcessing() {
-    return const Column(
+    return Column(
       children: [
-        SizedBox(height: 60),
-        CircularProgressIndicator(color: _teal),
-        SizedBox(height: 24),
+        const SizedBox(height: 60),
+        const CircularProgressIndicator(color: _teal),
+        const SizedBox(height: 24),
         Text(
-          'Understanding your entry...',
-          style: TextStyle(fontSize: 16, color: Colors.white70),
+          'voice_entry.processing'.tr(),
+          style: const TextStyle(fontSize: 16, color: Colors.white70),
         ),
-        SizedBox(height: 60),
+        const SizedBox(height: 60),
       ],
     );
   }
@@ -502,7 +503,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Submit', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text('voice_entry.confirm_btn'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
       ],
@@ -600,7 +601,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
                     flex: 3,
                     child: _darkField(
                       controller: _amountCtrl,
-                      label: 'Amount',
+                      label: 'voice_entry.amount_label'.tr(),
                       keyboard: const TextInputType.numberWithOptions(decimal: true),
                       onChanged: (v) {
                         final parsed = double.tryParse(v);
@@ -639,7 +640,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
               // Editable: Description
               _darkField(
                 controller: _descCtrl,
-                label: 'Description',
+                label: 'voice_entry.description_label'.tr(),
                 onChanged: (v) => setState(() => _editDescription = v),
               ),
               const SizedBox(height: 12),
@@ -665,7 +666,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           child: FilledButton.icon(
             onPressed: _confirm,
             icon: const Icon(Icons.check_rounded),
-            label: const Text('Confirm', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            label: Text('voice_entry.confirm_btn'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             style: FilledButton.styleFrom(
               backgroundColor: _teal,
               foregroundColor: Colors.black,
@@ -685,7 +686,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
               Navigator.of(context).pop();
             },
             style: TextButton.styleFrom(foregroundColor: Colors.white38),
-            child: const Text('Cancel'),
+            child: Text('voice_entry.cancel_btn'.tr()),
           ),
         ),
       ],
@@ -724,7 +725,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   // ── SAVING ───────────────────────────────────────────────────────────────
 
   Widget _buildSaving() {
-    return const Column(
+    return Column(
       children: [
         SizedBox(height: 60),
         SizedBox(
@@ -733,7 +734,10 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           child: CircularProgressIndicator(color: _teal, strokeWidth: 2.5),
         ),
         SizedBox(height: 20),
-        Text('Saving...', style: TextStyle(fontSize: 16, color: Colors.white70)),
+        Text(
+          'voice_entry.saving'.tr(),
+          style: const TextStyle(fontSize: 16, color: Colors.white70),
+        ),
         SizedBox(height: 60),
       ],
     );
@@ -742,14 +746,14 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   // ── DONE ─────────────────────────────────────────────────────────────────
 
   Widget _buildDone() {
-    return const Column(
+    return Column(
       children: [
         SizedBox(height: 48),
         Icon(Icons.check_circle_rounded, color: _teal, size: 64),
         SizedBox(height: 16),
         Text(
-          'Saved!',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
+          'voice_entry.saved'.tr(),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
         ),
         SizedBox(height: 48),
       ],
@@ -780,7 +784,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
               padding: const EdgeInsets.symmetric(vertical: 14),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             ),
-            child: const Text('Try again', style: TextStyle(fontWeight: FontWeight.w700)),
+            child: Text('voice_entry.error_retry'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
         ),
         const SizedBox(height: 40),

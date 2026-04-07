@@ -426,5 +426,23 @@
     "body": "Обнаружен язык: {language}. Продолжить или выбрать другой?",
     "keep": "Продолжить на {language}",
     "change": "Выбрать язык"
+  },
+  "voice_entry": {
+    "listening": "Слушаю…",
+    "tap_to_stop": "Нажмите для остановки",
+    "processing": "Обрабатываю запись…",
+    "clarify_prompt": "Что вы имели в виду?",
+    "confirm_title": "Подтвердить запись",
+    "amount_label": "Сумма",
+    "description_label": "Описание",
+    "confirm_btn": "Подтвердить",
+    "cancel_btn": "Отмена",
+    "saving": "Сохраняю…",
+    "saved": "Сохранено!",
+    "error_title": "Не удалось обработать",
+    "error_retry": "Попробовать снова",
+    "couldnt_hear": "Не расслышал, пробую снова…",
+    "group_label": "Группа",
+    "wallet_label": "Кошелёк"
   }
 }

@@ -1,0 +1,413 @@
+key,de,en,es,fr,ka,ru
+activity.all,Alle,All,Todo,Tout,ყველა,Все
+activity.expense,Ausgabe,Expense,Gasto,Dépense,ხარჯი,Расход
+activity.group_by_date,Datum,Date,Fecha,Date,თარიღი,Дата
+activity.group_by_type,Typ,Type,Tipo,Type,ტიპი,Тип
+activity.income,Einnahme,Income,Ingreso,Revenu,შემოსავალი,Доход
+activity.items,{count} Einträge,{count} items,{count} registros,{count} entrées,{count} ჩანაწერი,{count} записей
+activity.no_activity,Noch keine Aktivität,No activity yet,Aún no hay actividad,Pas encore d'activité,აქტივობა ჯერ არ არის,Активности пока нет
+activity.start_tracking,Tracking starten,Start Tracking,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,Начать учёт
+activity.title,Aktivität,Activity,Actividad,Activité,აქტივობა,Активность
+activity_screen.could_not_load,Aktivität konnte nicht geladen werden,Could not load activity,No se pudo cargar la actividad,Impossible de charger l'activité,აქტივობის ჩატვირთვა ვერ მოხერხდა,Не удалось загрузить активность
+activity_screen.delete_items_one,1 Element löschen?,Delete 1 item?,¿Eliminar 1 elemento?,Supprimer 1 élément ?,1 ელემენტის წაშლა?,Удалить 1 элемент?
+activity_screen.delete_items_other,{count} Elemente löschen?,Delete {count} items?,¿Eliminar {count} elementos?,Supprimer {count} éléments ?,{count} ელემენტის წაშლა?,Удалить {count} элементов?
+activity_screen.filter_groups,Gruppen,Groups,Grupos,Groupes,ჯგუფები,Группы
+activity_screen.filter_income,Einnahmen,Income,Ingresos,Revenus,შემოსავალი,Доходы
+activity_screen.filter_wallet,Brieftasche,Wallet,Cartera,Portefeuille,საფულე,Кошелёк
+activity_screen.search_hint,"Ausgaben, Gruppen, Personen suchen…","Search expenses, groups, people…","Buscar gastos, grupos, personas…","Rechercher dépenses, groupes, personnes…","ხარჯების, ჯგუფების, ადამიანების ძიება…","Поиск расходов, групп, людей…"
+activity_screen.section_earlier,Früher,Earlier,Antes,Plus tôt,ადრე,Ранее
+activity_screen.section_this_week,Diese Woche,This Week,Esta semana,Cette semaine,ამ კვირაში,На этой неделе
+activity_screen.section_today,Heute,Today,Hoy,Aujourd'hui,დღეს,Сегодня
+activity_screen.section_yesterday,Gestern,Yesterday,Ayer,Hier,გუშინ,Вчера
+activity_screen.type_edits_deletes,Bearbeitungen & Löschungen,Edits & Deletes,Ediciones y eliminaciones,Modifications et suppressions,რედაქტირება და წაშლა,Изменения и удаления
+activity_screen.type_group_events,Gruppenereignisse,Group Events,Eventos del grupo,Événements du groupe,ჯგუფის მოვლენები,События группы
+activity_screen.type_group_expenses,Gruppenausgaben,Group Expenses,Gastos del grupo,Dépenses du groupe,ჯგუფის ხარჯები,Расходы группы
+activity_screen.type_income,Einnahmen,Income,Ingresos,Revenus,შემოსავალი,Доходы
+activity_screen.type_other,Sonstiges,Other,Otros,Autres,სხვა,Прочее
+activity_screen.type_settlements,Abrechnungen,Settlements,Liquidaciones,Règlements,ანგარიშსწორება,Расчёты
+activity_screen.type_wallet,Brieftasche,Wallet,Cartera,Portefeuille,საფულე,Кошелёк
+add_expense.amount_currency,Betrag & Währung,Amount & currency,Importe y moneda,Montant et devise,თანხა და ვალუტა,Сумма и валюта
+add_expense.amount_label,Betrag,Amount,Importe,Montant,თანხა,Сумма
+add_expense.amount_unusually_large,Betrag übersteigt $10.000.000 — ist das korrekt?,"Amount exceeds $10,000,000 — is this correct?","El monto supera $10,000,000 — ¿es correcto?",Le montant dépasse $10 000 000 — est-ce correct?,"თანხა აღემატება $10,000,000 — დარწმუნებული ხართ?","Сумма превышает $10,000,000 — вы уверены?"
+add_expense.amounts_must_sum,Beträge müssen {amount} ergeben (erhalten: {total}),Amounts must sum to {amount} (got {total}),Los importes deben sumar {amount} (obtenido: {total}),Les montants doivent totaliser {amount} (obtenu : {total}),ჯამი უნდა იყოს {amount} (მიღებული: {total}),Сумма должна быть {amount} (получено: {total})
+add_expense.apply,Anwenden,Apply,Aplicar,Appliquer,გამოყენება,Применить
+add_expense.back,Zurück,Back,Atrás,Retour,უკან,Назад
+add_expense.category_label,Kategorie,Category,Categoría,Catégorie,კატეგორია,Категория
+add_expense.change_icon,Symbol & Farbe ändern,Change icon & colour,Cambiar icono y color,Changer l'icône et la couleur,ხატისა და ფერის შეცვლა,Изменить иконку и цвет
+add_expense.colour_label,Farbe,Colour,Color,Couleur,ფერი,Цвет
+add_expense.could_not_get_user,Benutzer konnte nicht abgerufen werden. Erneut versuchen.,Could not get user. Try again.,No se pudo obtener el usuario. Inténtalo de nuevo.,Impossible d'obtenir l'utilisateur. Réessayez.,მომხმარებლის მიღება ვერ მოხდა. სცადეთ ახლავე.,Не удалось получить пользователя. Попробуйте снова.
+add_expense.could_not_save,Eintrag konnte nicht gespeichert werden,Could not save entry,No se pudo guardar la entrada,Impossible d'enregistrer l'entrée,ჩანაწერის შენახვა ვერ მოხდა,Не удалось сохранить запись
+add_expense.could_not_save_expense,Ausgabe konnte nicht gespeichert werden,Could not save expense,No se pudo guardar el gasto,Impossible d'enregistrer la dépense,ხარჯის შენახვა ვერ მოხდა,Не удалось сохранить расход
+add_expense.description_hint,Wofür war das?,What was this for?,¿Para qué fue esto?,Pour quoi était-ce ?,რისთვის იყო?,Для чего это было?
+add_expense.description_label,Beschreibung,Description,Descripción,Description,აღწერა,Описание
+add_expense.details,Details,Details,Detalles,Détails,დეტალები,Детали
+add_expense.enter_share,Mindestens einen Anteil eingeben,Enter at least one share,Introduce al menos una parte,Entrez au moins une part,შეიყვანეთ სულ მცირე ერთი წილი,Введите хотя бы одну долю
+add_expense.enter_valid_amount,Gültigen Betrag eingeben,Enter a valid amount,Introduce un importe válido,Entrez un montant valide,შეიყვანეთ სწორი თანხა,Введите корректную сумму
+add_expense.expense_saved,Persönliche Ausgabe gespeichert,Personal expense saved,Gasto personal guardado,Dépense personnelle enregistrée,პირადი ხარჯი შეინახა,Личный расход сохранён
+add_expense.group_expense_saved,Ausgabe gespeichert,Expense saved,Gasto guardado,Dépense enregistrée,ხარჯი შეინახა,Расход сохранён
+add_expense.how_to_split,Wie aufteilen,How to split,Cómo dividir,Comment diviser,როგორ გავყოთ,Как разделить
+add_expense.icon_colour,Symbol & Farbe,Icon & Colour,Icono y color,Icône et couleur,ხატი და ფერი,Иконка и цвет
+add_expense.icon_label,Symbol,Icon,Icono,Icône,ხატი,Значок
+add_expense.income_recorded,Einnahme gespeichert,Income recorded,Ingreso registrado,Revenu enregistré,შემოსავალი ჩაიწერა,Доход записан
+add_expense.income_type,Einnahmenart,Income type,Tipo de ingreso,Type de revenu,შემოსავლის ტიპი,Тип дохода
+add_expense.manual_enter_total,Zuerst Gesamtbetrag eingeben,Enter total amount first,Introduce primero el importe total,Entrez d'abord le montant total,ჯერ შეიყვანეთ საერთო თანხა,Сначала введите общую сумму
+add_expense.manual_rate_label,Manueller Kurs (Bank / Bar),Manual rate (bank / cash),Tasa manual (banco / efectivo),Taux manuel (banque / espèces),ხელღვანდებული კურსი (ბანკი / ნაღდი),Ручной курс (банк / наличные)
+add_expense.manual_rate_optional,Manueller Kurs (Optional),Manual Rate (Optional),Tasa manual (opcional),Taux manuel (optionnel),ხელით კურსი (სურვილისამებრ),Ручной курс (необязательно)
+add_expense.manual_sum_matches,Summe: {currency} {sum} — entspricht Gesamt,Sum: {currency} {sum} — matches total,Suma: {currency} {sum} — coincide,Somme : {currency} {sum} — correspond,ჯამი: {currency} {sum} — ემთხვევა,Сумма: {currency} {sum} — совпадает с итогом
+add_expense.manual_sum_over,Summe: {currency} {sum} — {diff} zu viel,Sum: {currency} {sum} — {diff} over total,Suma: {currency} {sum} — {diff} de más,Somme : {currency} {sum} — {diff} de trop,ჯამი: {currency} {sum} — {diff} ზედმეტია,Сумма: {currency} {sum} — превышение на {diff}
+add_expense.manual_sum_remaining,Summe: {currency} {sum} — {diff} verbleibend,Sum: {currency} {sum} — {diff} remaining,Suma: {currency} {sum} — {diff} restante,Somme : {currency} {sum} — {diff} restant,ჯამი: {currency} {sum} — {diff} დარცა,Сумма: {currency} {sum} — осталось {diff}
+add_expense.member_n,Mitglied {n},Member {n},Miembro {n},Membre {n},წევრი {n},Участник {n}
+add_expense.new_category_btn,Neu,New,Nuevo,Nouveau,ახალი,Новая
+add_expense.next,Weiter,Next,Siguiente,Suivant,შემდეგი,Далее
+add_expense.no_members,Keine Mitglieder in dieser Gruppe. Zuerst Mitglieder hinzufügen.,No members in this group. Add members first.,No hay miembros en este grupo. Añade miembros primero.,Aucun membre dans ce groupe. Ajoutez d'abord des membres.,ჯგუფში წევრები არ არიან. ჯერ დაამატეთ წევრები.,В группе нет участников. Сначала добавьте участников.
+add_expense.notes_hint,Optionale Notiz…,Optional note…,Nota opcional…,Note optionnelle…,სურვილისამებრ შენიშვნა…,Необязательная заметка…
+add_expense.notes_label,Notizen,Notes,Notas,Notes,შენიშვნები,Заметки
+add_expense.payer_label,Bezahlt von,Paid by,Pagado por,Payé par,გადაიხადა,Кто платил
+add_expense.percentages_must_sum,Prozentwerte müssen 100 ergeben,Percentages must sum to 100,Los porcentajes deben sumar 100,Les pourcentages doivent totaliser 100,პროცენტების ჯამი უნდა იყოს 100,Сумма процентов должна быть 100
+add_expense.save_expense,Ausgabe speichern,Save expense,Guardar gasto,Enregistrer la dépense,ხარჯის შენახვა,Сохранить расход
+add_expense.save_income,Einnahme speichern,Save income,Guardar ingreso,Enregistrer le revenu,შემოსავლის შენახვა,Сохранить доход
+add_expense.saving,Speichern…,Saving…,Guardando…,Enregistrement…,ინახება…,Сохраняю…
+add_expense.split_even,Gleich,Even,Igual,Égal,თანაბრად,Поровну
+add_expense.split_evenly_members,Gleichmäßig auf {count} Mitglieder aufteilen,Split evenly among {count} members,Dividir equitativamente entre {count} miembros,Répartir équitablement entre {count} membres,თანაბრად {count} წევრზე,Равномерно на {count} участников
+add_expense.split_hint_manual,Genaue Summe pro Person,Exact amount per person,Importe exacto por persona,Montant exact par personne,ზუსტი თანხა ადამიანზე,Точная сумма на человека
+add_expense.split_hint_percent,Prozent pro Person (Summe = 100),Percentage per person (total = 100),Porcentaje por persona (total = 100),Pourcentage par personne (total = 100),პროცენტი ადამიანზე (ჯამი = 100),Процент на человека (сумма = 100)
+add_expense.split_hint_shares,Relative Anteile pro Person,Relative shares per person,Partes relativas por persona,Parts relatives par personne,ფარდობითი წილები,Относительные доли
+add_expense.split_label,Aufteilen,Split,Dividir,Répartir,გაყოფა,Разделить
+add_expense.split_manual,Manuell,Manual,Manual,Manuel,ხელით,Вручную
+add_expense.split_percent,%,%,%,%,%,%
+add_expense.split_shares,Anteile,Shares,Partes,Parts,წილები,Доли
+add_expense.standard_categories,Standard,Standard,Estándar,Standard,სტანდარტული,Стандартные
+add_expense.title_expense,Ausgabe hinzufügen,Add expense,Añadir gasto,Ajouter une dépense,ხარჯის დამატება,Добавить расход
+add_expense.title_income,Einnahme hinzufügen,Add income,Añadir ingreso,Ajouter un revenu,შემოსავლის დამატება,Добавить доход
+add_expense.unsupported_file,"Nicht unterstützter Dateityp. Erlaubt: Bilder, PDF, TXT, MD.","Unsupported file type. Allowed: images, PDF, TXT, MD.","Tipo de archivo no admitido. Permitidos: imágenes, PDF, TXT, MD.","Type de fichier non pris en charge. Autorisés : images, PDF, TXT, MD.","მხარდაუჭერი ფაილის ტიპი. დაშვებულია: სურათები, PDF, TXT, MD.","Неподдерживаемый тип файла. Разрешены: изображения, PDF, TXT, MD."
+add_expense.your_categories,Eigene Kategorien,Your Categories,Tus categorías,Vos catégories,თქვენი კატეგორიები,Ваши категории
+analytics.all_groups,Alle Gruppen,All groups,Todos los grupos,Tous les groupes,ყველა ჯგუფი,Все группы
+analytics.all_transactions,Alle Transaktionen,All Transactions,Todas las transacciones,Toutes les transactions,ყველა ტრანზაქცია,Все операции
+analytics.balance_sheet,Bilanz,Balance Sheet,Balance,Bilan,ბალანსი,Баланс
+analytics.burn_rate,Ausgaberate,Burn Rate,Tasa de gasto,Taux de dépense,ხარჯვის ტემპი,Темп трат
+analytics.burn_rate_detail,Ausgaberate: {currency} {rate} / Tag,Burn rate: {currency} {rate} / day,Tasa: {currency} {rate} / día,Taux : {currency} {rate} / jour,ხარჯის ტემპი: {currency} {rate} / დღე,Расход: {currency} {rate} / день
+analytics.chart_bar,Balken,Bar,Barra,Barre,ბარი,Столбцы
+analytics.chart_donut,Donut,Donut,Dona,Donut,დონატი,Пончик
+analytics.chart_pie,Kreis,Pie,Tarta,Camembert,ტორტი,Круговая
+analytics.currencies,Währungen,Currencies,Divisas,Devises,ვალუტები,Валюты
+analytics.daily_burn,Tagesbedarf,Daily burn,Gasto diario,Dépense journalière,დღიური ხარჯი,Дневной расход
+analytics.date_custom,Benutzerdefiniert,Custom,Personalizado,Personnalisé,მორგებული,Пользовательский
+analytics.filter_all,Alle,All,Todo,Tout,ყველა,Все
+analytics.groups,Gruppen,Groups,Grupos,Groupes,ჯგუფები,Группы
+analytics.income,Einnahmen,Income,Ingresos,Revenus,შემოსავალი,Доходы
+analytics.income_breakdown,Einnahmen nach Kategorie,Income by Category,Ingresos por categoría,Revenus par catégorie,შემოსავალი კატეგორიით,Доходы по категориям
+analytics.income_vs_expense,Einnahmen vs. Ausgaben,Income vs Expense,Ingresos vs Gastos,Revenus vs Dépenses,შემოსავალი vs ხარჯი,Доходы и расходы
+analytics.mode_balance,Bilanz,Balance Sheet,Balance,Bilan,ბალანსი,Баланс
+analytics.mode_income,Einnahmen,Income,Ingresos,Revenus,შემოსავლები,Доходы
+analytics.mode_spending,Ausgaben,Spending,Gastos,Dépenses,ხარჯები,Расходы
+analytics.more,weitere,more,más,de plus,მეტი,ещё
+analytics.more_transactions,+{n} weitere Transaktionen,+{n} more transactions,+{n} transacciones más,+{n} transactions de plus,კიდევ {n} ტრანზაქცია,ещё {n} операций
+analytics.net_flow,Nettofluss,Net Flow,Flujo neto,Flux net,წმინდა ნაკადი,Чистый поток
+analytics.net_position,Nettoposition,Net Position,Posición neta,Position nette,წმინდა პოზიცია,Чистая позиция
+analytics.net_position_trend,Nettoposition — 30 Tage,Net Position — 30 Days,Posición neta — 30 días,Position nette — 30 jours,წმინდა პოზიცია — 30 დღე,Чистая позиция — 30 дней
+analytics.no_data,Noch keine Ausgabendaten,No spending data yet,Aún no hay datos de gastos,Pas encore de données de dépenses,ხარჯების მონაცემები ჯერ არ არის,Данных о расходах пока нет
+analytics.no_data_hint,"Füge Ausgaben hinzu, um Einblicke zu sehen.",Add expenses to see your spending insights.,Añade gastos para ver tus estadísticas.,Ajoutez des dépenses pour voir vos statistiques.,დაამატეთ ხარჯები სტატისტიკის სანახავად.,Добавьте расходы для просмотра аналитики.
+analytics.other,Sonstiges,Other,Otros,Autres,სხვა,Другое
+analytics.pct_of_spend,{pct}% der Ausgaben,{pct}% of spend,{pct}% del gasto,{pct}% des dépenses,{pct}% ხარჯებიდან,{pct}% от расходов
+analytics.per_day,pro Tag,per day,por día,par jour,დღეში,в день
+analytics.spending,Ausgaben,Spending,Gastos,Dépenses,ხარჯები,Расходы
+analytics.spending_by_category,Ausgaben nach Kategorie,Spending by Category,Gastos por categoría,Dépenses par catégorie,ხარჯები კატეგორიის მიხედვით,Расходы по категориям
+analytics.start_tracking,Tracking starten,Start Tracking,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,Начать учёт
+analytics.title,Analyse,Analytics,Análisis,Analyses,ანალიტიკა,Аналитика
+analytics.today,Heute,Today,Hoy,Aujourd'hui,დღეს,Сегодня
+analytics.top_category,Hauptkategorie,Top Category,Categoría principal,Catégorie principale,მთავარი კატეგორია,Главная категория
+analytics.total,Gesamt,Total,Total,Total,სულ,Итого
+analytics.total_expenses,Gesamtausgaben,Total Expenses,Gastos totales,Dépenses totales,სულ ხარჯები,Итого расходов
+analytics.total_income,Gesamteinnahmen,Total Income,Ingresos totales,Revenus totaux,სულ შემოსავალი,Итого доходов
+analytics.vs_prev_pct,{sign}{pct}% ggü. Vorperiode,{sign}{pct}% vs prev,{sign}{pct}% vs. anterior,{sign}{pct}% vs préc.,{sign}{pct}% წინა პერ.,{sign}{pct}% к пред. периоду
+analytics.vs_prev_period,vs. Vorperiode,vs prev period,vs período anterior,vs période précédente,წინა პერიოდთან,vs прошлый период
+analytics.wallet,Geldbörse,Wallet,Cartera,Portefeuille,საფულე,Кошелёк
+categories.bills_utilities,Rechnungen & Versorgung,Bills & utilities,Facturas y servicios,Factures et services,გადასახადები,Счета и услуги
+categories.entertainment,Unterhaltung,Entertainment,Entretenimiento,Divertissement,გართობა,Развлечения
+categories.food_drink,Essen & Trinken,Food & drink,Comida y bebida,Nourriture et boissons,საკვები და სასმელი,Еда и напитки
+categories.general,Allgemein,General,General,Général,ზოგადი,Общее
+categories.other,Sonstiges,Other,Otro,Autre,სხვა,Прочее
+categories.shopping,Einkaufen,Shopping,Compras,Shopping,შოპინგი,Шоппинг
+categories.transport,Transport,Transport,Transporte,Transport,ტრანსპორტი,Транспорт
+categories.travel,Reisen,Travel,Viajes,Voyage,მოგზაურობა,Путешествия
+common.add_friend,Freund hinzufügen,Add friend,Agregar amigo,Ajouter un ami,მეგობრის დამატება,Добавить друга
+common.apply,Anwenden,Apply,Aplicar,Appliquer,გამოყენება,Применить
+common.attachments,Anhänge,Attachments,Adjuntos,Pièces jointes,დანართები,Вложения
+common.camera,Kamera,Camera,Cámara,Caméra,კამერა,Камера
+common.cancel,Abbrechen,Cancel,Cancelar,Annuler,გაუქმება,Отмена
+common.cannot_be_undone,Dies kann nicht rückgängig gemacht werden.,This cannot be undone.,Esto no se puede deshacer.,Cette action est irréversible.,ეს შეუქცევადია.,Это нельзя отменить.
+common.clear,Löschen,Clear,Borrar,Effacer,გასუფთავება,Очистить
+common.clear_all,Alle löschen,Clear all,Borrar todo,Tout effacer,გასუფთავება,Очистить всё
+common.continue_anyway,Fortfahren,Continue,Continuar,Continuer,გაგრძელება,Продолжить
+common.delete,Löschen,Delete,Eliminar,Supprimer,წაშლა,Удалить
+common.delete_count,Löschen ({count}),Delete ({count}),Eliminar ({count}),Supprimer ({count}),წაშლა ({count}),Удалить ({count})
+common.deselect_all,Auswahl aufheben,Deselect All,Deseleccionar todo,Désélectionner tout,მონიშვნის მოხსნა,Снять выбор
+common.done,Fertig,Done,Listo,Terminé,მზადაა,Готово
+common.edit,Bearbeiten,Edit,Editar,Modifier,რედაქტირება,Изменить
+common.error,Etwas ist schiefgelaufen,Something went wrong,Algo salió mal,Quelque chose s'est mal passé,შეცდომა მოხდა,Что-то пошло не так
+common.file,Datei,File,Archivo,Fichier,ფაილი,Файл
+common.gallery,Galerie,Gallery,Galería,Galerie,გალერეა,Галерея
+common.general,Allgemein,General,General,Général,ზოგადი,Общее
+common.largest_first,Höchster Betrag zuerst,Largest first,Mayor importe primero,Montant le plus élevé d'abord,დიდი თანხა პირველი,По убыванию суммы
+common.loading,Wird geladen…,Loading…,Cargando…,Chargement…,იტვირთება…,Загрузка…
+common.name_az,Name A→Z,Name A→Z,Nombre A→Z,Nom A→Z,სახელი ა→ჰ,Имя А→Я
+common.name_za,Name Z→A,Name Z→A,Nombre Z→A,Nom Z→A,სახელი ჰ→ა,Имя Я→А
+common.newest_first,Neueste zuerst,Newest first,Más recientes primero,Plus récents d'abord,ახალი პირველი,Сначала новые
+common.oldest_first,Älteste zuerst,Oldest first,Más antiguos primero,Plus anciens d'abord,ძველი პირველი,Сначала старые
+common.refresh,Aktualisieren,Refresh,Actualizar,Actualiser,განახლება,Обновить
+common.rename,Umbenennen,Rename,Renombrar,Renommer,გადარქმევა,Переименовать
+common.retry,Wiederholen,Retry,Reintentar,Réessayer,ხელახლა ცდა,Повторить
+common.save,Speichern,Save,Guardar,Enregistrer,შენახვა,Сохранить
+common.select,Auswählen,Select,Seleccionar,Sélectionner,არჩევა,Выбрать
+common.select_all,Alle auswählen,Select All,Seleccionar todo,Tout sélectionner,ყველას არჩევა,Выбрать всё
+common.settled_up,Alles beglichen,All settled up,Todo liquidado,Tout réglé,ყველაფერი ანაზღაურებულია,Все расчёты выполнены
+common.smallest_first,Niedrigster Betrag zuerst,Smallest first,Menor importe primero,Montant le plus faible d'abord,მცირე თანხა პირველი,По возрастанию суммы
+common.sort,Sortieren,Sort,Ordenar,Trier,დალაგება,Сортировка
+common.sort_largest,Größte,Largest,Mayores,Plus grands,დიდი,Большие
+common.sort_newest,Neueste,Newest,Más recientes,Récents,ახალი,Новые
+common.sort_oldest,Älteste,Oldest,Más antiguos,Anciens,ძველი,Старые
+common.sort_smallest,Kleinste,Smallest,Menores,Plus petits,მცირე,Маленькие
+common.today_prefix,Heute,Today,Hoy,Aujourd'hui,დღეს,Сегодня
+create_group.add_later_hint,Sie können Mitglieder jetzt oder später von der Gruppenseite hinzufügen.,You can add members now or later from the group page.,Puedes añadir miembros ahora o más tarde desde la página del grupo.,Vous pouvez ajouter des membres maintenant ou plus tard depuis la page du groupe.,წევრები შეგიძლიათ დაამატოთ ახლა ან მოგვიანებით ჯგუფის გვერდიდან.,Вы можете добавить участников сейчас или позже со страницы группы.
+create_group.add_members,Mitglieder hinzufügen (optional),Add Members (optional),Añadir miembros (opcional),Ajouter des membres (optionnel),წევრების დამატება (სურვილისამებრ),Добавить участников (необязательно)
+create_group.appearance,Gruppenaussehen,Group Appearance,Apariencia del grupo,Apparence du groupe,ჯგუფის გარეგნობა,Внешний вид группы
+create_group.choose_gallery,Aus Galerie auswählen,Choose from Gallery,Elegir de la galería,Choisir dans la galerie,გალერიიდან არჩევა,Выбрать из галереи
+create_group.colour,Farbe,Colour,Color,Couleur,ფერი,Цвет
+create_group.could_not_create,Gruppe konnte nicht erstellt werden. Verbindung prüfen.,Could not create group. Check your connection.,No se pudo crear el grupo. Comprueba la conexión.,Impossible de créer le groupe. Vérifiez la connexion.,ჯგუფის შექმნა ვერ მოხდა. შეამოწმეთ კავშირი.,Не удалось создать группу. Проверьте соединение.
+create_group.create_btn,Gruppe erstellen,Create Group,Crear grupo,Créer le groupe,ჯგუფის შექმნა,Создать группу
+create_group.create_with_members_one,Gruppe mit 1 Mitglied erstellen,Create Group with 1 member,Crear grupo con 1 miembro,Créer le groupe avec 1 membre,ჯგუფის შექმნა 1 წევრით,Создать группу с 1 участником
+create_group.create_with_members_other,Gruppe mit {count} Mitgliedern erstellen,Create Group with {count} members,Crear grupo con {count} miembros,Créer le groupe avec {count} membres,ჯგუფის შექმნა {count} წევრით,Создать группу с {count} участниками
+create_group.creating,Erstellen…,Creating…,Creando…,Création…,იქმნება…,Создаю…
+create_group.group_currency,Gruppenwährung (optional),Group Currency (optional),Moneda del grupo (opcional),Devise du groupe (optionnel),ჯგუფის ვალუტა (სურვილისამებრ),Валюта группы (необязательно)
+create_group.group_currency_subtitle,Ausgaben in dieser Gruppe werden in dieser Währung angezeigt.,Expenses in this group will display totals in this currency.,Los totales de gastos del grupo se mostrarán en esta moneda.,Les totaux des dépenses du groupe seront affichés dans cette devise.,ჯგუფის ხარჯების ჯამი ამ ვალუტაში ნაჩვენები იქნება.,Итоги расходов группы будут отображаться в этой валюте.
+create_group.group_name,Gruppenname,Group Name,Nombre del grupo,Nom du groupe,ჯგუფის სახელი,Название группы
+create_group.group_name_hint,"z.B. Barcelona-Reise, Wohngemeinschaft…","e.g. Barcelona trip, Flat mates…","p.ej. Viaje a Barcelona, Compañeros de piso…","ex. Voyage à Barcelone, Colocataires…","მაგ. ბარსელონა, ბინის მოიჯარეები…","напр. Барселона, Квартира…"
+create_group.icon,Symbol,Icon,Icono,Icône,ხატულა,Иконка
+create_group.members_count,Mitglieder ({count}),Members ({count}),Miembros ({count}),Membres ({count}),წევრები ({count}),Участники ({count})
+create_group.no_users_found,"Keine Benutzer für ""{query}"" gefunden.","No users found for ""{query}"".","No se encontraron usuarios para ""{query}"".","Aucun utilisateur trouvé pour ""{query}"".","მომხმარებლები ""{query}"" ვერ მოიძებნა.",Пользователи «{query}» не найдены.
+create_group.partial_add_failed,"Gruppe erstellt, aber konnte nicht hinzufügen: {names}. Versuchen Sie es von der Gruppenseite.","Group created, but could not add: {names}. Try adding them from the group page.","Grupo creado, pero no se pudo añadir: {names}. Inténtalo desde la página del grupo.","Groupe créé, mais impossible d'ajouter : {names}. Essayez depuis la page du groupe.","ჯგუფი შეიქმნა, მაგრამ ვერ დაემატა: {names}. სცადეთ ჯგუფის გვერდიდან.","Группа создана, но не удалось добавить: {names}. Попробуйте со страницы группы."
+create_group.pick_colour,Farbe wählen,Pick a colour,Elegir color,Choisir une couleur,ფერის არჩევა,Выбрать цвет
+create_group.please_enter_name,Bitte Gruppennamen eingeben.,Please enter a group name.,"Por favor, introduce un nombre de grupo.",Veuillez entrer un nom de groupe.,გთხოვთ შეიყვანოთ ჯგუფის სახელი.,"Пожалуйста, введите название группы."
+create_group.quick_add,Schnell hinzufügen,Quick Add,Añadir rápido,Ajout rapide,სწრაფი დამატება,Быстрое добавление
+create_group.remove_photo,Foto entfernen,Remove Photo,Eliminar foto,Supprimer la photo,ფოტოს წაშლა,Удалить фото
+create_group.search_currency,"Währung suchen (z.B. EUR, GEL…)","Search currency (e.g. EUR, GEL…)","Buscar moneda (p.ej. EUR, GEL…)","Rechercher une devise (ex. EUR, GEL…)","ვალუტის ძებნა (მაგ. EUR, GEL…)","Поиск валюты (напр. EUR, GEL…)"
+create_group.search_hint,"Nach Name, @Nickname oder E-Mail suchen…","Search by name, @nickname or email…","Buscar por nombre, @apodo o email…","Rechercher par nom, @pseudo ou email…","ძიება სახელით, @მეტსახელით ან email-ით…","Поиск по имени, @никнейму или email…"
+create_group.search_unavailable,Suche nicht verfügbar. Verbindung prüfen.,Search unavailable. Check connection.,Búsqueda no disponible. Comprueba la conexión.,Recherche indisponible. Vérifiez la connexion.,ძიება მიუწვდომელია. შეამოწმეთ კავშირი.,Поиск недоступен. Проверьте соединение.
+create_group.take_photo,Foto aufnehmen,Take a Photo,Hacer una foto,Prendre une photo,ფოტოს გადაღება,Сфотографировать
+create_group.title,Neue Gruppe,New Group,Nuevo grupo,Nouveau groupe,ახალი ჯგუფი,Новая группа
+create_group.use_default_currency,Meine Standardwährung verwenden,Use my default currency,Usar mi moneda predeterminada,Utiliser ma devise par défaut,ჩემის ნაგულიერი ვალუტა,Использовать валюту по умолчанию
+dashboard.ai_empty_state,"Beginne deine Ausgaben zu erfassen — KI-Einblicke werden freigeschaltet, sobald du Transaktionen hast.",Start tracking your spending — AI insights unlock once you have transactions.,Empieza a registrar tus gastos — los insights de IA se desbloquean cuando tengas transacciones.,Commencez à suivre vos dépenses — les insights IA se débloquent dès que vous avez des transactions.,დაიწყე ხარჯების აღრიცხვა — AI-ინსაითები გახსნილი იქნება ტრანზაქციების დამატების შემდეგ.,Начните отслеживать расходы — AI-инсайты станут доступны после добавления транзакций.
+dashboard.ai_no_data,"Füge Ausgaben hinzu, um deinen ersten KI-Einblick zu erhalten.",Add some expenses to get your first AI insight.,Agrega gastos para obtener tu primer análisis IA.,Ajoutez des dépenses pour obtenir votre premier aperçu IA.,დაამატე ხარჯები პირველი AI-ინსაითის მისაღებად.,"Добавьте расходы, чтобы получить первый AI-инсайт."
+dashboard.ai_offline,"Du bist offline. KI-Einblicke kehren zurück, sobald du wieder verbunden bist.",You're offline. AI insights will resume when you reconnect.,Estás sin conexión. Los insights de IA volverán cuando te reconectes.,Vous êtes hors ligne. Les insights IA reprendront à la reconnexion.,ხაზგარეშე ხარ. AI-ინსაითები დაბრუნდება კავშირის აღდგენისას.,Нет соединения. AI-инсайты вернутся при восстановлении связи.
+dashboard.ai_unavailable,KI-Einblick nicht verfügbar,AI insight unavailable,IA no disponible,Aperçu IA indisponible,AI-ინსაითი მიუწვდომელია,AI-инсайт недоступен
+dashboard.cash_position,Bargeldposition,Cash position,Posición en efectivo,Position en espèces,ნაღდი ფული,Наличные
+dashboard.group_count_one,{count} Gruppe,{count} group,{count} grupo,{count} groupe,{count} ჯგუფი,{count} группа
+dashboard.group_count_other,{count} Gruppen,{count} groups,{count} grupos,{count} groupes,{count} ჯგუფი,{count} групп
+dashboard.in_the_green,Du bist im Plus,You are in the green,Estás en positivo,Vous êtes dans le vert,თქვენ პლუსში ხართ,Вы в плюсе
+dashboard.in_the_red,Du bist im Minus,You are in the red,Estás en negativo,Vous êtes dans le rouge,თქვენ მინუსში ხართ,Вы в минусе
+dashboard.items,{count} Einträge,{count} items,{count} registros,{count} entrées,{count} ჩანაწერი,{count} записей
+dashboard.net_group_position,Netto-Gruppenposition,Net group position,Posición neta del grupo,Position nette du groupe,ჯგუფების წმინდა პოზიცია,Чистая позиция по группам
+dashboard.net_worth,Nettovermögen,Net Worth,Patrimonio neto,Valeur nette,წმინდა ღირებულება,Чистый капитал
+dashboard.net_worth_label,Nettovermögen,Net Worth,Patrimonio neto,Valeur nette,წმინდა ღირებულება,Чистый капитал
+dashboard.no_expenses,Noch keine Ausgaben,No expenses yet,Aún no hay gastos,Pas encore de dépenses,ხარჯები ჯერ არ არის,Расходов ещё нет
+dashboard.overall_balanced,Alles beglichen,All settled up,Todo liquidado,Tout réglé,ყველაფერი ანაზღაურებულია,Все расчёты выполнены
+dashboard.overall_owe,Gesamt schuldest du,Overall you owe,En total debes,Total à payer,სულ გეკუთვნის,Всего вы должны
+dashboard.overall_owed,Gesamt steht dir zu,Overall you are owed,En total te deben,Total à recevoir,სულ გეკუთვნით,Всего вам должны
+dashboard.personal_wallet,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position
+dashboard.recent_activity,Letzte Aktivität,Recent activity,Actividad reciente,Activité récente,ბოლო ოპერაციები,Последние операции
+dashboard.shared_balance,Gemeinsamer Saldo,Shared balance,Saldo compartido,Solde partagé,საერთო ბალანსი,Общий баланс
+dashboard.shared_expenses,Geteilte Ausgaben,Shared Expenses,Gastos compartidos,Dépenses partagées,საერთო ხარჯები,Общие расходы
+dashboard.start_tracking,Tracking starten,Start Tracking,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,Начать учёт
+dashboard.title,Dashboard,Dashboard,Inicio,Tableau de bord,მთავარი,Главная
+dashboard.trends,Trends & Einblicke,Trends & Insights,Tendencias e información,Tendances & insights,ტრენდები და ანალიტიკა,Тренды и аналитика
+dashboard.wallet_cash,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position
+dashboard.wallet_cash_label,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position,Cash Position
+dashboard.you_are_owed,Dein Guthaben,Owed to you,Te deben,On vous doit,გეკუთვნით,Вам должны
+dashboard.you_owe,Du schuldest,You owe,Debes,Vous devez,თქვენ გეკუთვნის,Вы должны
+dashboard.your_finances,DEINE FINANZEN,YOUR FINANCES,TUS FINANZAS,VOS FINANCES,ფინანსები,ФИНАНСЫ
+edit_expense.could_not_update,Ausgabe konnte nicht aktualisiert werden,Could not update expense,No se pudo actualizar el gasto,Impossible de mettre à jour la dépense,ხარჯის განახლება ვერ მოხდა,Не удалось обновить расход
+edit_expense.expense_updated,Ausgabe aktualisiert,Expense updated,Gasto actualizado,Dépense mise à jour,ხარჯი განახლდა,Расход обновлён
+edit_expense.not_found,Ausgabe nicht gefunden,Expense not found,Gasto no encontrado,Dépense introuvable,ხარჯი ვერ მოიძებნა,Расход не найден
+edit_expense.save_changes,Änderungen speichern,Save changes,Guardar cambios,Enregistrer les modifications,ცვლილებების შენახვა,Сохранить изменения
+edit_expense.title,Eintrag bearbeiten,Edit entry,Editar entrada,Modifier l'entrée,ჩანაწერის რედაქტირება,Редактировать запись
+group_picker.choose_group,Gruppe auswählen,Choose a group,Elige un grupo,Choisir un groupe,აირჩიეთ ჯგუფი,Выберите группу
+group_picker.could_not_load,Gruppen konnten nicht geladen werden,Could not load groups,No se pudieron cargar los grupos,Impossible de charger les groupes,ჯგუფების ჩატვირთვა ვერ მოხდა,Не удалось загрузить группы
+group_picker.new_group,Neue Gruppe,New group,Nuevo grupo,Nouveau groupe,ახალი ჯგუფი,Новая группа
+group_picker.no_groups,"Noch keine Gruppen. Tippe auf ""Neue Gruppe"".","No groups yet. Tap ""New group"" to create one.","Sin grupos añadidos. Pulsa ""Nuevo grupo"".","Pas encore de groupes. Appuyez sur ""Nouveau groupe"".",ჯგუფები ჯერ არ არის. დააჭირეთ «ახალი ჯგუფი».,Групп пока нет. Нажмите «Новая группа».
+group_picker.title,Ausgabe hinzufügen,Add expense,Añadir gasto,Ajouter une dépense,ხარჯის დამატება,Добавить расход
+groups.create,Neue Gruppe,New Group,Nuevo grupo,Nouveau groupe,ახალი ჯგუფი,Новая группа
+groups.member,1 Mitglied,1 member,1 miembro,1 membre,1 წევრი,1 участник
+groups.members,{count} Mitglieder,{count} members,{count} miembros,{count} membres,{count} წევრი,{count} участников
+groups.no_groups,Noch keine Gruppen,No groups yet,Aún no hay grupos,Pas encore de groupes,ჯგუფები ჯერ არ არის,Групп ещё нет
+groups.title,Gruppen,Groups,Grupos,Groupes,ჯგუფები,Группы
+groups.your_groups,Deine Gruppen,Your groups,Tus grupos,Vos groupes,თქვენი ჯგუფები,Ваши группы
+groups_screen.add_expense,Ausgabe hinzufügen,Add Expense,Añadir gasto,Ajouter une dépense,ხარჯის დამატება,Добавить расход
+groups_screen.could_not_load,Gruppen konnten nicht geladen werden,Could not load groups,No se pudieron cargar los grupos,Impossible de charger les groupes,ჯგუფების ჩატვირთვა ვერ მოხერხდა,Не удалось загрузить группы
+groups_screen.delete_confirm,{count} Gruppen löschen? Als Besitzer kannst du sie innerhalb von 12 Monaten wiederherstellen.,Delete {count} groups? As the owner you can restore them from the Activity screen within 12 months.,¿Eliminar {count} grupos? Como propietario puedes restaurarlos desde la pantalla de Actividad en 12 meses.,Supprimer {count} groupes ? En tant que propriétaire vous pouvez les restaurer depuis l'Activité dans les 12 mois.,{count} ჯგუფის წაშლა? მფლობელი 12 თვის განმავლობაში შეძლებს აღდგენას.,Удалить {count} групп? Как владелец вы можете восстановить их в разделе «Активность» в течение 12 месяцев.
+groups_screen.delete_confirm_one,1 Gruppe löschen? Als Besitzer kannst du sie innerhalb von 12 Monaten wiederherstellen.,Delete 1 group? As the owner you can restore it from the Activity screen within 12 months.,¿Eliminar 1 grupo? Como propietario puedes restaurarlo desde la pantalla de Actividad en 12 meses.,Supprimer 1 groupe ? En tant que propriétaire vous pouvez le restaurer depuis l'Activité dans les 12 mois.,1 ჯგუფის წაშლა? მფლობელი 12 თვის განმავლობაში შეძლებს აღდგენას.,Удалить 1 группу? Как владелец вы можете восстановить её в разделе «Активность» в течение 12 месяцев.
+groups_screen.delete_title,Gruppen löschen?,Delete groups?,¿Eliminar grupos?,Supprimer les groupes ?,ჯგუფების წაშლა?,Удалить группы?
+groups_screen.error_delete,Einige Gruppen konnten nicht gelöscht werden.,Could not delete some groups.,No se pudieron eliminar algunos grupos.,Impossible de supprimer certains groupes.,ზოგიერთი ჯგუფის წაშლა ვერ მოხერხდა.,Не удалось удалить некоторые группы.
+groups_screen.filter_by_group,Nach Gruppe filtern,Filter by group,Filtrar por grupo,Filtrer par groupe,ჯგუფის მიხედვით,Фильтр по группе
+groups_screen.new_group,Neue Gruppe,New Group,Nuevo grupo,Nouveau groupe,ახალი ჯგუფი,Новая группа
+groups_screen.no_expenses_filter,Keine Ausgaben entsprechen dem aktuellen Filter.,No expenses match the current filter.,Ningún gasto coincide con el filtro actual.,Aucune dépense ne correspond au filtre actuel.,ფილტრს ვერ დაემთხვა ხარჯი.,Расходов по выбранному фильтру нет.
+groups_screen.no_expenses_yet,Noch keine Ausgaben. Tippe auf Ausgabe hinzufügen.,No expenses yet. Tap Add expense to get started.,Aún no hay gastos. Toca Añadir gasto para empezar.,Pas encore de dépenses. Appuyez sur Ajouter une dépense.,ხარჯები ჯერ არ არის. დააჭირეთ ხარჯის დამატება.,Расходов пока нет. Нажмите «Добавить расход».
+groups_screen.overall_owe,Gesamt schuldest du,Overall you owe,En total debes,Total à payer,სულ გეკუთვნის,Всего вы должны
+groups_screen.overall_owed,Gesamt steht dir zu,Overall you are owed,En total te deben,Total à recevoir,სულ გეკუთვნით,Всего вам должны
+groups_screen.owed_to_you,Dein Guthaben,Owed to you,Te deben,On vous doit,გეკუთვნით,Вам должны
+groups_screen.recent_activity,Letzte Aktivität,Recent activity,Actividad reciente,Activité récente,ბოლო აქტივობა,Последние операции
+groups_screen.sort_activity_tooltip,Aktivität sortieren,Sort activity,Ordenar actividad,Trier l'activité,აქტივობის დალაგება,Сортировать активность
+groups_screen.sort_groups_tooltip,Gruppen sortieren,Sort groups,Ordenar grupos,Trier les groupes,ჯგუფების დალაგება,Сортировать группы
+groups_screen.you_owe,Du schuldest,You owe,Debes,Vous devez,გეკუთვნის,Вы должны
+invite_friend.copy_link,Link kopieren,Copy link,Copiar enlace,Copier le lien,ბმულის კოპირება,Скопировать ссылку
+invite_friend.footer,Dein Link ist einzigartig für dein Konto und läuft nie ab.,Your link is unique to your account and never expires.,Tu enlace es único para tu cuenta y nunca expira.,Votre lien est unique à votre compte et n'expire jamais.,თქვენი ბმული უნიკალურია თქვენი ანგარიშისთვის და არასოდეს ვადა ეწურება.,Ваша ссылка уникальна для вашего аккаунта и никогда не истекает.
+invite_friend.headline,Deinen persönlichen Link teilen,Share your personal link,Comparte tu enlace personal,Partagez votre lien personnel,გაუზიარეთ თქვენი პერსონალური ბმული,Поделитесь своей личной ссылкой
+invite_friend.link_copied,Link kopiert!,Link copied!,¡Enlace copiado!,Lien copié !,ბმული დაკოპირდა!,Ссылка скопирована!
+invite_friend.share_subject,Begleite mich auf SetAll,Join me on SetAll,Únete a mí en SetAll,Rejoignez-moi sur SetAll,შემომიერთდი SetAll-ში,Присоединяйтесь ко мне в SetAll
+invite_friend.share_text,Begleite mich auf SetAll zur Verfolgung unserer gemeinsamen Ausgaben: {link},Join me on SetAll to track our shared expenses: {link},Únete a mí en SetAll para rastrear nuestros gastos compartidos: {link},Rejoignez-moi sur SetAll pour suivre nos dépenses partagées : {link},შემომიერთდი SetAll-ში ჩვენი საერთო ხარჯების თვალსაყოლებლად: {link},Присоединяйтесь ко мне в SetAll для отслеживания общих расходов: {link}
+invite_friend.share_via,Teilen über…,Share via…,Compartir por…,Partager via…,გაზიარება…,Поделиться через…
+invite_friend.subtitle,"Jeder, der über deinen Link beitritt, wird automatisch mit dir auf SetAll verbunden.",Anyone who joins via your link will be automatically connected to you on SetAll.,Cualquiera que se una a través de tu enlace se conectará automáticamente contigo en SetAll.,Toute personne qui rejoint via votre lien sera automatiquement connectée à vous sur SetAll.,"ყველა, ვინც თქვენი ბმულით შემოვა, ავტომატურად დაუკავშირდება თქვენ SetAll-ზე.","Все, кто присоединяется по вашей ссылке, будут автоматически связаны с вами в SetAll."
+invite_friend.title,Freund einladen,Invite a Friend,Invitar a un amigo,Inviter un ami,მეგობრის მოწვევა,Пригласить друга
+lang_prompt.body,Erkannte Sprache: {language}. Weiter oder andere wählen?,Your device language is {language}. Continue or choose another?,Idioma {language} detectado. ¿Continuar o elegir otro?,Langue {language} détectée. Continuer ou en choisir une autre ?,გამოვლინდა ენა: {language}. გაგრძელება თუ სხვის არჩევა?,Обнаружен язык: {language}. Продолжить или выбрать другой?
+lang_prompt.change,Sprache wählen,Choose language,Elegir idioma,Choisir la langue,ენის არჩევა,Выбрать язык
+lang_prompt.keep,Weiter auf {language},Continue in {language},Continuar en {language},Continuer en {language},გაგრძელება {language}-ზე,Продолжить на {language}
+lang_prompt.title,Sprache erkannt,Language detected,Idioma detectado,Langue détectée,ენა გამოვლინდა,Язык обнаружен
+nav.activity,Aktivität,Activity,Actividad,Activité,აქტივობა,Активность
+nav.analytics,Analyse,Analytics,Análisis,Analyses,ანალიტიკა,Аналитика
+nav.dashboard,Dashboard,Dashboard,Panel,Tableau de bord,მთავარი,Главная
+nav.groups,Gruppen,Groups,Grupos,Groupes,ჯგუფები,Группы
+nav.settings,Einstellungen,Settings,Ajustes,Paramètres,პარამეტრები,Настройки
+nav.wallet,Geldbörse,Wallet,Cartera,Portefeuille,საფულე,Кошелёк
+settings.about,Über die App,About,Acerca de,À propos,აპლიკაციის შესახებ,О приложении
+settings.account,Konto,Account,Cuenta,Compte,ანგარიში,Аккаунт
+settings.appearance,Erscheinungsbild,Appearance,Apariencia,Apparence,გარეგნობა,Внешний вид
+settings.currency,Basiswährung,Base Currency,Moneda base,Devise de base,ძირითადი ვალუტა,Валюта по умолчанию
+settings.language,Sprache,Language,Idioma,Langue,ენა,Язык
+settings.language_subtitle,Bevorzugte Sprache wählen,Choose your preferred language,Elige tu idioma preferido,Choisissez votre langue préférée,აირჩიეთ სასურველი ენა,Выберите предпочитаемый язык
+settings.preferences,Einstellungen,Preferences,Preferencias,Préférences,პარამეტრები,Параметры
+settings.sign_out,Abmelden,Sign out,Cerrar sesión,Se déconnecter,გასვლა,Выйти
+settings.title,Einstellungen,Settings,Ajustes,Paramètres,პარამეტრები,Настройки
+settings_ext.base_currency_subtitle,Alle Dashboard-Summen werden in dieser Währung angezeigt.,All dashboard totals are displayed in this currency.,Todos los totales del panel se muestran en esta moneda.,Tous les totaux du tableau de bord sont affichés dans cette devise.,ყველა სქემის ჯამი ამ ვალუტაში ნაჩვენებია.,Все итоги на дашборде отображаются в этой валюте.
+settings_ext.cache_reset_success,Cache zurückgesetzt und aus Cloud synchronisiert,Cache reset and synced from cloud,Caché restablecido y sincronizado desde la nube,Cache réinitialisé et synchronisé depuis le cloud,ქეში გადატვირთულია და სინქრონიზებულია ღრუბლიდან,Кэш сброшен и синхронизирован из облака
+settings_ext.change_password,Passwort ändern,Change Password,Cambiar contraseña,Changer le mot de passe,პაროლის შეცვლა,Сменить пароль
+settings_ext.change_password_subtitle,Anmeldepasswort aktualisieren,Update your sign-in password,Actualiza tu contraseña de inicio de sesión,Mettre à jour votre mot de passe de connexion,განაახლეთ შესვლის პაროლი,Обновите пароль для входа
+settings_ext.change_photo,Foto ändern,Change photo,Cambiar foto,Changer la photo,ფოტოს შეცვლა,Изменить фото
+settings_ext.check_updates,Nach Updates suchen,Check for Updates,Buscar actualizaciones,Vérifier les mises à jour,განახლებების შემოწმება,Проверить обновления
+settings_ext.clear_expenses,Alle Ausgaben löschen,Clear all expenses,Limpiar todos los gastos,Effacer toutes les dépenses,ყველა ხარჯის გასუფთავება,Очистить все расходы
+settings_ext.clear_expenses_subtitle,Alle Ausgaben von Gerät und Cloud löschen,Wipe all expenses & splits from device and cloud,Eliminar todos los gastos del dispositivo y la nube,Supprimer toutes les dépenses de l'appareil et du cloud,ყველა ხარჯის წაშლა მოწყობილობიდან და ღრუბლიდან,Удалить все расходы и разделения с устройства и облака
+settings_ext.confirmation_sent,Bestätigung gesendet an {email}. Bitte überprüfen Sie Ihren Posteingang.,Confirmation sent to {email}. Check your inbox.,Confirmación enviada a {email}. Revise su bandeja de entrada.,Confirmation envoyée à {email}. Vérifiez votre boîte de réception.,დადასტურება გაგზავნილია {email}-ზე. შეამოწმეთ შემოსული.,Подтверждение отправлено на {email}. Проверьте вашу почту.
+settings_ext.could_not_load_profile,Profil konnte nicht geladen werden,Could not load profile,No se pudo cargar el perfil,Impossible de charger le profil,პროფილის ჩატვირთვა ვერ მოხდა,Не удалось загрузить профиль
+settings_ext.could_not_save_currency,Währung konnte nicht gespeichert werden: {error},Could not save currency: {error},No se pudo guardar la moneda: {error},Impossible de sauvegarder la devise : {error},ვალუტის შენახვა ვერ მოხერხდა: {error},Не удалось сохранить валюту: {error}
+settings_ext.could_not_update_email,E-Mail konnte nicht aktualisiert werden.,Could not update email.,No se pudo actualizar el email.,Impossible de mettre à jour l'email.,ელ-ფოსტის განახლება ვერ მოხერხდა.,Не удалось обновить email.
+settings_ext.could_not_update_password,Passwort konnte nicht aktualisiert werden.,Could not update password.,No se pudo actualizar la contraseña.,Impossible de mettre à jour le mot de passe.,პაროლის განახლება ვერ მოხერხდა.,Не удалось обновить пароль.
+settings_ext.data,Daten,Data,Datos,Données,მონაცემები,Данные
+settings_ext.delete_account,Konto löschen,Delete Account,Eliminar cuenta,Supprimer le compte,ანგარიშის წაშლა,Удалить аккаунт
+settings_ext.delete_account_subtitle,30 Tage Bedenkzeit. Innerhalb von 30 Tagen anmelden.,30-day cooling-off period. Log back in within 30 days to restore.,Período de 30 días. Inicia sesión en 30 días para restaurar.,Période de 30 jours. Reconnectez-vous dans 30 jours pour restaurer.,30-დღიანი პერიოდი. 30 დღეში შედით პროფილში პუნქტის სხვ.,30-дневный период. Войдите в течение 30 дней для восстановления.
+settings_ext.developer,Entwickler,Developer,Desarrollador,Développeur,დეველოპერი,Разработчик
+settings_ext.dialog_add_password_body,Passwort hinzufügen für E-Mail + Passwort-Login.,Add a password so you can also sign in with email + password.,Añade una contraseña para iniciar sesión con email + contraseña.,Ajoutez un mot de passe pour vous connecter avec email + mot de passe.,დაამატეთ პაროლი Email + პაროლით შესვლისთვის.,Добавьте пароль для входа по email + пароль.
+settings_ext.dialog_change_email_title,E-Mail ändern,Change Email,Cambiar Email,Changer l'Email,Email-ის შეცვლა,Изменить Email
+settings_ext.dialog_change_password_title,Passwort ändern,Change Password,Cambiar contraseña,Changer le mot de passe,პაროლის შეცვლა,Сменить пароль
+settings_ext.dialog_clear_expenses_body,Dadurch werden alle Ausgaben und Teilungen dauerhaft gelöscht. Gruppen und Mitglieder bleiben erhalten.,This will permanently delete every expense and split from your account. Groups and members are kept. This cannot be undone.,Esto eliminará permanentemente todos los gastos y divisiones. Los grupos y miembros se conservan.,Cela supprimera définitivement toutes les dépenses et divisions. Les groupes et membres sont conservés.,ეს სამუდამოდ წაშლის ყველა ხარჯს. ჯგუფები და წევრები შეინახება.,Это навсегда удалит все расходы и разделения. Группы и участники сохранятся. Отмена невозможна.
+settings_ext.dialog_clear_expenses_confirm,Ausgaben löschen,Clear expenses,Limpiar gastos,Effacer les dépenses,ხარჯების გასუფთავება,Очистить расходы
+settings_ext.dialog_clear_expenses_title,Alle Ausgaben löschen?,Clear all expenses?,¿Limpiar todos los gastos?,Effacer toutes les dépenses ?,ყველა ხარჯის გასუფთავება?,Очистить все расходы?
+settings_ext.dialog_confirm_password_label,Passwort bestätigen,Confirm password,Confirmar contraseña,Confirmer le mot de passe,გაიმეორეთ პაროლი,Подтвердить пароль
+settings_ext.dialog_cooling_period,30 Tage Bedenkzeit,30-day cooling-off period,Período de 30 días,Période de réflexion de 30 jours,30-დღიანი გაგრილების პერიოდი,30-дневный период охлаждения
+settings_ext.dialog_delete_account_body,"Ihr Konto wird zur Löschung markiert, alle Daten werden 30 Tage lang aufbewahrt.
+
+Melden Sie sich innerhalb von 30 Tagen an.
+
+Nach 30 Tagen werden Konto und alle Daten dauerhaft gelöscht.","Your account will be marked for deletion but all data is retained for 30 days.
+
+Log back in within 30 days to restore everything.
+
+After 30 days your account and all data are permanently deleted.","Tu cuenta será marcada para eliminación, pero todos los datos se conservan 30 días.
+
+Inicia sesión en 30 días para restaurar todo.
+
+Después de 30 días, tu cuenta y todos los datos se eliminan permanentemente.","Votre compte sera marqué pour suppression mais toutes les données sont conservées 30 jours.
+
+Reconnectez-vous dans 30 jours pour tout restaurer.
+
+Après 30 jours, votre compte et toutes les données sont définitivement supprimés.","თქვენი ანგარიში წასაშლელად მოინიშნება, მაგრამ ყველა მონაცემი 30 დღის განმავლობაში ინახება.
+
+შედით 30 დღეში ყველაფრის აღსადგენად.
+
+30 დღის შემდეგ ანგარიში და ყველა მონაცემი სამუდამოდ წაიშლება.","Ваш аккаунт будет помечен для удаления, но все данные хранятся 30 дней.
+
+Войдите в течение 30 дней для восстановления.
+
+После 30 дней аккаунт и все данные удаляются безвозвратно."
+settings_ext.dialog_delete_account_title,Konto löschen?,Delete Account?,¿Eliminar cuenta?,Supprimer le compte ?,ანგარიშის წაშლა?,Удалить аккаунт?
+settings_ext.dialog_delete_my_account,Mein Konto löschen,Delete My Account,Eliminar mi cuenta,Supprimer mon compte,ჩემი ანგარიშის წაშლა,Удалить мой аккаунт
+settings_ext.dialog_new_email_hint,Neue E-Mail-Adresse,New email address,Nueva dirección de email,Nouvelle adresse email,ახალი Email მისამართი,Новый адрес email
+settings_ext.dialog_new_password_label,Neues Passwort (min. 8 Zeichen),New password (min 8 characters),Nueva contraseña (mín. 8 caracteres),Nouveau mot de passe (min. 8 caractères),ახალი პაროლი (მინ. 8 სიმბოლო),Новый пароль (мин. 8 символов)
+settings_ext.dialog_reset_cache_body,Alle lokalen Daten werden gelöscht und erneut aus der Cloud heruntergeladen.,All local data will be wiped and re-downloaded from the cloud. Use this to fix ghost groups or missing expenses.,Todos los datos locales se eliminarán y se volverán a descargar desde la nube.,Toutes les données locales seront effacées et retéléchargées depuis le cloud.,ყველა ლოკალური მონაცემი წაიშლება და ახლიდან ჩამოტვირთავს ღრუბლიდან.,Все локальные данные будут удалены и загружены заново из облака.
+settings_ext.dialog_reset_cache_title,Lokalen Cache zurücksetzen?,Reset local cache?,¿Restablecer caché local?,Réinitialiser le cache local ?,ლოკალური ქეშის გადატვირთვა?,Сбросить кэш?
+settings_ext.dialog_reset_sync,Zurücksetzen & Synchronisieren,Reset & Sync,Restablecer y sincronizar,Réinitialiser et synchroniser,გადატვირთვა და სინქრონიზაცია,Сбросить и синхронизировать
+settings_ext.dialog_send_confirm,Bestätigung senden,Send confirmation,Enviar confirmación,Envoyer la confirmation,დადასტურების გაგზავნა,Отправить подтверждение
+settings_ext.dialog_set_password_title,Passwort setzen,Set Password,Establecer contraseña,Définir le mot de passe,პაროლის დაყენება,Установить пароль
+settings_ext.display_name,Anzeigename,Display Name,Nombre de pantalla,Nom d'affichage,საჩვენებელი სახელი,Отображаемое имя
+settings_ext.enter_valid_email,Bitte geben Sie eine gültige E-Mail-Adresse ein.,Enter a valid email address.,Ingrese una dirección de correo electrónico válida.,Entrez une adresse e-mail valide.,შეიყვანეთ სწორი ელ-ფოსტის მისამართი.,Введите действительный адрес электронной почты.
+settings_ext.error_generic,Fehler: {error},Error: {error},Error: {error},Erreur : {error},შეცდომა: {error},Ошибка: {error}
+settings_ext.expenses_cleared,Alle Ausgaben gelöscht,All expenses cleared,Todos los gastos borrados,Toutes les dépenses effacées,ყველა ხარჯი გასუფთავდა,Все расходы очищены
+settings_ext.import_splitwise,Import von Splitwise,Import from Splitwise,Importar de Splitwise,Importer de Splitwise,Splitwise-დან იმპორტი,Импорт из Splitwise
+settings_ext.import_splitwise_subtitle,CSV-Import — Ausgaben in Wallet importieren,CSV import — map expenses into your Wallet,Importación CSV — mapea gastos a tu Cartera,Import CSV — mapper les dépenses dans votre Portefeuille,CSV იმპორტი — ხარჯების გადატანა საფულეში,CSV импорт — добавьте расходы в кошелёк
+settings_ext.name_empty,Name darf nicht leer sein,Name cannot be empty,El nombre no puede estar vacío,Le nom ne peut pas être vide,სახელი ვერ იქნება ცარიელი,Имя не может быть пустым
+settings_ext.name_hint,Ihr Name,Your name,Tu nombre,Votre nom,თქვენი სახელი,Ваше имя
+settings_ext.nickname_hint,ihrname (kein @),yourhandle (no @),tunombre (sin @),votrenom (sans @),თქვენისახელი (@ გარეშე),вашник (без @)
+settings_ext.nickname_optional,Spitzname (optional),Nickname (optional),Apodo (opcional),Surnom (facultatif),მეტსახელი (სურვილისამებრ),Никнейм (необязательно)
+settings_ext.notifications,Benachrichtigungen,Notifications,Notificaciones,Notifications,შეტყობინებები,Уведомления
+settings_ext.notifications_subtitle,Push- und E-Mail-Benachrichtigungen,Push and email alerts,Alertas push y por email,Alertes push et email,Push და Email შეტყობინებები,Push и email-уведомления
+settings_ext.password_set,Passwort gesetzt! Sie können sich jetzt mit E-Mail + Passwort anmelden.,Password set! You can now sign in with email + password.,¡Contraseña establecida! Ahora puedes iniciar sesión con email + contraseña.,Mot de passe défini ! Vous pouvez maintenant vous connecter avec email + mot de passe.,პაროლი დაყენებულია! ახლა შეგიძლიათ შეხვიდეთ ელ-ფოსტით + პაროლით.,Пароль установлен! Теперь вы можете войти с помощью email + пароль.
+settings_ext.password_updated,Passwort erfolgreich aktualisiert.,Password updated successfully.,Contraseña actualizada correctamente.,Mot de passe mis à jour avec succès.,პაროლი წარმატებით განახლდა.,Пароль успешно обновлён.
+settings_ext.profile,Profil,Profile,Perfil,Profil,პროფილი,Профиль
+settings_ext.regional,Regionale Einstellungen,Regional Settings,Configuración regional,Paramètres régionaux,რეგიონალური პარამეტრები,Региональные настройки
+settings_ext.regional_subtitle,Datums- und Uhrzeitformat,Date & time format,Formato de fecha y hora,Format de date et d'heure,თარიღისა და დროის ფორმატი,Формат даты и времени
+settings_ext.reset_cache,Lokalen Cache zurücksetzen,Reset Local Cache,Restablecer caché local,Réinitialiser le cache local,ლოკალური ქეშის გადატვირთვა,Сбросить кэш
+settings_ext.reset_cache_subtitle,Lokale DB löschen und aus Cloud synchronisieren. Behebt Fehler.,Wipes local DB and re-syncs from cloud. Fixes ghost data.,Limpia la BD local y sincroniza desde la nube. Corrige errores.,Efface la BD locale et synchronise depuis le cloud. Corrige les erreurs.,ლოკალური DB-ის გასუფთავება და ღრუბლიდან სინქრონიზაცია.,Очищает локальную БД и синхронизирует из облака. Исправляет ошибки.
+settings_ext.save_profile,Profil speichern,Save Profile,Guardar perfil,Enregistrer le profil,პროფილის შენახვა,Сохранить профиль
+settings_ext.saved,Gespeichert,Saved,Guardado,Sauvegardé,შენახულია,Сохранено
+settings_ext.security,Sicherheit,Security,Seguridad,Sécurité,უსაფრთხოება,Безопасность
+settings_ext.security_subtitle,"Biometrie, PIN, Fallback-Authentifizierung","Biometrics, PIN, fallback auth","Biometría, PIN, autenticación de respaldo","Biométrie, PIN, authentification de secours","ბიომეტრია, PIN, სარეზერვო ავთენტიკაცია","Биометрия, PIN, резервная аутентификация"
+settings_ext.set_password,Passwort setzen,Set Password,Establecer contraseña,Définir le mot de passe,პაროლის დაყენება,Установить пароль
+settings_ext.set_password_subtitle,Passwort für E-Mail + Passwort-Login hinzufügen,Add a password to enable email + password login,Añade una contraseña para email + contraseña,Ajouter un mot de passe pour email + mot de passe,დაამატეთ პაროლი Email + პაროლით შესვლისთვის,Добавьте пароль для входа по email
+settings_ext.tap_change_email,Tippen zum Ändern der E-Mail,Tap to change email,Toca para cambiar email,Appuyer pour changer l'email,შეეხეთ Email-ის შესაცვლელად,Нажмите для изменения email
+settings_ext.theme_dark,Dunkel,Dark,Oscuro,Sombre,მუქი,Тёмная
+settings_ext.theme_light,Hell,Light,Claro,Clair,ღია,Светлая
+settings_ext.theme_system,Systemstandard,System default,Predeterminado del sistema,Défaut du système,სისტემის ნაგულისხმევი,По умолчанию
+settings_ext.update_available,Update verfügbar,Update Available,Actualización disponible,Mise à jour disponible,განახლება ხელმისაწვდომია,Доступно обновление
+settings_ext.update_now,Jetzt aktualisieren,Update Now,Actualizar ahora,Mettre à jour maintenant,განახლება ახლა,Обновить
+settings_ext.upload_photo_error,Foto konnte nicht hochgeladen werden,Could not upload photo,No se pudo subir la foto,Impossible de télécharger la photo,ფოტოს ატვირთვა ვერ მოხდა,Не удалось загрузить фото
+settings_ext.uploading_photo,Wird hochgeladen…,Uploading…,Subiendo…,Envoi en cours…,იტვირთება…,Загрузка…
+settings_ext.version_prefix,Version,Version,Versión,Version,ვერსია,Версия
+wallet.expenses,Ausgaben,Expenses,Gastos,Dépenses,ხარჯები,Расходы
+wallet.income,Einnahmen,Income,Ingresos,Revenus,შემოსავალი,Доходы
+wallet.net,Netto,Net,Neto,Net,სულ,Итого
+wallet.no_entries,Keine Einträge in der Geldbörse,No wallet entries yet,Sin entradas en la cartera,Aucune entrée dans le portefeuille,საფულეში ჩანაწერი არ არის,Записей в кошельке нет
+wallet.start_tracking,Tracking starten,Start Tracking,Empezar a registrar,Commencer le suivi,დაიწყეთ აღრიცხვა,Начать учёт
+wallet.title,Geldbörse,Wallet,Cartera,Portefeuille,საფულე,Кошелёк
+wallet_entry.add_expense,AUSGABE HINZUFÜGEN,ADD AN EXPENSE,AGREGAR UN GASTO,AJOUTER UNE DÉPENSE,ხარჯის დამატება,ДОБАВИТЬ РАСХОД
+wallet_entry.add_income,EINNAHME HINZUFÜGEN,ADD AN INCOME,AGREGAR UN INGRESO,AJOUTER UN REVENU,შემოსავლის დამატება,ДОБАВИТЬ ДОХОД
+wallet_entry.choose_direction,Wählen Sie die Richtung dieses Wallet-Eintrags.,Choose the direction of this wallet entry.,Elija la dirección de esta entrada de cartera.,Choisissez la direction de cette entrée de portefeuille.,აირჩიეთ ამ საფულის ჩანაწერის მიმართულება.,Выберите направление этой записи кошелька.
+wallet_entry.expense_subtitle,"Essen, Transport, Rechnungen, Einkaufen, Reisen…","Food, transport, bills, shopping, travel…","Comida, transporte, facturas, compras, viajes…","Nourriture, transport, factures, shopping, voyages…","საკვები, ტრანსპორტი, გადასახადები, საყიდლები, მოგზაურობა…","Еда, транспорт, счета, покупки, путешествия…"
+wallet_entry.group_hint,Sie können auch Gruppenausgaben aus dem Gruppen-Tab hinzufügen.,You can also add group expenses from the Groups tab.,También puede agregar gastos de grupo desde la pestaña Grupos.,Vous pouvez également ajouter des dépenses de groupe depuis l'onglet Groupes.,ასევე შეგიძლიათ დაამატოთ ჯგუფური ხარჯები ჯგუფების ჩანართიდან.,Вы также можете добавить групповые расходы на вкладке «Группы».
+wallet_entry.income_subtitle,"Gehalt, Freiberuf, Geschenk, Investitionsrendite…","Salary, freelance, gift, investment return…","Salario, autónomo, regalo, rendimiento de inversión…","Salaire, freelance, cadeau, rendement d'investissement…","ხელფასი, ფრილანსი, საჩუქარი, საინვესტიციო შემოსავალი…","Зарплата, фриланс, подарок, доход от инвестиций…"
+wallet_entry.title,Wallet-Eintrag hinzufügen,Add Wallet Entry,Agregar entrada de cartera,Ajouter une entrée de portefeuille,საფულის ჩანაწერის დამატება,Добавить запись в кошелёк
+wallet_entry.what_type,Welche Art von Eintrag?,What type of entry?,¿Qué tipo de entrada?,Quel type d'entrée ?,ჩანაწერის სახეობა?,Какой тип записи?
+wallet_screen.add_entry,Eintrag hinzufügen,Add wallet entry,Añadir entrada,Ajouter une entrée,ჩანაწერის დამატება,Добавить запись
+wallet_screen.all_entries,Alle Einträge,All entries,Todas las entradas,Toutes les entrées,ყველა ჩანაწერი,Все записи
+wallet_screen.delete_confirm,{count} Einträge löschen? Dies kann nicht rückgängig gemacht werden.,Delete {count} wallet entries? This cannot be undone.,¿Eliminar {count} entradas? Esto no se puede deshacer.,Supprimer {count} entrées ? Cette action est irréversible.,{count} ჩანაწერის წაშლა? ეს შეუქცევადია.,Удалить {count} записей? Это нельзя отменить.
+wallet_screen.delete_confirm_one,1 Eintrag löschen? Dies kann nicht rückgängig gemacht werden.,Delete 1 wallet entry? This cannot be undone.,¿Eliminar 1 entrada? Esto no se puede deshacer.,Supprimer 1 entrée ? Cette action est irréversible.,1 ჩანაწერის წაშლა? ეს შეუქცევადია.,Удалить 1 запись? Это нельзя отменить.
+wallet_screen.delete_title,Einträge löschen?,Delete entries?,¿Eliminar entradas?,Supprimer les entrées ?,ჩანაწერების წაშლა?,Удалить записи?
+wallet_screen.entry_count_one,1 Eintrag,1 entry,1 entrada,1 entrée,1 ჩანაწერი,1 запись
+wallet_screen.entry_count_other,{count} Einträge,{count} entries,{count} entradas,{count} entrées,{count} ჩანაწერი,{count} записей
+wallet_screen.expense_entries,Ausgabeeinträge,Expense entries,Entradas de gastos,Entrées de dépenses,ხარჯის ჩანაწერები,Записи расходов
+wallet_screen.filter_all,Alle,All,Todo,Tout,ყველა,Все
+wallet_screen.filter_expense,Ausgaben,Expense,Gastos,Dépenses,ხარჯი,Расходы
+wallet_screen.filter_income,Einnahmen,Income,Ingresos,Revenus,შემოსავალი,Доходы
+wallet_screen.income_breakdown,Einnahmenübersicht,Income breakdown,Desglose de ingresos,Répartition des revenus,შემოსავლების დეტალი,Разбивка доходов
+wallet_screen.income_entries,Einnahmeeinträge,Income entries,Entradas de ingresos,Entrées de revenus,შემოსავლის ჩანაწერები,Записи доходов
+wallet_screen.no_entries_found,Keine Einträge gefunden,No entries found,No se encontraron entradas,Aucune entrée trouvée,ჩანაწერი ვერ მოიძებნა,Записей не найдено
+wallet_screen.no_entries_hint,Anderen Filter wählen oder neuen Eintrag hinzufügen.,Try a different filter or add a new entry.,Prueba un filtro diferente o añade una nueva entrada.,Essayez un autre filtre ou ajoutez une entrée.,სცადეთ სხვა ფილტრი ან დაამატეთ ჩანაწერი.,Попробуйте другой фильтр или добавьте запись.
+wallet_screen.personal_wallet,Persönliche Brieftasche,Personal wallet,Cartera personal,Portefeuille personnel,პირადი საფულე,Личный кошелёк
+wallet_screen.sort_tooltip,Sortieren,Sort,Ordenar,Trier,დალაგება,Сортировка
+wallet_screen.spending_breakdown,Ausgabenübersicht,Spending breakdown,Desglose de gastos,Répartition des dépenses,ხარჯების დეტალი,Разбивка расходов

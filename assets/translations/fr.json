@@ -426,5 +426,23 @@
     "body": "Langue {language} détectée. Continuer ou en choisir une autre ?",
     "keep": "Continuer en {language}",
     "change": "Choisir la langue"
+  },
+  "voice_entry": {
+    "listening": "J'écoute…",
+    "tap_to_stop": "Appuyer pour arrêter",
+    "processing": "Traitement en cours…",
+    "clarify_prompt": "Que vouliez-vous dire ?",
+    "confirm_title": "Confirmer l'entrée",
+    "amount_label": "Montant",
+    "description_label": "Description",
+    "confirm_btn": "Confirmer",
+    "cancel_btn": "Annuler",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré !",
+    "error_title": "Traitement impossible",
+    "error_retry": "Réessayer",
+    "couldnt_hear": "Je n'ai pas entendu, nouvel essai…",
+    "group_label": "Groupe",
+    "wallet_label": "Portefeuille"
   }
 }

@@ -1,0 +1,83 @@
+screen,line,hardcoded_text
+groups_screen,114,PDF report
+groups_screen,115,Full groups report as PDF
+groups_screen,125,Export failed: \$e
+groups_screen,134,CSV export
+groups_screen,135,All group expenses as spreadsheet
+groups_screen,144,Export failed: \$e
+groups_screen,153,JSON export
+groups_screen,154,All group expenses as JSON
+groups_screen,163,Export failed: \$e
+groups_screen,1227,Rename group
+groups_screen,1235,Cancel
+groups_screen,1239,Save
+groups_screen,1254,Could not rename. Only the group creator can rename.
+groups_screen,1264,Settle group?
+groups_screen,1267,Cancel
+groups_screen,1271,Settle
+groups_screen,1284,Group settled up!
+groups_screen,1297,Group reopened.
+groups_screen,1313,Cancel
+groups_screen,1340,Could not delete group. Try Force Delete from the long-press menu.
+groups_screen,1356,Rename group
+groups_screen,1372,Download report
+groups_screen,1430,PDF report
+groups_screen,1431,Group expenses as PDF
+groups_screen,1438,Export failed: $e
+groups_screen,1462,Rename group
+groups_screen,1768,Delete expense?
+groups_screen,1773,Cancel
+groups_screen,1777,Delete
+groups_screen,1790,Expense deleted
+groups_screen,1805,Edit expense
+groups_screen,1835,Edit expense
+wallet_screen,178,PDF report
+wallet_screen,179,Full wallet report as PDF
+wallet_screen,184,CSV export
+wallet_screen,185,All wallet entries as spreadsheet
+wallet_screen,190,JSON export
+wallet_screen,191,All wallet entries as JSON
+wallet_screen,251,Export failed: $e
+wallet_screen,1188,Entry list
+wallet_screen,1189,All wallet transactions
+wallet_screen,1196,Category breakdown
+wallet_screen,1197,Spending by category
+wallet_screen,1207,Cancel
+wallet_screen,1218,Export PDF
+activity_screen,1256,Delete expense?
+activity_screen,1257,This cannot be undone.
+activity_screen,1259,Cancel
+activity_screen,1263,Delete
+activity_screen,1353,View details
+activity_screen,1365,Delete expense?
+activity_screen,1366,This cannot be undone.
+activity_screen,1368,Cancel
+activity_screen,1372,Delete
+activity_screen,1387,Cancel
+activity_screen,1487,Delete entry?
+activity_screen,1488,This cannot be undone.
+activity_screen,1490,Cancel
+activity_screen,1494,Delete
+activity_screen,1669,Could not restore group
+activity_screen,1893,Could not restore expense
+activity_screen,1914,Could not restore group
+activity_screen,1929,Restore options
+activity_screen,1934,This expense only
+activity_screen,1938,Whole group + all expenses
+activity_screen,2077,Could not restore wallet entry
+voice_entry_sheet,688,Cancel
+group_info_screen,86,Cancel
+group_info_screen,118,Could not delete. Try Force Delete from the … menu.
+group_info_screen,131,Rename group
+group_info_screen,141,Cancel
+group_info_screen,147,Save
+group_info_screen,165,Could not rename. Only the group creator can rename.
+group_info_screen,176,Settle group?
+group_info_screen,179,Cancel
+group_info_screen,183,Settle
+group_info_screen,195,Group settled up!
+group_info_screen,206,Group reopened.
+group_info_screen,223,Rename group
+group_info_screen,231,Add member
+group_info_screen,263,Download report
+group_info_screen,283,Export failed: $e
