@@ -483,7 +483,12 @@
     "couldnt_hear": "Nicht gehört, versuche es erneut…",
     "group_label": "Gruppe",
     "wallet_label": "Geldbörse",
-    "listening_hint": "Spreche deine Ausgabe oder Einnahme"
+    "listening_hint": "Spreche deine Ausgabe oder Einnahme",
+    "create_group_confirm": "Gruppe '{name}' erstellen?",
+    "add_member_confirm": "{name} hinzufügen?",
+    "member_not_found": "Kein Nutzer für '{query}' gefunden",
+    "action_skip": "Überspringen",
+    "step_x_of_y": "Schritt {n} von {total}"
   },
   "regional": {
     "date_time_format": "Datum & Uhrzeit Format",

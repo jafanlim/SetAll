@@ -483,7 +483,12 @@
     "couldnt_hear": "Je n'ai pas entendu, nouvel essai…",
     "group_label": "Groupe",
     "wallet_label": "Portefeuille",
-    "listening_hint": "Dites votre dépense ou revenu"
+    "listening_hint": "Dites votre dépense ou revenu",
+    "create_group_confirm": "Créer le groupe '{name}' ?",
+    "add_member_confirm": "Ajouter {name} ?",
+    "member_not_found": "Aucun utilisateur trouvé pour '{query}'",
+    "action_skip": "Passer",
+    "step_x_of_y": "Étape {n} sur {total}"
   },
   "regional": {
     "date_time_format": "Format de date et heure",

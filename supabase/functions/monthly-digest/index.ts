@@ -21,10 +21,30 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'authorization, content-type',
 }
 
-type Profile = { id: string; email: string; full_name: string }
+type Profile = { id: string; email: string; full_name: string; lang: string }
 
-const monthName = (d: Date) =>
-  d.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+const LANG_LOCALE: Record<string, string> = {
+  en: 'en-US',
+  ru: 'ru-RU',
+  de: 'de-DE',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  ka: 'ka-GE',
+}
+
+const SUBJECT_TMPL: Record<string, string> = {
+  en: 'Your SetAll summary for {month}',
+  ru: 'Ваш отчёт SetAll за {month}',
+  de: 'Deine SetAll-Zusammenfassung für {month}',
+  es: 'Tu resumen de SetAll para {month}',
+  fr: 'Votre résumé SetAll pour {month}',
+  ka: 'თქვენი SetAll შეჯამება {month}-სთვის',
+}
+
+const monthName = (d: Date, lang = 'en') => {
+  const locale = LANG_LOCALE[lang] ?? 'en-US'
+  return d.toLocaleString(locale, { month: 'long', year: 'numeric' })
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -47,10 +67,16 @@ serve(async (req) => {
           { status: 404, headers: { 'Content-Type': 'application/json', ...CORS_HEADERS } }
         )
       }
+      const { data: testProfRow } = await supabaseAdmin
+        .from('profiles')
+        .select('language_code')
+        .eq('id', authUser.id)
+        .maybeSingle()
       const testProfile: Profile = {
         id:        authUser.id,
         email:     authUser.email ?? testEmail,
         full_name: authUser.user_metadata?.full_name ?? authUser.user_metadata?.name ?? testEmail,
+        lang:      testProfRow?.language_code ?? 'en',
       }
       const ok = await sendDigestForUser(supabaseAdmin, testProfile, true)
       return new Response(
@@ -65,7 +91,7 @@ serve(async (req) => {
     // notification_preferences->>'monthly_digest' stored in profiles table.
     const { data: profRows, error: profErr } = await supabaseAdmin
       .from('profiles')
-      .select('id, name, notification_preferences')
+      .select('id, name, notification_preferences, language_code')
       .filter("notification_preferences->>'monthly_digest'", 'eq', 'true')
     if (profErr) throw profErr
 
@@ -82,6 +108,7 @@ serve(async (req) => {
         id:        p.id,
         email:     emailMap[p.id],
         full_name: p.name ?? emailMap[p.id],
+        lang:      p.language_code ?? 'en',
       }
       const ok = await sendDigestForUser(supabaseAdmin, profile, false)
       if (ok) sent++
@@ -112,7 +139,7 @@ async function sendDigestForUser(
   const periodEnd   = isTest
     ? new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999)
     : new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999)
-  const label       = monthName(periodStart)
+  const label       = monthName(periodStart, profile.lang)
 
   // ── Personal wallet expenses (group_id IS NULL) ──────────────────────────
   const { data: walletRows } = await supabaseAdmin
@@ -189,7 +216,7 @@ async function sendDigestForUser(
     body: JSON.stringify({
       from:    `SetAll <${FROM_ADDRESS}>`,
       to:      [profile.email],
-      subject: `Your SetAll summary for ${label}`,
+      subject: (SUBJECT_TMPL[profile.lang] ?? SUBJECT_TMPL['en']).replace('{month}', label),
       html,
     }),
   })

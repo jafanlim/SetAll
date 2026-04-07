@@ -12,6 +12,54 @@ const WELCOME_HOOK_SECRET = Deno.env.get('WELCOME_HOOK_SECRET') ?? ''
 const FROM_ADDRESS        = 'noreply@setall.app'
 const APP_URL             = 'https://setall.app'
 
+const WELCOME_SUBJECT: Record<string, string> = {
+  en: 'Welcome to SetAll — stop doing math ⚖️',
+  ru: 'Добро пожаловать в SetAll — бросьте считать в уме ⚖️',
+  de: 'Willkommen bei SetAll — nie wieder kopfrechnen ⚖️',
+  es: 'Bienvenido a SetAll — deja de hacer cálculos ⚖️',
+  fr: 'Bienvenue sur SetAll — fini les calculs mentaux ⚖️',
+  ka: 'კეთილი დაბრევით SetAll-ში — აღარ გატარიი არითმეტიკა ⚖️',
+}
+
+type WelcomeStrings = {
+  heading: string
+  body: string
+  cta: string
+}
+
+const WELCOME_COPY: Record<string, WelcomeStrings> = {
+  en: {
+    heading: 'Welcome — your account is ready 🎉',
+    body:    "Your email has been confirmed. You're all set to split expenses, simplify debts, and settle with friends across any currency — without the mental math.",
+    cta:     'Open SetAll →',
+  },
+  ru: {
+    heading: 'Добро пожаловать — ваш аккаунт готов 🎉',
+    body:    'Ваш email подтверждён. Теперь можно делить расходы, упрощать долги и рассчитываться с друзьями в любой валюте — без мысленных вычислений.',
+    cta:     'Открыть SetAll →',
+  },
+  de: {
+    heading: 'Willkommen — Ihr Konto ist bereit 🎉',
+    body:    'Ihre E-Mail wurde bestätigt. Teilen Sie Ausgaben auf, vereinfachen Sie Schulden und rechnen Sie mit Freunden in jeder Währung ab — ganz ohne Kopfrechnen.',
+    cta:     'SetAll öffnen →',
+  },
+  es: {
+    heading: 'Bienvenido — tu cuenta está lista 🎉',
+    body:    'Tu email ha sido confirmado. Ya puedes dividir gastos, simplificar deudas y saldar cuentas con amigos en cualquier moneda — sin cálculos mentales.',
+    cta:     'Abrir SetAll →',
+  },
+  fr: {
+    heading: 'Bienvenue — votre compte est prêt 🎉',
+    body:    'Votre email a été confirmé. Vous pouvez désormais partager des dépenses, simplifier les dettes et solder les comptes avec vos amis dans n’importe quelle devise — sans calcul mental.',
+    cta:     'Ouvrir SetAll →',
+  },
+  ka: {
+    heading: 'კეთილი დაბრევით — თქვენი ანგარიში მზადაა 🎉',
+    body:    'თქვენი ელ-ფოსტი დადასტურდა. ახლა შეგიძლიათ გადახარდოთ განაწილდოთ და მეგობრებთან გაანგარიშოთ ნებისმიერ ვალუტაში — შინაგან გარეშების გარეშე.',
+    cta:     'SetAll-ის გახსნა →',
+  },
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -33,7 +81,8 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json() as { email?: string; userId?: string }
+    const { email, language_code } = await req.json() as { email?: string; userId?: string; language_code?: string }
+    const lang = language_code ?? 'en'
 
     if (!email || !email.includes('@')) {
       return new Response(JSON.stringify({ error: 'email required' }), {
@@ -59,8 +108,8 @@ serve(async (req) => {
       body: JSON.stringify({
         from:    `SetAll <${FROM_ADDRESS}>`,
         to:      [email],
-        subject: 'Welcome to SetAll — stop doing math ⚖️',
-        html:    buildWelcomeHtml(email),
+        subject: WELCOME_SUBJECT[lang] ?? WELCOME_SUBJECT['en'],
+        html:    buildWelcomeHtml(email, lang),
       }),
     })
 
@@ -86,7 +135,8 @@ serve(async (req) => {
   }
 })
 
-function buildWelcomeHtml(email: string): string {
+function buildWelcomeHtml(email: string, lang = 'en'): string {
+  const copy = WELCOME_COPY[lang] ?? WELCOME_COPY['en']
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -112,10 +162,10 @@ function buildWelcomeHtml(email: string): string {
         <tr>
           <td style="padding:40px;">
             <h1 style="margin:0 0 16px;font-size:22px;font-weight:800;color:#F1F5F9;line-height:1.3;">
-              Welcome — your account is ready 🎉
+              ${copy.heading}
             </h1>
             <p style="margin:0 0 24px;font-size:15px;color:#CBD5E1;line-height:1.7;">
-              Your email has been confirmed. You're all set to split expenses, simplify debts, and settle with friends across any currency — without the mental math.
+              ${copy.body}
             </p>
 
             <!-- Feature pills -->
@@ -148,7 +198,7 @@ function buildWelcomeHtml(email: string): string {
                 <td align="center">
                   <a href="${APP_URL}/login"
                      style="display:inline-block;background:#14B8A6;color:#0F172A;font-weight:700;font-size:15px;padding:14px 36px;border-radius:10px;text-decoration:none;letter-spacing:-0.2px;">
-                    Open SetAll →
+                    ${copy.cta}
                   </a>
                 </td>
               </tr>

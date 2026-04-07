@@ -8,6 +8,11 @@
     <link rel="stylesheet" href="/styles.css">
     <script src="https://unpkg.com/lucide@0.460.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/i18n.js"></script>
+    <style>
+        #lang-switcher button { background:none; border:1px solid rgba(255,255,255,0.15); color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.2rem 0.4rem; border-radius:4px; cursor:pointer; transition:color .15s,border-color .15s; }
+        #lang-switcher button:hover, #lang-switcher button.lang-active { color:#14B8A6; border-color:#14B8A6; }
+    </style>
     <style>
         .glass-card { background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
         .glow-effect { position: absolute; width: 800px; height: 800px; background: radial-gradient(circle, rgba(20,184,166,0.12) 0%, rgba(2,6,23,0) 60%); top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: -1; pointer-events: none; }
@@ -21,6 +26,7 @@
             <i data-lucide="scale" class="text-brand-teal w-8 h-8"></i>
             <span class="text-white text-2xl font-extrabold tracking-tight">SetAll</span>
         </a>
+        <div id="lang-switcher" class="flex gap-1"></div>
     </header>
     <main class="flex-grow flex items-center justify-center p-6 z-10 mt-12">
         <div class="w-full max-w-md">
@@ -28,7 +34,7 @@
                 <div class="text-center mb-8">
                     <h1 id="auth-title" class="text-3xl font-extrabold text-white tracking-tight mb-2">Welcome back</h1>
                     <p id="auth-subtitle" class="text-slate-400 text-sm">Enter your credentials to access your ledger.</p>
-                    <p class="text-slate-600 mt-3" style="font-size:11px;line-height:1.5">SetAll is currently in Private Beta. This is a mathematical ledger tool and does not process actual currency.</p>
+                    <p id="beta-notice" class="text-slate-600 mt-3" style="font-size:11px;line-height:1.5" data-i18n="login_beta_notice">SetAll is currently in Private Beta. This is a mathematical ledger tool and does not process actual currency.</p>
                 </div>
                 <div id="auth-banner" class="hidden mb-4 p-3 rounded-xl text-sm font-medium text-center"></div>
                 <div id="oauth-section" class="anim-container opacity-100">
@@ -40,18 +46,18 @@
                                 <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                             </svg>
-                            Continue with Google
+                            <span data-i18n="login_btn_google">Continue with Google</span>
                         </button>
                     </div>
                     <div class="relative flex items-center py-5">
                         <div class="flex-grow border-t border-brand-border"></div>
-                        <span class="flex-shrink-0 mx-4 text-slate-500 text-sm font-medium">or continue with email</span>
+                        <span class="flex-shrink-0 mx-4 text-slate-500 text-sm font-medium" data-i18n="login_or_email">or continue with email</span>
                         <div class="flex-grow border-t border-brand-border"></div>
                     </div>
                 </div>
                 <form id="auth-form" class="space-y-4">
                     <div id="email-container" class="anim-container opacity-100">
-                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1">Email address</label>
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1" data-i18n="login_label_email">Email address</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i data-lucide="mail" class="w-5 h-5 text-slate-500"></i>
@@ -62,7 +68,7 @@
                     <div id="password-container" class="anim-container opacity-100">
                         <div class="flex justify-between items-end mb-1.5 ml-1 mr-1">
                             <label id="password-label" class="block text-sm font-medium text-slate-400">Password</label>
-                            <button type="button" id="forgot-password-link" onclick="setMode('forgot')" class="text-xs font-semibold text-brand-teal hover:text-brand-tealHover transition-colors focus:outline-none">Forgot password?</button>
+                            <button type="button" id="forgot-password-link" onclick="setMode('forgot')" class="text-xs font-semibold text-brand-teal hover:text-brand-tealHover transition-colors focus:outline-none" data-i18n="login_forgot_link">Forgot password?</button>
                         </div>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -74,14 +80,14 @@
                             </button>
                         </div>
                         <div id="password-strength" class="hidden mt-3 ml-1 space-y-1.5">
-                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-length"><i data-lucide="check" class="w-3 h-3"></i> 8+ characters</div>
-                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-upper"><i data-lucide="check" class="w-3 h-3"></i> 1 Uppercase letter</div>
-                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-number"><i data-lucide="check" class="w-3 h-3"></i> 1 Number</div>
-                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-special"><i data-lucide="check" class="w-3 h-3"></i> 1 Special character</div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-length"><i data-lucide="check" class="w-3 h-3"></i> <span data-i18n="login_req_length">8+ characters</span></div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-upper"><i data-lucide="check" class="w-3 h-3"></i> <span data-i18n="login_req_upper">1 Uppercase letter</span></div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-number"><i data-lucide="check" class="w-3 h-3"></i> <span data-i18n="login_req_number">1 Number</span></div>
+                            <div class="flex items-center gap-2 text-xs text-slate-500" id="req-special"><i data-lucide="check" class="w-3 h-3"></i> <span data-i18n="login_req_special">1 Special character</span></div>
                         </div>
                     </div>
                     <div id="confirm-password-container" class="hidden anim-container opacity-0 h-0">
-                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1 mt-1">Confirm Password</label>
+                        <label class="block text-sm font-medium text-slate-400 mb-1.5 ml-1 mt-1" data-i18n="login_label_confirm">Confirm Password</label>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i data-lucide="shield-check" class="w-5 h-5 text-slate-500"></i>
@@ -91,7 +97,7 @@
                                 <i id="eye-icon-2" data-lucide="eye" class="w-5 h-5"></i>
                             </button>
                         </div>
-                        <p id="password-match-error" class="hidden text-xs text-red-400 mt-2 ml-1">Passwords do not match.</p>
+                        <p id="password-match-error" class="hidden text-xs text-red-400 mt-2 ml-1" data-i18n="login_pw_mismatch">Passwords do not match.</p>
                     </div>
                     <button type="submit" id="submit-btn" class="w-full bg-brand-teal hover:bg-brand-tealHover text-brand-deep text-base font-bold py-3.5 px-4 rounded-xl transition-all shadow-[0_0_20px_rgba(20,184,166,0.2)] hover:shadow-[0_0_25px_rgba(20,184,166,0.4)] mt-4">
                         Sign In
@@ -126,14 +132,15 @@
     <footer class="relative z-10 text-center py-6 text-xs text-slate-700">
         <p>
             &copy; 2026 SetAll &nbsp;·&nbsp;
-            <a href="/privacy" class="hover:text-slate-400 transition-colors">Privacy Policy</a> &nbsp;·&nbsp;
-            <a href="/terms" class="hover:text-slate-400 transition-colors">Terms of Service</a> &nbsp;·&nbsp;
-            <a href="/support" class="hover:text-slate-400 transition-colors">Support</a>
+            <a href="/privacy" class="hover:text-slate-400 transition-colors" data-i18n="footer_privacy">Privacy Policy</a> &nbsp;·&nbsp;
+            <a href="/terms" class="hover:text-slate-400 transition-colors" data-i18n="footer_terms">Terms of Service</a> &nbsp;·&nbsp;
+            <a href="/support" class="hover:text-slate-400 transition-colors" data-i18n="footer_help">Support</a>
         </p>
         <p class="mt-1">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</p>
     </footer>
 
     <script>
+        const i18n = (key) => { const d = window._setAllDict || {}; return d[key] || key; };
         const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
         const SUPABASE_ANON = 'REDACTED_JWT';
         const { createClient } = supabase;
@@ -185,42 +192,42 @@
 
             if (mode === 'login') {
                 document.title = 'Sign In | SetAll';
-                title.textContent = 'Welcome back';
-                subtitle.textContent = 'Enter your credentials to access your ledger.';
-                passwordLabel.textContent = 'Password';
-                submitBtn.textContent = 'Sign In';
-                toggleText.textContent = "Don't have an account?";
-                toggleBtn.textContent = 'Sign up';
+                title.textContent = i18n('login_title_login');
+                subtitle.textContent = i18n('login_sub_login');
+                passwordLabel.textContent = i18n('login_label_password');
+                submitBtn.textContent = i18n('login_btn_signin');
+                toggleText.textContent = i18n('login_no_account');
+                toggleBtn.textContent = i18n('login_signup_link');
                 toggleBtn.onclick = () => setMode('signup');
             } else if (mode === 'signup') {
                 document.title = 'Sign Up | SetAll';
-                title.textContent = 'Create account';
-                subtitle.textContent = 'Join SetAll and start settling expenses seamlessly.';
-                passwordLabel.textContent = 'Password';
-                submitBtn.textContent = 'Create Account';
-                toggleText.textContent = 'Already have an account?';
-                toggleBtn.textContent = 'Sign in here';
+                title.textContent = i18n('login_title_signup');
+                subtitle.textContent = i18n('login_sub_signup');
+                passwordLabel.textContent = i18n('login_label_password');
+                submitBtn.textContent = i18n('login_btn_signup');
+                toggleText.textContent = i18n('login_have_account');
+                toggleBtn.textContent = i18n('login_signin_link');
                 toggleBtn.onclick = () => setMode('login');
                 forgotLink.style.display = 'none';
                 strengthBox.classList.remove('hidden');
                 showConfirmPassword();
             } else if (mode === 'forgot') {
                 document.title = 'Reset Password | SetAll';
-                title.textContent = 'Recover account';
-                subtitle.textContent = 'Enter your email to receive a reset link.';
-                submitBtn.textContent = 'Send Recovery Link';
-                toggleText.textContent = 'Remembered your password?';
-                toggleBtn.textContent = 'Back to Sign In';
+                title.textContent = i18n('login_title_forgot');
+                subtitle.textContent = i18n('login_sub_forgot');
+                submitBtn.textContent = i18n('login_btn_recovery');
+                toggleText.textContent = i18n('login_remembered');
+                toggleBtn.textContent = i18n('login_back_signin');
                 toggleBtn.onclick = () => setMode('login');
                 oauthSection.classList.add('hidden','h-0','opacity-0','mb-0');
                 passwordContainer.classList.add('hidden','h-0','opacity-0');
                 passwordInput.required = false;
             } else if (mode === 'recovery') {
                 document.title = 'Set New Password | SetAll';
-                title.textContent = 'Set new password';
-                subtitle.textContent = 'Please secure your account with a new password.';
-                passwordLabel.textContent = 'New Password';
-                submitBtn.textContent = 'Update Password';
+                title.textContent = i18n('login_title_recovery');
+                subtitle.textContent = i18n('login_sub_recovery');
+                passwordLabel.textContent = i18n('login_label_new_pw');
+                submitBtn.textContent = i18n('login_btn_update');
                 oauthSection.classList.add('hidden','h-0','opacity-0','mb-0');
                 emailContainer.classList.add('hidden','h-0','opacity-0');
                 footerToggle.classList.add('hidden','h-0','opacity-0');
@@ -285,7 +292,7 @@
             e.preventDefault();
             hideBanner();
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Please wait…';
+            submitBtn.textContent = i18n('login_btn_signin') + '…';
 
             const email    = emailInput.value.trim();
             const password = passwordInput.value;
@@ -294,7 +301,7 @@
                 if (password !== confirmInput.value) {
                     matchError.classList.remove('hidden');
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Create Account';
+                    submitBtn.textContent = i18n('login_btn_signup');
                     return;
                 }
                 matchError.classList.add('hidden');
@@ -302,9 +309,9 @@
                     options: { emailRedirectTo: window.location.origin + '/login' }
                 });
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Create Account';
+                submitBtn.textContent = i18n('login_btn_signup');
                 if (error) { showBanner(error.message, true); return; }
-                document.getElementById('modal-title').textContent = 'Check your email';
+                document.getElementById('modal-title').textContent = i18n('login_modal_check');
                 document.getElementById('modal-desc').textContent = 'We sent a confirmation link to ' + email + '. Click it to activate your account.';
                 const modal = document.getElementById('success-modal');
                 modal.classList.remove('hidden');
@@ -313,7 +320,7 @@
             } else if (currentMode === 'login') {
                 const { data, error } = await sb.auth.signInWithPassword({ email, password });
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Sign In';
+                submitBtn.textContent = i18n('login_btn_signin');
                 if (error) { showBanner(error.message, true); return; }
                 const next = new URLSearchParams(window.location.search).get('next') || sessionStorage.getItem('login_next') || '/portal';
                 sessionStorage.removeItem('login_next');
@@ -324,9 +331,9 @@
                     redirectTo: window.location.origin + '/reset-password'
                 });
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Send Recovery Link';
+                submitBtn.textContent = i18n('login_btn_recovery');
                 if (error) { showBanner(error.message, true); return; }
-                document.getElementById('modal-title').textContent = 'Recovery Email Sent';
+                document.getElementById('modal-title').textContent = i18n('login_modal_recovery');
                 document.getElementById('modal-desc').textContent = 'Check your inbox for a link to securely reset your password.';
                 const modal = document.getElementById('success-modal');
                 modal.classList.remove('hidden');
@@ -336,12 +343,12 @@
                 if (password !== confirmInput.value) {
                     matchError.classList.remove('hidden');
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Update Password';
+                    submitBtn.textContent = i18n('login_btn_update');
                     return;
                 }
                 const { error } = await sb.auth.updateUser({ password });
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Update Password';
+                submitBtn.textContent = i18n('login_btn_update');
                 if (error) { showBanner(error.message, true); return; }
                 await sb.auth.refreshSession();
                 window.location.replace('/portal');

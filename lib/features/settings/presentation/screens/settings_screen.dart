@@ -1549,9 +1549,16 @@ class _LanguageRow extends StatelessWidget {
                   trailing: l.code == current
                       ? const Icon(Icons.check_rounded, color: _teal, size: 20)
                       : null,
-                  onTap: () {
+                  onTap: () async {
                     ctx.setLocale(Locale(l.code));
                     Navigator.of(ctx).pop();
+                    final uid = Supabase.instance.client.auth.currentUser?.id;
+                    if (uid != null) {
+                      await Supabase.instance.client
+                          .from('profiles')
+                          .update({'language_code': l.code})
+                          .eq('id', uid);
+                    }
                   },
                 )),
                 const SizedBox(height: 8),

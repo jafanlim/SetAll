@@ -10,6 +10,7 @@ import '../../../core/providers/setall_providers.dart';
 import '../../../core/services/voice_entry_service.dart';
 import '../../../core/utils/haptic_utils.dart';
 import '../../../data/models/group_model.dart';
+import '../../../data/models/profile_model.dart';
 import '../../../data/repositories/setall_repository.dart' show SplitInsert;
 import '../../../domain/entities/expense.dart' show SplitType;
 
@@ -24,6 +25,7 @@ enum VoiceEntryState {
   processing,
   clarifying,
   confirming,
+  multiConfirming,
   saving,
   done,
   error,
@@ -46,23 +48,37 @@ class VoiceEntrySheet extends ConsumerStatefulWidget {
 class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
     with TickerProviderStateMixin {
   VoiceEntryState _state = VoiceEntryState.listening;
-  String _partial   = '';
+  String _partial    = '';
   String _transcript = '';
-  String _errorMsg  = '';
+  String _errorMsg   = '';
   int    _retryCount = 0;
-  VoiceEntryResult? _result;
 
-  // Inline edit state (initialised when entering confirming)
+  // Single confirming state (add_expense only)
+  AddExpenseAction? _singleResult;
+
+  // Inline edit state for single confirming
   double _editAmount      = 0;
   String _editCurrency    = 'USD';
   String _editDescription = '';
 
+  // Multi-action stepper state
+  List<VoiceAction> _pendingActions    = [];
+  int               _currentActionIdx  = 0;
+  // Resolved group from a create_group step (used by subsequent add_member/add_expense)
+  GroupModel?       _createdGroup;
+  // User search results for current add_member step
+  List<ProfileModel> _memberSearchResults = [];
+  bool               _memberSearching     = false;
+
+  // Clarifying state — points to the action being clarified
+  AddExpenseAction? _clarifyingResult;
+
   late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulseAnim;
 
-  final TextEditingController _clarifyCtrl   = TextEditingController();
-  final TextEditingController _amountCtrl    = TextEditingController();
-  final TextEditingController _descCtrl      = TextEditingController();
+  final TextEditingController _clarifyCtrl = TextEditingController();
+  final TextEditingController _amountCtrl  = TextEditingController();
+  final TextEditingController _descCtrl    = TextEditingController();
 
   @override
   void initState() {
@@ -107,13 +123,9 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         preferredLocale: locale,
       );
       if (transcript.trim().isEmpty) {
-        // STT returned empty — likely error_no_match or error_speech_timeout.
-        // Transient: show a brief hint and retry automatically (up to 3 times).
         if (_retryCount < 3) {
           _retryCount++;
-          if (mounted) {
-            setState(() => _partial = 'voice_entry.couldnt_hear'.tr());
-          }
+          if (mounted) setState(() => _partial = 'voice_entry.couldnt_hear'.tr());
           await Future.delayed(const Duration(milliseconds: 1500));
           await _startListening();
         } else {
@@ -162,7 +174,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           .toList();
 
       final langCode = EasyLocalization.of(context)?.locale.languageCode ?? 'en';
-      final result = await VoiceEntryService.instance.parse(
+      final response = await VoiceEntryService.instance.parse(
         transcript,
         groupMaps,
         widget.defaultCurrency,
@@ -170,22 +182,38 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       );
 
       if (!mounted) return;
-      if (result.needsClarification != null) {
-        setState(() {
-          _result = result;
-          _state  = VoiceEntryState.clarifying;
-        });
-      } else {
-        _editAmount      = result.amount;
-        _editCurrency    = result.currency;
-        _editDescription = result.description;
-        _amountCtrl.text = result.amount.toStringAsFixed(2);
-        _descCtrl.text   = result.description;
-        setState(() {
-          _result = result;
-          _state  = VoiceEntryState.confirming;
-        });
+
+      // Top-level clarification (e.g. empty/no amount)
+      if (response.actions.isEmpty && response.needsClarification != null) {
+        _clarifyingResult = null;
+        setState(() => _state = VoiceEntryState.clarifying);
+        return;
       }
+
+      // Single add_expense → existing confirming flow
+      if (response.actions.length == 1 && response.actions.first is AddExpenseAction) {
+        final action = response.actions.first as AddExpenseAction;
+        if (action.needsClarification != null) {
+          _clarifyingResult = action;
+          setState(() => _state = VoiceEntryState.clarifying);
+          return;
+        }
+        _singleResult    = action;
+        _editAmount      = action.amount;
+        _editCurrency    = action.currency;
+        _editDescription = action.description;
+        _amountCtrl.text = action.amount.toStringAsFixed(2);
+        _descCtrl.text   = action.description;
+        setState(() => _state = VoiceEntryState.confirming);
+        return;
+      }
+
+      // Multi-action stepper
+      _pendingActions   = response.actions;
+      _currentActionIdx = 0;
+      _createdGroup     = null;
+      setState(() => _state = VoiceEntryState.multiConfirming);
+      _prepareCurrentMultiStep();
     } catch (e) {
       if (mounted) {
         setState(() {
@@ -196,6 +224,8 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
     }
   }
 
+  // ── Clarification ─────────────────────────────────────────────────────
+
   Future<void> _submitClarification() async {
     final clarification = _clarifyCtrl.text.trim();
     if (clarification.isEmpty) return;
@@ -204,94 +234,33 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
     await _parse(_transcript);
   }
 
-  Future<void> _confirm() async {
-    final result = _result;
-    if (result == null) return;
+  // ── Single confirming ─────────────────────────────────────────────────
+
+  Future<void> _confirmSingle() async {
+    final action = _singleResult;
+    if (action == null) return;
     HapticUtils.primaryTap();
 
-    // Fuzzy match group if needed
     String? resolvedGroupId;
-    if (result.type == 'group') {
-      final hint  = (result.groupNameHint ?? '').toLowerCase();
+    if (action.groupNameHint != null) {
+      final hint  = action.groupNameHint!.toLowerCase();
       final match = widget.groups.firstWhere(
         (g) => g.name.toLowerCase().contains(hint) || hint.contains(g.name.toLowerCase()),
         orElse: () => GroupModel(id: '', name: '', creatorId: ''),
       );
       if (match.id.isEmpty) {
-        setState(() {
-          _result = VoiceEntryResult(
-            type:               result.type,
-            amount:             result.amount,
-            currency:           result.currency,
-            description:        result.description,
-            category:           result.category,
-            isIncome:           result.isIncome,
-            groupNameHint:      result.groupNameHint,
-            splitMode:          result.splitMode,
-            needsClarification: 'group_not_found',
-          );
-          _state = VoiceEntryState.clarifying;
-        });
+        _clarifyingResult = action.copyWith(needsClarification: 'group_not_found');
+        setState(() => _state = VoiceEntryState.clarifying);
         return;
       }
       resolvedGroupId = match.id;
     }
 
     setState(() => _state = VoiceEntryState.saving);
-
     try {
-      final repo   = ref.read(setAllRepositoryProvider);
-      final uid    = await repo.ensureUser();
-      if (uid == null) throw Exception('Not authenticated');
-
-      // Use inline-edited values, not raw result fields
-      final amountDecimal = Decimal.parse(_editAmount.toStringAsFixed(2));
-      final currency      = _editCurrency;
-      final description   = _editDescription.trim().isEmpty ? result.description : _editDescription.trim();
-
-      // Build even-split list for group entries
-      List<SplitInsert> splits = [];
-      if (result.type == 'group' && resolvedGroupId != null && result.splitMode == 'even') {
-        final members = await repo.getGroupMembers(resolvedGroupId);
-        if (members.isEmpty) {
-          splits = [SplitInsert(
-            userId: uid,
-            universalUsdOwed: amountDecimal,
-          )];
-        } else {
-          final count = Decimal.fromInt(members.length);
-          final share = (amountDecimal / count).toDecimal(scaleOnInfinitePrecision: 2);
-          splits = members.map((m) => SplitInsert(
-            userId: m.id,
-            universalUsdOwed: share,
-          )).toList();
-        }
-      } else {
-        splits = [SplitInsert(
-          userId: uid,
-          universalUsdOwed: amountDecimal,
-        )];
-      }
-
-      await repo.addExpense(
-        groupId:     resolvedGroupId,
-        payerId:     uid,
-        amount:      amountDecimal,
-        description: description,
-        currency:    currency,
-        splitType:   result.splitMode == 'even' ? SplitType.even : SplitType.manual,
-        splits:      splits,
-        category:    result.category,
-        isIncome:    result.isIncome,
-      );
-
-      ref.invalidate(balanceSummaryProvider);
-      ref.invalidate(recentExpensesProvider);
-      ref.invalidate(myGroupsProvider);
-
+      await _executeAddExpense(action, resolvedGroupId, useEditFields: true);
       if (!mounted) return;
       setState(() => _state = VoiceEntryState.done);
-
       Future.delayed(const Duration(milliseconds: 1200), () {
         if (mounted) Navigator.of(context).pop();
       });
@@ -303,6 +272,157 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         });
       }
     }
+  }
+
+  // ── Multi-action stepper ──────────────────────────────────────────────
+
+  void _prepareCurrentMultiStep() {
+    final action = _pendingActions[_currentActionIdx];
+    if (action is AddMemberAction) {
+      _searchMemberForStep(action.memberNameHint);
+    }
+  }
+
+  Future<void> _searchMemberForStep(String hint) async {
+    if (!mounted) return;
+    setState(() {
+      _memberSearchResults = [];
+      _memberSearching     = true;
+    });
+    try {
+      final repo    = ref.read(setAllRepositoryProvider);
+      final results = await repo.searchUsers(hint);
+      if (mounted) setState(() { _memberSearchResults = results; _memberSearching = false; });
+    } catch (_) {
+      if (mounted) setState(() => _memberSearching = false);
+    }
+  }
+
+  Future<void> _confirmMultiStep() async {
+    HapticUtils.primaryTap();
+    final action = _pendingActions[_currentActionIdx];
+
+    setState(() => _state = VoiceEntryState.saving);
+    try {
+      await _executeAction(action);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _state    = VoiceEntryState.error;
+          _errorMsg = e.toString();
+        });
+      }
+      return;
+    }
+
+    _advanceMultiStep();
+  }
+
+  void _skipMultiStep() {
+    HapticUtils.lightTap();
+    _advanceMultiStep();
+  }
+
+  void _advanceMultiStep() {
+    final nextIdx = _currentActionIdx + 1;
+    if (nextIdx >= _pendingActions.length) {
+      // All done
+      if (!mounted) return;
+      ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
+      ref.invalidate(myGroupsProvider);
+      setState(() => _state = VoiceEntryState.done);
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) Navigator.of(context).pop();
+      });
+    } else {
+      if (!mounted) return;
+      setState(() {
+        _currentActionIdx = nextIdx;
+        _state = VoiceEntryState.multiConfirming;
+      });
+      _prepareCurrentMultiStep();
+    }
+  }
+
+  Future<void> _executeAction(VoiceAction action) async {
+    if (action is CreateGroupAction) {
+      final repo  = ref.read(setAllRepositoryProvider);
+      final group = await repo.createGroup(action.name);
+      if (group != null) _createdGroup = group;
+
+    } else if (action is AddMemberAction) {
+      final repo    = ref.read(setAllRepositoryProvider);
+      final groupId = _resolveGroupId(action.groupNameHint);
+      if (groupId == null) return; // skip silently if no group to add to
+      if (_memberSearchResults.isNotEmpty) {
+        await repo.addMemberById(groupId, _memberSearchResults.first.id);
+      }
+
+    } else if (action is AddExpenseAction) {
+      final groupId = _resolveGroupId(action.groupNameHint);
+      await _executeAddExpense(action, groupId);
+      ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
+      ref.invalidate(myGroupsProvider);
+    }
+  }
+
+  String? _resolveGroupId(String? hint) {
+    if (_createdGroup != null) return _createdGroup!.id;
+    if (hint == null) return null;
+    final h = hint.toLowerCase();
+    final match = widget.groups.firstWhere(
+      (g) => g.name.toLowerCase().contains(h) || h.contains(g.name.toLowerCase()),
+      orElse: () => GroupModel(id: '', name: '', creatorId: ''),
+    );
+    return match.id.isEmpty ? null : match.id;
+  }
+
+  Future<void> _executeAddExpense(
+    AddExpenseAction action,
+    String? groupId, {
+    bool useEditFields = false,
+  }) async {
+    final repo   = ref.read(setAllRepositoryProvider);
+    final uid    = await repo.ensureUser();
+    if (uid == null) throw Exception('Not authenticated');
+
+    final resolvedAmount = useEditFields ? _editAmount : action.amount;
+    final resolvedCurrency = useEditFields ? _editCurrency : action.currency;
+    final resolvedDesc = (useEditFields && _editDescription.trim().isNotEmpty)
+        ? _editDescription.trim()
+        : action.description;
+
+    final amountDecimal = Decimal.parse(resolvedAmount.toStringAsFixed(2));
+    final currency      = resolvedCurrency;
+    final description   = resolvedDesc;
+
+    List<SplitInsert> splits = [];
+    if (groupId != null && action.splitMode == 'even') {
+      final members = await repo.getGroupMembers(groupId);
+      if (members.isEmpty) {
+        splits = [SplitInsert(userId: uid, universalUsdOwed: amountDecimal)];
+      } else {
+        final count = Decimal.fromInt(members.length);
+        final share = (amountDecimal / count).toDecimal(scaleOnInfinitePrecision: 2);
+        splits = members.map((m) => SplitInsert(userId: m.id, universalUsdOwed: share)).toList();
+      }
+    } else {
+      splits = [SplitInsert(userId: uid, universalUsdOwed: amountDecimal)];
+    }
+
+    await repo.addExpense(
+      groupId:     groupId,
+      payerId:     uid,
+      amount:      amountDecimal,
+      description: description,
+      currency:    currency,
+      splitType:   action.splitMode == 'even' ? SplitType.even : SplitType.manual,
+      splits:      splits,
+      category:    action.category,
+      isIncome:    action.isIncome,
+    );
   }
 
   // ── UI ──────────────────────────────────────────────────────────────────
@@ -350,13 +470,14 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
 
   Widget _buildBody() {
     switch (_state) {
-      case VoiceEntryState.listening:   return _buildListening();
-      case VoiceEntryState.processing:  return _buildProcessing();
-      case VoiceEntryState.clarifying:  return _buildClarifying();
-      case VoiceEntryState.confirming:  return _buildConfirming();
-      case VoiceEntryState.saving:      return _buildSaving();
-      case VoiceEntryState.done:        return _buildDone();
-      case VoiceEntryState.error:       return _buildError();
+      case VoiceEntryState.listening:        return _buildListening();
+      case VoiceEntryState.processing:       return _buildProcessing();
+      case VoiceEntryState.clarifying:       return _buildClarifying();
+      case VoiceEntryState.confirming:       return _buildConfirming();
+      case VoiceEntryState.multiConfirming:  return _buildMultiConfirming();
+      case VoiceEntryState.saving:           return _buildSaving();
+      case VoiceEntryState.done:             return _buildDone();
+      case VoiceEntryState.error:            return _buildError();
     }
   }
 
@@ -437,7 +558,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   // ── CLARIFYING ───────────────────────────────────────────────────────────
 
   Widget _buildClarifying() {
-    final key      = _result?.needsClarification;
+    final key      = _clarifyingResult?.needsClarification;
     final question = _clarificationQuestion(key);
     final showGroupChips = (key == 'group_not_found' || key == 'group_name') &&
         widget.groups.isNotEmpty;
@@ -454,25 +575,23 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         ),
         const SizedBox(height: 16),
 
-        // Tappable group chips for group_not_found / group_name
-        if (showGroupChips) ...
-          [
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: widget.groups.map((g) => ActionChip(
-                label: Text(g.name),
-                labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
-                backgroundColor: _teal.withValues(alpha: 0.15),
-                side: BorderSide(color: _teal.withValues(alpha: 0.4)),
-                onPressed: () {
-                  _clarifyCtrl.text = g.name;
-                  _submitClarification();
-                },
-              )).toList(),
-            ),
-            const SizedBox(height: 16),
-          ],
+        if (showGroupChips) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: widget.groups.map((g) => ActionChip(
+              label: Text(g.name),
+              labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+              backgroundColor: _teal.withValues(alpha: 0.15),
+              side: BorderSide(color: _teal.withValues(alpha: 0.4)),
+              onPressed: () {
+                _clarifyCtrl.text = g.name;
+                _submitClarification();
+              },
+            )).toList(),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         TextField(
           controller: _clarifyCtrl,
@@ -515,27 +634,27 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   String _clarificationQuestion(String? key) {
     final groupNames = widget.groups.map((g) => g.name).join(', ');
     switch (key) {
-      case 'currency':         return 'Which currency? e.g. USD, GEL, EUR';
-      case 'amount':           return 'How much?';
-      case 'group_name':       return 'Which group? $groupNames';
-      case 'income_or_expense':return 'Income or expense?';
-      case 'group_not_found':  return 'Group not found. Which group? $groupNames';
-      default:                 return 'Could you clarify?';
+      case 'currency':          return 'Which currency? e.g. USD, GEL, EUR';
+      case 'amount':            return 'How much?';
+      case 'group_name':        return 'Which group? $groupNames';
+      case 'income_or_expense': return 'Income or expense?';
+      case 'group_not_found':   return 'Group not found. Which group? $groupNames';
+      default:                  return 'Could you clarify?';
     }
   }
 
-  // ── CONFIRMING ───────────────────────────────────────────────────────────
+  // ── CONFIRMING (single add_expense) ──────────────────────────────────────
 
   static const _commonCurrencies = ['USD', 'AED', 'GEL', 'EUR', 'GBP', 'RUB', 'CNY', 'VND', 'INR'];
 
   Widget _buildConfirming() {
-    final r = _result!;
+    final r = _singleResult!;
     final isIncome    = r.isIncome;
     final amountColor = isIncome ? _teal : _orange;
     final sign        = isIncome ? '+' : '-';
 
     String groupLabel = 'WALLET';
-    if (r.type == 'group' && r.groupNameHint != null) {
+    if (r.groupNameHint != null) {
       final hint  = r.groupNameHint!.toLowerCase();
       final match = widget.groups.firstWhere(
         (g) => g.name.toLowerCase().contains(hint) || hint.contains(g.name.toLowerCase()),
@@ -544,7 +663,6 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       groupLabel = match.name.toUpperCase();
     }
 
-    // Ensure dropdown value is in the list
     final currencyValue = _commonCurrencies.contains(_editCurrency)
         ? _editCurrency
         : _commonCurrencies.first;
@@ -563,11 +681,10 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Type badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: r.type == 'group'
+                  color: r.groupNameHint != null
                       ? _teal.withValues(alpha: 0.15)
                       : Colors.white10,
                   borderRadius: BorderRadius.circular(6),
@@ -578,13 +695,11 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.8,
-                    color: r.type == 'group' ? _teal : Colors.white54,
+                    color: r.groupNameHint != null ? _teal : Colors.white54,
                   ),
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Amount preview
               Text(
                 '$sign$_editCurrency ${_editAmount.toStringAsFixed(2)}',
                 style: TextStyle(
@@ -594,8 +709,6 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
                 ),
               ),
               const SizedBox(height: 14),
-
-              // Editable: Amount + Currency row
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -638,16 +751,12 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
                 ],
               ),
               const SizedBox(height: 10),
-
-              // Editable: Description
               _darkField(
                 controller: _descCtrl,
                 label: 'voice_entry.description_label'.tr(),
                 onChanged: (v) => setState(() => _editDescription = v),
               ),
               const SizedBox(height: 12),
-
-              // Category chip (display-only)
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -661,12 +770,10 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           ),
         ),
         const SizedBox(height: 20),
-
-        // Confirm button
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: _confirm,
+            onPressed: _confirmSingle,
             icon: const Icon(Icons.check_rounded),
             label: Text('voice_entry.confirm_btn'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
             style: FilledButton.styleFrom(
@@ -678,8 +785,6 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           ),
         ),
         const SizedBox(height: 10),
-
-        // Cancel button
         SizedBox(
           width: double.infinity,
           child: TextButton(
@@ -694,6 +799,177 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       ],
     );
   }
+
+  // ── MULTI-CONFIRMING stepper ──────────────────────────────────────────────
+
+  Widget _buildMultiConfirming() {
+    if (_pendingActions.isEmpty) return _buildSaving();
+    final total  = _pendingActions.length;
+    final n      = _currentActionIdx + 1;
+    final action = _pendingActions[_currentActionIdx];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        // Step counter
+        Text(
+          'voice_entry.step_x_of_y'.tr(namedArgs: {'n': '$n', 'total': '$total'}),
+          style: const TextStyle(fontSize: 12, color: Colors.white38, fontWeight: FontWeight.w600, letterSpacing: 0.6),
+        ),
+        const SizedBox(height: 4),
+        LinearProgressIndicator(
+          value: n / total,
+          backgroundColor: Colors.white12,
+          color: _teal,
+          minHeight: 3,
+          borderRadius: BorderRadius.circular(2),
+        ),
+        const SizedBox(height: 20),
+
+        // Action-specific card
+        _buildActionCard(action),
+
+        const SizedBox(height: 20),
+
+        // Confirm button
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: (action is AddMemberAction && _memberSearching)
+                ? null
+                : _confirmMultiStep,
+            icon: const Icon(Icons.check_rounded),
+            label: Text('voice_entry.confirm_btn'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            style: FilledButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+
+        // Skip button
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: _skipMultiStep,
+            style: TextButton.styleFrom(foregroundColor: Colors.white38),
+            child: Text('voice_entry.action_skip'.tr()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionCard(VoiceAction action) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: switch (action) {
+        CreateGroupAction a => _buildCreateGroupCard(a),
+        AddMemberAction   a => _buildAddMemberCard(a),
+        AddExpenseAction  a => _buildExpenseCard(a),
+      },
+    );
+  }
+
+  Widget _buildCreateGroupCard(CreateGroupAction action) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: _purple.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: const Icon(Icons.group_add_rounded, color: _purple, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'voice_entry.create_group_confirm'.tr(namedArgs: {'name': action.name}),
+              style: const TextStyle(fontSize: 16, color: Colors.white, height: 1.4),
+            ),
+          ),
+        ]),
+      ],
+    );
+  }
+
+  Widget _buildAddMemberCard(AddMemberAction action) {
+    final found = _memberSearchResults.isNotEmpty ? _memberSearchResults.first : null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: _teal.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: const Icon(Icons.person_add_rounded, color: _teal, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'voice_entry.add_member_confirm'.tr(namedArgs: {'name': found?.name ?? action.memberNameHint}),
+              style: const TextStyle(fontSize: 16, color: Colors.white, height: 1.4),
+            ),
+          ),
+          if (_memberSearching)
+            const SizedBox(
+              width: 18, height: 18,
+              child: CircularProgressIndicator(color: _teal, strokeWidth: 2),
+            ),
+        ]),
+        if (!_memberSearching && found == null) ...[
+          const SizedBox(height: 12),
+          Text(
+            'voice_entry.member_not_found'.tr(namedArgs: {'query': action.memberNameHint}),
+            style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildExpenseCard(AddExpenseAction action) {
+    final isIncome    = action.isIncome;
+    final amountColor = isIncome ? _teal : _orange;
+    final sign        = isIncome ? '+' : '-';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(color: _orange.withValues(alpha: 0.15), shape: BoxShape.circle),
+            child: Icon(isIncome ? Icons.arrow_downward_rounded : Icons.arrow_upward_rounded, color: _orange, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '$sign${action.currency} ${action.amount.toStringAsFixed(2)} — ${action.description}',
+              style: TextStyle(fontSize: 16, color: amountColor, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 10),
+        Wrap(spacing: 6, runSpacing: 6, children: [
+          _Chip(label: action.category, color: _purple),
+          if (action.isIncome) _Chip(label: 'Income', color: _teal),
+          if (action.splitMode == 'none') _Chip(label: 'No split', color: Colors.white38),
+        ]),
+      ],
+    );
+  }
+
+  // ── Shared field widget ───────────────────────────────────────────────────
 
   Widget _darkField({
     required TextEditingController controller,
@@ -729,18 +1005,18 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   Widget _buildSaving() {
     return Column(
       children: [
-        SizedBox(height: 60),
-        SizedBox(
+        const SizedBox(height: 60),
+        const SizedBox(
           width: 28,
           height: 28,
           child: CircularProgressIndicator(color: _teal, strokeWidth: 2.5),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         Text(
           'voice_entry.saving'.tr(),
           style: const TextStyle(fontSize: 16, color: Colors.white70),
         ),
-        SizedBox(height: 60),
+        const SizedBox(height: 60),
       ],
     );
   }
@@ -750,14 +1026,14 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   Widget _buildDone() {
     return Column(
       children: [
-        SizedBox(height: 48),
-        Icon(Icons.check_circle_rounded, color: _teal, size: 64),
-        SizedBox(height: 16),
+        const SizedBox(height: 48),
+        const Icon(Icons.check_circle_rounded, color: _teal, size: 64),
+        const SizedBox(height: 16),
         Text(
           'voice_entry.saved'.tr(),
           style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
         ),
-        SizedBox(height: 48),
+        const SizedBox(height: 48),
       ],
     );
   }

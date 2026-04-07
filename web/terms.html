@@ -6,6 +6,12 @@
     <title>Terms of Service | SetAll</title>
     <meta name="description" content="SetAll Terms of Service and User Agreement.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+    <script src="/i18n.js"></script>
+    <style>
+        #lang-switcher { display:flex; gap:0.25rem; }
+        #lang-switcher button { background:none; border:1px solid rgba(255,255,255,0.15); color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.2rem 0.4rem; border-radius:4px; cursor:pointer; transition:color .15s,border-color .15s; }
+        #lang-switcher button:hover, #lang-switcher button.lang-active { color:#14B8A6; border-color:#14B8A6; }
+    </style>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
@@ -100,23 +106,24 @@
                 <span>SetAll</span>
             </a>
             <div class="nav-actions">
-                <a href="/download" class="btn-ghost">Download</a>
-                <a href="/login" class="btn-primary">Sign In</a>
+                <div id="lang-switcher"></div>
+                <a href="/download" class="btn-ghost" data-i18n="legal_nav_download">Download</a>
+                <a href="/login" class="btn-primary" data-i18n="legal_nav_signin">Sign In</a>
             </div>
         </div>
     </nav>
 
     <main class="z1">
         <div class="hero">
-            <h1>Terms of Service</h1>
-            <p>Effective Date: March 2026</p>
+            <h1 data-i18n="legal_terms_title">Terms of Service</h1>
+            <p data-i18n="legal_effective">Effective Date: March 2026</p>
         </div>
 
         <div class="page z1">
             <div class="legal-card">
 
                 <div class="legal-section">
-                    <h2>1. Acceptance of Terms</h2>
+                    <h2 data-i18n="legal_t1">1. Acceptance of Terms</h2>
                     <p>Welcome to SetAll ("Company", "we", "our", "us"). These Terms of Service ("Terms") govern your access to and use of the SetAll website, mobile applications, desktop applications, and related services (collectively, the "Service").</p>
                     <p style="margin-top:0.5rem">By creating an account, accessing, or using the Service, you agree to be bound by these Terms and our Privacy Policy. If you do not agree to these Terms, you may not access or use the Service.</p>
                 </div>
@@ -124,7 +131,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>2. Description of Service (Non-Custodial Nature)</h2>
+                    <h2 data-i18n="legal_t2">2. Description of Service (Non-Custodial Nature)</h2>
                     <p>SetAll is a peer-to-peer expense tracking and mathematical calculation utility designed to help users log shared expenses and determine optimized debt settlements.</p>
                     <ul>
                         <li><strong>Not a Financial Institution:</strong> SetAll is <strong>not</strong> a bank, payment processor, money transmitter, or financial institution. We do not hold, transfer, process, or have access to real fiat currency, bank accounts, or credit cards.</li>
@@ -147,7 +154,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>3. Eligibility and Account Security</h2>
+                    <h2 data-i18n="legal_t3">3. Eligibility and Account Security</h2>
                     <p>You must be at least 13 years of age (or 16 in the EEA) to create an account and use the Service. By using the Service, you represent and warrant that you meet these requirements.</p>
                     <p style="margin-top:0.5rem">When you register, you agree to provide accurate and complete information. You are solely responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.</p>
                 </div>
@@ -155,7 +162,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>4. Acceptable Use and User Conduct</h2>
+                    <h2 data-i18n="legal_t4">4. Acceptable Use and User Conduct</h2>
                     <p>You agree to use the Service only for lawful purposes. You agree <strong>not</strong> to:</p>
                     <ul>
                         <li>Use the Service to facilitate, track, or hide illegal transactions, illicit goods, fraud, or money laundering.</li>
@@ -169,7 +176,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>5. Intellectual Property Rights</h2>
+                    <h2 data-i18n="legal_t5">5. Intellectual Property Rights</h2>
                     <p>The Service, including its original content, design, algorithms (including the "Greedy Flow" engine), code, graphics, and trademarks, are owned by SetAll and are protected by international intellectual property laws.</p>
                     <p style="margin-top:0.5rem">We grant you a personal, worldwide, royalty-free, non-assignable, non-exclusive, revocable, and non-sublicensable license to access and use the Service strictly as permitted by these Terms. You may not copy, modify, distribute, sell, or lease any part of our Service.</p>
                 </div>
@@ -204,7 +211,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>8. Disclaimer of Warranties</h2>
+                    <h2 data-i18n="legal_t6">8. Disclaimer of Warranties</h2>
                     <p class="as-is">The Service is provided on an "AS IS" and "AS AVAILABLE" basis.</p>
                     <p style="margin-top:0.5rem">To the maximum extent permitted by applicable law, SetAll expressly disclaims all warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not warrant that the Service will be uninterrupted, error-free, or secure. We do not guarantee the absolute accuracy of currency exchange rates or mathematical calculations; users should verify critical financial figures independently.</p>
                 </div>
@@ -212,7 +219,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>9. Limitation of Liability</h2>
+                    <h2 data-i18n="legal_t7">9. Limitation of Liability</h2>
                     <p>To the maximum extent permitted by applicable law, in no event shall SetAll, its directors, employees, partners, agents, suppliers, or affiliates, be liable for any indirect, incidental, special, consequential, or punitive damages resulting from:</p>
                     <ul>
                         <li>Your access to or use of or inability to access or use the Service;</li>
@@ -233,14 +240,14 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>11. Termination</h2>
+                    <h2 data-i18n="legal_t9">11. Termination</h2>
                     <p>We may terminate or suspend your account immediately, without prior notice or liability, for any reason whatsoever, including without limitation if you breach the Terms. Upon termination, your right to use the Service will immediately cease. If you wish to terminate your account, you may use the "Delete Account" feature within the app's settings.</p>
                 </div>
 
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                  <h2>12. Governing Law and Dispute Resolution</h2>
+                  <h2 data-i18n="legal_t10">12. Governing Law and Dispute Resolution</h2>
                   <p>These Terms shall be governed by and construed in accordance with the laws of the <strong>Republic of Georgia</strong>, without regard to its conflict of law provisions.</p>
                   <p style="margin-top:0.5rem"><strong>Informal Resolution:</strong> Before initiating any formal proceeding, you agree to contact us at <a href="mailto:contact@setall.app" class="contact-link" style="display:inline">contact@setall.app</a> and attempt to resolve the dispute informally. We will make good faith efforts to resolve any complaint within 30 days.</p>
                   <p style="margin-top:0.5rem"><strong>Formal Disputes:</strong> If informal resolution fails, disputes shall be subject to the exclusive jurisdiction of the courts of Tbilisi, Georgia. If you are an EU consumer, you may also have the right to bring proceedings in the courts of your country of residence under applicable EU consumer protection law.</p>
@@ -250,7 +257,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>13. Changes to Terms</h2>
+                    <h2 data-i18n="legal_t11">13. Changes to Terms</h2>
                     <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. If a revision is material, we will try to provide at least 30 days' notice prior to any new terms taking effect. By continuing to access or use our Service after those revisions become effective, you agree to be bound by the revised terms.</p>
                 </div>
 
@@ -264,7 +271,7 @@
                 <hr class="legal-divider">
 
                 <div class="legal-section">
-                    <h2>14. Contact Us</h2>
+                    <h2 data-i18n="legal_t12">14. Contact Us</h2>
                     <p>If you have any questions or concerns about these Terms, please contact us at:</p>
                     <a href="mailto:contact@setall.app" class="contact-link">
                         contact@setall.app
@@ -279,10 +286,10 @@
     <footer class="z1">
         <p>
             &copy; 2026 SetAll
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/terms">Terms of Service</a>
-            <a href="/support">Help &amp; Support</a>
-            <a href="mailto:contact@setall.app">Contact</a>
+            <a href="/privacy" data-i18n="legal_footer_privacy">Privacy Policy</a>
+            <a href="/terms" data-i18n="legal_footer_terms">Terms of Service</a>
+            <a href="/support" data-i18n-html="legal_footer_support">Help &amp; Support</a>
+            <a href="mailto:contact@setall.app" data-i18n="legal_footer_contact">Contact</a>
         </p>
         <p style="margin-top:0.5rem;font-size:0.75rem">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</p>
     </footer>

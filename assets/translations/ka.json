@@ -483,7 +483,12 @@
     "couldnt_hear": "ვერ გავიგე, ვცდი ხელახლა…",
     "group_label": "ჯგუფი",
     "wallet_label": "საფულე",
-    "listening_hint": "წარმოთქვით თქვენი ხარჯი ან შემოსავალი"
+    "listening_hint": "წარმოთქვით თქვენი ხარჯი ან შემოსავალი",
+    "create_group_confirm": "შევქმნა ჯგუფი '{name}'?",
+    "add_member_confirm": "დავამატო {name}?",
+    "member_not_found": "მომხმარებელი '{query}' ვერ მოიძებნა",
+    "action_skip": "გამოტოვება",
+    "step_x_of_y": "ნაბიჯი {n} / {total}"
   },
   "regional": {
     "date_time_format": "თარიღისა და დროის ფორმატი",

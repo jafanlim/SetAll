@@ -483,7 +483,12 @@
     "couldnt_hear": "No te escuché, reintentando…",
     "group_label": "Grupo",
     "wallet_label": "Cartera",
-    "listening_hint": "Di tu gasto o ingreso"
+    "listening_hint": "Di tu gasto o ingreso",
+    "create_group_confirm": "¿Crear grupo '{name}'?",
+    "add_member_confirm": "¿Añadir {name}?",
+    "member_not_found": "No se encontró usuario para '{query}'",
+    "action_skip": "Omitir",
+    "step_x_of_y": "Paso {n} de {total}"
   },
   "regional": {
     "date_time_format": "Formato de fecha y hora",

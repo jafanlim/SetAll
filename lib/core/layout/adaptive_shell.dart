@@ -1,6 +1,7 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:go_router/go_router.dart';
@@ -663,9 +664,16 @@ class _LangPromptSheet extends StatelessWidget {
               trailing: l.code == currentCode
                   ? const Icon(Icons.check_rounded, color: _kTeal, size: 20)
                   : null,
-              onTap: () {
+              onTap: () async {
                 ctx.setLocale(Locale(l.code));
                 Navigator.of(ctx).pop();
+                final uid = Supabase.instance.client.auth.currentUser?.id;
+                if (uid != null) {
+                  await Supabase.instance.client
+                      .from('profiles')
+                      .update({'language_code': l.code})
+                      .eq('id', uid);
+                }
               },
             )),
             const SizedBox(height: 8),

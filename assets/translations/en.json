@@ -483,7 +483,12 @@
     "couldnt_hear": "Couldn't hear you, trying again…",
     "group_label": "Group",
     "wallet_label": "Wallet",
-    "listening_hint": "Speak your expense or income"
+    "listening_hint": "Speak your expense or income",
+    "create_group_confirm": "Create group '{name}'?",
+    "add_member_confirm": "Add {name}?",
+    "member_not_found": "No user found for '{query}'",
+    "action_skip": "Skip",
+    "step_x_of_y": "Step {n} of {total}"
   },
   "regional": {
     "date_time_format": "Date & Time Format",

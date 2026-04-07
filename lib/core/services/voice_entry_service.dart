@@ -84,7 +84,7 @@ class VoiceEntryService {
   Future<void> cancel() async => _stt.cancel();
   bool get isListening => _stt.isListening;
 
-  Future<VoiceEntryResult> parse(
+  Future<VoiceParseResponse> parse(
     String transcript,
     List<Map<String, dynamic>> groups,
     String defaultCurrency, {
@@ -116,6 +116,6 @@ class VoiceEntryService {
     }
 
     final json = jsonDecode(response.body) as Map<String, dynamic>;
-    return VoiceEntryResult.fromJson(json);
+    return VoiceParseResponse.fromJson(json);
   }
 }

@@ -483,7 +483,12 @@
     "couldnt_hear": "Не расслышал, пробую снова…",
     "group_label": "Группа",
     "wallet_label": "Кошелёк",
-    "listening_hint": "Произнесите ваш расход или доход"
+    "listening_hint": "Произнесите ваш расход или доход",
+    "create_group_confirm": "Создать группу '{name}'?",
+    "add_member_confirm": "Добавить {name}?",
+    "member_not_found": "Пользователь '{query}' не найден",
+    "action_skip": "Пропустить",
+    "step_x_of_y": "Шаг {n} из {total}"
   },
   "regional": {
     "date_time_format": "Формат даты и времени",
