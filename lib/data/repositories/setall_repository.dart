@@ -8,7 +8,7 @@ import 'package:flutter_image_compress/flutter_image_compress.dart'
     if (dart.library.html) '../../core/stubs/image_compress_stub.dart';
 import 'package:path/path.dart' as p;
 import '../../core/utils/attachment_processor.dart';
-import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
+import 'package:flutter/foundation.dart' show kDebugMode, kIsWeb, debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -3040,7 +3040,7 @@ class SetAllRepository {
           ));
         }
       } catch (e) {
-        debugPrint('[_buildOmniActivity] deleted_wallet_entries query failed: $e');
+        if (kDebugMode) debugPrint('[_buildOmniActivity] deleted_wallet_entries query failed: $e');
       }
     }
 

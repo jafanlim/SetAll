@@ -58,19 +58,33 @@ class NotificationService {
 
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
-      // ── 2. Fetch and persist FCM token ──────────────────────────────────
+      // ── 2. On iOS, wait for APNS token before requesting FCM token ───────
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        try {
+          final apns = await messaging.getAPNSToken();
+          if (apns == null) {
+            if (kDebugMode) debugPrint('[Notifications] APNS token not yet available (simulator?)');
+            return;
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('[Notifications] APNS token fetch failed: $e');
+          return;
+        }
+      }
+
+      // ── 3. Fetch and persist FCM token ──────────────────────────────────
       final token = await messaging.getToken();
       if (token != null) {
         await _persistToken(token);
       }
 
-      // ── 3. Token refresh — re-persist and re-sync ───────────────────────
+      // ── 4. Token refresh — re-persist and re-sync ───────────────────────
       messaging.onTokenRefresh.listen((newToken) async {
         await _persistToken(newToken);
         await syncToSupabase(token: newToken);
       });
 
-      // ── 4. Foreground message handler ───────────────────────────────────
+      // ── 5. Foreground message handler ───────────────────────────────────
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         if (kDebugMode) {
           debugPrint(
@@ -79,7 +93,7 @@ class NotificationService {
         }
       });
 
-      // ── 5. Background / terminated tap handler ───────────────────────────
+      // ── 6. Background / terminated tap handler ───────────────────────────
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         if (kDebugMode) {
           debugPrint('[Notifications] Opened from: ${message.notification?.title}');
