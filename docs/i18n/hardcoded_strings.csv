@@ -1,0 +1,37 @@
+screen,line,hardcoded_text
+groups_screen,125,Export failed: \$e
+groups_screen,144,Export failed: \$e
+groups_screen,163,Export failed: \$e
+groups_screen,1235,Cancel
+groups_screen,1239,Save
+groups_screen,1267,Cancel
+groups_screen,1313,Cancel
+groups_screen,1438,Export failed: $e
+groups_screen,1768,Delete expense?
+groups_screen,1773,Cancel
+groups_screen,1777,Delete
+groups_screen,1790,Expense deleted
+groups_screen,1805,Edit expense
+groups_screen,1835,Edit expense
+wallet_screen,251,Export failed: $e
+wallet_screen,1196,Category breakdown
+wallet_screen,1197,Spending by category
+wallet_screen,1207,Cancel
+wallet_screen,1218,Export PDF
+activity_screen,1256,Delete expense?
+activity_screen,1257,This cannot be undone.
+activity_screen,1259,Cancel
+activity_screen,1263,Delete
+activity_screen,1368,Cancel
+activity_screen,1372,Delete
+activity_screen,1387,Cancel
+activity_screen,1490,Cancel
+activity_screen,1494,Delete
+activity_screen,1914,Could not restore group
+activity_screen,2077,Could not restore wallet entry
+group_info_screen,87,Cancel
+group_info_screen,119,Could not delete. Try Force Delete from the … menu.
+group_info_screen,142,Cancel
+group_info_screen,148,Save
+group_info_screen,180,Cancel
+group_info_screen,284,Export failed: $e

@@ -443,7 +443,8 @@ class SetAllRepository {
         .from('groups')
         .select('id')
         .eq('type', 'normal')
-        .eq('is_deleted', false) as List;
+        .eq('is_deleted', false)
+        .isFilter('settled_at', null) as List;
     final normalGroupIds = normalGroupRows
         .map((r) => (r as Map<String, dynamic>)['id'] as String)
         .where((id) => !leftGroupIds.contains(id))
@@ -516,7 +517,7 @@ class SetAllRepository {
     final normalGroupRows = await LocalDatabase.db.query(
       'groups',
       columns: ['id'],
-      where: 'type = ? AND (is_deleted IS NULL OR is_deleted = 0)',
+      where: 'type = ? AND (is_deleted IS NULL OR is_deleted = 0) AND settled_at IS NULL',
       whereArgs: ['normal'],
     );
     final normalGroupIds =
@@ -562,9 +563,39 @@ class SetAllRepository {
     return (youOwe: youOwe, youAreOwed: youAreOwed);
   }
 
+  /// Returns true when [groupId] has a non-null settled_at timestamp.
+  Future<bool> isGroupSettled(String groupId) async {
+    if (_isWeb && _client != null) {
+      try {
+        final rows = await _client
+            .from('groups')
+            .select('settled_at')
+            .eq('id', groupId)
+            .limit(1) as List;
+        if (rows.isEmpty) return false;
+        return (rows.first as Map<String, dynamic>)['settled_at'] != null;
+      } catch (_) {
+        return false;
+      }
+    }
+    final rows = await LocalDatabase.db.query(
+      'groups',
+      columns: ['settled_at'],
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+    if (rows.isEmpty) return false;
+    return rows.first['settled_at'] != null;
+  }
+
   /// Group-scoped raw balance. Returns null when the group has no expenses.
+  /// Returns empty lists (zeroed) when the group is settled.
   Future<({List<BalanceEntry> youOwe, List<BalanceEntry> youAreOwed})?>
       getGroupBalanceRawData(String uid, String groupId) async {
+    // If group is settled, show zero balance.
+    if (await isGroupSettled(groupId)) {
+      return (youOwe: <BalanceEntry>[], youAreOwed: <BalanceEntry>[]);
+    }
     if (_isWeb && _client != null) {
       return _getGroupBalanceRawDataWeb(uid, groupId);
     }
@@ -1664,6 +1695,82 @@ class SetAllRepository {
     return true;
   }
 
+  /// Marks a group as fully settled (sets settled_at + settled_by).
+  /// Does NOT create any expense entries — settlement is a pure status flag.
+  Future<bool> setGroupSettled(String groupId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+    final now = _now();
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'settled_at': now,
+          'settled_by': uid,
+        }).eq('id', groupId);
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[setGroupSettled] Supabase error: $e');
+        return false;
+      }
+    }
+
+    await LocalDatabase.db.update(
+      'groups',
+      {'settled_at': now, 'settled_by': uid},
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'settled_at': now,
+          'settled_by': uid,
+        }).eq('id', groupId);
+      } catch (_) {}
+    }
+    _notify();
+    return true;
+  }
+
+  /// Clears the settled status of a group so debts come back as they were.
+  Future<bool> clearGroupSettled(String groupId) async {
+    final uid = await ensureUser();
+    if (uid == null) return false;
+
+    if (_isWeb && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'settled_at': null,
+          'settled_by': null,
+        }).eq('id', groupId);
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[clearGroupSettled] Supabase error: $e');
+        return false;
+      }
+    }
+
+    await LocalDatabase.db.update(
+      'groups',
+      {'settled_at': null, 'settled_by': null},
+      where: 'id = ?',
+      whereArgs: [groupId],
+    );
+    if (await _isOnline && _client != null) {
+      try {
+        await _client.from('groups').update({
+          'settled_at': null,
+          'settled_by': null,
+        }).eq('id', groupId);
+      } catch (_) {}
+    }
+    _notify();
+    return true;
+  }
+
   /// Creates a 1-on-1 direct group with [otherEmail].
   ///
   /// On web/Supabase: calls the `create_direct_group` RPC which is idempotent
@@ -2745,7 +2852,7 @@ class SetAllRepository {
       } else {
         final raw = await _client
             .from('groups')
-            .select('id, name, creator_id, created_at')
+            .select('id, name, creator_id, created_at, settled_at, settled_by')
             .inFilter('id', gids) as List;
         groupRows = raw.cast<Map<String, dynamic>>();
       }
@@ -2769,7 +2876,7 @@ class SetAllRepository {
       if (gids.isNotEmpty) {
         final raw = await LocalDatabase.db.query(
           'groups',
-          columns: ['id', 'name', 'creator_id', 'created_at'],
+          columns: ['id', 'name', 'creator_id', 'created_at', 'settled_at', 'settled_by'],
           where: 'id IN (${gids.map((_) => '?').join(',')})',
           whereArgs: gids,
         );
@@ -2832,6 +2939,19 @@ class SetAllRepository {
         groupName: g['name'] as String? ?? '',
         createdByYou: (g['creator_id'] as String?) == uid,
       ));
+      // Emit a single GroupSettledEvent for each settled group.
+      final settledAt = g['settled_at'] as String?;
+      final settledByUid = g['settled_by'] as String?;
+      if (settledAt != null && settledByUid != null) {
+        events.add(GroupSettledEvent(
+          timestamp: settledAt,
+          groupId: g['id'] as String,
+          groupName: g['name'] as String? ?? '',
+          settledByUid: settledByUid,
+          settledByName: await payerName(settledByUid),
+          settledByYou: settledByUid == uid,
+        ));
+      }
     }
 
     // ── 3. Expenses (group + personal) ───────────────────────────────────────
@@ -2875,13 +2995,26 @@ class SetAllRepository {
       }
     } else {
       if (gids.isNotEmpty) {
-        final raw = await LocalDatabase.db.query(
+        var raw = await LocalDatabase.db.query(
           'expenses',
           where: 'group_id IN (${gids.map((_) => '?').join(',')})',
           whereArgs: gids,
           orderBy: 'created_at DESC',
           limit: limit,
         );
+        // Fallback to Supabase when local SQLite has no group expenses yet
+        // (e.g. a member who just joined before the first sync completes).
+        if (raw.isEmpty && _client != null && await _isOnline) {
+          try {
+            final remote = await _client
+                .from('expenses')
+                .select()
+                .inFilter('group_id', gids)
+                .order('created_at', ascending: false)
+                .limit(limit) as List;
+            raw = remote.cast<Map<String, dynamic>>();
+          } catch (_) {}
+        }
         for (final r in raw) {
           final e = _rowToExpense(r);
           events.add(ExpenseEvent(
@@ -3705,6 +3838,8 @@ class SetAllRepository {
     String groupId, {
     String baseCurrency = 'USD',
   }) async {
+    // When group is settled, no debts to show.
+    if (await isGroupSettled(groupId)) return [];
     if (_isWeb && _client != null) {
       final allRows = await _client
           .from('expenses')

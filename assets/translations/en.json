@@ -177,7 +177,10 @@
     "delete_confirm_one": "Delete 1 wallet entry? This cannot be undone.",
     "entry_count_one": "1 entry",
     "entry_count_other": "{count} entries",
-    "sort_tooltip": "Sort"
+    "sort_tooltip": "Sort",
+    "report_entry_list": "Entry list",
+    "report_all_transactions": "All wallet transactions",
+    "report_category_breakdown": "Category breakdown"
   },
   "groups_screen": {
     "filter_by_group": "Filter by group",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "Delete 1 group? As the owner you can restore it from the Activity screen within 12 months.",
     "error_delete": "Could not delete some groups.",
     "sort_activity_tooltip": "Sort activity",
-    "sort_groups_tooltip": "Sort groups"
+    "sort_groups_tooltip": "Sort groups",
+    "rename_group": "Rename group",
+    "settle_group_title": "Settle group?",
+    "settle_btn": "Settle",
+    "settled_up": "Group settled up!",
+    "reopened": "Group reopened.",
+    "could_not_rename": "Could not rename. Only the group creator can rename.",
+    "could_not_delete": "Could not delete group. Try Force Delete from the long-press menu.",
+    "delete_expense_title": "Delete expense?",
+    "edit_expense": "Edit expense",
+    "expense_deleted": "Expense deleted",
+    "download_report": "Download report",
+    "add_member": "Add member"
   },
   "activity_screen": {
     "search_hint": "Search expenses, groups, people…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "Group Expenses",
     "type_group_events": "Group Events",
     "type_edits_deletes": "Edits & Deletes",
-    "type_other": "Other"
+    "type_other": "Other",
+    "delete_entry_title": "Delete entry?",
+    "delete_expense_title": "Delete expense?",
+    "view_details": "View details",
+    "restore_options": "Restore options",
+    "restore_expense_only": "This expense only",
+    "restore_whole_group": "Whole group + all expenses",
+    "could_not_restore_expense": "Could not restore expense",
+    "could_not_restore_group": "Could not restore group",
+    "could_not_restore_wallet": "Could not restore wallet entry"
   },
   "categories": {
     "general": "General",
@@ -426,5 +450,38 @@
     "body": "Your device language is {language}. Continue or choose another?",
     "keep": "Continue in {language}",
     "change": "Choose language"
+  },
+  "group_info_screen": {
+    "could_not_delete": "Could not delete. Try Force Delete from the … menu."
+  },
+  "export": {
+    "pdf_title": "PDF report",
+    "csv_title": "CSV export",
+    "json_title": "JSON export",
+    "pdf_groups_subtitle": "Full groups report as PDF",
+    "pdf_group_subtitle": "Group expenses as PDF",
+    "csv_groups_subtitle": "All group expenses as spreadsheet",
+    "json_groups_subtitle": "All group expenses as JSON",
+    "pdf_wallet_subtitle": "Full wallet report as PDF",
+    "csv_wallet_subtitle": "All wallet entries as spreadsheet",
+    "json_wallet_subtitle": "All wallet entries as JSON"
+  },
+  "voice_entry": {
+    "listening": "Listening…",
+    "tap_to_stop": "Tap to stop",
+    "processing": "Understanding your entry…",
+    "clarify_prompt": "What did you mean?",
+    "confirm_title": "Confirm Entry",
+    "amount_label": "Amount",
+    "description_label": "Description",
+    "confirm_btn": "Confirm",
+    "cancel_btn": "Cancel",
+    "saving": "Saving…",
+    "saved": "Saved!",
+    "error_title": "Couldn't process that",
+    "error_retry": "Try Again",
+    "couldnt_hear": "Couldn't hear you, trying again…",
+    "group_label": "Group",
+    "wallet_label": "Wallet"
   }
 }

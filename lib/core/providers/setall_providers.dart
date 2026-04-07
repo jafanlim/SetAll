@@ -112,6 +112,8 @@ final groupBalanceSummaryProvider =
   // whenever a sync pull or local write changes expenses — no manual
   // ref.invalidate(groupBalanceSummaryProvider) needed anywhere.
   ref.watch(groupExpensesProvider(groupId));
+  // Watch group list so balance recomputes when settled_at changes.
+  ref.watch(myGroupsProvider);
   return ref
       .watch(balanceServiceProvider)
       .getGroupBalanceSummary(groupId, targetCurrency: targetCurrency);

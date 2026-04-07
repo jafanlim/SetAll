@@ -10,6 +10,8 @@ class GroupModel extends Group {
     super.colorValue,
     super.avatarUrl,
     super.defaultCurrency,
+    super.settledAt,
+    super.settledBy,
   });
 
   static GroupType _typeFromString(String? v) {
@@ -27,6 +29,8 @@ class GroupModel extends Group {
       colorValue: json['color_value'] as int?,
       avatarUrl: json['avatar_url'] as String?,
       defaultCurrency: json['default_currency'] as String?,
+      settledAt: json['settled_at'] as String?,
+      settledBy: json['settled_by'] as String?,
     );
   }
 
@@ -39,5 +43,7 @@ class GroupModel extends Group {
         if (colorValue != null) 'color_value': colorValue,
         if (avatarUrl != null) 'avatar_url': avatarUrl,
         if (defaultCurrency != null) 'default_currency': defaultCurrency,
+        'settled_at': settledAt,
+        'settled_by': settledBy,
       };
 }

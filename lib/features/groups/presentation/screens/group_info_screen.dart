@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -64,7 +65,10 @@ class GroupInfoScreen extends ConsumerStatefulWidget {
 class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
   bool _deleting = false;
 
-  GroupModel get group => widget.group;
+  GroupModel get group {
+    final groups = ref.read(myGroupsProvider).asData?.value ?? [];
+    return groups.firstWhere((g) => g.id == widget.group.id, orElse: () => widget.group);
+  }
 
   // ── Delete ────────────────────────────────────────────────────────────────
   Future<void> _delete({bool force = false}) async {
@@ -125,7 +129,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rename group'),
+        title: Text('groups_screen.rename_group'.tr()),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -158,15 +162,55 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not rename. Only the group creator can rename.'),
+        SnackBar(
+          content: Text('groups_screen.could_not_rename'.tr()),
         ),
       );
     }
   }
 
+  // ── Settle / Reopen ───────────────────────────────────────────────────────
+  Future<void> _settleGroup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('groups_screen.settle_group_title'.tr()),
+        content: Text('Mark "${group.name}" as settled? All debts will show as zero.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('groups_screen.settle_btn'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await ref.read(setAllRepositoryProvider).setGroupSettled(group.id);
+    if (!mounted) return;
+    ref.invalidate(myGroupsProvider);
+    ref.invalidate(groupBalanceSummaryProvider(group.id));
+    ref.invalidate(balanceSummaryProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('groups_screen.settled_up'.tr())),
+    );
+  }
+
+  Future<void> _reopenGroup() async {
+    await ref.read(setAllRepositoryProvider).clearGroupSettled(group.id);
+    if (!mounted) return;
+    ref.invalidate(myGroupsProvider);
+    ref.invalidate(groupBalanceSummaryProvider(group.id));
+    ref.invalidate(balanceSummaryProvider);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('groups_screen.reopened'.tr())),
+    );
+  }
+
   // ── Overflow menu ─────────────────────────────────────────────────────────
   Future<void> _showOverflowMenu() async {
+    final isSettled = group.isSettled;
     final result = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -174,18 +218,33 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       items: [
         PopupMenuItem(
           value: 'rename',
-          child: Row(children: const [
-            Icon(Icons.edit_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Rename group'),
+          child: Row(children: [
+            const Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.rename_group'.tr()),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'invite',
           child: Row(children: [
-            Icon(Icons.person_add_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Add member'),
+            const Icon(Icons.person_add_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.add_member'.tr()),
+          ]),
+        ),
+        PopupMenuItem(
+          value: isSettled ? 'reopen' : 'settle',
+          child: Row(children: [
+            Icon(
+              isSettled ? Icons.undo_rounded : Icons.check_circle_outline,
+              size: 16,
+              color: isSettled ? _orange : _teal,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
+              style: TextStyle(color: isSettled ? _orange : _teal),
+            ),
           ]),
         ),
         const PopupMenuItem(
@@ -197,12 +256,12 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                 style: TextStyle(color: _brandOrange)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'export_pdf',
           child: Row(children: [
-            Icon(Icons.download_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Download report'),
+            const Icon(Icons.download_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.download_report'.tr()),
           ]),
         ),
       ],
@@ -213,6 +272,8 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       context.push('/group/${group.id}/invite',
           extra: {'groupName': group.name});
     }
+    if (result == 'settle') _settleGroup();
+    if (result == 'reopen') _reopenGroup();
     if (result == 'force_delete') _delete(force: true);
     if (result == 'export_pdf') {
       final messenger = ScaffoldMessenger.of(context);
@@ -230,6 +291,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
   @override
   Widget build(BuildContext context) {
     final theme        = Theme.of(context);
+    ref.watch(myGroupsProvider);
     final membersAsync = ref.watch(groupMembersProvider(group.id));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(group.id));
 
@@ -526,6 +588,42 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
               ),
               const SizedBox(height: 10),
 
+              // ── Settle / Reopen banner ─────────────────────────
+              if (group.isSettled)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0x2600D9B0),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: _teal.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.check_circle_rounded, color: _teal, size: 18),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'This group is settled up.',
+                            style: TextStyle(color: _teal, fontWeight: FontWeight.w600, fontSize: 13),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _reopenGroup,
+                          style: TextButton.styleFrom(
+                            foregroundColor: _orange,
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: const Text('Reopen', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
               // ── Secondary actions row ──────────────────────────
               Row(
                 children: [
@@ -550,16 +648,19 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _rename,
-                      icon: const Icon(Icons.edit_outlined, size: 16),
-                      label: const Text('Rename',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 13)),
+                      onPressed: group.isSettled ? _reopenGroup : _settleGroup,
+                      icon: Icon(
+                        group.isSettled ? Icons.undo_rounded : Icons.check_circle_outline,
+                        size: 16,
+                      ),
+                      label: Text(
+                        group.isSettled ? 'Reopen' : 'Settle',
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                      ),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: _teal,
-                        side: const BorderSide(color: _teal, width: 1),
-                        padding:
-                            const EdgeInsets.symmetric(vertical: 12),
+                        foregroundColor: group.isSettled ? _orange : _teal,
+                        side: BorderSide(color: group.isSettled ? _orange : _teal, width: 1),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
                     ),
                   ),

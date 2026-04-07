@@ -169,6 +169,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
     if (ev is ExpenseEditedEvent)      return ev.newDescription.toLowerCase().contains(lower) || ev.groupName.toLowerCase().contains(lower);
     if (ev is WalletEntryDeletedEvent) return ev.description.toLowerCase().contains(lower) || ev.category.toLowerCase().contains(lower);
     if (ev is SettlementEvent) return ev.fromName.toLowerCase().contains(lower) || ev.toName.toLowerCase().contains(lower);
+    if (ev is GroupSettledEvent) return ev.groupName.toLowerCase().contains(lower) || ev.settledByName.toLowerCase().contains(lower);
     return false;
   }
 
@@ -180,6 +181,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
         _ActivityFilter.wallet => ev is WalletActivityEvent || (ev is ExpenseEvent && ev.expense.groupId == null),
         _ActivityFilter.groups => (ev is ExpenseEvent && ev.expense.groupId != null) ||
             ev is GroupCreatedEvent || ev is GroupDeletedEvent || ev is MemberAddedEvent ||
+            ev is GroupSettledEvent ||
             (ev is ExpenseDeletedEvent && ev.groupId != null) ||
             (ev is ExpenseEditedEvent  && ev.groupId != null),
         _ActivityFilter.income => (ev is ExpenseEvent && ev.expense.isIncome) || (ev is WalletActivityEvent && ev.entry.isIncome),
@@ -236,6 +238,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       if (ev.expense.category == 'Settlement') return 'activity_screen.type_settlements'.tr();
       return 'activity_screen.type_group_expenses'.tr();
     }
+    if (ev is GroupSettledEvent)  return 'activity_screen.type_settlements'.tr();
     if (ev is SettlementEvent)    return 'activity_screen.type_settlements'.tr();
     if (ev is GroupCreatedEvent || ev is GroupDeletedEvent || ev is MemberAddedEvent) return 'activity_screen.type_group_events'.tr();
     if (ev is ExpenseDeletedEvent || ev is ExpenseEditedEvent) return 'activity_screen.type_edits_deletes'.tr();
@@ -381,6 +384,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                         if (ev is GroupCreatedEvent)   return _GroupCreatedTile(event: ev);
                         if (ev is GroupDeletedEvent)   return _GroupDeletedTile(event: ev);
                         if (ev is MemberAddedEvent)    return _MemberAddedTile(event: ev);
+                        if (ev is GroupSettledEvent)   return _GroupSettledTile(event: ev);
                         if (ev is SettlementEvent)     return _SettlementTile(event: ev);
                         if (ev is ExpenseDeletedEvent)     return _ExpenseDeletedTile(event: ev);
                         if (ev is ExpenseEditedEvent)      return _ExpenseEditedTile(event: ev, editMode: _editMode, selected: isSelected, onSelect: onSelect);
@@ -1346,7 +1350,7 @@ class _ExpenseTile extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(2))),
                 ListTile(
                   leading: const Icon(Icons.open_in_new_outlined),
-                  title: const Text('View details'),
+                  title: Text('activity_screen.view_details'.tr()),
                   onTap: () { Navigator.pop(ctx); navigateToDetail(); },
                 ),
                 if (isPayer)
@@ -1358,8 +1362,8 @@ class _ExpenseTile extends ConsumerWidget {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (d) => AlertDialog(
-                          title: const Text('Delete expense?'),
-                          content: const Text('This cannot be undone.'),
+                          title: Text('activity_screen.delete_expense_title'.tr()),
+                          content: Text('common.cannot_be_undone'.tr()),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
                             FilledButton(
@@ -1480,8 +1484,8 @@ class _WalletEntryTile extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Delete entry?'),
-                content: const Text('This cannot be undone.'),
+                title: Text('activity_screen.delete_entry_title'.tr()),
+                content: Text('common.cannot_be_undone'.tr()),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
                   FilledButton(
@@ -1662,7 +1666,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore group')),
+        SnackBar(content: Text('activity_screen.could_not_restore_group'.tr())),
       );
     }
   }
@@ -1886,7 +1890,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore expense')),
+        SnackBar(content: Text('activity_screen.could_not_restore_expense'.tr())),
       );
     }
   }
@@ -1922,16 +1926,16 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
         final choice = await showDialog<_RestoreChoice>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Restore options'),
+            title: Text('activity_screen.restore_options'.tr()),
             content: Text('The group "${ev.groupName}" was also deleted. What would you like to restore?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, _RestoreChoice.expenseOnly),
-                child: const Text('This expense only'),
+                child: Text('activity_screen.restore_expense_only'.tr()),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, _RestoreChoice.wholeGroup),
-                child: const Text('Whole group + all expenses'),
+                child: Text('activity_screen.restore_whole_group'.tr()),
               ),
             ],
           ),
@@ -2157,6 +2161,32 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
       );
     }
     return tile;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Group settled event tile
+// ---------------------------------------------------------------------------
+class _GroupSettledTile extends StatelessWidget {
+  const _GroupSettledTile({required this.event});
+  final GroupSettledEvent event;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final title = event.settledByYou
+        ? 'You settled up "${event.groupName}"'
+        : '${event.settledByName} settled up "${event.groupName}"';
+
+    return _buildEventTile(
+      context:        context,
+      theme:          theme,
+      accent:         _green,
+      icon:           Icons.check_circle_rounded,
+      title:          title,
+      badge:          'Settled',
+      timestamp:      event.timestamp,
+    );
   }
 }
 

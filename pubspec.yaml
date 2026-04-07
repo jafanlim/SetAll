@@ -49,6 +49,9 @@ dependencies:
   home_widget: ^0.7.0
   uuid: ^4.4.2
 
+  # Utilities
+  collection: ^1.18.0
+
   # Money & i18n
   decimal: ^3.0.1
   intl: ^0.20.0

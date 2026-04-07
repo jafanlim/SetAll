@@ -177,7 +177,10 @@
     "delete_confirm_one": "Supprimer 1 entrée ? Cette action est irréversible.",
     "entry_count_one": "1 entrée",
     "entry_count_other": "{count} entrées",
-    "sort_tooltip": "Trier"
+    "sort_tooltip": "Trier",
+    "report_entry_list": "Liste des entrées",
+    "report_all_transactions": "Toutes les transactions du portefeuille",
+    "report_category_breakdown": "Répartition par catégorie"
   },
   "groups_screen": {
     "filter_by_group": "Filtrer par groupe",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "Supprimer 1 groupe ? En tant que propriétaire vous pouvez le restaurer depuis l'Activité dans les 12 mois.",
     "error_delete": "Impossible de supprimer certains groupes.",
     "sort_activity_tooltip": "Trier l'activité",
-    "sort_groups_tooltip": "Trier les groupes"
+    "sort_groups_tooltip": "Trier les groupes",
+    "rename_group": "Renommer le groupe",
+    "settle_group_title": "Solder le groupe ?",
+    "settle_btn": "Solder",
+    "settled_up": "Groupe soldé !",
+    "reopened": "Groupe rouvert.",
+    "could_not_rename": "Impossible de renommer. Seul le créateur peut renommer le groupe.",
+    "could_not_delete": "Impossible de supprimer le groupe. Essayez Forcer la suppression via le menu long.",
+    "delete_expense_title": "Supprimer la dépense ?",
+    "edit_expense": "Modifier la dépense",
+    "expense_deleted": "Dépense supprimée",
+    "download_report": "Télécharger le rapport",
+    "add_member": "Ajouter un membre"
   },
   "activity_screen": {
     "search_hint": "Rechercher dépenses, groupes, personnes…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "Dépenses du groupe",
     "type_group_events": "Événements du groupe",
     "type_edits_deletes": "Modifications et suppressions",
-    "type_other": "Autres"
+    "type_other": "Autres",
+    "delete_entry_title": "Supprimer l'entrée ?",
+    "delete_expense_title": "Supprimer la dépense ?",
+    "view_details": "Voir les détails",
+    "restore_options": "Options de restauration",
+    "restore_expense_only": "Cette dépense uniquement",
+    "restore_whole_group": "Groupe entier + toutes les dépenses",
+    "could_not_restore_expense": "Impossible de restaurer la dépense",
+    "could_not_restore_group": "Impossible de restaurer le groupe",
+    "could_not_restore_wallet": "Impossible de restaurer l'entrée du portefeuille"
   },
   "categories": {
     "general": "Général",
@@ -396,7 +420,7 @@
   "wallet_entry": {
     "title": "Ajouter une entrée de portefeuille",
     "what_type": "Quel type d'entrée ?",
-    "choose_direction": "Choisissez la direction de cette entrée de portefeuille.",
+    "choose_direction": "Choisissez le sens de cette entrée dans le portefeuille.",
     "add_income": "AJOUTER UN REVENU",
     "income_subtitle": "Salaire, freelance, cadeau, rendement d'investissement…",
     "add_expense": "AJOUTER UNE DÉPENSE",
@@ -426,5 +450,38 @@
     "body": "Langue {language} détectée. Continuer ou en choisir une autre ?",
     "keep": "Continuer en {language}",
     "change": "Choisir la langue"
+  },
+  "group_info_screen": {
+    "could_not_delete": "Impossible de supprimer. Essayez Forcer la suppression via le menu …"
+  },
+  "export": {
+    "pdf_title": "Rapport PDF",
+    "csv_title": "Export CSV",
+    "json_title": "Export JSON",
+    "pdf_groups_subtitle": "Rapport complet des groupes en PDF",
+    "pdf_group_subtitle": "Dépenses du groupe en PDF",
+    "csv_groups_subtitle": "Toutes les dépenses du groupe en tableur",
+    "json_groups_subtitle": "Toutes les dépenses du groupe en JSON",
+    "pdf_wallet_subtitle": "Rapport complet du portefeuille en PDF",
+    "csv_wallet_subtitle": "Toutes les entrées du portefeuille en tableur",
+    "json_wallet_subtitle": "Toutes les entrées du portefeuille en JSON"
+  },
+  "voice_entry": {
+    "listening": "J'écoute…",
+    "tap_to_stop": "Appuyer pour arrêter",
+    "processing": "Traitement en cours…",
+    "clarify_prompt": "Que vouliez-vous dire ?",
+    "confirm_title": "Confirmer l'entrée",
+    "amount_label": "Montant",
+    "description_label": "Description",
+    "confirm_btn": "Confirmer",
+    "cancel_btn": "Annuler",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré !",
+    "error_title": "Traitement impossible",
+    "error_retry": "Réessayer",
+    "couldnt_hear": "Je n'ai pas entendu, nouvel essai…",
+    "group_label": "Groupe",
+    "wallet_label": "Portefeuille"
   }
 }

@@ -55,6 +55,10 @@ Rules:
 - needsClarification: null if all required fields are clear. Otherwise ONE of:
   "currency" | "group_not_found" | "amount" | "income_or_expense" | "group_name"
 
+The voice input may be in any language (English, Russian, Arabic, etc.).
+Parse correctly regardless of input language.
+Always return JSON with English field names and values as specified.
+
 Respond ONLY with valid JSON. No explanation, no markdown backticks, no preamble.
 
 Example output:

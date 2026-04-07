@@ -9,7 +9,9 @@ import 'package:window_manager/window_manager.dart' if (dart.library.html) '../s
 import '../utils/haptic_utils.dart';
 import '../router/app_router.dart';
 import '../providers/desktop_providers.dart';
+import '../providers/setall_providers.dart';
 import '../widgets/bug_report_button.dart';
+import '../../features/voice/presentation/voice_entry_sheet.dart';
 
 /// Breakpoint: side rail replaces bottom nav (tablet / small desktop).
 const double kAdaptiveBreakpoint = 600;
@@ -140,6 +142,7 @@ class _AdaptiveShellState extends ConsumerState<AdaptiveShell> {
       selectedIndex: _selectedIndex,
       onTap: _onTap,
       useRail: useRail,
+      currentPath: widget.currentPath,
       child: widget.child,
     );
   }
@@ -372,21 +375,28 @@ class _SidebarNavItemState extends State<_SidebarNavItem> {
 
 // ── Mobile layout (< 900 dp) ──────────────────────────────────────────────
 
-class _MobileLayout extends StatelessWidget {
+class _MobileLayout extends ConsumerWidget {
   const _MobileLayout({
     required this.selectedIndex,
     required this.onTap,
     required this.useRail,
     required this.child,
+    required this.currentPath,
   });
 
   final int selectedIndex;
   final void Function(int) onTap;
   final bool useRail;
   final Widget child;
+  final String currentPath;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final showFab = currentPath == '/' ||
+        currentPath == '/wallet' ||
+        currentPath == '/activity' ||
+        currentPath == '/groups';
+
     return Scaffold(
       body: SafeArea(
         bottom: false,
@@ -403,6 +413,29 @@ class _MobileLayout extends StatelessWidget {
           ],
         ),
       ),
+      floatingActionButton: showFab
+          ? FloatingActionButton(
+              heroTag: 'voiceMicFab',
+              onPressed: () {
+                HapticUtils.primaryTap();
+                final groups       = ref.read(myGroupsProvider).value ?? [];
+                final baseCurrency = ref.read(baseCurrencyProvider).value ?? 'USD';
+                showModalBottomSheet<void>(
+                  context: context,
+                  isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
+                  builder: (_) => VoiceEntrySheet(
+                    groups: groups,
+                    defaultCurrency: baseCurrency,
+                  ),
+                );
+              },
+              backgroundColor: const Color(0xFF7C3AED),
+              tooltip: 'Add by voice',
+              child: const Icon(Icons.mic_rounded, color: Colors.white),
+            )
+          : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       bottomNavigationBar: !useRail ? _buildBottomNav(context) : null,
     );
   }
