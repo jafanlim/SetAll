@@ -234,6 +234,27 @@ dashboard.wallet_cash_label,Cash Position,Cash Position,Cash Position,Cash Posit
 dashboard.you_are_owed,Owed to you,Dein Guthaben,Te deben,On vous doit,გეკუთვნით,Вам должны
 dashboard.you_owe,You owe,Du schuldest,Debes,Vous devez,თქვენ გეზდებათ,Вы должны
 dashboard.your_finances,YOUR FINANCES,DEINE FINANZEN,TUS FINANZAS,VOS FINANCES,ფინანსები,ФИНАНСЫ
+data_privacy.ai_chat_sessions,AI chat sessions,KI-Chat-Sitzungen,Sesiones de chat IA,Sessions de chat IA,AI ჩატის სესიები,Сессии AI-чата
+data_privacy.cloud_data,CLOUD DATA,CLOUD-DATEN,DATOS EN LA NUBE,DONNÉES CLOUD,CLOUD მონაცემები,ОБЛАЧНЫЕ ДАННЫЕ
+data_privacy.csv_export,CSV — spreadsheet,CSV — Tabelle,CSV — hoja de cálculo,CSV — tableur,CSV — ცხრილი,CSV — таблица
+data_privacy.download_report,Download report,Bericht herunterladen,Descargar informe,Télécharger le rapport,ანგარიშის გადმოწერა,Скачать отчёт
+data_privacy.export_data,Export My Data,Meine Daten exportieren,Exportar mis datos,Exporter mes données,მონაცემების ექსპორტი,Экспортировать данные
+data_privacy.export_failed,Export failed: {error},Export fehlgeschlagen: {error},Error al exportar: {error},Échec de l'export : {error},ექსპორტი ვერ მოხდა: {error},Ошибка экспорта: {error}
+data_privacy.group_expenses,Group expenses,Gruppenausgaben,Gastos de grupo,Dépenses de groupe,ჯგუფის ხარჯები,Расходы группы
+data_privacy.group_expenses_synced,Group expenses (synced),Gruppenausgaben (synchronisiert),Gastos de grupo (sincronizados),Dépenses de groupe (synchronisées),ჯგუფის ხარჯები (სინქრონიზებული),Расходы группы (синхронизированы)
+data_privacy.groups,Groups,Gruppen,Grupos,Groupes,ჯგუფები,Группы
+data_privacy.groups_created,Groups created,Erstellte Gruppen,Grupos creados,Groupes créés,შექმნილი ჯგუფები,Созданные группы
+data_privacy.groups_report,Groups report,Gruppenbericht,Informe de grupos,Rapport des groupes,ჯგუფების ანგარიში,Отчёт по группам
+data_privacy.groups_report_sub,All your group expenses as PDF,Alle deine Gruppenausgaben als PDF,Todos tus gastos de grupo en PDF,Toutes vos dépenses de groupe en PDF,თქვენი ყველა ჯგუფის ხარჯი PDF ფორმატში,Все расходы группы в формате PDF
+data_privacy.json_export,JSON — full export,JSON — vollständiger Export,JSON — exportación completa,JSON — export complet,JSON — სრული ექსპორტი,JSON — полный экспорт
+data_privacy.local_data,LOCAL DATA,LOKALE DATEN,DATOS LOCALES,DONNÉES LOCALES,ლოკალური მონაცემები,ЛОКАЛЬНЫЕ ДАННЫЕ
+data_privacy.pdf_report,PDF report,PDF-Bericht,Informe PDF,Rapport PDF,PDF ანგარიში,PDF-отчёт
+data_privacy.privacy_policy,Privacy Policy,Datenschutzerklärung,Política de privacidad,Politique de confidentialité,კონფიდენციალურობის პოლიტიკა,Политика конфиденциальности
+data_privacy.title,Data & Privacy,Daten & Datenschutz,Datos y privacidad,Données et confidentialité,მონაცემები და კონფიდენციალურობა,Данные и конфиденциальность
+data_privacy.wallet_entries,Wallet entries,Wallet-Einträge,Entradas de cartera,Entrées du portefeuille,საფულის ჩანაწერები,Записи кошелька
+data_privacy.wallet_report,Wallet report,Wallet-Bericht,Informe de cartera,Rapport portefeuille,საფულის ანგარიში,Отчёт кошелька
+data_privacy.wallet_report_sub,Your personal wallet entries as PDF,Deine persönlichen Wallet-Einträge als PDF,Tus entradas de cartera personales en PDF,Vos entrées de portefeuille personnelles en PDF,თქვენი პირადი საფულის ჩანაწერები PDF ფორმატში,Личные записи кошелька в формате PDF
+data_privacy.wallet_synced,Wallet entries (synced),Wallet-Einträge (synchronisiert),Entradas de cartera (sincronizadas),Entrées du portefeuille (synchronisées),საფულის ჩანაწერები (სინქრონიზებული),Записи кошелька (синхронизированы)
 edit_expense.could_not_update,Could not update expense,Ausgabe konnte nicht aktualisiert werden,No se pudo actualizar el gasto,Impossible de mettre à jour la dépense,ხარჯის განახლება ვერ მოხდა,Не удалось обновить расход
 edit_expense.expense_updated,Expense updated,Ausgabe aktualisiert,Gasto actualizado,Dépense mise à jour,ხარჯი განახლდა,Расход обновлён
 edit_expense.not_found,Expense not found,Ausgabe nicht gefunden,Gasto no encontrado,Dépense introuvable,ხარჯი ვერ მოიძებნა,Расход не найден
@@ -309,6 +330,60 @@ nav.dashboard,Dashboard,Dashboard,Panel,Tableau de bord,მთავარი,Г
 nav.groups,Groups,Gruppen,Grupos,Groupes,ჯგუფები,Группы
 nav.settings,Settings,Einstellungen,Ajustes,Paramètres,პარამეტრები,Настройки
 nav.wallet,Wallet,Geldbörse,Cartera,Portefeuille,საფულე,Кошелёк
+notifications.email,Email,E-Mail,Correo,E-mail,ელ-ფოსტა,Email
+notifications.group_activity,Group activity,Gruppenaktivität,Actividad del grupo,Activité du groupe,ჯგუფის აქტივობა,Активность группы
+notifications.group_activity_sub,When members add or change expenses,Wenn Mitglieder Ausgaben hinzufügen oder ändern,Cuando los miembros agregan o cambian gastos,Quand les membres ajoutent ou modifient des dépenses,როდესაც წევრები ხარჯებს ამატებენ ან ცვლიან,Когда участники добавляют или изменяют расходы
+notifications.group_events,Group events,Gruppenereignisse,Eventos de grupo,Événements de groupe,ჯგუფის მოვლენები,События группы
+notifications.group_events_sub,"New members, group creation","Neue Mitglieder, Gruppenerstellung","Nuevos miembros, creación de grupo","Nouveaux membres, création de groupe","ახალი წევრები, ჯგუფის შექმნა","Новые участники, создание группы"
+notifications.new_expenses,New expenses,Neue Ausgaben,Nuevos gastos,Nouvelles dépenses,ახალი ხარჯები,Новые расходы
+notifications.new_expenses_sub,When an expense or income is added,Wenn eine Ausgabe oder Einnahme hinzugefügt wird,Cuando se agrega un gasto o ingreso,Quand une dépense ou un revenu est ajouté,როდესაც ხარჯი ან შემოსავალი ემატება,Когда добавляется расход или доход
+notifications.push,Push,Push,Push,Push,პუშ,Push
+notifications.push_note,Push delivery requires Firebase Cloud Messaging (FCM) or APNs to be configured in the server. Preferences below are saved and will take effect once the push service is wired up.,"Push-Zustellung erfordert FCM oder APNs auf dem Server. Einstellungen werden gespeichert und wirksam, sobald der Push-Dienst eingerichtet ist.",La entrega push requiere FCM o APNs configurado en el servidor. Las preferencias se guardan y tendrán efecto cuando el servicio push esté listo.,La livraison push nécessite FCM ou APNs configuré sur le serveur. Les préférences sont sauvegardées et prendront effet une fois le service push configuré.,პუშ-შეტყობინებები საჭიროებს FCM ან APNs კონფიგურაციას სერვერზე.,Push-уведомления требуют настройки FCM или APNs на сервере. Настройки сохраняются и вступят в силу после подключения push-сервиса.
+notifications.settlements,Settlements,Abrechnungen,Liquidaciones,Règlements,ანგარიშსწორებები,Взаиморасчёты
+notifications.settlements_sub,When a balance is settled,Wenn ein Saldo ausgeglichen wird,Cuando se liquida un saldo,Quand un solde est réglé,როდესაც ბალანსი ანგარიშსწორდება,Когда баланс погашается
+notifications.weekly_digest,Weekly digest,Wöchentliche Zusammenfassung,Resumen semanal,Résumé hebdomadaire,კვირეული შეჯამება,Еженедельный дайджест
+notifications.weekly_digest_sub,Activity summary every Monday,Aktivitätszusammenfassung jeden Montag,Resumen de actividad cada lunes,Résumé d'activité chaque lundi,ყოველ ორშაბათს აქტივობის შეჯამება,Сводка активности каждый понедельник
+regional.active,Active,Aktiv,Activo,Actif,აქტიური,Активен
+regional.date_time_format,Date & Time Format,Datum & Uhrzeit Format,Formato de fecha y hora,Format de date et heure,თარიღისა და დროის ფორმატი,Формат даты и времени
+regional.date_time_subtitle,Affects how dates are shown throughout the app.,Beeinflusst die Datumsanzeige in der gesamten App.,Afecta cómo se muestran las fechas en toda la app.,Affecte l'affichage des dates dans toute l'application.,გავლენას ახდენს თარიღების ჩვენებაზე მთელ აპლიკაციაში.,Влияет на отображение дат во всём приложении.
+regional.manual_override,Manual override,Manuelle Einstellung,Configuración manual,Réglage manuel,ხელით პარამეტრი,Ручная настройка
+regional.manual_override_subtitle,Choose a specific date format instead of using the system default.,Wähle ein bestimmtes Datumsformat statt der Systemvorgabe.,Elige un formato de fecha específico en lugar del predeterminado.,Choisissez un format de date spécifique au lieu du format système.,აირჩიეთ კონკრეტული თარიღის ფორმატი სისტემის ნაცვლად.,Выберите конкретный формат даты вместо системного.
+regional.manual_time_subtitle,Choose 24h or AM/PM instead of the system default.,Wähle 24h oder AM/PM statt der Systemvorgabe.,Elige 24h o AM/PM en lugar del predeterminado del sistema.,Choisissez 24h ou AM/PM au lieu du format système.,აირჩიეთ 24 საათი ან AM/PM სისტემის ნაცვლად.,Выберите 24ч или AM/PM вместо системного формата.
+regional.preview,Preview,Vorschau,Vista previa,Aperçu,გადახედვა,Предпросмотр
+regional.system_locale,System locale,Systemgebietsschema,Configuración regional del sistema,Paramètres régionaux du système,სისტემის ლოკალი,Системная локаль
+regional.system_time_format,System time format,Systemzeitformat,Formato de hora del sistema,Format d'heure du système,სისტემის დროის ფორმატი,Системный формат времени
+regional.time_format,Time Format,Zeitformat,Formato de hora,Format d'heure,დროის ფორმატი,Формат времени
+regional.time_format_subtitle,Affects how times are shown throughout the app.,Beeinflusst die Zeitanzeige in der gesamten App.,Afecta cómo se muestran las horas en toda la app.,Affecte l'affichage des heures dans toute l'application.,გავლენას ახდენს დროის ჩვენებაზე მთელ აპლიკაციაში.,Влияет на отображение времени во всём приложении.
+security_screen.account_password,Account Password,Konto-Passwort,Contraseña de cuenta,Mot de passe du compte,ანგარიშის პაროლი,Пароль учётной записи
+security_screen.biometrics,Biometrics,Biometrie,Biometría,Biométrie,ბიომეტრია,Биометрия
+security_screen.biometrics_unavailable,Biometrics not available on this device.,Biometrie ist auf diesem Gerät nicht verfügbar.,La biometría no está disponible en este dispositivo.,La biométrie n'est pas disponible sur cet appareil.,ბიომეტრია მიუწვდომელია ამ მოწყობილობაზე.,Биометрия недоступна на этом устройстве.
+security_screen.change_password,Change Password,Passwort ändern,Cambiar contraseña,Changer le mot de passe,პაროლის შეცვლა,Изменить пароль
+security_screen.change_password_sub,Update your account login password,Aktualisiere dein Konto-Anmeldepasswort,Actualiza tu contraseña de inicio de sesión,Mettez à jour votre mot de passe de connexion,განაახლეთ თქვენი ანგარიშის შესვლის პაროლი,Обновите пароль входа в учётную запись
+security_screen.change_pin,Change PIN,PIN ändern,Cambiar PIN,Changer le PIN,PIN-ის შეცვლა,Изменить PIN
+security_screen.dialog_cancel,Cancel,Abbrechen,Cancelar,Annuler,გაუქმება,Отмена
+security_screen.dialog_change_pin_title,Change PIN,PIN ändern,Cambiar PIN,Changer le PIN,PIN-ის შეცვლა,Изменить PIN
+security_screen.dialog_confirm_pin,Confirm PIN,PIN bestätigen,Confirmar PIN,Confirmer le PIN,PIN-ის დადასტურება,Подтвердить PIN
+security_screen.dialog_current_pin,Current PIN,Aktueller PIN,PIN actual,PIN actuel,მიმდინარე PIN,Текущий PIN
+security_screen.dialog_incorrect_pin,Incorrect PIN,Falscher PIN,PIN incorrecto,PIN incorrect,არასწორი PIN,Неверный PIN
+security_screen.dialog_pin_fallback,Used as fallback when biometrics fail.,"Als Fallback verwendet, wenn Biometrie fehlschlägt.",Usado como respaldo cuando falla la biometría.,Utilisé comme solution de secours si la biométrie échoue.,გამოიყენება სარეზერვოდ ბიომეტრიის წარუმატებლობისას.,Используется как запасной вариант при сбое биометрии.
+security_screen.dialog_pin_label,PIN (4–8 digits),PIN (4–8 Ziffern),PIN (4–8 dígitos),PIN (4–8 chiffres),PIN (4–8 ციფრი),PIN (4–8 цифр)
+security_screen.dialog_pin_min,PIN must be at least 4 digits,PIN muss mindestens 4 Ziffern haben,El PIN debe tener al menos 4 dígitos,Le PIN doit contenir au moins 4 chiffres,PIN უნდა შეიცავდეს მინიმუმ 4 ციფრს,PIN должен содержать не менее 4 цифр
+security_screen.dialog_pin_mismatch,PINs do not match,PINs stimmen nicht überein,Los PINs no coinciden,Les PIN ne correspondent pas,PIN-ები არ ემთხვევა,PIN-коды не совпадают
+security_screen.dialog_remove,Remove,Entfernen,Eliminar,Supprimer,წაშლა,Удалить
+security_screen.dialog_remove_pin_body,Enter your current PIN to confirm removal.,Gib deinen aktuellen PIN zur Bestätigung ein.,Ingresa tu PIN actual para confirmar la eliminación.,Entrez votre PIN actuel pour confirmer la suppression.,შეიყვანეთ მიმდინარე PIN წაშლის დასადასტურებლად.,Введите текущий PIN для подтверждения удаления.
+security_screen.dialog_remove_pin_title,Remove PIN,PIN entfernen,Eliminar PIN,Supprimer le PIN,PIN-ის წაშლა,Удалить PIN
+security_screen.dialog_save_pin,Save PIN,PIN speichern,Guardar PIN,Enregistrer le PIN,PIN-ის შენახვა,Сохранить PIN
+security_screen.dialog_set_pin_title,Set PIN,PIN festlegen,Establecer PIN,Définir un PIN,PIN-ის დაყენება,Установить PIN
+security_screen.face_id,Face ID / Fingerprint,Face ID / Fingerabdruck,Face ID / Huella dactilar,Face ID / Empreinte digitale,Face ID / თითის ანაბეჭდი,Face ID / Отпечаток пальца
+security_screen.grace_period,Grace period,Toleranzzeit,Período de gracia,Délai de grâce,შეღავათის პერიოდი,Льготный период
+security_screen.no_pin,No PIN set,Kein PIN gesetzt,Sin PIN,Aucun PIN défini,PIN არ არის დაყენებული,PIN не установлен
+security_screen.pin_active,PIN is active,PIN ist aktiv,PIN activo,PIN actif,PIN აქტიურია,PIN активен
+security_screen.pin_saved,PIN saved,PIN gespeichert,PIN guardado,PIN enregistré,PIN შენახულია,PIN сохранён
+security_screen.pin_section,PIN,PIN,PIN,PIN,PIN,PIN
+security_screen.remove_pin,Remove PIN,PIN entfernen,Eliminar PIN,Supprimer le PIN,PIN-ის წაშლა,Удалить PIN
+security_screen.require_on_open,Require on app open,Beim App-Start erforderlich,Requerir al abrir la app,Requis à l'ouverture de l'app,საჭიროა აპის გახსნისას,Требовать при открытии приложения
+security_screen.set_pin,Set PIN,PIN festlegen,Establecer PIN,Définir un PIN,PIN-ის დაყენება,Установить PIN
+security_screen.title,Security,Sicherheit,Seguridad,Sécurité,უსაფრთხოება,Безопасность
 settings.about,About,Über die App,Acerca de,À propos,აპლიკაციის შესახებ,О приложении
 settings.account,Account,Konto,Cuenta,Compte,ანგარიში,Аккаунт
 settings.appearance,Appearance,Erscheinungsbild,Apariencia,Apparence,გარეგნობა,Внешний вид
@@ -422,6 +497,7 @@ voice_entry.error_retry,Try Again,Erneut versuchen,Intentar de nuevo,Réessayer,
 voice_entry.error_title,Couldn't process that,Verarbeitung fehlgeschlagen,No se pudo procesar,Traitement impossible,დამუშავება ვერ მოხდა,Не удалось обработать
 voice_entry.group_label,Group,Gruppe,Grupo,Groupe,ჯგუფი,Группа
 voice_entry.listening,Listening…,Höre zu…,Escuchando…,J'écoute…,ვუსმენ…,Слушаю…
+voice_entry.listening_hint,Speak your expense or income,Spreche deine Ausgabe oder Einnahme,Di tu gasto o ingreso,Dites votre dépense ou revenu,წარმოთქვით თქვენი ხარჯი ან შემოსავალი,Произнесите ваш расход или доход
 voice_entry.processing,Understanding your entry…,Eintrag wird verarbeitet…,Procesando entrada…,Traitement en cours…,ვამუშავებ ჩანაწერს…,Обрабатываю запись…
 voice_entry.saved,Saved!,Gespeichert!,¡Guardado!,Enregistré !,შენახულია!,Сохранено!
 voice_entry.saving,Saving…,Speichern…,Guardando…,Enregistrement…,ინახება…,Сохраняю…

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -99,12 +100,12 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
         String? error;
         return StatefulBuilder(
           builder: (ctx, setDlg) => AlertDialog(
-            title: Text(_pinSet ? 'Change PIN' : 'Set PIN'),
+            title: Text(_pinSet ? 'security_screen.dialog_change_pin_title'.tr() : 'security_screen.dialog_set_pin_title'.tr()),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Used as fallback when biometrics fail.',
+                  'security_screen.dialog_pin_fallback'.tr(),
                   style: TextStyle(fontSize: 12, color: Theme.of(ctx).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
@@ -115,8 +116,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                   keyboardType: TextInputType.number,
                   maxLength: 8,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'PIN (4–8 digits)',
+                  decoration: InputDecoration(
+                    labelText: 'security_screen.dialog_pin_label'.tr(),
                     prefixIcon: Icon(Icons.pin_outlined),
                     counterText: '',
                   ),
@@ -128,8 +129,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                   keyboardType: TextInputType.number,
                   maxLength: 8,
                   inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  decoration: const InputDecoration(
-                    labelText: 'Confirm PIN',
+                  decoration: InputDecoration(
+                    labelText: 'security_screen.dialog_confirm_pin'.tr(),
                     prefixIcon: Icon(Icons.pin_outlined),
                     counterText: '',
                   ),
@@ -143,7 +144,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx),
-                child: const Text('Cancel'),
+                child: Text('security_screen.dialog_cancel'.tr()),
               ),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
@@ -151,18 +152,18 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                   final p1 = pinCtrl1.text.trim();
                   final p2 = pinCtrl2.text.trim();
                   if (p1.length < 4) {
-                    setDlg(() => error = 'PIN must be at least 4 digits');
+                    setDlg(() => error = 'security_screen.dialog_pin_min'.tr());
                     return;
                   }
                   if (p1 != p2) {
-                    setDlg(() => error = 'PINs do not match');
+                    setDlg(() => error = 'security_screen.dialog_pin_mismatch'.tr());
                     return;
                   }
                   // Pass the pin as result BEFORE the dialog closes so we
                   // never read a potentially-disposed controller after close.
                   Navigator.pop(ctx, p1);
                 },
-                child: const Text('Save PIN'),
+                child: Text('security_screen.dialog_save_pin'.tr()),
               ),
             ],
           ),
@@ -183,8 +184,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     if (mounted) {
       setState(() => _pinSet = true);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('PIN saved'),
+        SnackBar(
+          content: Text('security_screen.pin_saved'.tr()),
           backgroundColor: _teal,
         ),
       );
@@ -203,11 +204,11 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDlg) => AlertDialog(
-          title: const Text('Remove PIN'),
+          title: Text('security_screen.dialog_remove_pin_title'.tr()),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('Enter your current PIN to confirm removal.'),
+              Text('security_screen.dialog_remove_pin_body'.tr()),
               const SizedBox(height: 12),
               TextField(
                 controller: pinCtrl,
@@ -217,7 +218,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                 maxLength: 8,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                 decoration: InputDecoration(
-                  labelText: 'Current PIN',
+                  labelText: 'security_screen.dialog_current_pin'.tr(),
                   prefixIcon: const Icon(Icons.pin_outlined),
                   counterText: '',
                   errorText: errorMsg,
@@ -226,17 +227,17 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('security_screen.dialog_cancel'.tr())),
             FilledButton(
               style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
               onPressed: () {
                 if (pinCtrl.text.trim() != savedPin) {
-                  setDlg(() => errorMsg = 'Incorrect PIN');
+                  setDlg(() => errorMsg = 'security_screen.dialog_incorrect_pin'.tr());
                   return;
                 }
                 Navigator.pop(ctx, true);
               },
-              child: const Text('Remove'),
+              child: Text('security_screen.dialog_remove'.tr()),
             ),
           ],
         ),
@@ -256,7 +257,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Security', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text('security_screen.title'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -267,7 +268,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
                 // ── Biometrics ──────────────────────────────────────────
-                _SectionLabel('Biometrics'),
+                _SectionLabel('security_screen.biometrics'.tr()),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
@@ -277,7 +278,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           child: Text(
-                            'Biometrics not available on this device.',
+                            'security_screen.biometrics_unavailable'.tr(),
                             style: TextStyle(fontSize: 13, color: theme.colorScheme.onSurfaceVariant),
                           ),
                         )
@@ -285,9 +286,9 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                         SwitchListTile(
                           contentPadding: EdgeInsets.zero,
                           secondary: const Icon(Icons.face_retouching_natural_rounded, color: _teal),
-                          title: const Text('Face ID / Fingerprint',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          subtitle: Text('Require on app open',
+                          title: Text('security_screen.face_id'.tr(),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                          subtitle: Text('security_screen.require_on_open'.tr(),
                               style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                           value: _biometricEnabled,
                           activeThumbColor: _teal,
@@ -300,7 +301,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Grace period',
+                                Text('security_screen.grace_period'.tr(),
                                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
                                         color: theme.colorScheme.onSurfaceVariant)),
                                 const SizedBox(height: 8),
@@ -333,7 +334,7 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                 const SizedBox(height: 20),
 
                 // ── PIN ─────────────────────────────────────────────────
-                _SectionLabel('PIN'),
+                _SectionLabel('security_screen.pin_section'.tr()),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: EdgeInsets.zero,
@@ -342,11 +343,11 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                       ListTile(
                         leading: const Icon(Icons.pin_rounded, color: _teal),
                         title: Text(
-                          _pinSet ? 'Change PIN' : 'Set PIN',
+                          _pinSet ? 'security_screen.change_pin'.tr() : 'security_screen.set_pin'.tr(),
                           style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                         ),
                         subtitle: Text(
-                          _pinSet ? 'PIN is active' : 'No PIN set',
+                          _pinSet ? 'security_screen.pin_active'.tr() : 'security_screen.no_pin'.tr(),
                           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                         ),
                         trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
@@ -356,8 +357,8 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                         const Divider(height: 1, indent: 56, endIndent: 16),
                         ListTile(
                           leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-                          title: const Text('Remove PIN',
-                              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.redAccent)),
+                          title: Text('security_screen.remove_pin'.tr(),
+                              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.redAccent)),
                           onTap: _removePin,
                         ),
                       ],
@@ -368,15 +369,15 @@ class _SecurityScreenState extends ConsumerState<SecurityScreen> {
                 const SizedBox(height: 20),
 
                 // ── Account Password ────────────────────────────────────
-                _SectionLabel('Account Password'),
+                _SectionLabel('security_screen.account_password'.tr()),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: EdgeInsets.zero,
                   child: ListTile(
                     leading: const Icon(Icons.lock_outline_rounded, color: _slate),
-                    title: const Text('Change Password',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    subtitle: Text('Update your account login password',
+                    title: Text('security_screen.change_password'.tr(),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    subtitle: Text('security_screen.change_password_sub'.tr(),
                         style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant)),
                     trailing: Icon(Icons.chevron_right, size: 18, color: theme.colorScheme.onSurfaceVariant),
                     onTap: () => context.push(AppRouter.settingsChangePassword),

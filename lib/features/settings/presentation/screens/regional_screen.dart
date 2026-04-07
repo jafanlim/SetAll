@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -173,7 +174,7 @@ class _RegionalScreenState extends State<RegionalScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Regional Settings', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text('settings_ext.regional'.tr(), style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -184,9 +185,9 @@ class _RegionalScreenState extends State<RegionalScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               children: [
                 // ── Date & Time ─────────────────────────────────────────
-                _SectionLabel('Date & Time Format'),
+                _SectionLabel('regional.date_time_format'.tr()),
                 Text(
-                  'Affects how dates are shown throughout the app.',
+                  'regional.date_time_subtitle'.tr(),
                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
@@ -202,8 +203,8 @@ class _RegionalScreenState extends State<RegionalScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('System locale',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('regional.system_locale'.tr(),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             Text(
                               '$_systemLocale  ·  ${_preview(_systemDateFormat)}',
                               style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
@@ -218,8 +219,8 @@ class _RegionalScreenState extends State<RegionalScreen> {
                             color: const Color(0x2200D9B0),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text('Active',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _teal)),
+                          child: Text('regional.active'.tr(),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _teal)),
                         ),
                     ],
                   ),
@@ -232,10 +233,10 @@ class _RegionalScreenState extends State<RegionalScreen> {
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     secondary: const Icon(Icons.tune_rounded, color: _slate),
-                    title: const Text('Manual override',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    title: Text('regional.manual_override'.tr(),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      'Choose a specific date format instead of using the system default.',
+                      'regional.manual_override_subtitle'.tr(),
                       style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                     ),
                     value: _manualOverride,
@@ -284,9 +285,9 @@ class _RegionalScreenState extends State<RegionalScreen> {
                 const SizedBox(height: 28),
 
                 // ── Time Format ──────────────────────────────────────────
-                _SectionLabel('Time Format'),
+                _SectionLabel('regional.time_format'.tr()),
                 Text(
-                  'Affects how times are shown throughout the app.',
+                  'regional.time_format_subtitle'.tr(),
                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 12),
@@ -301,8 +302,8 @@ class _RegionalScreenState extends State<RegionalScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text('System time format',
-                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                            Text('regional.system_time_format'.tr(),
+                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                             Text(
                               '$_systemTimeFormat  ·  ${_previewTime(_systemTimeFormat)}',
                               style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
@@ -317,8 +318,8 @@ class _RegionalScreenState extends State<RegionalScreen> {
                             color: const Color(0x2200D9B0),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: const Text('Active',
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _teal)),
+                          child: Text('regional.active'.tr(),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _teal)),
                         ),
                     ],
                   ),
@@ -331,10 +332,10 @@ class _RegionalScreenState extends State<RegionalScreen> {
                   child: SwitchListTile(
                     contentPadding: EdgeInsets.zero,
                     secondary: const Icon(Icons.tune_rounded, color: _slate),
-                    title: const Text('Manual override',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    title: Text('regional.manual_override'.tr(),
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
                     subtitle: Text(
-                      'Choose 24h or AM/PM instead of the system default.',
+                      'regional.manual_time_subtitle'.tr(),
                       style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
                     ),
                     value: _manualTimeOverride,
@@ -375,7 +376,7 @@ class _RegionalScreenState extends State<RegionalScreen> {
                 const SizedBox(height: 20),
 
                 // ── Preview ─────────────────────────────────────────────
-                _SectionLabel('Preview'),
+                _SectionLabel('regional.preview'.tr()),
                 const SizedBox(height: 8),
                 GlassCard(
                   padding: const EdgeInsets.all(14),

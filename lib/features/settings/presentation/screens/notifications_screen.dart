@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -85,8 +86,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Notifications',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text('settings_ext.notifications'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -99,9 +100,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                 // ── FCM/APNs wiring note ─────────────────────────────────
                 _InfoBanner(
                   icon: LucideIcons.info,
-                  text: 'Push delivery requires Firebase Cloud Messaging (FCM) or APNs '
-                      'to be configured in the server. Preferences below are saved and '
-                      'will take effect once the push service is wired up.',
+                  text: 'notifications.push_note'.tr(),
                 ),
                 const SizedBox(height: 20),
 
@@ -119,7 +118,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             children: [
                               const Icon(LucideIcons.smartphone, size: 12, color: _teal),
                               const SizedBox(width: 4),
-                              Text('Push',
+                              Text('notifications.push'.tr(),
                                   style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
@@ -136,7 +135,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             children: [
                               const Icon(LucideIcons.mail, size: 12, color: _slate),
                               const SizedBox(width: 4),
-                              Text('Email',
+                              Text('notifications.email'.tr(),
                                   style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w700,
@@ -158,8 +157,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _NotifRow(
                         icon: LucideIcons.receipt,
                         iconColor: _teal,
-                        title: 'New expenses',
-                        subtitle: 'When an expense or income is added',
+                        title: 'notifications.new_expenses'.tr(),
+                        subtitle: 'notifications.new_expenses_sub'.tr(),
                         pushValue: _pushExpense,
                         emailValue: _emailExpense,
                         onPushChanged: (v) { setState(() => _pushExpense = v);    _set(_kPushExpense, v); },
@@ -169,8 +168,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _NotifRow(
                         icon: LucideIcons.handCoins,
                         iconColor: _teal,
-                        title: 'Settlements',
-                        subtitle: 'When a balance is settled',
+                        title: 'notifications.settlements'.tr(),
+                        subtitle: 'notifications.settlements_sub'.tr(),
                         pushValue: _pushSettlement,
                         emailValue: _emailSettlement,
                         onPushChanged: (v) { setState(() => _pushSettlement = v);  _set(_kPushSettlement, v); },
@@ -180,8 +179,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _NotifRow(
                         icon: LucideIcons.users,
                         iconColor: _teal,
-                        title: 'Group events',
-                        subtitle: 'New members, group creation',
+                        title: 'notifications.group_events'.tr(),
+                        subtitle: 'notifications.group_events_sub'.tr(),
                         pushValue: _pushGroupEvent,
                         emailValue: _emailGroupEvent,
                         onPushChanged: (v) { setState(() => _pushGroupEvent = v);  _set(_kPushGroupEvent, v); },
@@ -191,8 +190,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _NotifRow(
                         icon: LucideIcons.bell,
                         iconColor: _teal,
-                        title: 'Group activity',
-                        subtitle: 'When members add or change expenses',
+                        title: 'notifications.group_activity'.tr(),
+                        subtitle: 'notifications.group_activity_sub'.tr(),
                         pushValue: _pushGroupActivity,
                         emailValue: false,
                         onPushChanged: (v) { setState(() => _pushGroupActivity = v); _set(_kPushGroupActivity, v); },
@@ -202,8 +201,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       _NotifRow(
                         icon: LucideIcons.calendarDays,
                         iconColor: _amber,
-                        title: 'Weekly digest',
-                        subtitle: 'Activity summary every Monday',
+                        title: 'notifications.weekly_digest'.tr(),
+                        subtitle: 'notifications.weekly_digest_sub'.tr(),
                         pushValue: _pushDigest,
                         emailValue: _emailDigest,
                         onPushChanged: (v) { setState(() => _pushDigest = v);  _set(_kPushDigest, v); },
