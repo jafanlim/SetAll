@@ -394,7 +394,8 @@ class _MobileLayout extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final showFab = currentPath == '/' ||
         currentPath == '/wallet' ||
-        currentPath == '/activity';
+        currentPath == '/activity' ||
+        currentPath == '/groups';
 
     return Scaffold(
       body: SafeArea(
