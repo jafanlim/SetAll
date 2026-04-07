@@ -57,5 +57,5 @@ class AuthConfig {
   // Preview deploy: https://69d4acec30a837b7e632b810--setall.netlify.app
   // Switch to prod URL ('https://setall.app/.netlify/functions/voice-entry') when merging to main.
   static const String netlifyVoiceEntryUrl =
-      'https://69d4acec30a837b7e632b810--setall.netlify.app/.netlify/functions/voice-entry';
+      'https://setall.app/.netlify/functions/voice-entry';
 }
