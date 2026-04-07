@@ -162,10 +162,11 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           '\n\nRecent 20 transactions:\n$recentRows'
           '${historyStr.isNotEmpty ? '\n\nRecent chat:\n$historyStr' : ''}';
 
+      final baseCurrency = await ref.read(baseCurrencyProvider.future);
       final httpRes = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': query, 'mode': mode}),
+        body: jsonEncode({'query': query, 'mode': mode, 'currency': baseCurrency}),
       );
 
       if (httpRes.statusCode != 200) {

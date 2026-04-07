@@ -62,7 +62,7 @@ Example output:
  "description":"Coffee Shop","category":"Food & drink",
  "groupNameHint":null,"splitMode":"even","needsClarification":null}`;
 
-    const userMessage = `${transcript}\n\nContext: defaultCurrency=${defaultCurrency}, groups=${JSON.stringify(groups)}, categories=${knownCategories.join(',')}`;
+    const userMessage = `${transcript}\n\nContext: defaultCurrency=${defaultCurrency} (IMPORTANT: use ${defaultCurrency} if no currency mentioned), groups=${JSON.stringify(groups)}, categories=${knownCategories.join(',')}`;
 
     const callGroq = async () => fetch(GROQ_API_URL, {
       method: 'POST',

@@ -50,10 +50,17 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   String _errorMsg  = '';
   VoiceEntryResult? _result;
 
+  // Inline edit state (initialised when entering confirming)
+  double _editAmount      = 0;
+  String _editCurrency    = 'USD';
+  String _editDescription = '';
+
   late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulseAnim;
 
-  final TextEditingController _clarifyCtrl = TextEditingController();
+  final TextEditingController _clarifyCtrl   = TextEditingController();
+  final TextEditingController _amountCtrl    = TextEditingController();
+  final TextEditingController _descCtrl      = TextEditingController();
 
   @override
   void initState() {
@@ -73,6 +80,8 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   void dispose() {
     _pulseCtrl.dispose();
     _clarifyCtrl.dispose();
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
     VoiceEntryService.instance.cancel();
     super.dispose();
   }
@@ -139,6 +148,11 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           _state  = VoiceEntryState.clarifying;
         });
       } else {
+        _editAmount      = result.amount;
+        _editCurrency    = result.currency;
+        _editDescription = result.description;
+        _amountCtrl.text = result.amount.toStringAsFixed(2);
+        _descCtrl.text   = result.description;
         setState(() {
           _result = result;
           _state  = VoiceEntryState.confirming;
@@ -202,7 +216,10 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       final uid    = await repo.ensureUser();
       if (uid == null) throw Exception('Not authenticated');
 
-      final amountDecimal = Decimal.parse(result.amount.toString());
+      // Use inline-edited values, not raw result fields
+      final amountDecimal = Decimal.parse(_editAmount.toStringAsFixed(2));
+      final currency      = _editCurrency;
+      final description   = _editDescription.trim().isEmpty ? result.description : _editDescription.trim();
 
       // Build even-split list for group entries
       List<SplitInsert> splits = [];
@@ -232,8 +249,8 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
         groupId:     resolvedGroupId,
         payerId:     uid,
         amount:      amountDecimal,
-        description: result.description,
-        currency:    result.currency,
+        description: description,
+        currency:    currency,
         splitType:   result.splitMode == 'even' ? SplitType.even : SplitType.manual,
         splits:      splits,
         category:    result.category,
@@ -391,7 +408,11 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   // ── CLARIFYING ───────────────────────────────────────────────────────────
 
   Widget _buildClarifying() {
-    final question = _clarificationQuestion(_result?.needsClarification);
+    final key      = _result?.needsClarification;
+    final question = _clarificationQuestion(key);
+    final showGroupChips = (key == 'group_not_found' || key == 'group_name') &&
+        widget.groups.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -402,13 +423,34 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           question,
           style: const TextStyle(fontSize: 16, color: Colors.white, height: 1.4),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 16),
+
+        // Tappable group chips for group_not_found / group_name
+        if (showGroupChips) ...
+          [
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: widget.groups.map((g) => ActionChip(
+                label: Text(g.name),
+                labelStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                backgroundColor: _teal.withValues(alpha: 0.15),
+                side: BorderSide(color: _teal.withValues(alpha: 0.4)),
+                onPressed: () {
+                  _clarifyCtrl.text = g.name;
+                  _submitClarification();
+                },
+              )).toList(),
+            ),
+            const SizedBox(height: 16),
+          ],
+
         TextField(
           controller: _clarifyCtrl,
-          autofocus: true,
+          autofocus: !showGroupChips,
           style: const TextStyle(color: Colors.white),
           decoration: InputDecoration(
-            hintText: 'Type your answer...',
+            hintText: 'Or type your answer...',
             hintStyle: const TextStyle(color: Colors.white38),
             filled: true,
             fillColor: Colors.white10,
@@ -455,9 +497,11 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
 
   // ── CONFIRMING ───────────────────────────────────────────────────────────
 
+  static const _commonCurrencies = ['USD', 'AED', 'GEL', 'EUR', 'GBP', 'RUB', 'CNY', 'VND', 'INR'];
+
   Widget _buildConfirming() {
     final r = _result!;
-    final isIncome = r.isIncome;
+    final isIncome    = r.isIncome;
     final amountColor = isIncome ? _teal : _orange;
     final sign        = isIncome ? '+' : '-';
 
@@ -470,6 +514,11 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       );
       groupLabel = match.name.toUpperCase();
     }
+
+    // Ensure dropdown value is in the list
+    final currencyValue = _commonCurrencies.contains(_editCurrency)
+        ? _editCurrency
+        : _commonCurrencies.first;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,29 +555,70 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
               ),
               const SizedBox(height: 14),
 
-              // Amount
+              // Amount preview
               Text(
-                '$sign${r.currency} ${r.amount.toStringAsFixed(2)}',
+                '$sign$_editCurrency ${_editAmount.toStringAsFixed(2)}',
                 style: TextStyle(
-                  fontSize: 32,
+                  fontSize: 28,
                   fontWeight: FontWeight.w800,
                   color: amountColor,
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 14),
 
-              // Description
-              Text(
-                r.description,
-                style: const TextStyle(
-                  fontSize: 16,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                ),
+              // Editable: Amount + Currency row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _darkField(
+                      controller: _amountCtrl,
+                      label: 'Amount',
+                      keyboard: const TextInputType.numberWithOptions(decimal: true),
+                      onChanged: (v) {
+                        final parsed = double.tryParse(v);
+                        if (parsed != null) setState(() => _editAmount = parsed);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: currencyValue,
+                          dropdownColor: const Color(0xFF1E293B),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                          items: _commonCurrencies
+                              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _editCurrency = v);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 10),
 
-              // Category chip
+              // Editable: Description
+              _darkField(
+                controller: _descCtrl,
+                label: 'Description',
+                onChanged: (v) => setState(() => _editDescription = v),
+              ),
+              const SizedBox(height: 12),
+
+              // Category chip (display-only)
               Wrap(
                 spacing: 6,
                 runSpacing: 6,
@@ -573,6 +663,35 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _darkField({
+    required TextEditingController controller,
+    required String label,
+    TextInputType keyboard = TextInputType.text,
+    void Function(String)? onChanged,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      style: const TextStyle(color: Colors.white),
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+        filled: true,
+        fillColor: Colors.white10,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _teal),
+        ),
+      ),
     );
   }
 

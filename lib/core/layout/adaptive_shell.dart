@@ -433,6 +433,7 @@ class _MobileLayout extends ConsumerWidget {
               child: const Icon(Icons.mic_rounded, color: Colors.white),
             )
           : null,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
       bottomNavigationBar: !useRail ? _buildBottomNav(context) : null,
     );
   }

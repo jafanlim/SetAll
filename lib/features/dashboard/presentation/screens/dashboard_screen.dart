@@ -89,6 +89,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   // ARCH-01: Migrated from supabase.functions.invoke — plain HTTPS, no JWT.
   // Netlify fn authenticates to Gemini server-side via process.env.GEMINI_API_KEY.
   // No caller auth required: mirrors web/insights.html:504 fetch() exactly.
+  final baseCurrency = await ref.read(baseCurrencyProvider.future);
   final query = 'Give me a concise 1-sentence financial insight about my spending this month.'
       '\n\nFinancial data (last 30 days):'
       '\nTotal Expenses: \$${analyticsData.totalSpend.toStringAsFixed(2)}'
@@ -102,7 +103,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyAiUrl),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'query': query, 'mode': 'chat'}),
+      body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency}),
     );
 
     if (response.statusCode == 429) {
@@ -111,7 +112,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       final retry = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': query, 'mode': 'chat'}),
+        body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency}),
       );
       if (retry.statusCode != 200) return '';
       final retryData = jsonDecode(retry.body) as Map<String, dynamic>?;
