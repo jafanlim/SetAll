@@ -177,7 +177,10 @@
     "delete_confirm_one": "¿Eliminar 1 entrada? Esto no se puede deshacer.",
     "entry_count_one": "1 entrada",
     "entry_count_other": "{count} entradas",
-    "sort_tooltip": "Ordenar"
+    "sort_tooltip": "Ordenar",
+    "report_entry_list": "Lista de entradas",
+    "report_all_transactions": "Todas las transacciones del monedero",
+    "report_category_breakdown": "Desglose por categoría"
   },
   "groups_screen": {
     "filter_by_group": "Filtrar por grupo",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "¿Eliminar 1 grupo? Como propietario puedes restaurarlo desde la pantalla de Actividad en 12 meses.",
     "error_delete": "No se pudieron eliminar algunos grupos.",
     "sort_activity_tooltip": "Ordenar actividad",
-    "sort_groups_tooltip": "Ordenar grupos"
+    "sort_groups_tooltip": "Ordenar grupos",
+    "rename_group": "Renombrar grupo",
+    "settle_group_title": "¿Liquidar grupo?",
+    "settle_btn": "Liquidar",
+    "settled_up": "¡Grupo liquidado!",
+    "reopened": "Grupo reabierto.",
+    "could_not_rename": "No se pudo renombrar. Solo el creador puede renombrar el grupo.",
+    "could_not_delete": "No se pudo eliminar el grupo. Prueba Forzar eliminación desde el menú largo.",
+    "delete_expense_title": "¿Eliminar gasto?",
+    "edit_expense": "Editar gasto",
+    "expense_deleted": "Gasto eliminado",
+    "download_report": "Descargar informe",
+    "add_member": "Añadir miembro"
   },
   "activity_screen": {
     "search_hint": "Buscar gastos, grupos, personas…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "Gastos del grupo",
     "type_group_events": "Eventos del grupo",
     "type_edits_deletes": "Ediciones y eliminaciones",
-    "type_other": "Otros"
+    "type_other": "Otros",
+    "delete_entry_title": "¿Eliminar entrada?",
+    "delete_expense_title": "¿Eliminar gasto?",
+    "view_details": "Ver detalles",
+    "restore_options": "Opciones de restauración",
+    "restore_expense_only": "Solo este gasto",
+    "restore_whole_group": "Grupo completo + todos los gastos",
+    "could_not_restore_expense": "No se pudo restaurar el gasto",
+    "could_not_restore_group": "No se pudo restaurar el grupo",
+    "could_not_restore_wallet": "No se pudo restaurar la entrada del monedero"
   },
   "categories": {
     "general": "General",
@@ -426,6 +450,21 @@
     "body": "Idioma {language} detectado. ¿Continuar o elegir otro?",
     "keep": "Continuar en {language}",
     "change": "Elegir idioma"
+  },
+  "group_info_screen": {
+    "could_not_delete": "No se pudo eliminar. Prueba Forzar eliminación desde el menú …"
+  },
+  "export": {
+    "pdf_title": "Informe PDF",
+    "csv_title": "Exportar CSV",
+    "json_title": "Exportar JSON",
+    "pdf_groups_subtitle": "Informe completo de grupos en PDF",
+    "pdf_group_subtitle": "Gastos del grupo en PDF",
+    "csv_groups_subtitle": "Todos los gastos del grupo como hoja de cálculo",
+    "json_groups_subtitle": "Todos los gastos del grupo en JSON",
+    "pdf_wallet_subtitle": "Informe completo del monedero en PDF",
+    "csv_wallet_subtitle": "Todas las entradas del monedero como hoja de cálculo",
+    "json_wallet_subtitle": "Todas las entradas del monedero en JSON"
   },
   "voice_entry": {
     "listening": "Escuchando…",

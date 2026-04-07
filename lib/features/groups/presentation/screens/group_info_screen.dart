@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -128,7 +129,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rename group'),
+        title: Text('groups_screen.rename_group'.tr()),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -161,8 +162,8 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not rename. Only the group creator can rename.'),
+        SnackBar(
+          content: Text('groups_screen.could_not_rename'.tr()),
         ),
       );
     }
@@ -173,14 +174,14 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Settle group?'),
+        title: Text('groups_screen.settle_group_title'.tr()),
         content: Text('Mark "${group.name}" as settled? All debts will show as zero.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Settle'),
+            child: Text('groups_screen.settle_btn'.tr()),
           ),
         ],
       ),
@@ -192,7 +193,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     ref.invalidate(groupBalanceSummaryProvider(group.id));
     ref.invalidate(balanceSummaryProvider);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Group settled up!')),
+      SnackBar(content: Text('groups_screen.settled_up'.tr())),
     );
   }
 
@@ -203,7 +204,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     ref.invalidate(groupBalanceSummaryProvider(group.id));
     ref.invalidate(balanceSummaryProvider);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Group reopened.')),
+      SnackBar(content: Text('groups_screen.reopened'.tr())),
     );
   }
 
@@ -217,18 +218,18 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       items: [
         PopupMenuItem(
           value: 'rename',
-          child: Row(children: const [
-            Icon(Icons.edit_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Rename group'),
+          child: Row(children: [
+            const Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.rename_group'.tr()),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'invite',
           child: Row(children: [
-            Icon(Icons.person_add_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Add member'),
+            const Icon(Icons.person_add_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.add_member'.tr()),
           ]),
         ),
         PopupMenuItem(
@@ -241,7 +242,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
             ),
             const SizedBox(width: 8),
             Text(
-              isSettled ? 'Reopen group' : 'Settle group',
+              isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
               style: TextStyle(color: isSettled ? _orange : _teal),
             ),
           ]),
@@ -255,12 +256,12 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                 style: TextStyle(color: _brandOrange)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'export_pdf',
           child: Row(children: [
-            Icon(Icons.download_outlined, size: 16, color: _teal),
-            SizedBox(width: 8),
-            Text('Download report'),
+            const Icon(Icons.download_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.download_report'.tr()),
           ]),
         ),
       ],

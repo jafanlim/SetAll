@@ -177,7 +177,10 @@
     "delete_confirm_one": "Удалить 1 запись? Это нельзя отменить.",
     "entry_count_one": "1 запись",
     "entry_count_other": "{count} записей",
-    "sort_tooltip": "Сортировка"
+    "sort_tooltip": "Сортировка",
+    "report_entry_list": "Список записей",
+    "report_all_transactions": "Все операции кошелька",
+    "report_category_breakdown": "Разбивка по категориям"
   },
   "groups_screen": {
     "filter_by_group": "Фильтр по группе",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "Удалить 1 группу? Как владелец вы можете восстановить её в разделе «Активность» в течение 12 месяцев.",
     "error_delete": "Не удалось удалить некоторые группы.",
     "sort_activity_tooltip": "Сортировать активность",
-    "sort_groups_tooltip": "Сортировать группы"
+    "sort_groups_tooltip": "Сортировать группы",
+    "rename_group": "Переименовать группу",
+    "settle_group_title": "Завершить расчёты?",
+    "settle_btn": "Завершить",
+    "settled_up": "Расчёты завершены!",
+    "reopened": "Группа возобновлена.",
+    "could_not_rename": "Не удалось переименовать. Только создатель группы может переименовывать.",
+    "could_not_delete": "Не удалось удалить группу. Попробуйте «Принудительное удаление» через долгое нажатие.",
+    "delete_expense_title": "Удалить расход?",
+    "edit_expense": "Редактировать расход",
+    "expense_deleted": "Расход удалён",
+    "download_report": "Скачать отчёт",
+    "add_member": "Добавить участника"
   },
   "activity_screen": {
     "search_hint": "Поиск расходов, групп, людей…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "Расходы группы",
     "type_group_events": "События группы",
     "type_edits_deletes": "Изменения и удаления",
-    "type_other": "Прочее"
+    "type_other": "Прочее",
+    "delete_entry_title": "Удалить запись?",
+    "delete_expense_title": "Удалить расход?",
+    "view_details": "Подробнее",
+    "restore_options": "Варианты восстановления",
+    "restore_expense_only": "Только этот расход",
+    "restore_whole_group": "Вся группа + все расходы",
+    "could_not_restore_expense": "Не удалось восстановить расход",
+    "could_not_restore_group": "Не удалось восстановить группу",
+    "could_not_restore_wallet": "Не удалось восстановить запись кошелька"
   },
   "categories": {
     "general": "Общее",
@@ -426,6 +450,21 @@
     "body": "Обнаружен язык: {language}. Продолжить или выбрать другой?",
     "keep": "Продолжить на {language}",
     "change": "Выбрать язык"
+  },
+  "group_info_screen": {
+    "could_not_delete": "Не удалось удалить. Попробуйте «Принудительное удаление» через меню …"
+  },
+  "export": {
+    "pdf_title": "PDF-отчёт",
+    "csv_title": "Экспорт CSV",
+    "json_title": "Экспорт JSON",
+    "pdf_groups_subtitle": "Полный отчёт по группам в PDF",
+    "pdf_group_subtitle": "Расходы группы в PDF",
+    "csv_groups_subtitle": "Все расходы группы в виде таблицы",
+    "json_groups_subtitle": "Все расходы группы в JSON",
+    "pdf_wallet_subtitle": "Полный отчёт по кошельку в PDF",
+    "csv_wallet_subtitle": "Все записи кошелька в виде таблицы",
+    "json_wallet_subtitle": "Все записи кошелька в JSON"
   },
   "voice_entry": {
     "listening": "Слушаю…",

@@ -177,7 +177,10 @@
     "delete_confirm_one": "1 Eintrag löschen? Dies kann nicht rückgängig gemacht werden.",
     "entry_count_one": "1 Eintrag",
     "entry_count_other": "{count} Einträge",
-    "sort_tooltip": "Sortieren"
+    "sort_tooltip": "Sortieren",
+    "report_entry_list": "Eintragliste",
+    "report_all_transactions": "Alle Geldbörsentransaktionen",
+    "report_category_breakdown": "Kategorieaufschlüsselung"
   },
   "groups_screen": {
     "filter_by_group": "Nach Gruppe filtern",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "1 Gruppe löschen? Als Besitzer kannst du sie innerhalb von 12 Monaten wiederherstellen.",
     "error_delete": "Einige Gruppen konnten nicht gelöscht werden.",
     "sort_activity_tooltip": "Aktivität sortieren",
-    "sort_groups_tooltip": "Gruppen sortieren"
+    "sort_groups_tooltip": "Gruppen sortieren",
+    "rename_group": "Gruppe umbenennen",
+    "settle_group_title": "Gruppe abrechnen?",
+    "settle_btn": "Abrechnen",
+    "settled_up": "Gruppe abgerechnet!",
+    "reopened": "Gruppe wieder geöffnet.",
+    "could_not_rename": "Umbenennen fehlgeschlagen. Nur der Ersteller kann die Gruppe umbenennen.",
+    "could_not_delete": "Gruppe konnte nicht gelöscht werden. Versuche Force Delete über das Langdrück-Menü.",
+    "delete_expense_title": "Ausgabe löschen?",
+    "edit_expense": "Ausgabe bearbeiten",
+    "expense_deleted": "Ausgabe gelöscht",
+    "download_report": "Bericht herunterladen",
+    "add_member": "Mitglied hinzufügen"
   },
   "activity_screen": {
     "search_hint": "Ausgaben, Gruppen, Personen suchen…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "Gruppenausgaben",
     "type_group_events": "Gruppenereignisse",
     "type_edits_deletes": "Bearbeitungen & Löschungen",
-    "type_other": "Sonstiges"
+    "type_other": "Sonstiges",
+    "delete_entry_title": "Eintrag löschen?",
+    "delete_expense_title": "Ausgabe löschen?",
+    "view_details": "Details anzeigen",
+    "restore_options": "Wiederherstellungsoptionen",
+    "restore_expense_only": "Nur diese Ausgabe",
+    "restore_whole_group": "Ganze Gruppe + alle Ausgaben",
+    "could_not_restore_expense": "Ausgabe konnte nicht wiederhergestellt werden",
+    "could_not_restore_group": "Gruppe konnte nicht wiederhergestellt werden",
+    "could_not_restore_wallet": "Geldbörsen-Eintrag konnte nicht wiederhergestellt werden"
   },
   "categories": {
     "general": "Allgemein",
@@ -426,6 +450,21 @@
     "body": "Erkannte Sprache: {language}. Weiter oder andere wählen?",
     "keep": "Weiter auf {language}",
     "change": "Sprache wählen"
+  },
+  "group_info_screen": {
+    "could_not_delete": "Löschen fehlgeschlagen. Versuche Force Delete über das …-Menü."
+  },
+  "export": {
+    "pdf_title": "PDF-Bericht",
+    "csv_title": "CSV-Export",
+    "json_title": "JSON-Export",
+    "pdf_groups_subtitle": "Vollständiger Gruppenbericht als PDF",
+    "pdf_group_subtitle": "Gruppenausgaben als PDF",
+    "csv_groups_subtitle": "Alle Gruppenausgaben als Tabelle",
+    "json_groups_subtitle": "Alle Gruppenausgaben als JSON",
+    "pdf_wallet_subtitle": "Vollständiger Geldbörsen-Bericht als PDF",
+    "csv_wallet_subtitle": "Alle Geldbörseneinträge als Tabelle",
+    "json_wallet_subtitle": "Alle Geldbörseneinträge als JSON"
   },
   "voice_entry": {
     "listening": "Höre zu…",

@@ -1350,7 +1350,7 @@ class _ExpenseTile extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(2))),
                 ListTile(
                   leading: const Icon(Icons.open_in_new_outlined),
-                  title: const Text('View details'),
+                  title: Text('activity_screen.view_details'.tr()),
                   onTap: () { Navigator.pop(ctx); navigateToDetail(); },
                 ),
                 if (isPayer)
@@ -1362,8 +1362,8 @@ class _ExpenseTile extends ConsumerWidget {
                       final confirmed = await showDialog<bool>(
                         context: context,
                         builder: (d) => AlertDialog(
-                          title: const Text('Delete expense?'),
-                          content: const Text('This cannot be undone.'),
+                          title: Text('activity_screen.delete_expense_title'.tr()),
+                          content: Text('common.cannot_be_undone'.tr()),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
                             FilledButton(
@@ -1484,8 +1484,8 @@ class _WalletEntryTile extends StatelessWidget {
             final confirmed = await showDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
-                title: const Text('Delete entry?'),
-                content: const Text('This cannot be undone.'),
+                title: Text('activity_screen.delete_entry_title'.tr()),
+                content: Text('common.cannot_be_undone'.tr()),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
                   FilledButton(
@@ -1666,7 +1666,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore group')),
+        SnackBar(content: Text('activity_screen.could_not_restore_group'.tr())),
       );
     }
   }
@@ -1890,7 +1890,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore expense')),
+        SnackBar(content: Text('activity_screen.could_not_restore_expense'.tr())),
       );
     }
   }
@@ -1926,16 +1926,16 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
         final choice = await showDialog<_RestoreChoice>(
           context: context,
           builder: (ctx) => AlertDialog(
-            title: const Text('Restore options'),
+            title: Text('activity_screen.restore_options'.tr()),
             content: Text('The group "${ev.groupName}" was also deleted. What would you like to restore?'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, _RestoreChoice.expenseOnly),
-                child: const Text('This expense only'),
+                child: Text('activity_screen.restore_expense_only'.tr()),
               ),
               FilledButton(
                 onPressed: () => Navigator.pop(ctx, _RestoreChoice.wholeGroup),
-                child: const Text('Whole group + all expenses'),
+                child: Text('activity_screen.restore_whole_group'.tr()),
               ),
             ],
           ),

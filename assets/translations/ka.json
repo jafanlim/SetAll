@@ -177,7 +177,10 @@
     "delete_confirm_one": "1 ჩანაწერის წაშლა? ეს შეუქცევადია.",
     "entry_count_one": "1 ჩანაწერი",
     "entry_count_other": "{count} ჩანაწერი",
-    "sort_tooltip": "დალაგება"
+    "sort_tooltip": "დალაგება",
+    "report_entry_list": "ჩანაწერების სია",
+    "report_all_transactions": "საფულის ყველა ტრანზაქცია",
+    "report_category_breakdown": "კატეგორიების დეტალი"
   },
   "groups_screen": {
     "filter_by_group": "ჯგუფის მიხედვით",
@@ -196,7 +199,19 @@
     "delete_confirm_one": "1 ჯგუფის წაშლა? მფლობელი 12 თვის განმავლობაში შეძლებს აღდგენას.",
     "error_delete": "ზოგიერთი ჯგუფის წაშლა ვერ მოხერხდა.",
     "sort_activity_tooltip": "აქტივობის დალაგება",
-    "sort_groups_tooltip": "ჯგუფების დალაგება"
+    "sort_groups_tooltip": "ჯგუფების დალაგება",
+    "rename_group": "ჯგუფის გადარქმევა",
+    "settle_group_title": "ჯგუფის ანგარიშსწორება?",
+    "settle_btn": "ანგარიშსწორება",
+    "settled_up": "ჯგუფი ანგარიშსწორდა!",
+    "reopened": "ჯგუფი გახსნილია.",
+    "could_not_rename": "გადარქმევა ვერ მოხდა. მხოლოდ ჯგუფის შემქმნელს შეუძლია გადარქმევა.",
+    "could_not_delete": "ჯგუფის წაშლა ვერ მოხდა. სცადეთ ძალით წაშლა გრძელი დაჭერის მენიუდან.",
+    "delete_expense_title": "ხარჯის წაშლა?",
+    "edit_expense": "ხარჯის რედაქტირება",
+    "expense_deleted": "ხარჯი წაიშალა",
+    "download_report": "ანგარიშის ჩამოტვირთვა",
+    "add_member": "წევრის დამატება"
   },
   "activity_screen": {
     "search_hint": "ხარჯების, ჯგუფების, ადამიანების ძიება…",
@@ -216,7 +231,16 @@
     "type_group_expenses": "ჯგუფის ხარჯები",
     "type_group_events": "ჯგუფის მოვლენები",
     "type_edits_deletes": "რედაქტირება და წაშლა",
-    "type_other": "სხვა"
+    "type_other": "სხვა",
+    "delete_entry_title": "ჩანაწერის წაშლა?",
+    "delete_expense_title": "ხარჯის წაშლა?",
+    "view_details": "დეტალების ნახვა",
+    "restore_options": "აღდგენის პარამეტრები",
+    "restore_expense_only": "მხოლოდ ეს ხარჯი",
+    "restore_whole_group": "მთელი ჯგუფი + ყველა ხარჯი",
+    "could_not_restore_expense": "ხარჯის აღდგენა ვერ მოხდა",
+    "could_not_restore_group": "ჯგუფის აღდგენა ვერ მოხდა",
+    "could_not_restore_wallet": "საფულის ჩანაწერის აღდგენა ვერ მოხდა"
   },
   "categories": {
     "general": "ზოგადი",
@@ -426,6 +450,21 @@
     "body": "გამოვლინდა ენა: {language}. გაგრძელება თუ სხვის არჩევა?",
     "keep": "გაგრძელება {language}-ზე",
     "change": "ენის არჩევა"
+  },
+  "group_info_screen": {
+    "could_not_delete": "წაშლა ვერ მოხდა. სცადეთ ძალით წაშლა … მენიუდან."
+  },
+  "export": {
+    "pdf_title": "PDF ანგარიში",
+    "csv_title": "CSV ექსპორტი",
+    "json_title": "JSON ექსპორტი",
+    "pdf_groups_subtitle": "ჯგუფების სრული ანგარიში PDF-ად",
+    "pdf_group_subtitle": "ჯგუფის ხარჯები PDF-ად",
+    "csv_groups_subtitle": "ყველა ჯგუფის ხარჯი ცხრილის სახით",
+    "json_groups_subtitle": "ყველა ჯგუფის ხარჯი JSON-ად",
+    "pdf_wallet_subtitle": "საფულის სრული ანგარიში PDF-ად",
+    "csv_wallet_subtitle": "საფულის ყველა ჩანაწერი ცხრილის სახით",
+    "json_wallet_subtitle": "საფულის ყველა ჩანაწერი JSON-ად"
   },
   "voice_entry": {
     "listening": "ვუსმენ…",

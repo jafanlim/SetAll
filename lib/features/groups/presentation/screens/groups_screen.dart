@@ -111,8 +111,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.download_outlined, color: _teal),
-              title: const Text('PDF report'),
-              subtitle: const Text('Full groups report as PDF'),
+              title: Text('export.pdf_title'.tr()),
+              subtitle: Text('export.pdf_groups_subtitle'.tr()),
               onTap: () async {
                 Navigator.of(ctx).pop();
                 if (!mounted) return;
@@ -131,8 +131,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.table_chart_outlined, color: Color(0xFF0EA5E9)),
-              title: const Text('CSV export'),
-              subtitle: const Text('All group expenses as spreadsheet'),
+              title: Text('export.csv_title'.tr()),
+              subtitle: Text('export.csv_groups_subtitle'.tr()),
               onTap: () async {
                 Navigator.of(ctx).pop();
                 if (!mounted) return;
@@ -150,8 +150,8 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
             ),
             ListTile(
               leading: const Icon(Icons.data_object_outlined, color: Color(0xFFF97316)),
-              title: const Text('JSON export'),
-              subtitle: const Text('All group expenses as JSON'),
+              title: Text('export.json_title'.tr()),
+              subtitle: Text('export.json_groups_subtitle'.tr()),
               onTap: () async {
                 Navigator.of(ctx).pop();
                 if (!mounted) return;
@@ -1224,7 +1224,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rename group'),
+        title: Text('groups_screen.rename_group'.tr()),
         content: TextField(
           controller: ctrl,
           autofocus: true,
@@ -1251,7 +1251,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not rename. Only the group creator can rename.')),
+        SnackBar(content: Text('groups_screen.could_not_rename'.tr())),
       );
     }
   }
@@ -1261,14 +1261,14 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Settle group?'),
+        title: Text('groups_screen.settle_group_title'.tr()),
         content: Text('Mark "${widget.group.name}" as settled? All debts will show as zero.'),
         actions: [
           TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Settle'),
+            child: Text('groups_screen.settle_btn'.tr()),
           ),
         ],
       ),
@@ -1281,7 +1281,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     ref.invalidate(balanceSummaryProvider);
     HapticUtils.success();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Group settled up!')),
+      SnackBar(content: Text('groups_screen.settled_up'.tr())),
     );
   }
 
@@ -1294,7 +1294,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     ref.invalidate(balanceSummaryProvider);
     HapticUtils.success();
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Group reopened.')),
+      SnackBar(content: Text('groups_screen.reopened'.tr())),
     );
   }
 
@@ -1337,7 +1337,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete group. Try Force Delete from the long-press menu.')),
+        SnackBar(content: Text('groups_screen.could_not_delete'.tr())),
       );
     }
   }
@@ -1353,7 +1353,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
           children: [
             ListTile(
               leading: const Icon(Icons.edit_outlined, color: _teal),
-              title: const Text('Rename group'),
+              title: Text('groups_screen.rename_group'.tr()),
               onTap: () => Navigator.of(ctx).pop('rename'),
             ),
             ListTile(
@@ -1362,14 +1362,14 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                 color: isSettled ? _orange : _teal,
               ),
               title: Text(
-                isSettled ? 'Reopen group' : 'Settle group',
+                isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
                 style: TextStyle(color: isSettled ? _orange : _teal, fontWeight: FontWeight.w600),
               ),
               onTap: () => Navigator.of(ctx).pop(isSettled ? 'reopen' : 'settle'),
             ),
             ListTile(
               leading: const Icon(Icons.download_outlined, color: _teal),
-              title: const Text('Download report'),
+              title: Text('groups_screen.download_report'.tr()),
               onTap: () => Navigator.of(ctx).pop('download'),
             ),
             ListTile(
@@ -1427,8 +1427,8 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.download_outlined, color: _teal),
-              title: const Text('PDF report'),
-              subtitle: const Text('Group expenses as PDF'),
+              title: Text('export.pdf_title'.tr()),
+              subtitle: Text('export.pdf_group_subtitle'.tr()),
               onTap: () async {
                 Navigator.of(ctx).pop();
                 try {
@@ -1459,7 +1459,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
           child: Row(children: [
             const Icon(Icons.edit_outlined, size: 16, color: _teal),
             const SizedBox(width: 8),
-            const Text('Rename group'),
+            Text('groups_screen.rename_group'.tr()),
           ]),
         ),
         PopupMenuItem(
@@ -1472,7 +1472,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             ),
             const SizedBox(width: 8),
             Text(
-              isSettled ? 'Reopen group' : 'Settle group',
+              isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
               style: TextStyle(color: isSettled ? _orange : _teal),
             ),
           ]),
