@@ -60,8 +60,9 @@ Rules:
 - Respond in plain conversational text. No bullet points unless explicitly asked.
 - IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.${langLine}`;
 
-    const maxTokens  = isCanvas ? 4096 : 1024;
+    const maxTokens   = isCanvas ? 2048 : 1024;
     const temperature = isCanvas ? 0.2 : 0.9;
+    const model       = isCanvas ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
 
     const callGroq = async () => fetch(GROQ_API_URL, {
       method: 'POST',
@@ -70,7 +71,7 @@ Rules:
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: query },
