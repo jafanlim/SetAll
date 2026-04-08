@@ -506,6 +506,12 @@ class LocalDatabase {
       await _addColumnIfNotExists(db, 'groups', 'settled_at', 'TEXT');
       await _addColumnIfNotExists(db, 'groups', 'settled_by', 'TEXT');
     }
+    if (oldVersion < 33) {
+      // Schema v33: frozen base-currency amount at entry time; eliminates
+      // USD-rate drift in wallet totals. Column is nullable — pre-existing
+      // rows fall back to live-rate conversion in getWalletEntryTotals().
+      await _addColumnIfNotExists(db, 'expenses', 'base_currency_amount', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -727,6 +733,17 @@ class LocalDatabase {
       'CREATE INDEX IF NOT EXISTS idx_wallet_entries_user_created '
       'ON wallet_entries(user_id, created_at)',
     );
+    await db.execute('''
+      CREATE TABLE deleted_wallet_entries (
+        entry_id    TEXT PRIMARY KEY,
+        description TEXT,
+        amount      TEXT NOT NULL,
+        currency    TEXT,
+        is_income   INTEGER NOT NULL DEFAULT 0,
+        deleted_at  TEXT NOT NULL,
+        deleted_by  TEXT
+      )
+    ''');
   }
 }
 

@@ -171,34 +171,32 @@ class _MobileLayout extends ConsumerWidget {
         ) ??
         false;
 
-    return Stack(
+    return Column(
       children: [
-        Column(
-          children: [
-            const _LatestAnalysisCard(),
-            Expanded(child: _ChatPanel(scrollCtrl: scrollCtrl)),
-            _InputBar(
-              controller: inputCtrl,
-              onSend: onSend,
-              onDeepAnalysis: onDeepAnalysis,
-            ),
-          ],
-        ),
+        const _LatestAnalysisCard(),
+        Expanded(child: _ChatPanel(scrollCtrl: scrollCtrl)),
         if (hasCanvas)
-          Positioned(
-            bottom: 80,
-            right: 16,
-            child: FloatingActionButton.extended(
-              onPressed: onShowCanvas,
-              backgroundColor: _teal,
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.bar_chart_outlined, size: 18),
-              label: const Text(
-                'View Analysis',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 16, 8),
+              child: FloatingActionButton.extended(
+                onPressed: onShowCanvas,
+                backgroundColor: _teal,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.bar_chart_outlined, size: 18),
+                label: const Text(
+                  'View Analysis',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                ),
               ),
             ),
           ),
+        _InputBar(
+          controller: inputCtrl,
+          onSend: onSend,
+          onDeepAnalysis: onDeepAnalysis,
+        ),
       ],
     );
   }
