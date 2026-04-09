@@ -307,11 +307,13 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final theme        = Theme.of(context);
-    final totalsAsync  = ref.watch(walletEntryTotalsProvider);
-    final entriesAsync = ref.watch(walletEntriesProvider);
-    final baseCcyAsync = ref.watch(baseCurrencyProvider);
-    final baseCurrency = baseCcyAsync.valueOrNull ?? 'USD';
+    final theme          = Theme.of(context);
+    final totalsAsync    = ref.watch(walletEntryTotalsProvider);
+    final entriesAsync   = ref.watch(walletEntriesProvider);
+    final baseCcyAsync   = ref.watch(baseCurrencyProvider);
+    final baseCurrency   = baseCcyAsync.valueOrNull ?? 'USD';
+    final usdRateAsync   = ref.watch(usdToBaseCurrencyRateProvider);
+    final usdToBase      = usdRateAsync.valueOrNull ?? Decimal.one;
 
     final allExpenses = entriesAsync.valueOrNull ?? [];
     final expenses    = _applyFilterSort(allExpenses);
@@ -570,13 +572,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     spend.putIfAbsent(cat, () => {})[ccy] =
                         (spend[cat]![ccy] ?? Decimal.zero) + amt;
                     final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
-                    final baseAmt = Decimal.tryParse(
-                        hasFrozen ? e.baseCurrencyAmount! : e.universalUsdAmount,
-                      ) ?? Decimal.zero;
-                    final effectiveCcy = hasFrozen ? baseCurrency : 'USD';
+                    final Decimal baseAmt;
+                    if (hasFrozen) {
+                      baseAmt = Decimal.tryParse(e.baseCurrencyAmount!) ?? Decimal.zero;
+                    } else {
+                      final usd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
+                      baseAmt = (usd * usdToBase).round(scale: 2);
+                    }
                     spendBase.putIfAbsent(cat, () => {})[ccy] =
                         (spendBase[cat]?[ccy] ?? Decimal.zero) + baseAmt;
-                    spendBaseCcy.putIfAbsent(cat, () => {})[ccy] = effectiveCcy;
+                    spendBaseCcy.putIfAbsent(cat, () => {})[ccy] = baseCurrency;
                   }
                   if (spend.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                   // Build flat rows: one per (cat, ccy) pair.
@@ -649,13 +654,16 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     income.putIfAbsent(cat, () => {})[ccy] =
                         (income[cat]![ccy] ?? Decimal.zero) + amt;
                     final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
-                    final baseAmt = Decimal.tryParse(
-                        hasFrozen ? e.baseCurrencyAmount! : e.universalUsdAmount,
-                      ) ?? Decimal.zero;
-                    final effectiveCcy = hasFrozen ? baseCurrency : 'USD';
+                    final Decimal baseAmt;
+                    if (hasFrozen) {
+                      baseAmt = Decimal.tryParse(e.baseCurrencyAmount!) ?? Decimal.zero;
+                    } else {
+                      final usd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
+                      baseAmt = (usd * usdToBase).round(scale: 2);
+                    }
                     incomeBase.putIfAbsent(cat, () => {})[ccy] =
                         (incomeBase[cat]?[ccy] ?? Decimal.zero) + baseAmt;
-                    incomeBaseCcy.putIfAbsent(cat, () => {})[ccy] = effectiveCcy;
+                    incomeBaseCcy.putIfAbsent(cat, () => {})[ccy] = baseCurrency;
                   }
                   if (income.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                   final rows = <({String cat, Decimal amt, String ccy, Decimal baseAmt, String annotCcy})>[];

@@ -1660,7 +1660,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
       ref.invalidate(omniActivityProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Group "${widget.event.groupName}" restored'),
+          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -1886,7 +1886,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$label" restored'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1905,13 +1905,13 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('"${widget.event.groupName}" and all its expenses restored'),
+          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore group')),
+        SnackBar(content: Text('activity_screen.could_not_restore_group'.tr())),
       );
     }
   }
@@ -1927,7 +1927,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text('activity_screen.restore_options'.tr()),
-            content: Text('The group "${ev.groupName}" was also deleted. What would you like to restore?'),
+            content: Text('activity_screen.restore_group_also_deleted'.tr(namedArgs: {'group': ev.groupName})),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, _RestoreChoice.expenseOnly),
@@ -2070,11 +2070,11 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('"$label" restored'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore wallet entry')),
+        SnackBar(content: Text('activity_screen.could_not_restore_wallet'.tr())),
       );
     }
   }

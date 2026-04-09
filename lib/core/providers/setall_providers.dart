@@ -191,6 +191,15 @@ final walletBalanceProvider = FutureProvider<String>((ref) async {
   return balance.toStringAsFixed(2);
 });
 
+/// Exchange rate: 1 USD → baseCurrency. Used by the wallet screen to convert
+/// universalUsdAmount to the user's base currency for category annotations.
+/// Returns Decimal.one when baseCurrency is already USD.
+final usdToBaseCurrencyRateProvider = FutureProvider<Decimal>((ref) async {
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  if (baseCurrency == 'USD') return Decimal.one;
+  return ref.watch(currencyServiceProvider).getRate('USD', baseCurrency);
+});
+
 /// Wallet income, expenses, and net — all separately, in the user's base
 /// currency. Drives the Income / Expenses pills in WalletHero.
 final walletTotalsProvider =
