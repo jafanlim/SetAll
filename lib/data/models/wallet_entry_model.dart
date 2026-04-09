@@ -13,6 +13,7 @@ class WalletEntryModel {
     this.originalCurrency,
     this.exchangeRateApplied,
     this.universalUsdAmount = '0',
+    this.baseCurrencyAmount,
     this.iconCodepoint,
     this.iconColor,
     this.notes,
@@ -34,6 +35,9 @@ class WalletEntryModel {
   final String? originalCurrency;
   final String? exchangeRateApplied;
   final String universalUsdAmount;
+  /// Frozen base-currency amount computed at save time (schema v33+).
+  /// Used as annotation on category rows: ≈ baseCurrency amount.
+  final String? baseCurrencyAmount;
   final int? iconCodepoint;
   final int? iconColor;
   final String? notes;
@@ -60,6 +64,7 @@ class WalletEntryModel {
       originalCurrency: json['original_currency'] as String?,
       exchangeRateApplied: json['exchange_rate_applied']?.toString(),
       universalUsdAmount: (json['universal_usd_amount'])?.toString() ?? '0',
+      baseCurrencyAmount: json['base_currency_amount']?.toString(),
       iconCodepoint: json['icon_codepoint'] as int?,
       iconColor: json['icon_color'] as int?,
       notes: json['notes'] as String?,
@@ -83,6 +88,7 @@ class WalletEntryModel {
     if (originalCurrency != null)   'original_currency': originalCurrency,
     if (exchangeRateApplied != null)'exchange_rate_applied': exchangeRateApplied,
     'universal_usd_amount': universalUsdAmount,
+    if (baseCurrencyAmount != null) 'base_currency_amount': baseCurrencyAmount,
     if (iconCodepoint != null)      'icon_codepoint': iconCodepoint,
     if (iconColor != null)          'icon_color': iconColor,
     if (notes != null)              'notes': notes,
@@ -125,6 +131,7 @@ class WalletEntryModel {
     String? originalCurrency,
     String? exchangeRateApplied,
     String? universalUsdAmount,
+    String? baseCurrencyAmount,
     int? iconCodepoint,
     int? iconColor,
     String? notes,
@@ -145,6 +152,7 @@ class WalletEntryModel {
     originalCurrency:     originalCurrency     ?? this.originalCurrency,
     exchangeRateApplied:  exchangeRateApplied  ?? this.exchangeRateApplied,
     universalUsdAmount:   universalUsdAmount   ?? this.universalUsdAmount,
+    baseCurrencyAmount:   baseCurrencyAmount   ?? this.baseCurrencyAmount,
     iconCodepoint:        iconCodepoint        ?? this.iconCodepoint,
     iconColor:            iconColor            ?? this.iconColor,
     notes:                notes                ?? this.notes,

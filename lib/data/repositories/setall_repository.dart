@@ -3973,6 +3973,7 @@ class SetAllRepository {
         originalCurrency:    e.originalCurrency,
         exchangeRateApplied: e.exchangeRateApplied,
         universalUsdAmount:  e.universalUsdAmount ?? '0',
+        baseCurrencyAmount:  e.baseCurrencyAmount,
         iconCodepoint:       e.iconCodepoint,
         iconColor:           e.iconColor,
         notes:               e.notes,
