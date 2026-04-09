@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:easy_localization/easy_localization.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -59,7 +60,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
     final desc = _descCtrl.text.trim();
     if (desc.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please describe what happened.')),
+        SnackBar(content: Text('bug_report.describe_first'.tr())),
       );
       return;
     }
@@ -137,8 +138,8 @@ class _BugReportScreenState extends State<BugReportScreen> {
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Bug report sent. Thank you!'),
+          SnackBar(
+            content: Text('bug_report.sent_thanks'.tr()),
             backgroundColor: _teal,
           ),
         );
@@ -146,7 +147,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to send: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('${'bug_report.failed_prefix'.tr()}$e'), backgroundColor: Colors.red),
         );
       }
     } finally {
@@ -182,8 +183,8 @@ class _BugReportScreenState extends State<BugReportScreen> {
           const SizedBox(height: 16),
 
           // Title
-          const Text('Report a Bug',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+          Text('bug_report.title'.tr(),
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
           const SizedBox(height: 16),
 
           // Description
@@ -192,8 +193,8 @@ class _BugReportScreenState extends State<BugReportScreen> {
             maxLines: 3,
             maxLength: 500,
             decoration: InputDecoration(
-              labelText: 'What were you doing?',
-              hintText: 'Describe the issue…',
+              labelText: 'bug_report.what_happened_label'.tr(),
+              hintText: 'bug_report.what_happened_hint'.tr(),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -208,7 +209,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
             controller: _expectedCtrl,
             maxLines: 2,
             decoration: InputDecoration(
-              labelText: 'What did you expect? (optional)',
+              labelText: 'bug_report.expected_label'.tr(),
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
               focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
@@ -221,7 +222,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
           // Severity
           Row(
             children: [
-              Text('Severity', style: TextStyle(
+              Text('bug_report.severity_label'.tr(), style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: theme.colorScheme.onSurface,
@@ -236,7 +237,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
                   ),
                   items: _severities.map((s) => DropdownMenuItem(
                     value: s,
-                    child: Text(s[0].toUpperCase() + s.substring(1)),
+                    child: Text('bug_report.severity_$s'.tr()),
                   )).toList(),
                   onChanged: (v) { if (v != null) setState(() => _severity = v); },
                 ),
@@ -249,7 +250,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
           CheckboxListTile(
             value: _includeDevice,
             onChanged: (v) => setState(() => _includeDevice = v ?? true),
-            title: const Text('Include device info', style: TextStyle(fontSize: 13)),
+            title: Text('bug_report.include_device'.tr(), style: const TextStyle(fontSize: 13)),
             activeColor: _teal,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
@@ -257,7 +258,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
           CheckboxListTile(
             value: _includeLogs,
             onChanged: (v) => setState(() => _includeLogs = v ?? true),
-            title: const Text('Include recent logs', style: TextStyle(fontSize: 13)),
+            title: Text('bug_report.include_logs'.tr(), style: const TextStyle(fontSize: 13)),
             activeColor: _teal,
             contentPadding: EdgeInsets.zero,
             controlAffinity: ListTileControlAffinity.leading,
@@ -278,7 +279,7 @@ class _BugReportScreenState extends State<BugReportScreen> {
               child: _submitting
                   ? const SizedBox(width: 18, height: 18,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black))
-                  : const Text('Submit', style: TextStyle(fontWeight: FontWeight.w700)),
+                  : Text('bug_report.submit_btn'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
             ),
           ),
         ],

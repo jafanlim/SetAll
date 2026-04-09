@@ -89,6 +89,16 @@ class VoiceEntryService {
     List<Map<String, dynamic>> groups,
     String defaultCurrency, {
     String language = 'en',
+    List<String> knownCategories = const [
+      'Food & drink',
+      'Transport',
+      'Travel',
+      'Entertainment',
+      'Bills & utilities',
+      'Shopping',
+      'General',
+      'Other',
+    ],
   }) async {
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyVoiceEntryUrl),
@@ -98,16 +108,7 @@ class VoiceEntryService {
         'groups': groups,
         'defaultCurrency': defaultCurrency,
         'language': language,
-        'knownCategories': [
-          'Food & drink',
-          'Transport',
-          'Travel',
-          'Entertainment',
-          'Bills & utilities',
-          'Shopping',
-          'General',
-          'Other',
-        ],
+        'knownCategories': knownCategories,
       }),
     ).timeout(const Duration(seconds: 15));
 

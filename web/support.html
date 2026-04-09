@@ -6,6 +6,12 @@
     <title>Support | SetAll</title>
     <meta name="description" content="Get help with SetAll, read FAQs, or contact our support team.">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>">
+    <script src="/i18n.js"></script>
+    <style>
+        #lang-switcher { display:flex; gap:0.25rem; }
+        #lang-switcher button { background:none; border:1px solid rgba(255,255,255,0.15); color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.2rem 0.4rem; border-radius:4px; cursor:pointer; transition:color .15s,border-color .15s; }
+        #lang-switcher button:hover, #lang-switcher button.lang-active { color:#14B8A6; border-color:#14B8A6; }
+    </style>
     <style>
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         html { scroll-behavior: smooth; }
@@ -122,16 +128,17 @@
                 <span>SetAll</span>
             </a>
             <div class="nav-actions">
-                <a href="/download" class="btn-ghost">Download</a>
-                <a href="/login" class="btn-primary">Sign In</a>
+                <div id="lang-switcher"></div>
+                <a href="/download" class="btn-ghost" data-i18n="supp_nav_download">Download</a>
+                <a href="/login" class="btn-primary" data-i18n="supp_nav_signin">Sign In</a>
             </div>
         </div>
     </nav>
 
     <main class="z1">
         <div class="hero">
-            <h1>How can we <span>help?</span></h1>
-            <p>Find answers to common questions or reach out to us directly.</p>
+            <h1 data-i18n-html="supp_hero_h1">How can we <span>help?</span></h1>
+            <p data-i18n="supp_hero_sub">Find answers to common questions or reach out to us directly.</p>
         </div>
 
         <div class="page z1">
@@ -140,8 +147,8 @@
                     <div class="card-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
                     </div>
-                    <h3>Email Support</h3>
-                    <p>Need help with your account or have a specific question? We're here to help.</p>
+                    <h3 data-i18n="supp_email_title">Email Support</h3>
+                    <p data-i18n="supp_email_body">Need help with your account or have a specific question? We're here to help.</p>
                     <a href="mailto:contact@setall.app?subject=SetAll%20Support%20Request" class="card-link">
                         contact@setall.app
                         <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
@@ -151,10 +158,10 @@
                     <div class="card-icon" aria-hidden="true">
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                     </div>
-                    <h3>Report a Bug</h3>
-                    <p>Found a glitch or have a feature request? Let us know on our public tracker.</p>
+                    <h3 data-i18n="supp_bug_title">Report a Bug</h3>
+                    <p data-i18n="supp_bug_body">Found a glitch or have a feature request? Let us know on our public tracker.</p>
                     <a href="https://github.com/jafanlim/SetAll/issues/new" target="_blank" rel="noopener" class="card-link">
-                        Open an Issue
+                        <span data-i18n="supp_bug_link">Open an Issue</span>
                         <svg viewBox="0 0 24 24"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     </a>
                 </div>
@@ -162,28 +169,28 @@
 
             <hr class="divider">
 
-            <p class="section-label">Help Centre</p>
-            <h2 class="section-heading">Frequently Asked Questions</h2>
+            <p class="section-label" data-i18n="supp_faq_label">Help Centre</p>
+            <h2 class="section-heading" data-i18n="supp_faq_heading">Frequently Asked Questions</h2>
             <div class="faq-list">
                 <div class="faq-item">
-                    <h3>Is SetAll free to use?</h3>
-                    <p>Yes, the core SetAll engine is completely free. We believe managing shared expenses shouldn't cost you extra money.</p>
+                    <h3 data-i18n="supp_q1">Is SetAll free to use?</h3>
+                    <p data-i18n="supp_a1">Yes, the core SetAll engine is completely free. We believe managing shared expenses shouldn't cost you extra money.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>How does the "Greedy Flow" engine work?</h3>
-                    <p>Our engine algorithmically simplifies group debts. Instead of tracking dozens of complex IOUs, SetAll calculates the absolute minimum number of transfers required to settle the entire group, saving everyone time and bank fees.</p>
+                    <h3 data-i18n="supp_q2">How does the "Greedy Flow" engine work?</h3>
+                    <p data-i18n="supp_a2">Our engine algorithmically simplifies group debts. Instead of tracking dozens of complex IOUs, SetAll calculates the absolute minimum number of transfers required to settle the entire group, saving everyone time and bank fees.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>Does SetAll connect to my bank account?</h3>
-                    <p>No. SetAll is a non-custodial ledger. We track the math, but we never touch your money. When it's time to settle up, you transfer the funds using your preferred method (Cash, Bank Transfer, PayPal) and mark it as settled in the app.</p>
+                    <h3 data-i18n="supp_q3">Does SetAll connect to my bank account?</h3>
+                    <p data-i18n="supp_a3">No. SetAll is a non-custodial ledger. We track the math, but we never touch your money. When it's time to settle up, you transfer the funds using your preferred method (Cash, Bank Transfer, PayPal) and mark it as settled in the app.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>Can I use the app without an internet connection?</h3>
-                    <p>Yes. SetAll uses a local-first architecture. You can add expenses and create groups while entirely offline. The moment your device reconnects, it seamlessly syncs with the cloud in the background.</p>
+                    <h3 data-i18n="supp_q4">Can I use the app without an internet connection?</h3>
+                    <p data-i18n="supp_a4">Yes. SetAll uses a local-first architecture. You can add expenses and create groups while entirely offline. The moment your device reconnects, it seamlessly syncs with the cloud in the background.</p>
                 </div>
                 <div class="faq-item">
-                    <h3>How do I delete my account?</h3>
-                    <p>Open the SetAll app, navigate to Settings → Delete Account, or go to your <a href="/portal" style="color:#14B8A6;font-weight:600">Account Portal</a> → Danger Zone. Your data is permanently wiped from our servers within 30 days.</p>
+                    <h3 data-i18n="supp_q5">How do I delete my account?</h3>
+                    <p data-i18n="supp_a5">Open the SetAll app, navigate to Settings → Delete Account, or go to your <a href="/portal" style="color:#14B8A6;font-weight:600">Account Portal</a> → Danger Zone. Your data is permanently wiped from our servers within 30 days.</p>
                 </div>
             </div>
         </div>
@@ -192,10 +199,10 @@
     <footer class="z1">
         <p>
             &copy; 2026 SetAll
-            <a href="/privacy">Privacy Policy</a>
-            <a href="/terms">Terms of Service</a>
-            <a href="/support">Help &amp; Support</a>
-            <a href="mailto:contact@setall.app">Contact</a>
+            <a href="/privacy" data-i18n="supp_footer_privacy">Privacy Policy</a>
+            <a href="/terms" data-i18n="supp_footer_terms">Terms of Service</a>
+            <a href="/support" data-i18n-html="supp_footer_support">Help &amp; Support</a>
+            <a href="mailto:contact@setall.app" data-i18n="supp_footer_contact">Contact</a>
             <a href="https://github.com/jafanlim/SetAll" target="_blank" rel="noopener">GitHub</a>
         </p>
         <p style="margin-top:0.5rem;font-size:0.75rem">SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia</p>

@@ -1,3 +1,4 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -62,7 +63,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   Future<void> _sendDeepAnalysis() async {
     HapticUtils.primaryTap();
     await ref.read(insightsProvider.notifier).sendMessage(
-      'Generate a comprehensive financial analysis with charts',
+      'insights.deep_analysis_trigger'.tr(),
       mode: 'canvas',
     );
     _scrollToBottom();
@@ -84,7 +85,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(24)),
           ),
-          child: const _CanvasPanel(scrollable: true),
+          child: _CanvasPanel(scrollable: true, scrollController: sc),
         ),
       ),
     );
@@ -99,9 +100,9 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        title: const Text(
-          'Insights',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
+        title: Text(
+          'insights.title'.tr(),
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 20),
         ),
         backgroundColor: Theme.of(context).colorScheme.surface,
         foregroundColor: Theme.of(context).colorScheme.onSurface,
@@ -110,7 +111,7 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.add_comment_outlined, color: _teal),
-            tooltip: 'New session',
+            tooltip: 'insights.new_session_tooltip'.tr(),
             onPressed: () {
               HapticUtils.lightTap();
               ref.read(insightsProvider.notifier).newSession();
@@ -185,9 +186,9 @@ class _MobileLayout extends ConsumerWidget {
                 backgroundColor: _teal,
                 foregroundColor: Colors.white,
                 icon: const Icon(Icons.bar_chart_outlined, size: 18),
-                label: const Text(
-                  'View Analysis',
-                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                label: Text(
+                  'insights.view_analysis_btn'.tr(),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 ),
               ),
             ),
@@ -305,7 +306,7 @@ class _HistorySidebar extends ConsumerWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
-              'Sessions',
+              'insights.sessions_header'.tr(),
               style: theme.textTheme.labelSmall?.copyWith(
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.1,
@@ -317,7 +318,7 @@ class _HistorySidebar extends ConsumerWidget {
             child: sessionIds.isEmpty
                 ? Center(
                     child: Text(
-                      'No sessions yet',
+                      'insights.no_sessions'.tr(),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
@@ -342,7 +343,7 @@ class _HistorySidebar extends ConsumerWidget {
                               : theme.colorScheme.onSurfaceVariant,
                         ),
                         title: Text(
-                          'Session ${index + 1}',
+                          'insights.session_n'.tr(namedArgs: {'n': '${index + 1}'}),
                           style: theme.textTheme.bodySmall?.copyWith(
                             fontWeight:
                                 isActive ? FontWeight.w700 : FontWeight.w400,
@@ -383,7 +384,7 @@ class _ChatPanel extends ConsumerWidget {
       loading: () =>
           const Center(child: CircularProgressIndicator(strokeWidth: 2)),
       error: (e, _) => Center(
-        child: Text('Error loading insights: $e'),
+        child: Text('insights.error_loading'.tr(namedArgs: {'error': '$e'})),
       ),
       data: (state) {
         final messages = state.messages;
@@ -414,9 +415,10 @@ class _ChatPanel extends ConsumerWidget {
 // Canvas Panel — FEAT-08: full structured AI analysis with charts
 // ---------------------------------------------------------------------------
 class _CanvasPanel extends ConsumerWidget {
-  const _CanvasPanel({this.scrollable = false});
+  const _CanvasPanel({this.scrollable = false, this.scrollController});
 
   final bool scrollable;
+  final ScrollController? scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -451,7 +453,7 @@ class _CanvasPanel extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              'Tap Deep Analysis\nto generate charts.',
+              'insights.tap_deep_hint'.tr(),
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -464,7 +466,7 @@ class _CanvasPanel extends ConsumerWidget {
       final widgets = <Widget>[
         // Header
         Text(
-          'ANALYSIS',
+          'insights.analysis_header'.tr(),
           style: theme.textTheme.labelSmall?.copyWith(
             fontWeight: FontWeight.w700,
             letterSpacing: 1.2,
@@ -494,7 +496,7 @@ class _CanvasPanel extends ConsumerWidget {
         if (canvas.insights.isNotEmpty) ...[  
           const SizedBox(height: 14),
           Text(
-            'KEY INSIGHTS',
+            'insights.key_insights_header'.tr(),
             style: theme.textTheme.labelSmall?.copyWith(
               fontWeight: FontWeight.w700,
               letterSpacing: 1.1,
@@ -556,10 +558,9 @@ class _CanvasPanel extends ConsumerWidget {
       ];
 
       body = ListView(
+        controller: scrollController,
         padding: const EdgeInsets.all(16),
-        physics: scrollable
-            ? const ClampingScrollPhysics()
-            : const NeverScrollableScrollPhysics(),
+        physics: const ClampingScrollPhysics(),
         shrinkWrap: scrollable,
         children: widgets,
       );
@@ -995,7 +996,7 @@ class _EmptyChat extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Ask anything about your finances.',
+            'insights.ask_hint'.tr(),
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -1054,7 +1055,7 @@ class _InputBar extends ConsumerWidget {
                   maxLines: 4,
                   textInputAction: TextInputAction.newline,
                   decoration: InputDecoration(
-                    hintText: 'Ask about your finances…',
+                    hintText: 'insights.ask_hint'.tr(),
                     hintStyle: TextStyle(
                       color: theme.colorScheme.onSurfaceVariant,
                       fontSize: 14,
@@ -1102,8 +1103,8 @@ class _InputBar extends ConsumerWidget {
               child: OutlinedButton.icon(
                 onPressed: isLoading ? null : onDeepAnalysis,
                 icon: const Icon(Icons.auto_awesome, size: 14),
-                label: const Text('Deep Analysis',
-                    style: TextStyle(
+                label: Text('insights.deep_analysis_btn'.tr(),
+                    style: const TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w700)),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: _teal,
@@ -1242,7 +1243,7 @@ class _LatestAnalysisCardState extends ConsumerState<_LatestAnalysisCard> {
               children: [
                 const Icon(Icons.auto_awesome, size: 14, color: _teal),
                 const SizedBox(width: 6),
-                Text('Latest Analysis · $date',
+                Text('insights.latest_analysis_label'.tr(namedArgs: {'date': date}),
                     style: const TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w700,
                         color: _teal, letterSpacing: 0.3)),

@@ -53,7 +53,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
 
   void _toggleEditMode() {
     HapticUtils.selection();
-    setState(() { _editMode = !_editMode; _selected.clear(); });
+    final next = !_editMode;
+    setState(() { _editMode = next; _selected.clear(); });
+    ref.read(screenEditModeProvider.notifier).state = next;
   }
 
   void _toggleItem(String id) {
@@ -118,6 +120,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
     setState(() { _editMode = false; _selected.clear(); });
+    ref.read(screenEditModeProvider.notifier).state = false;
   }
 
   Future<void> _deleteOne(String id) async {
@@ -411,12 +414,36 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                 child: totalsAsync.when(
                   skipLoadingOnReload: true,
-                  data: (totals) => WalletHero(
-                    walletBalance: totals.net,
-                    income: totals.income,
-                    spend: totals.spend,
-                    currency: baseCurrency,
-                  ),
+                  data: (totals) {
+                    // For single-currency wallets, prefer the raw-amount currency
+                    // from entries rather than baseCurrency (which defaults to USD
+                    // if the profile hasn't been saved yet).
+                    final entries = entriesAsync.valueOrNull ?? [];
+                    final ccySet = entries.map((e) => e.currency.isEmpty ? 'USD' : e.currency).toSet();
+                    final heroCcy = ccySet.length == 1 ? ccySet.first : baseCurrency;
+                    // When all entries share one currency, recalculate totals from
+                    // raw amounts so the hero matches the breakdown exactly.
+                    if (ccySet.length == 1) {
+                      var rawIncome = Decimal.zero;
+                      var rawSpend  = Decimal.zero;
+                      for (final e in entries) {
+                        final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
+                        if (e.isIncome) { rawIncome += amt; } else { rawSpend += amt; }
+                      }
+                      return WalletHero(
+                        walletBalance: rawIncome - rawSpend,
+                        income: rawIncome,
+                        spend: rawSpend,
+                        currency: heroCcy,
+                      );
+                    }
+                    return WalletHero(
+                      walletBalance: totals.net,
+                      income: totals.income,
+                      spend: totals.spend,
+                      currency: heroCcy,
+                    );
+                  },
                   loading: () => WalletHero.loading(),
                   error: (_, _) => WalletHero.error(),
                 ),
@@ -528,33 +555,44 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ),
               entriesAsync.when(
                 data: (exp) {
-                  final spend = <String, Decimal>{};
+                  // Group by (category, currency) using raw amount — no USD conversion.
+                  final spend = <String, Map<String, Decimal>>{};
                   for (final e in exp) {
                     if (e.isIncome) continue;
-                    final cat    = e.category.isEmpty ? 'Other' : e.category;
-                    final rawUsd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
-                    final entryBaseCcy = e.originalCurrency ?? e.currency;
-                    final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
-                        ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
-                        : rawUsd;
-                    spend[cat] = (spend[cat] ?? Decimal.zero) + amt;
+                    final cat = e.category.isEmpty ? 'Other' : e.category;
+                    final ccy = e.currency.isEmpty ? 'USD' : e.currency;
+                    final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
+                    spend.putIfAbsent(cat, () => {})[ccy] =
+                        (spend[cat]![ccy] ?? Decimal.zero) + amt;
                   }
                   if (spend.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  final sorted = spend.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-                  final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
+                  // Build flat rows: one per (cat, ccy) pair.
+                  final rows = <({String cat, Decimal amt, String ccy})>[];
+                  for (final catEntry in spend.entries) {
+                    for (final ccyEntry in catEntry.value.entries) {
+                      rows.add((cat: catEntry.key, amt: ccyEntry.value, ccy: ccyEntry.key));
+                    }
+                  }
+                  rows.sort((a, b) => b.amt.compareTo(a.amt));
+                  // Total per currency for the progress bar denominator.
+                  final totals = <String, Decimal>{};
+                  for (final r in rows) {
+                    totals[r.ccy] = (totals[r.ccy] ?? Decimal.zero) + r.amt;
+                  }
                   return SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => _CategoryRow(
-                        category: sorted[i].key,
-                        amount: sorted[i].value,
-                        total: total,
+                        category: rows[i].cat,
+                        amount: rows[i].amt,
+                        total: totals[rows[i].ccy] ?? rows[i].amt,
+                        currency: rows[i].ccy,
                         accentColor: _purple,
                         onTap: () {
                           HapticUtils.selection();
-                          setState(() => _catFilter = sorted[i].key);
+                          setState(() => _catFilter = rows[i].cat);
                         },
                       ),
-                      childCount: sorted.length,
+                      childCount: rows.length,
                     ),
                   );
                 },
@@ -579,33 +617,41 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ),
               entriesAsync.when(
                 data: (exp) {
-                  final income = <String, Decimal>{};
+                  final income = <String, Map<String, Decimal>>{};
                   for (final e in exp) {
                     if (!e.isIncome) continue;
-                    final cat    = e.category.isEmpty ? 'Other' : e.category;
-                    final rawUsd = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
-                    final entryBaseCcy = e.originalCurrency ?? e.currency;
-                    final amt = (entryBaseCcy == baseCurrency && e.originalAmount != null)
-                        ? (Decimal.tryParse(e.originalAmount!) ?? rawUsd)
-                        : rawUsd;
-                    income[cat] = (income[cat] ?? Decimal.zero) + amt;
+                    final cat = e.category.isEmpty ? 'Other' : e.category;
+                    final ccy = e.currency.isEmpty ? 'USD' : e.currency;
+                    final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
+                    income.putIfAbsent(cat, () => {})[ccy] =
+                        (income[cat]![ccy] ?? Decimal.zero) + amt;
                   }
                   if (income.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  final sorted = income.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
-                  final total  = sorted.fold(Decimal.zero, (s, e) => s + e.value);
+                  final rows = <({String cat, Decimal amt, String ccy})>[];
+                  for (final catEntry in income.entries) {
+                    for (final ccyEntry in catEntry.value.entries) {
+                      rows.add((cat: catEntry.key, amt: ccyEntry.value, ccy: ccyEntry.key));
+                    }
+                  }
+                  rows.sort((a, b) => b.amt.compareTo(a.amt));
+                  final totals = <String, Decimal>{};
+                  for (final r in rows) {
+                    totals[r.ccy] = (totals[r.ccy] ?? Decimal.zero) + r.amt;
+                  }
                   return SliverList(
                     delegate: SliverChildBuilderDelegate(
                       (ctx, i) => _CategoryRow(
-                        category: sorted[i].key,
-                        amount: sorted[i].value,
-                        total: total,
+                        category: rows[i].cat,
+                        amount: rows[i].amt,
+                        total: totals[rows[i].ccy] ?? rows[i].amt,
+                        currency: rows[i].ccy,
                         accentColor: _teal,
                         onTap: () {
                           HapticUtils.selection();
-                          setState(() { _catFilter = sorted[i].key; _filter = _WalletFilter.income; });
+                          setState(() { _catFilter = rows[i].cat; _filter = _WalletFilter.income; });
                         },
                       ),
-                      childCount: sorted.length,
+                      childCount: rows.length,
                     ),
                   );
                 },
@@ -1018,6 +1064,7 @@ class _CategoryRow extends StatelessWidget {
     required this.category,
     required this.amount,
     required this.total,
+    required this.currency,
     this.onTap,
     this.accentColor = _purple,
   });
@@ -1025,6 +1072,7 @@ class _CategoryRow extends StatelessWidget {
   final String       category;
   final Decimal      amount;
   final Decimal      total;
+  final String       currency;
   final VoidCallback? onTap;
   final Color        accentColor;
 
@@ -1088,7 +1136,7 @@ class _CategoryRow extends StatelessWidget {
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text('USD ${amount.toStringAsFixed(2)}',
+                Text('$currency ${amount.toStringAsFixed(2)}',
                     style: TextStyle(
                         fontWeight: FontWeight.w700, fontSize: 13, color: accentColor)),
                 Text('${pct.toStringAsFixed(1)}%',

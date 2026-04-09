@@ -395,14 +395,19 @@ class _MobileLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(localeProvider.notifier).state = context.locale;
-    });
-    final voiceSheetOpen = ref.watch(_voiceSheetOpenProvider);
-    final showFab = currentPath == '/' ||
+    // Sync locale into provider immediately so consumers like _aiInsightProvider
+    // read the correct languageCode — deferred callback was too late on cold start.
+    final currentLocale = context.locale;
+    if (ref.read(localeProvider) != currentLocale) {
+      Future.microtask(() =>
+          ref.read(localeProvider.notifier).state = currentLocale);
+    }
+    final voiceSheetOpen  = ref.watch(_voiceSheetOpenProvider);
+    final screenEditMode   = ref.watch(screenEditModeProvider);
+    final showFab = (currentPath == '/' ||
         currentPath == '/wallet' ||
         currentPath == '/activity' ||
-        currentPath == '/groups';
+        currentPath == '/groups') && !screenEditMode;
 
     return Scaffold(
       body: SafeArea(

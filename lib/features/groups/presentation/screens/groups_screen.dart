@@ -254,10 +254,12 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
 
   void _toggleEditMode() {
     HapticUtils.selection();
+    final next = !_editMode;
     setState(() {
-      _editMode = !_editMode;
+      _editMode = next;
       _selected.clear();
     });
+    ref.read(screenEditModeProvider.notifier).state = next;
   }
 
   void _toggleItem(String id) {
@@ -434,6 +436,7 @@ class _GroupsScreenState extends ConsumerState<GroupsScreen> {
       _editMode = false;
       _selected.clear();
     });
+    ref.read(screenEditModeProvider.notifier).state = false;
     if (!ok) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('groups_screen.error_delete'.tr())),

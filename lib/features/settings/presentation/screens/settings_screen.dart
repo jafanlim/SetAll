@@ -644,8 +644,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 _NavRow(
                   icon: Icons.shield_outlined,
                   iconColor: _teal,
-                  label: 'Data & Privacy',
-                  subtitle: 'View usage and export your data',
+                  label: 'settings_ext.data_privacy'.tr(),
+                  subtitle: 'settings_ext.data_privacy_subtitle'.tr(),
                   onTap: () => context.push(AppRouter.settingsDataUsage),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
@@ -862,9 +862,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                                 subtitle: Text(
                                   _updateResult != null
                                       ? (_updateResult!.hasUpdate
-                                          ? 'Tap "Update Now" to get ${_updateResult!.latestTag}'
-                                          : 'You\'re up to date ✓')
-                                      : 'Tap to check for a new version',
+                                          ? 'settings_ext.update_tap_hint'.tr(namedArgs: {'tag': _updateResult!.latestTag})
+                                          : 'settings_ext.up_to_date'.tr())
+                                      : 'settings_ext.check_updates_subtitle'.tr(),
                                   style: TextStyle(fontSize: 12, color: theme.colorScheme.onSurfaceVariant),
                                 ),
                                 onTap: _checkingUpdate ? null : () async {

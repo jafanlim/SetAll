@@ -55,7 +55,7 @@ Each element in "actions" must have a "type" field. Supported types:
 
 3. add_member:
    { "type": "add_member", "memberNameHint": "<person name as user said it>",
-     "groupNameHint": "<group name or null>" }
+     "groupNameHint": "<group name — REQUIRED if user mentions a group, even an existing one. null only if it is completely unclear which group>" }
 
 Rules:
 - Return ONLY the actions the user actually requested. Most transcripts = 1 action.
@@ -84,7 +84,10 @@ Example — single expense:
 {"actions":[{"type":"add_expense","amount":50,"currency":"GEL","isIncome":false,"description":"Coffee Shop","category":"Food & drink","groupNameHint":null,"splitMode":"even","needsClarification":null}]}
 
 Example — create group + add member + add expense:
-{"actions":[{"type":"create_group","name":"Barcelona"},{"type":"add_member","memberNameHint":"Alex","groupNameHint":"Barcelona"},{"type":"add_expense","amount":120,"currency":"EUR","isIncome":false,"description":"Hotel","category":"Travel","groupNameHint":"Barcelona","splitMode":"even","needsClarification":null}]}`;
+{"actions":[{"type":"create_group","name":"Barcelona"},{"type":"add_member","memberNameHint":"Alex","groupNameHint":"Barcelona"},{"type":"add_expense","amount":120,"currency":"EUR","isIncome":false,"description":"Hotel","category":"Travel","groupNameHint":"Barcelona","splitMode":"even","needsClarification":null}]}
+
+Example — add member to EXISTING group (no create_group needed):
+{"actions":[{"type":"add_member","memberNameHint":"Maria","groupNameHint":"Barcelona"}]}`;
 
     const userMessage = `${transcript}\n\nContext: defaultCurrency=${defaultCurrency} (IMPORTANT: use ${defaultCurrency} if no currency mentioned), groups=${JSON.stringify(groups)}, categories=${knownCategories.join(',')}`;
 
@@ -100,7 +103,7 @@ Example — create group + add member + add expense:
           { role: 'system', content: systemPrompt },
           { role: 'user',   content: userMessage },
         ],
-        max_tokens: 512,
+        max_tokens: 1024,
         temperature: 0.1,
       }),
     });

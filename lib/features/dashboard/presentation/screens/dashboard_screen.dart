@@ -103,7 +103,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyAiUrl),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency}),
+      body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency, 'language': ref.read(localeProvider).languageCode}),
     );
 
     if (response.statusCode == 429) {
@@ -112,7 +112,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       final retry = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency}),
+        body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency, 'language': ref.read(localeProvider).languageCode}),
       );
       if (retry.statusCode != 200) return '';
       final retryData = jsonDecode(retry.body) as Map<String, dynamic>?;
@@ -151,6 +151,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   void initState() {
     super.initState();
+    // Listen to locale changes and invalidate AI provider so it re-fetches
+    // in the new language without showing stale English text.
+    ref.listenManual(localeProvider, (previous, next) {
+      if (previous != next) ref.invalidate(_aiInsightProvider);
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(syncServiceProvider).performFullSync().then((_) {
         if (mounted) {
@@ -632,8 +637,8 @@ class _AiInsightCardState extends ConsumerState<_AiInsightCard>
                               HapticUtils.lightTap(); // FEAT-06: entry point to InsightsPanel
                               context.push(AppRouter.insights);
                             },
-                            child: const Text(
-                              'Full analysis →',
+                            child: Text(
+                              'dashboard.ai_full_analysis'.tr(),
                               style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,

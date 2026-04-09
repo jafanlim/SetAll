@@ -152,14 +152,17 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       final historyStr = history
           .map((m) => '${m['role']}: ${m['content']}')
           .join('\n');
-      final query = 'User: ${userText.trim()}'
+      final isCasualChat = mode == 'chat' && userText.trim().length <= 20;
+      final financialContext = isCasualChat ? '' :
           '\n\nFinancial data (last 30 days):'
           '\nTotal Expenses: \$${analyticsData.totalSpend.toStringAsFixed(2)}'
           '\nDaily Burn: \$${analyticsData.burnRate.toStringAsFixed(2)}'
           '\nTotal Income: \$${analyticsData.totalIncome.toStringAsFixed(2)}'
           '\nNet: \$${analyticsData.netFlow.toStringAsFixed(2)}'
           '\nTop Categories: $topCatsStr'
-          '\n\nRecent 20 transactions:\n$recentRows'
+          '\n\nRecent 20 transactions:\n$recentRows';
+      final query = 'User: ${userText.trim()}'
+          '$financialContext'
           '${historyStr.isNotEmpty ? '\n\nRecent chat:\n$historyStr' : ''}';
 
       final baseCurrency = await ref.read(baseCurrencyProvider.future);

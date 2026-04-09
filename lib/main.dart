@@ -12,8 +12,11 @@ import 'package:window_manager/window_manager.dart' if (dart.library.html) 'core
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 
+import 'package:shared_preferences/shared_preferences.dart';
+
 import 'app.dart';
 import 'firebase_options.dart';
+import 'core/providers/setall_providers.dart';
 import 'core/services/currency_sync_service.dart';
 import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
@@ -81,6 +84,13 @@ void main() {
     await EasyLocalization.ensureInitialized();
     await initializeDateFormatting();
 
+    // Seed localeProvider before runApp so providers that run on cold start
+    // (e.g. _aiInsightProvider) read the correct saved language, not the
+    // default Locale('en').
+    final prefs = await SharedPreferences.getInstance();
+    final savedLangCode = prefs.getString('locale') ?? 'en';
+    final seedLocale = Locale(savedLangCode);
+
     runApp(
       EasyLocalization(
         supportedLocales: const [
@@ -93,8 +103,11 @@ void main() {
         ],
         path: 'assets/translations',
         fallbackLocale: const Locale('en'),
-        child: const ProviderScope(
-          child: _AppLoader(),
+        child: ProviderScope(
+          overrides: [
+            localeProvider.overrideWith((ref) => seedLocale),
+          ],
+          child: const _AppLoader(),
         ),
       ),
     );

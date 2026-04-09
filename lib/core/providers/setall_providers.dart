@@ -396,3 +396,7 @@ final aiInsightsProvider = FutureProvider<List<AiInsightModel>>((ref) async {
 /// Tracks the active app locale so providers without BuildContext can read languageCode.
 /// Updated by adaptive_shell on every build.
 final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));
+
+/// True while a screen (wallet / groups) is in edit mode.
+/// Shell reads this to hide the voice FAB, matching the screen's own FAB hide logic.
+final screenEditModeProvider = StateProvider<bool>((ref) => false);

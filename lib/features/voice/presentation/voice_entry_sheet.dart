@@ -76,9 +76,10 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
   late final AnimationController _pulseCtrl;
   late final Animation<double>   _pulseAnim;
 
-  final TextEditingController _clarifyCtrl = TextEditingController();
-  final TextEditingController _amountCtrl  = TextEditingController();
-  final TextEditingController _descCtrl    = TextEditingController();
+  final TextEditingController _clarifyCtrl      = TextEditingController();
+  final TextEditingController _amountCtrl       = TextEditingController();
+  final TextEditingController _descCtrl         = TextEditingController();
+  final TextEditingController _memberSearchCtrl = TextEditingController();
 
   @override
   void initState() {
@@ -100,6 +101,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
     _clarifyCtrl.dispose();
     _amountCtrl.dispose();
     _descCtrl.dispose();
+    _memberSearchCtrl.dispose();
     VoiceEntryService.instance.cancel();
     super.dispose();
   }
@@ -174,11 +176,22 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           .toList();
 
       final langCode = EasyLocalization.of(context)?.locale.languageCode ?? 'en';
+      final translatedCategories = [
+        'categories.food_drink'.tr(),
+        'categories.transport'.tr(),
+        'categories.travel'.tr(),
+        'categories.entertainment'.tr(),
+        'categories.bills_utilities'.tr(),
+        'categories.shopping'.tr(),
+        'categories.general'.tr(),
+        'categories.other'.tr(),
+      ];
       final response = await VoiceEntryService.instance.parse(
         transcript,
         groupMaps,
         widget.defaultCurrency,
         language: langCode,
+        knownCategories: translatedCategories,
       );
 
       if (!mounted) return;
@@ -218,7 +231,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       if (mounted) {
         setState(() {
           _state    = VoiceEntryState.error;
-          _errorMsg = 'Could not parse entry. Please try again.';
+          _errorMsg = 'voice_entry.error_title'.tr();
         });
       }
     }
@@ -268,7 +281,7 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
       if (mounted) {
         setState(() {
           _state    = VoiceEntryState.error;
-          _errorMsg = 'Failed to save. Please try again.';
+          _errorMsg = 'voice_entry.error_title'.tr();
         });
       }
     }
@@ -917,8 +930,16 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'voice_entry.add_member_confirm'.tr(namedArgs: {'name': found?.name ?? action.memberNameHint}),
-              style: const TextStyle(fontSize: 16, color: Colors.white, height: 1.4),
+              found != null
+                  ? 'voice_entry.add_member_confirm'.tr(namedArgs: {'name': found.name})
+                  : _memberSearching
+                      ? 'voice_entry.add_member_confirm'.tr(namedArgs: {'name': action.memberNameHint})
+                      : 'voice_entry.member_not_found'.tr(namedArgs: {'query': action.memberNameHint}),
+              style: TextStyle(
+                fontSize: 16,
+                color: (!_memberSearching && found == null) ? Colors.redAccent : Colors.white,
+                height: 1.4,
+              ),
             ),
           ),
           if (_memberSearching)
@@ -928,11 +949,59 @@ class _VoiceEntrySheetState extends ConsumerState<VoiceEntrySheet>
             ),
         ]),
         if (!_memberSearching && found == null) ...[
-          const SizedBox(height: 12),
-          Text(
-            'voice_entry.member_not_found'.tr(namedArgs: {'query': action.memberNameHint}),
-            style: const TextStyle(fontSize: 13, color: Colors.redAccent),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _memberSearchCtrl,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'voice_entry.member_search_hint'.tr(),
+                    hintStyle: const TextStyle(color: Colors.white38),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
+                      borderSide: const BorderSide(color: _teal),
+                    ),
+                  ),
+                  onSubmitted: (_) {
+                    final q = _memberSearchCtrl.text.trim();
+                    if (q.isNotEmpty) _searchMemberForStep(q);
+                  },
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                onPressed: () {
+                  final q = _memberSearchCtrl.text.trim();
+                  if (q.isNotEmpty) _searchMemberForStep(q);
+                },
+                icon: const Icon(Icons.search_rounded, color: _teal),
+                style: IconButton.styleFrom(backgroundColor: _teal.withValues(alpha: 0.15)),
+              ),
+            ],
           ),
+          if (_memberSearchResults.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...(_memberSearchResults.take(3).map((p) => ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.person_rounded, color: _teal, size: 20),
+              title: Text(p.name, style: const TextStyle(color: Colors.white, fontSize: 14)),
+              trailing: const Icon(Icons.check_circle_outline_rounded, color: _teal, size: 18),
+              onTap: () => setState(() {
+                _memberSearchResults = [p];
+                _memberSearchCtrl.clear();
+              }),
+            ))),
+          ],
         ],
       ],
     );

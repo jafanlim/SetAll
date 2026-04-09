@@ -10,6 +10,12 @@
     <script src="https://unpkg.com/lucide@0.460.0"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="/i18n.js"></script>
+    <style>
+        #lang-switcher { display:flex; gap:0.25rem; }
+        #lang-switcher button { background:none; border:1px solid rgba(255,255,255,0.15); color:#94a3b8; font-size:0.7rem; font-weight:600; padding:0.2rem 0.4rem; border-radius:4px; cursor:pointer; transition:color .15s,border-color .15s; }
+        #lang-switcher button:hover, #lang-switcher button.lang-active { color:#14B8A6; border-color:#14B8A6; }
+    </style>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -75,13 +81,16 @@
                             <div class="absolute top-0 right-0 w-2.5 h-2.5 bg-orange-500 rounded-full border-2 border-[#0F172A]"></div>
                         </div>
                         <div>
-                            <h2 class="font-bold text-white text-lg tracking-tight">Neural Engine</h2>
+                            <h2 class="font-bold text-white text-lg tracking-tight" id="neural-engine-title">Neural Engine</h2>
                             <p id="ai-mode-label" class="text-[10px] uppercase tracking-widest text-brand-teal font-bold">Advisor &middot; Online</p>
                         </div>
                     </div>
-                    <a href="/portal" class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg border border-slate-700 hover:border-slate-500">
-                        <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Portal
-                    </a>
+                    <div class="flex items-center gap-2">
+                        <div id="lang-switcher"></div>
+                        <a href="/portal" id="portal-back-link" class="flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white transition-colors px-3 py-2 rounded-lg border border-slate-700 hover:border-slate-500">
+                            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Portal
+                        </a>
+                    </div>
                 </div>
 
                 <div class="flex-1 overflow-y-auto p-5 space-y-5" id="chat-history">
@@ -95,7 +104,7 @@
                             <input type="file" id="file-upload" class="hidden" accept=".csv,.xls,.xlsx,.pdf" />
                         </label>
                         <div class="relative flex-1">
-                            <input type="text" id="chat-input" placeholder="Ask anything — or say 'analyze my spending'…" autocomplete="off"
+                            <input type="text" id="chat-input" placeholder="Ask anything — or say 'analyze my spending'…" autocomplete="off" data-i18n-placeholder="ins_chat_placeholder"
                                 class="w-full bg-[#0F172A] border border-slate-700 rounded-2xl py-4 pl-5 pr-14 text-sm focus:outline-none focus:border-brand-teal text-white shadow-inner transition-all placeholder:text-slate-500" />
                             <button type="submit" id="chat-submit"
                                 class="absolute right-2 top-1/2 -translate-y-1/2 p-2.5 bg-brand-teal rounded-xl text-[#0F172A] hover:bg-teal-400 disabled:opacity-50 transition-all">
@@ -109,6 +118,9 @@
     </div>
 
     <script>
+        // ── i18n helper ──────────────────────────────────────────────────────
+        function t(key) { return (window._setAllDict || {})[key] || key; }
+
         // ── Global State (window scope) ────────────────────────────────────
         const SUPABASE_URL  = 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
         const SUPABASE_ANON = 'REDACTED_JWT';
@@ -119,6 +131,7 @@
         window.userCurrency    = localStorage.getItem('setall_currency') || 'USD';
         window.exchangeRate    = 1;
         window.fetchInProgress = false;
+        window.siteLang        = (window._setAllDict && localStorage.getItem('setall_lang')) || 'en';
 
         // Bust stale AI response cache on model upgrade (v3 = 2.5-flash-lite + 2.5-flash)
         const AI_CACHE_VER = 'sai_v3';
@@ -259,13 +272,13 @@
                         window.userCurrency = expCurrency;
                         try { localStorage.setItem('setall_currency', window.userCurrency); } catch (_) {}
                     }
-                    chatMessages[0].text = `Welcome back! I've loaded your last 90 days of personal expenses from your SetAll ledger. Your canvas is live. Click any chart element or ask me anything.`;
+                    chatMessages[0].text = t('ins_welcome_data');
                 } else {
-                    chatMessages[0].text = `Welcome! I couldn't find any personal wallet expenses in the last 90 days. Add some expenses in the SetAll app and come back — the canvas will populate automatically.`;
+                    chatMessages[0].text = t('ins_welcome_empty');
                 }
             } catch (err) {
                 console.warn('Supabase fetch failed, using demo data:', err);
-                chatMessages[0].text = `Canvas is running on demo data (couldn't connect to your ledger). Try signing out and back in if this persists.`;
+                chatMessages[0].text = t('ins_demo_data');
                 // DO NOT retry — log and stop
             } finally {
                 window.fetchInProgress = false;
@@ -287,15 +300,21 @@
 
         let isEditMode = false;
 
+        const DEFAULT_WIDGET_TITLES = {
+            'w1': () => t('ins_stat_spending'),
+            'w2': () => t('ins_stat_burn'),
+            'w3': () => t('ins_stat_timeline') || 'Spending Timeline',
+            'w4': () => t('ins_stat_cat_split') || 'Category Split',
+        };
         let widgets = [
-            { id: 'w1', type: 'stat',  title: 'Total Spending', metric: 'exp',  width: 'normal' },
-            { id: 'w2', type: 'stat',  title: 'Daily Burn',     metric: 'burn', width: 'normal' },
-            { id: 'w3', type: 'trend', title: 'Spending Timeline', width: 'wide'   },
-            { id: 'w4', type: 'donut', title: 'Category Split',    width: 'normal' },
+            { id: 'w1', type: 'stat',  titleKey: 'ins_stat_spending', metric: 'exp',  width: 'normal' },
+            { id: 'w2', type: 'stat',  titleKey: 'ins_stat_burn',     metric: 'burn', width: 'normal' },
+            { id: 'w3', type: 'trend', titleKey: 'ins_stat_timeline',  width: 'wide'   },
+            { id: 'w4', type: 'donut', titleKey: 'ins_stat_cat_split', width: 'normal' },
         ];
 
         let chatMessages = [
-            { role: 'ai', text: 'Loading your ledger data…' }
+            { role: 'ai', text: t('ins_loading_ledger') }
         ];
         let isThinking = false;
         const aiChartRegistry  = {};
@@ -322,10 +341,10 @@
             const el = document.getElementById('ai-mode-label');
             if (!el) return;
             if (mode === 'canvas') {
-                el.textContent = 'Analyst \u00b7 Generating';
+                el.textContent = t('ins_analyst_gen');
                 el.className = 'text-[10px] uppercase tracking-widest font-bold text-purple-400';
             } else {
-                el.textContent = 'Advisor \u00b7 Online';
+                el.textContent = t('ins_advisor_online');
                 el.className = 'text-[10px] uppercase tracking-widest font-bold text-brand-teal';
             }
         }
@@ -429,10 +448,11 @@
             renderWidgets();
         };
 
+        const METRIC_TITLE_KEYS = { net: 'ins_stat_net', burn: 'ins_stat_burn', income: 'ins_stat_income', exp: 'ins_stat_spending' };
         window.changeWidgetMetric = (index, metric) => {
-            const titles = { net: 'Net Worth', burn: 'Daily Burn', income: 'Total Income', exp: 'Total Spending' };
-            widgets[index].metric = metric;
-            widgets[index].title  = titles[metric] || 'Statistic';
+            widgets[index].metric   = metric;
+            widgets[index].titleKey = METRIC_TITLE_KEYS[metric] || 'ins_stat_statistic';
+            delete widgets[index].title;
             renderWidgets();
         };
 
@@ -451,7 +471,11 @@
             const fmtVal = zeroDec.includes(cur)
                 ? Math.round(localVal).toLocaleString('en-US') + ' ' + cur
                 : localVal.toFixed(2) + ' ' + cur;
-            triggerAiResponse(`I clicked on the ${name} slice — ${fmtVal}, ${pct.toFixed(1)}% of my spending. What does this tell you?`);
+            const sliceMsg = t('ins_click_slice')
+                .replace('{name}', name)
+                .replace('{val}', fmtVal)
+                .replace('{pct}', pct.toFixed(1));
+            triggerAiResponse(sliceMsg);
         };
 
         window.handleBarClick = (type, value, label) => {
@@ -462,7 +486,11 @@
             const fmtVal = zeroDec.includes(cur)
                 ? Math.round(localVal).toLocaleString('en-US') + ' ' + cur
                 : localVal.toFixed(2) + ' ' + cur;
-            triggerAiResponse(`What can you tell me about my ${type.toLowerCase()} of ${fmtVal} on ${label}?`);
+            const barMsg = t('ins_click_bar')
+                .replace('{type}', type.toLowerCase())
+                .replace('{val}', fmtVal)
+                .replace('{label}', label);
+            triggerAiResponse(barMsg);
         };
 
         // ── AI Engine ────────────────────────────────────────────────────────
@@ -486,8 +514,10 @@
             const mode = detectMode(userText);
             setModeLabel(mode);
 
+            const lang = localStorage.getItem('setall_lang') || 'en';
+
             // Cache only chat responses (canvas always fresh)
-            const cacheKey = simpleHash(userText + '|' + mode + '|' + topCats);
+            const cacheKey = simpleHash(userText + '|' + mode + '|' + topCats + '|' + lang);
             if (mode === 'chat') {
                 try {
                     const cached = localStorage.getItem(cacheKey);
@@ -500,12 +530,12 @@
                 .slice(-6)
                 .map(m => m.role + ': ' + m.text.replace(/<[^>]+>/g, '').slice(0, 120))
                 .join('\n');
-
             const res = await fetch('/.netlify/functions/ai-analyst', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     mode,
+                    language: lang,
                     query: `User: ${userText}\n\nFinancial data (${cur}, last 90 days):\nTotal Expenses: ${fmtLocal(s.exp)}\nDaily Burn: ${fmtLocal(parseFloat(s.burn))}\nTotal Income: ${fmtLocal(s.income)}\nNet: ${fmtLocal(s.net)}\nTop Categories: ${topCats}\n\nRecent 20 transactions:\n${recentRows}\n\nRecent chat:\n${history}`
                 })
             });
@@ -708,6 +738,25 @@
             }
         }
 
+        // Re-render dynamic content when i18n language changes
+        window.onSetAllLangChange = function() {
+            if (window.currentUser) {
+                // Reset chat to a fresh welcome in the new language so old-language
+                // messages don't mix with new-language widget labels.
+                chatMessages = [{ role: 'ai', text: t('ins_welcome_data') }];
+                isThinking = false;
+                renderHeader();
+                renderWidgets();
+                renderChat();
+                setModeLabel('chat');
+                const portalLink = document.getElementById('portal-back-link');
+                if (portalLink) portalLink.childNodes[portalLink.childNodes.length - 1].textContent = ' ' + t('ins_portal_back');
+                const neuralTitle = document.getElementById('neural-engine-title');
+                if (neuralTitle) neuralTitle.textContent = t('ins_neural_engine');
+                lucide.createIcons();
+            }
+        };
+
         document.getElementById('chat-form').addEventListener('submit', e => {
             e.preventDefault();
             const input = document.getElementById('chat-input');
@@ -815,7 +864,7 @@
                     </div>
                     <div>
                         <h1 class="text-3xl font-black text-white tracking-tight">SetAll <span class="text-brand-teal">Canvas</span></h1>
-                        <p class="text-slate-400 text-sm font-medium mt-0.5">${name} · Live from your ledger</p>
+                        <p class="text-slate-400 text-sm font-medium mt-0.5">${name} · ${t('ins_live_from')}</p>
                     </div>
                 </div>
                 <button onclick="window.toggleEditMode()"
@@ -823,7 +872,7 @@
                         ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
                         : 'bg-[#0F172A] border border-slate-700 text-slate-300 hover:bg-slate-800'}">
                     <i data-lucide="${isEditMode ? 'check' : 'layout-dashboard'}" class="w-[18px] h-[18px]"></i>
-                    ${isEditMode ? 'Save Layout' : 'Edit Canvas'}
+                    ${isEditMode ? t('ins_save_layout') : t('ins_edit_canvas')}
                 </button>
             `;
             lucide.createIcons();
@@ -896,7 +945,7 @@
                         <div class="flex flex-col justify-center h-full pt-2">
                             <i data-lucide="${iconName}" class="${colorCls} w-7 h-7"></i>
                             <p class="text-4xl font-extrabold mt-4 tracking-tight">${val}</p>
-                            <p class="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">last 90 days</p>
+                            <p class="text-xs text-slate-500 mt-1 font-medium uppercase tracking-wider">${t('ins_last_90')}</p>
                         </div>`;
                 } else if (w.type === 'donut') {
                     const cur = window.userCurrency || 'USD';
@@ -908,14 +957,17 @@
                             : lv.toFixed(2) + ' ' + cur;
                     };
                     const totalExp = stats.exp || 1;
+                    const DONUT_R = 38; const DONUT_CIRC = 2 * Math.PI * DONUT_R; // ~238.76
                     let offset = 0;
                     const circles = stats.cats.map((c, i) => {
                         const pct = (c.value / totalExp) * 100;
-                        const off = -offset;
+                        const dash = (pct / 100) * DONUT_CIRC;
+                        const gap  = DONUT_CIRC - dash;
+                        const off  = -(offset / 100) * DONUT_CIRC;
                         offset += pct;
-                        return `<circle cx="50" cy="50" r="15.9" fill="transparent"
+                        return `<circle cx="50" cy="50" r="${DONUT_R}" fill="transparent"
                             stroke="${CATEGORY_COLORS[i % CATEGORY_COLORS.length]}"
-                            stroke-width="6" stroke-dasharray="${pct} 100" stroke-dashoffset="${off}"
+                            stroke-width="9" stroke-dasharray="${dash.toFixed(2)} ${gap.toFixed(2)}" stroke-dashoffset="${off.toFixed(2)}"
                             class="donut-segment"
                             onclick="window.handleSliceClick('${c.name.replace(/'/g, '\\&#39;')}', ${c.value}, ${pct})"></circle>`;
                     }).join('');
@@ -930,26 +982,26 @@
                         </div>`).join('');
 
                     const emptyMsg = stats.cats.length === 0
-                        ? `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="inbox" class="w-8 h-8 mb-3 opacity-40"></i>No expense data yet</div>`
+                        ? `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="inbox" class="w-8 h-8 mb-3 opacity-40"></i>${t('ins_no_expense')}</div>`
                         : '';
 
                     content = emptyMsg || `
                         <div class="flex flex-col h-full justify-between">
-                            <div class="relative w-full h-56 mx-auto flex items-center justify-center my-2">
-                                <svg viewBox="0 0 100 100" class="w-full h-full max-w-[220px] transform -rotate-90 drop-shadow-2xl">
-                                    <circle cx="50" cy="50" r="15.9" fill="transparent" stroke="#1E293B" stroke-width="6"/>
+                            <div class="relative w-full mx-auto flex items-center justify-center" style="height:200px;">
+                                <svg viewBox="0 0 100 100" style="width:200px;height:200px;" class="transform -rotate-90 drop-shadow-2xl flex-shrink-0">
+                                    <circle cx="50" cy="50" r="${DONUT_R}" fill="transparent" stroke="#1E293B" stroke-width="9"/>
                                     ${circles}
                                 </svg>
                                 <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                    <span class="text-[11px] text-slate-500 uppercase font-bold tracking-widest">Spent</span>
-                                    <span class="text-3xl font-extrabold text-white mt-1">$${stats.exp >= 1000 ? (stats.exp/1000).toFixed(1)+'k' : stats.exp.toFixed(0)}</span>
+                                    <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">${t('ins_spent')}</span>
+                                    <span class="text-2xl font-extrabold text-white mt-0.5">${cur}${stats.exp >= 1000 ? (stats.exp * (window.exchangeRate||1) / 1000).toFixed(1)+'k' : (stats.exp * (window.exchangeRate||1)).toFixed(0)}</span>
                                 </div>
                             </div>
                             <div class="space-y-2.5 mt-2">${legend}</div>
                         </div>`;
                 } else if (w.type === 'trend') {
                     if (stats.trend.length === 0) {
-                        content = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="bar-chart-2" class="w-8 h-8 mb-3 opacity-40"></i>No timeline data yet</div>`;
+                        content = `<div class="flex flex-col items-center justify-center h-64 text-slate-500 text-sm"><i data-lucide="bar-chart-2" class="w-8 h-8 mb-3 opacity-40"></i>${t('ins_no_timeline')}</div>`;
                     } else {
                         const max = Math.max(...stats.trend.map(d => Math.max(d.income, d.expense)), 1) * 1.1;
                         const bars = stats.trend.map(d => `
@@ -973,27 +1025,27 @@
                 if (isEditMode) {
                     overlay = `
                         <div class="absolute inset-0 bg-[#0F172A]/90 backdrop-blur-md z-30 rounded-[32px] flex flex-col items-center justify-center gap-4 border-2 border-orange-500/50">
-                            <div class="text-orange-400 font-bold text-xs uppercase tracking-widest mb-2">Edit Widget</div>
+                            <div class="text-orange-400 font-bold text-xs uppercase tracking-widest mb-2">${t('ins_edit_widget')}</div>
                             <div class="flex gap-2 items-center">
                                 <div class="p-3 bg-slate-700/60 rounded-xl text-slate-400 cursor-grab" title="Drag to reorder"><i data-lucide="grip-vertical" class="w-4 h-4"></i></div>
                                 <button onclick="window.resizeWidget(${index})" class="p-3 bg-slate-800 rounded-xl hover:bg-brand-teal hover:text-[#0F172A] text-white transition-colors" title="Resize"><i data-lucide="maximize-2" class="w-4 h-4"></i></button>
                             </div>
                             <div class="flex gap-2">
                                 <select onchange="window.changeWidgetType(${index},this.value)" class="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer">
-                                    <option value="stat"  ${w.type==='stat'  ? 'selected':''}>Statistic</option>
-                                    <option value="donut" ${w.type==='donut' ? 'selected':''}>Donut</option>
-                                    <option value="trend" ${w.type==='trend' ? 'selected':''}>Trend</option>
+                                    <option value="stat"  ${w.type==='stat'  ? 'selected':''}>${t('ins_type_stat')}</option>
+                                    <option value="donut" ${w.type==='donut' ? 'selected':''}>${t('ins_type_donut')}</option>
+                                    <option value="trend" ${w.type==='trend' ? 'selected':''}>${t('ins_type_trend')}</option>
                                 </select>
                                 ${w.type === 'stat' ? `
                                 <select onchange="window.changeWidgetMetric(${index},this.value)" class="bg-slate-800 text-white text-sm p-3 rounded-xl outline-none border border-slate-700 cursor-pointer">
-                                    <option value="exp"    ${w.metric==='exp'    ? 'selected':''}>Total Spending</option>
-                                    <option value="burn"   ${w.metric==='burn'   ? 'selected':''}>Daily Burn</option>
-                                    <option value="net"    ${w.metric==='net'    ? 'selected':''}>Net Worth</option>
-                                    <option value="income" ${w.metric==='income' ? 'selected':''}>Total Income</option>
+                                    <option value="exp"    ${w.metric==='exp'    ? 'selected':''}>${t('ins_stat_spending')}</option>
+                                    <option value="burn"   ${w.metric==='burn'   ? 'selected':''}>${t('ins_stat_burn')}</option>
+                                    <option value="net"    ${w.metric==='net'    ? 'selected':''}>${t('ins_stat_net')}</option>
+                                    <option value="income" ${w.metric==='income' ? 'selected':''}>${t('ins_stat_income')}</option>
                                 </select>` : ''}
                             </div>
                             <button onclick="window.removeWidget('${w.id}')" class="mt-2 p-2 px-4 bg-red-500/20 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-colors flex items-center gap-2 text-sm font-bold">
-                                <i data-lucide="trash-2" class="w-4 h-4"></i> Remove Widget
+                                <i data-lucide="trash-2" class="w-4 h-4"></i> ${t('ins_remove_widget')}
                             </button>
                         </div>`;
                 }
@@ -1004,7 +1056,7 @@
                         ${overlay}
                         ${isEditMode ? `<button onclick="window.removeWidget('${w.id}')" class="absolute -top-3 -right-3 p-2.5 bg-red-500 hover:bg-red-400 transition-colors text-white rounded-full z-40 shadow-lg"><i data-lucide="x" class="w-4 h-4"></i></button>` : ''}
                         <div class="flex items-center justify-between mb-4 relative z-10">
-                            <h3 class="text-brand-teal text-xs font-black uppercase tracking-widest">${w.title}</h3>
+                            <h3 class="text-brand-teal text-xs font-black uppercase tracking-widest">${w.titleKey ? t(w.titleKey) : w.title}</h3>
                             <i data-lucide="${w.type==='trend' ? 'bar-chart-2' : w.type==='donut' ? 'pie-chart' : 'zap'}" class="w-4 h-4 text-slate-600"></i>
                         </div>
                         <div class="flex-1 relative z-10">${content}</div>
@@ -1015,7 +1067,7 @@
                 html += `
                     <div onclick="window.addWidget()" class="xl:col-span-4 md:col-span-1 bg-[#1E293B]/30 border-2 border-dashed border-slate-700 rounded-[32px] p-8 flex flex-col items-center justify-center cursor-pointer hover:border-brand-teal hover:bg-[#1E293B]/60 transition-all min-h-[300px]">
                         <div class="p-4 bg-slate-800 rounded-full mb-4 text-brand-teal"><i data-lucide="plus" class="w-6 h-6"></i></div>
-                        <span class="text-white font-bold">Add Widget</span>
+                        <span class="text-white font-bold">${t('ins_add_widget')}</span>
                     </div>`;
             }
 
