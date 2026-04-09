@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:intl/intl.dart';
+import 'package:easy_localization/easy_localization.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -461,7 +461,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Imported $count expense${count == 1 ? '' : 's'}'),
+          content: Text('settings_ext.csv_imported_ok'.tr(namedArgs: {'count': count.toString()})),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
       );
@@ -492,8 +492,8 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Import CSV',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+        title: Text('settings_ext.csv_title'.tr(),
+            style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
         scrolledUnderElevation: 0.5,
@@ -535,24 +535,24 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       children: [
         _InfoBanner(
           icon: Icons.info_outline_rounded,
-          body: 'Export your Splitwise data: Account → Export to CSV. Choose where to import below.',
+          body: 'settings_ext.csv_info_splitwise'.tr(),
         ),
         const SizedBox(height: 24),
-        Text('Import to',
+        Text('settings_ext.csv_import_to'.tr(),
             style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700, color: _slate)),
         const SizedBox(height: 10),
         _DestinationTile(
           icon: Icons.account_balance_wallet_outlined,
-          title: 'Personal Wallet',
-          subtitle: 'All expenses go to your wallet',
+          title: 'settings_ext.csv_dest_wallet'.tr(),
+          subtitle: 'settings_ext.csv_dest_wallet_sub'.tr(),
           selected: _destination == _Destination.wallet,
           onTap: () => setState(() { _destination = _Destination.wallet; _selectedGroup = null; }),
         ),
         const SizedBox(height: 10),
         _DestinationTile(
           icon: Icons.group_outlined,
-          title: 'Shared Group',
-          subtitle: 'Map CSV names to group members and split expenses',
+          title: 'settings_ext.csv_dest_group'.tr(),
+          subtitle: 'settings_ext.csv_dest_group_sub'.tr(),
           selected: _destination == _Destination.group,
           onTap: () => setState(() { _destination = _Destination.group; }),
         ),
@@ -562,9 +562,9 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
             data: (groups) {
               final normal = groups.where((g) => g.type.name == 'normal').toList();
               if (normal.isEmpty) {
-                return const _InfoBanner(
+                return _InfoBanner(
                   icon: Icons.warning_amber_rounded,
-                  body: 'No shared groups found. Create a group first.',
+                  body: 'settings_ext.csv_no_groups'.tr(),
                 );
               }
               return GlassCard(
@@ -600,8 +600,8 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
               );
             },
             loading: () => const Center(child: CircularProgressIndicator(color: _teal)),
-            error: (_, e2) => const _InfoBanner(
-                icon: Icons.error_outline, body: 'Could not load groups'),
+            error: (_, e2) => _InfoBanner(
+                icon: Icons.error_outline, body: 'settings_ext.csv_load_groups_error'.tr()),
           ),
         ],
         const SizedBox(height: 24),
@@ -620,8 +620,8 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
             ),
             child: Text(
               _destination == _Destination.group && _selectedGroup != null
-                  ? 'Continue with "${_selectedGroup!.name}"'
-                  : 'Continue',
+                  ? 'settings_ext.csv_continue_with'.tr(namedArgs: {'name': _selectedGroup!.name})
+                  : 'settings_ext.csv_continue'.tr(),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
@@ -639,8 +639,8 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
         _InfoBanner(
           icon: Icons.info_outline_rounded,
           body: _destination == _Destination.group
-              ? 'Choose your Splitwise CSV. Names in the file will be mapped to group members next.'
-              : 'Choose a Splitwise CSV export or a SetAll wallet export file.',
+              ? 'settings_ext.csv_info_group'.tr()
+              : 'settings_ext.csv_info_wallet'.tr(),
         ),
         const SizedBox(height: 16),
         _parsing
@@ -651,7 +651,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
                 onPressed: _importing ? null : _pickAndParse,
                 icon: const Icon(Icons.upload_file_rounded, color: _teal),
                 label: Text(
-                  _fileName ?? 'Choose CSV file',
+                  _fileName ?? 'settings_ext.csv_choose_file'.tr(),
                   style: const TextStyle(color: _teal, fontWeight: FontWeight.w600),
                 ),
                 style: OutlinedButton.styleFrom(
@@ -669,7 +669,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           Row(children: [
             const Icon(Icons.checklist_rounded, color: _teal, size: 18),
             const SizedBox(width: 6),
-            Text('${_rows.length} expenses found',
+            Text('settings_ext.csv_rows_found'.tr(namedArgs: {'count': _rows.length.toString()}),
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
           ]),
           const SizedBox(height: 10),
@@ -688,9 +688,14 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
               ),
               label: Text(
                 _destination == _Destination.group && _csvNames.isNotEmpty
-                    ? 'Map Members (${_csvNames.length} name${_csvNames.length == 1 ? '' : 's'} found)'
-                    : 'Import ${_rows.length} expense${_rows.length == 1 ? '' : 's'}'
-                      '${_destination == _Destination.group ? ' into ${_selectedGroup!.name}' : ' into Wallet'}',
+                    ? (_csvNames.length == 1
+                        ? 'settings_ext.csv_map_members'.tr(namedArgs: {'count': _csvNames.length.toString()})
+                        : 'settings_ext.csv_map_members_plural'.tr(namedArgs: {'count': _csvNames.length.toString()}))
+                    : 'settings_ext.csv_import_btn'.tr(namedArgs: {
+                        'count': _rows.length.toString(),
+                        'type': 'settings_ext.csv_import_entries'.tr(),
+                        'dest': _destination == _Destination.group ? _selectedGroup!.name : 'settings_ext.csv_dest_wallet'.tr(),
+                      }),
                 style: const TextStyle(fontWeight: FontWeight.w700),
               ),
               style: FilledButton.styleFrom(
@@ -706,7 +711,8 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           Padding(
             padding: const EdgeInsets.only(top: 20),
             child: Center(
-              child: Text('No importable rows found in $_fileName',
+              child: Text('settings_ext.csv_no_rows'.tr(namedArgs: {'file': _fileName ?? ''}),
+                  // ignore: avoid_redundant_argument_values
                   style: const TextStyle(color: _slate, fontSize: 13)),
             ),
           ),
@@ -722,11 +728,12 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       children: [
         _InfoBanner(
           icon: Icons.people_alt_outlined,
-          body: 'Match each CSV name to a member of "${_selectedGroup!.name}". '
-              'Unmapped names are excluded from splits.',
+          body: 'settings_ext.csv_map_title'.tr(namedArgs: {'group': _selectedGroup!.name}),
         ),
         const SizedBox(height: 16),
-        Text('${_csvNames.length} name${_csvNames.length == 1 ? '' : 's'} found in CSV',
+        Text(_csvNames.length == 1
+            ? 'settings_ext.csv_names_found'.tr(namedArgs: {'count': _csvNames.length.toString()})
+            : 'settings_ext.csv_names_found_plural'.tr(namedArgs: {'count': _csvNames.length.toString()}),
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
         const SizedBox(height: 10),
         GlassCard(
@@ -746,7 +753,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
                           children: [
                             Text(csvName,
                                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                            Text('from CSV',
+                            Text('settings_ext.csv_from_csv'.tr(),
                                 style: TextStyle(fontSize: 11,
                                     color: theme.colorScheme.onSurfaceVariant)),
                           ],
@@ -770,7 +777,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
         ),
         const SizedBox(height: 8),
         Text(
-          'Tip: leave unmapped to exclude that person from splits.',
+          'settings_ext.csv_map_tip'.tr(),
           style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
         ),
         const SizedBox(height: 20),
@@ -780,7 +787,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
             onPressed: _doImport,
             icon: const Icon(Icons.check_circle_outline, size: 18),
             label: Text(
-              'Import ${_rows.length} expense${_rows.length == 1 ? '' : 's'} into ${_selectedGroup!.name}',
+              'settings_ext.csv_import_group_btn'.tr(namedArgs: {'count': _rows.length.toString(), 'group': _selectedGroup!.name}),
               style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             style: FilledButton.styleFrom(
@@ -806,13 +813,13 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           children: [
             const CircularProgressIndicator(color: _teal),
             const SizedBox(height: 20),
-            Text('Importing $_imported / ${_rows.length}…',
+            Text('settings_ext.csv_importing'.tr(namedArgs: {'done': _imported.toString(), 'total': _rows.length.toString()}),
                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             Text(
               _destination == _Destination.group
-                  ? 'Adding to ${_selectedGroup!.name}'
-                  : 'Adding to Personal Wallet',
+                  ? 'settings_ext.csv_adding_to_group'.tr(namedArgs: {'group': _selectedGroup!.name})
+                  : 'settings_ext.csv_adding_to_wallet'.tr(),
               style: const TextStyle(fontSize: 13, color: _slate),
             ),
           ],
@@ -842,17 +849,17 @@ class _PreviewTable extends StatelessWidget {
               color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
               borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Expanded(flex: 2, child: Text('Date',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
-                Expanded(flex: 3, child: Text('Description',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
-                Expanded(flex: 2, child: Text('Category',
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
+                Expanded(flex: 2, child: Text('settings_ext.csv_col_date'.tr(),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
+                Expanded(flex: 3, child: Text('settings_ext.csv_col_description'.tr(),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
+                Expanded(flex: 2, child: Text('settings_ext.csv_col_category'.tr(),
+                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate))),
                 Expanded(flex: 2, child: Align(alignment: Alignment.centerRight,
-                    child: Text('Amount',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate)))),
+                    child: Text('settings_ext.csv_col_amount'.tr(),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: _slate)))),
               ],
             ),
           ),
@@ -884,7 +891,7 @@ class _PreviewTable extends StatelessWidget {
               if (isLast && rows.length > 50)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
-                  child: Text('… and ${rows.length - 50} more',
+                  child: Text('settings_ext.csv_more_rows'.tr(namedArgs: {'count': (rows.length - 50).toString()}),
                       style: const TextStyle(fontSize: 11, color: _slate)),
                 ),
             ]);
@@ -1002,12 +1009,12 @@ class _MemberDropdown extends StatelessWidget {
       child: DropdownButton<ProfileModel?>(
         value: selected,
         isExpanded: true,
-        hint: const Text('— Skip —', style: TextStyle(fontSize: 12, color: _slate)),
+        hint: Text('settings_ext.csv_skip'.tr(), style: const TextStyle(fontSize: 12, color: _slate)),
         style: const TextStyle(fontSize: 12),
         items: [
-          const DropdownMenuItem<ProfileModel?>(
+          DropdownMenuItem<ProfileModel?>(
             value: null,
-            child: Text('— Skip —', style: TextStyle(fontSize: 12, color: _slate)),
+            child: Text('settings_ext.csv_skip'.tr(), style: const TextStyle(fontSize: 12, color: _slate)),
           ),
           ...members.map((m) => DropdownMenuItem<ProfileModel?>(
             value: m,
