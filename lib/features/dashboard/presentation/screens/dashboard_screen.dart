@@ -72,12 +72,13 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
     }
   }
 
+  final baseCurrency = await ref.read(baseCurrencyProvider.future);
   final topCats = analyticsData.categoryTotals.entries
       .toList()
     ..sort((a, b) => b.value.compareTo(a.value));
   final topCatsStr = topCats
       .take(5)
-      .map((e) => '${e.key}: \$${e.value.toStringAsFixed(2)}')
+      .map((e) => '${e.key}: $baseCurrency ${e.value.toStringAsFixed(2)}')
       .join(', ');
 
   final recentRows = analyticsData.allExpenses
@@ -89,15 +90,14 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
   // ARCH-01: Migrated from supabase.functions.invoke — plain HTTPS, no JWT.
   // Netlify fn authenticates to Gemini server-side via process.env.GEMINI_API_KEY.
   // No caller auth required: mirrors web/insights.html:504 fetch() exactly.
-  final baseCurrency = await ref.read(baseCurrencyProvider.future);
   final query = 'Give me a concise 1-sentence financial insight about my spending this month.'
-      '\n\nFinancial data (last 30 days):'
-      '\nTotal Expenses: \$${analyticsData.totalSpend.toStringAsFixed(2)}'
-      '\nDaily Burn: \$${analyticsData.burnRate.toStringAsFixed(2)}'
-      '\nTotal Income: \$${analyticsData.totalIncome.toStringAsFixed(2)}'
-      '\nNet: \$${analyticsData.netFlow.toStringAsFixed(2)}'
+      '\n\nFinancial data (last 30 days, all amounts in $baseCurrency):'
+      '\nTotal Expenses: $baseCurrency ${analyticsData.totalSpend.toStringAsFixed(2)}'
+      '\nDaily Burn: $baseCurrency ${analyticsData.burnRate.toStringAsFixed(2)}'
+      '\nTotal Income: $baseCurrency ${analyticsData.totalIncome.toStringAsFixed(2)}'
+      '\nNet: $baseCurrency ${analyticsData.netFlow.toStringAsFixed(2)}'
       '\nTop Categories: $topCatsStr'
-      '\n\nRecent 20 transactions:\n$recentRows';
+      '\n\nRecent 20 transactions (native currency per entry):\n$recentRows';
 
   try {
     final response = await http.post(
