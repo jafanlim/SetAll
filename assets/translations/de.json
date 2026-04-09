@@ -491,7 +491,9 @@
     "csv_col_date": "Datum",
     "csv_col_description": "Beschreibung",
     "csv_col_category": "Kategorie",
-    "csv_col_amount": "Betrag"
+    "csv_col_amount": "Betrag",
+    "csv_warnings": "{count} Warnung",
+    "csv_warnings_plural": "{count} Warnungen"
   },
   "wallet_entry": {
     "title": "Wallet-Eintrag hinzufügen",

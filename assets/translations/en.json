@@ -492,7 +492,9 @@
     "csv_col_date": "Date",
     "csv_col_description": "Description",
     "csv_col_category": "Category",
-    "csv_col_amount": "Amount"
+    "csv_col_amount": "Amount",
+    "csv_warnings": "{count} warning",
+    "csv_warnings_plural": "{count} warnings"
   },
   "wallet_entry": {
     "title": "Add Wallet Entry",

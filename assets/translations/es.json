@@ -491,7 +491,9 @@
     "csv_col_date": "Fecha",
     "csv_col_description": "Descripci\u00f3n",
     "csv_col_category": "Categor\u00eda",
-    "csv_col_amount": "Importe"
+    "csv_col_amount": "Importe",
+    "csv_warnings": "{count} advertencia",
+    "csv_warnings_plural": "{count} advertencias"
   },
   "wallet_entry": {
     "title": "Agregar entrada de cartera",

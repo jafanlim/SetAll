@@ -919,7 +919,9 @@ class _ErrorsCard extends StatelessWidget {
           Row(children: [
             const Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 16),
             const SizedBox(width: 6),
-            Text('${errors.length} warning${errors.length == 1 ? '' : 's'}',
+            Text(errors.length == 1
+                ? 'settings_ext.csv_warnings'.tr(namedArgs: {'count': errors.length.toString()})
+                : 'settings_ext.csv_warnings_plural'.tr(namedArgs: {'count': errors.length.toString()}),
                 style: const TextStyle(fontWeight: FontWeight.w700,
                     color: Colors.orangeAccent, fontSize: 12)),
           ]),

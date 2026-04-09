@@ -491,7 +491,9 @@
     "csv_col_date": "Дата",
     "csv_col_description": "Описание",
     "csv_col_category": "Категория",
-    "csv_col_amount": "Сумма"
+    "csv_col_amount": "Сумма",
+    "csv_warnings": "{count} предупреждение",
+    "csv_warnings_plural": "{count} предупреждений"
   },
   "wallet_entry": {
     "title": "Добавить запись в кошелёк",

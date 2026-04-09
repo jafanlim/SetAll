@@ -491,7 +491,9 @@
     "csv_col_date": "თარიღი",
     "csv_col_description": "აღწერა",
     "csv_col_category": "კატეგორია",
-    "csv_col_amount": "თანხა"
+    "csv_col_amount": "თანხა",
+    "csv_warnings": "{count} გაფრთხილება",
+    "csv_warnings_plural": "{count} გაფრთხილება"
   },
   "wallet_entry": {
     "title": "საფულის ჩანაწერის დამატება",
