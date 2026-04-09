@@ -21,7 +21,7 @@ const _slate = Color(0xFF94A3B8);
 enum _Destination { wallet, group }
 
 // ---------------------------------------------------------------------------
-// Parsed row from Splitwise CSV
+// Parsed row from Splitwise CSV (or SetAll wallet export)
 // ---------------------------------------------------------------------------
 class _SplitwiseRow {
   const _SplitwiseRow({
@@ -33,6 +33,7 @@ class _SplitwiseRow {
     required this.csvNames,
     required this.payerCsvName,
     required this.personAmounts,
+    this.isIncome = false,
   });
 
   final DateTime             date;
@@ -40,6 +41,7 @@ class _SplitwiseRow {
   final String               category;
   final Decimal              cost;
   final String               currency;
+  final bool                 isIncome;      // SetAll export: true for income rows
   final List<String>         csvNames;      // all participants (non-zero amount)
   final String?              payerCsvName;  // CSV column name of whoever paid (positive value)
   final Map<String, Decimal> personAmounts; // csvName → signed amount (+payer credit, -owes)
@@ -144,6 +146,9 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
   }
 
   // Returns (rows, errors).
+  // Supports two CSV formats:
+  //   Splitwise: Date, Description, [Category], Cost, Currency, [person cols…]
+  //   SetAll:    Date, Description, Category, Amount, Currency, Type
   (List<_SplitwiseRow>, List<String>) _parseCsv(String raw) {
     final lines = raw.split(RegExp(r'\r?\n'));
     if (lines.isEmpty) return ([], ['Empty file']);
@@ -151,10 +156,23 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
     int headerIdx = -1;
     List<String> headers         = [];
     List<String> originalHeaders = [];
+    bool isSetAllFormat = false;
+
     for (int i = 0; i < lines.length; i++) {
       final cols = _splitCsvLine(lines[i]);
       if (cols.length >= 4) {
         final lower = cols.map((c) => c.toLowerCase().trim()).toList();
+        // SetAll wallet export format
+        if (lower.contains('date') && lower.contains('description') &&
+            lower.contains('amount') && lower.contains('currency') &&
+            lower.contains('type')) {
+          headerIdx       = i;
+          headers         = lower;
+          originalHeaders = cols.map((c) => c.trim()).toList();
+          isSetAllFormat  = true;
+          break;
+        }
+        // Splitwise format
         if (lower.contains('date') && lower.contains('description') &&
             lower.contains('cost') && lower.contains('currency')) {
           headerIdx       = i;
@@ -165,14 +183,76 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       }
     }
     if (headerIdx < 0) {
-      return ([], ['Could not find a header row with: Date, Description, Cost, Currency']);
+      return ([], [
+        'Could not find a header row.\n'
+        'Expected Splitwise format: Date, Description, Cost, Currency\n'
+        'or SetAll export format: Date, Description, Category, Amount, Currency, Type',
+      ]);
     }
 
     final dateIdx     = headers.indexOf('date');
     final descIdx     = headers.indexOf('description');
     final catIdx      = headers.indexWhere((h) => h.contains('category'));
-    final costIdx     = headers.indexOf('cost');
     final currencyIdx = headers.indexOf('currency');
+
+    if (isSetAllFormat) {
+      // ── SetAll wallet CSV ─────────────────────────────────────────────────
+      final amountIdx = headers.indexOf('amount');
+      final typeIdx   = headers.indexOf('type');
+      final rows   = <_SplitwiseRow>[];
+      final errors = <String>[];
+
+      for (int i = headerIdx + 1; i < lines.length; i++) {
+        final line = lines[i].trim();
+        if (line.isEmpty) continue;
+        final cols = _splitCsvLine(line);
+        if (cols.length <= amountIdx || cols.length <= currencyIdx) continue;
+
+        final rawDate = _col(cols, dateIdx);
+        if (rawDate.toLowerCase().contains('total') || rawDate.isEmpty) continue;
+
+        DateTime? date;
+        for (final fmt in ['yyyy-MM-dd', 'MM/dd/yyyy', 'dd/MM/yyyy', 'yyyy/MM/dd']) {
+          try { date = DateFormat(fmt).parseStrict(rawDate.trim()); break; } catch (_) {}
+        }
+        if (date == null) {
+          errors.add('Row ${i + 1}: unrecognised date "$rawDate" — skipped');
+          continue;
+        }
+
+        final rawAmt = _col(cols, amountIdx).replaceAll(RegExp(r'[,\s]'), '');
+        Decimal? amt;
+        try {
+          amt = Decimal.parse(rawAmt.isEmpty ? '0' : rawAmt);
+        } catch (_) {
+          errors.add('Row ${i + 1}: invalid amount "$rawAmt" — skipped');
+          continue;
+        }
+        if (amt == Decimal.zero) continue;
+
+        final typeStr  = typeIdx >= 0 ? _col(cols, typeIdx).toLowerCase() : '';
+        final isIncome = typeStr == 'income';
+        final description = _col(cols, descIdx).isEmpty ? 'Imported entry' : _col(cols, descIdx);
+        final category    = catIdx >= 0 ? _col(cols, catIdx) : 'General';
+        final currency    = _col(cols, currencyIdx).isEmpty ? 'USD' : _col(cols, currencyIdx).toUpperCase();
+
+        rows.add(_SplitwiseRow(
+          date:          date,
+          description:   description,
+          category:      category.isEmpty ? 'General' : category,
+          cost:          amt.abs(),
+          currency:      currency,
+          isIncome:      isIncome,
+          csvNames:      [],
+          payerCsvName:  null,
+          personAmounts: {},
+        ));
+      }
+      return (rows, errors);
+    }
+
+    // ── Splitwise CSV ─────────────────────────────────────────────────────────
+    final costIdx = headers.indexOf('cost');
 
     // Detect person-amount columns: any column whose header doesn't match
     // known Splitwise fixed fields is treated as a participant name.
@@ -309,7 +389,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           splitType:   SplitType.even,
           splits:      [SplitInsert(userId: uid, universalUsdOwed: row.cost)],
           category:    _mapCategory(row.category),
-          isIncome:    false,
+          isIncome:    row.isIncome,
         );
         count++;
         if (mounted) setState(() => _imported = count);
@@ -412,7 +492,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
-        title: const Text('Import from Splitwise',
+        title: const Text('Import CSV',
             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
         backgroundColor: theme.colorScheme.surface,
         elevation: 0,
@@ -560,7 +640,7 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           icon: Icons.info_outline_rounded,
           body: _destination == _Destination.group
               ? 'Choose your Splitwise CSV. Names in the file will be mapped to group members next.'
-              : 'Choose your Splitwise CSV export file.',
+              : 'Choose a Splitwise CSV export or a SetAll wallet export file.',
         ),
         const SizedBox(height: 16),
         _parsing
