@@ -86,7 +86,8 @@
     "account": "Account",
     "about": "About",
     "sign_out": "Sign out",
-    "currency": "Base Currency"
+    "currency": "Base Currency",
+    "currency_search_hint": "Search currency…"
   },
   "common": {
     "save": "Save",
@@ -126,7 +127,31 @@
     "file": "File",
     "today_prefix": "Today",
     "retry": "Retry",
-    "continue_anyway": "Continue"
+    "continue_anyway": "Continue",
+    "remove": "Remove",
+    "restore": "Restore",
+    "force_delete": "Force Delete",
+    "force_delete_purge": "Purges all expenses from server",
+    "add": "Add",
+    "back": "Back",
+    "reopen": "Reopen",
+    "settle": "Settle",
+    "yes_delete_forever": "Yes, delete forever",
+    "no_expenses_yet_tap": "No expenses yet. Tap + to add one.",
+    "could_not_load_members": "Could not load members",
+    "could_not_load_expenses": "Could not load expenses",
+    "no_members_yet": "No members yet",
+    "all_settled_group": "All settled up in this group",
+    "settled_group_banner": "This group is settled up — no one owes anything.",
+    "owed_to_you": "Owed to you",
+    "you_owe": "You owe",
+    "you_creator": "{name} (creator)",
+    "remove_member_title": "Remove member?",
+    "remove_member_confirm": "Remove \"{name}\" from this group?",
+    "could_not_remove_member": "Could not remove member.",
+    "share_link": "Share Link",
+    "add_by_voice": "Add by voice",
+    "setup_failed": "Setup failed"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -184,6 +209,39 @@
     "report_all_transactions": "All wallet transactions",
     "report_category_breakdown": "Category breakdown"
   },
+  "group_detail": {
+    "delete_expenses_title": "Delete expenses?",
+    "delete_expenses_confirm": "Are you sure you want to delete {count} expense? This is irreversible.",
+    "delete_expenses_confirm_plural": "Are you sure you want to delete {count} expenses? This is irreversible.",
+    "could_not_delete_expenses": "Could not delete some expenses.",
+    "rename_group": "Rename group",
+    "group_name_label": "Group name",
+    "settle_title": "Mark group as settled?",
+    "settle_body": "This marks all debts in the group as settled. No payments are recorded — you can reopen the group at any time.",
+    "settled_snack": "Group marked as settled ✓",
+    "settle_failed": "Settlement failed. Please try again.",
+    "reopen_title": "Reopen group?",
+    "reopen_body": "This restores all outstanding debts. Members will owe each other as before.",
+    "reopened_snack": "Group reopened",
+    "reopen_failed": "Could not reopen group. Please try again.",
+    "delete_title": "Delete group?",
+    "delete_body": "Delete \"{name}\"? You can restore it from the Activity screen within 90 days.",
+    "delete_sure_title": "Are you sure?",
+    "delete_sure_body": "The group will be hidden immediately. As the owner, you can restore it from the Activity screen within 90 days.",
+    "could_not_delete": "Could not delete group.",
+    "could_not_rename": "Could not rename group",
+    "deselect_all": "Deselect All",
+    "select_all": "Select All",
+    "edit_group": "Edit group",
+    "select_expenses": "Select expenses",
+    "settle_group": "Settle group",
+    "reopen_group": "Reopen group",
+    "delete_group": "Delete group",
+    "add_expense": "Add expense",
+    "invite_member": "Invite member",
+    "members": "Members",
+    "expenses": "Expenses"
+  },
   "groups_screen": {
     "filter_by_group": "Filter by group",
     "new_group": "New Group",
@@ -213,7 +271,17 @@
     "edit_expense": "Edit expense",
     "expense_deleted": "Expense deleted",
     "download_report": "Download report",
-    "add_member": "Add member"
+    "add_member": "Add member",
+    "group_name_hint": "Group name",
+    "settle_body": "Mark \"{name}\" as settled? All debts will show as zero.",
+    "delete_group": "Delete group",
+    "force_delete_group_title": "Force delete group?",
+    "force_delete_group_body": "Force-delete \"{name}\"? This will also purge all its expenses and splits from the server.",
+    "delete_group_body": "Delete \"{name}\"? You can restore it from the Activity screen within 12 months.",
+    "reopen_group": "Reopen group",
+    "download_group_report": "Download \"{name}\" report",
+    "export_failed": "Export failed: {error}",
+    "delete_expense_body": "Remove \"{name}\"?"
   },
   "activity_screen": {
     "search_hint": "Search expenses, groups, people…",
@@ -242,7 +310,13 @@
     "restore_whole_group": "Whole group + all expenses",
     "could_not_restore_expense": "Could not restore expense",
     "could_not_restore_group": "Could not restore group",
-    "could_not_restore_wallet": "Could not restore wallet entry"
+    "could_not_restore_wallet": "Could not restore wallet entry",
+    "restore_btn": "RESTORE",
+    "wallet_income_tag": "Wallet Income",
+    "wallet_tag": "Wallet",
+    "you_deleted": "You deleted \"{label}\"",
+    "you_settled": "You settled up \"{group}\"",
+    "settled_by": "{name} settled up \"{group}\""
   },
   "categories": {
     "general": "General",
@@ -311,6 +385,18 @@
     "manual_sum_over": "Sum: {currency} {sum} — {diff} over total",
     "amount_unusually_large": "Amount exceeds $10,000,000 — is this correct?"
   },
+  "expense_detail": {
+    "delete_title": "Delete expense?",
+    "delete_body": "Remove \"{label}\"?",
+    "delete_sure_title": "Are you sure?",
+    "delete_sure_body": "This action is irreversible. The expense and all its splits will be permanently deleted.",
+    "yes_delete_forever": "Yes, delete forever",
+    "expense_deleted": "Expense deleted",
+    "edit": "Edit",
+    "delete": "Delete",
+    "you": "You",
+    "member": "Member"
+  },
   "edit_expense": {
     "title": "Edit entry",
     "not_found": "Expense not found",
@@ -348,6 +434,35 @@
     "use_default_currency": "Use my default currency",
     "search_currency": "Search currency (e.g. EUR, GEL…)"
   },
+  "auth": {
+    "continue_google": "Continue with Google",
+    "continue_apple": "Continue with Apple",
+    "forgot_password": "Forgot password?",
+    "already_have_account": "Already have an account? ",
+    "create_account": "Create Account",
+    "not_now": "Not now",
+    "biometric_failed": "Biometric failed.",
+    "try_again": "Try {label} again",
+    "use_another_method": "Use another method",
+    "use_face_id": "Use Face ID to unlock?",
+    "enable": "Enable",
+    "unlock": "Unlock",
+    "enter_pin": "Enter your PIN",
+    "enter_password": "Enter your password",
+    "stay_on_login": "Stay on Login",
+    "sign_out_relogin": "Sign out and re-login",
+    "account_recovery": "Account Recovery",
+    "send_recovery_email": "Send recovery email",
+    "recovery_sent": "Recovery email sent to {email}",
+    "change_password": "Change Password",
+    "update_password": "Update Password",
+    "password_updated": "Password updated"
+  },
+  "wallet_detail": {
+    "delete_title": "Delete entry?",
+    "delete_body": "This wallet entry will be permanently removed.",
+    "could_not_open_attachment": "Could not open attachment"
+  },
   "insights": {
     "title": "Insights",
     "new_session_tooltip": "New session",
@@ -355,6 +470,8 @@
     "no_sessions": "No sessions yet",
     "session_n": "Session {n}",
     "ask_hint": "Ask about your finances…",
+    "generate": "Generate",
+    "generate_tooltip": "Generate a comprehensive AI analysis with charts",
     "deep_analysis_btn": "Deep Analysis",
     "deep_analysis_trigger": "Generate a comprehensive financial analysis with charts",
     "view_analysis_btn": "View Analysis",
@@ -538,12 +655,27 @@
     "csv_title": "CSV export",
     "json_title": "JSON export",
     "pdf_groups_subtitle": "Full groups report as PDF",
-    "pdf_group_subtitle": "Group expenses as PDF",
+    "pdf_group_subtitle": "Group expenses, members & settlements",
     "csv_groups_subtitle": "All group expenses as spreadsheet",
     "json_groups_subtitle": "All group expenses as JSON",
     "pdf_wallet_subtitle": "Full wallet report as PDF",
     "csv_wallet_subtitle": "All wallet entries as spreadsheet",
-    "json_wallet_subtitle": "All wallet entries as JSON"
+    "json_wallet_subtitle": "All wallet entries as JSON",
+    "pdf_all_groups_subtitle": "All groups combined",
+    "pdf_options_title": "PDF Report Options",
+    "pdf_options_subtitle": "Choose what to include in the report",
+    "pdf_category_breakdown": "Category breakdown",
+    "pdf_category_breakdown_sub": "Spending by category",
+    "download_wallet": "Download wallet report",
+    "download_group": "Download \"{name}\" report",
+    "download_all_groups": "Download groups report",
+    "export_failed": "Export failed: {error}",
+    "pdf_entries": "Entries",
+    "pdf_members": "Members",
+    "pdf_expenses": "Expenses",
+    "pdf_settlements": "Settlements",
+    "pdf_no_expenses": "No expenses",
+    "pdf_category_breakdown_header": "Category Breakdown"
   },
   "voice_entry": {
     "listening": "Listening…",
@@ -652,5 +784,10 @@
     "dialog_current_pin": "Current PIN",
     "dialog_incorrect_pin": "Incorrect PIN",
     "dialog_remove": "Remove"
+  },
+  "friends_screen": {
+    "search_hint": "Find by name, @nickname, or email",
+    "no_results": "No results",
+    "no_results_hint": "Try a different search term or filter."
   }
 }

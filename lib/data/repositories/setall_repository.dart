@@ -4005,17 +4005,22 @@ class SetAllRepository {
     Decimal? cachedRate;
     for (final e in entries) {
       Decimal amt;
-      final frozen = e.baseCurrencyAmount;
-      if (frozen != null && frozen.isNotEmpty) {
-        // v33+: use frozen base-currency amount — immune to rate drift.
-        amt = Decimal.tryParse(frozen) ?? Decimal.zero;
+      // If entry is already in the target base currency, use raw amount directly.
+      final entryCcy = e.currency.isEmpty ? 'USD' : e.currency;
+      if (entryCcy == baseCurrency) {
+        amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
       } else {
-        // Legacy fallback for pre-v33 rows without base_currency_amount.
+        // Convert via universalUsdAmount (always USD pivot) → baseCurrency.
+        // This correctly reflects the current baseCurrency regardless of when
+        // the entry was saved or what base currency was active at save time.
         final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
-        amt = usd;
-        if (baseCurrency != 'USD' && _currencyService != null && usd != Decimal.zero) {
+        if (baseCurrency == 'USD') {
+          amt = usd;
+        } else if (_currencyService != null && usd != Decimal.zero) {
           cachedRate ??= await _currencyService.getRate('USD', baseCurrency);
           amt = (usd * cachedRate).round(scale: 2);
+        } else {
+          amt = usd;
         }
       }
       if (e.isIncome) { income += amt; } else { spend += amt; }

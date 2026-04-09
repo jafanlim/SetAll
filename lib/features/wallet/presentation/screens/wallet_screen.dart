@@ -415,15 +415,15 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                 child: totalsAsync.when(
                   skipLoadingOnReload: true,
                   data: (totals) {
-                    // For single-currency wallets, prefer the raw-amount currency
-                    // from entries rather than baseCurrency (which defaults to USD
-                    // if the profile hasn't been saved yet).
+                    // For single-currency wallets whose currency matches the
+                    // user's current base currency, show raw native amounts so
+                    // the hero matches the breakdown exactly (no rounding).
+                    // If the user changes base currency to something else, fall
+                    // through to the converted totals path.
                     final entries = entriesAsync.valueOrNull ?? [];
                     final ccySet = entries.map((e) => e.currency.isEmpty ? 'USD' : e.currency).toSet();
-                    final heroCcy = ccySet.length == 1 ? ccySet.first : baseCurrency;
-                    // When all entries share one currency, recalculate totals from
-                    // raw amounts so the hero matches the breakdown exactly.
-                    if (ccySet.length == 1) {
+                    final singleNativeCcy = ccySet.length == 1 ? ccySet.first : null;
+                    if (singleNativeCcy != null && singleNativeCcy == baseCurrency) {
                       var rawIncome = Decimal.zero;
                       var rawSpend  = Decimal.zero;
                       for (final e in entries) {
@@ -434,14 +434,14 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         walletBalance: rawIncome - rawSpend,
                         income: rawIncome,
                         spend: rawSpend,
-                        currency: heroCcy,
+                        currency: singleNativeCcy,
                       );
                     }
                     return WalletHero(
                       walletBalance: totals.net,
                       income: totals.income,
                       spend: totals.spend,
-                      currency: heroCcy,
+                      currency: baseCurrency,
                     );
                   },
                   loading: () => WalletHero.loading(),
@@ -556,11 +556,12 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               entriesAsync.when(
                 data: (exp) {
                   // Group by (category, currency) using raw amount — no USD conversion.
-                  final spend    = <String, Map<String, Decimal>>{};
-                  // Accumulate frozen base-currency amounts per (cat, ccy) for annotation.
-                  // NOTE: base_currency_amount is frozen at save time; may be stale if
-                  // the user later changes their base currency in settings.
-                  final spendBase = <String, Map<String, Decimal>>{};
+                  final spend     = <String, Map<String, Decimal>>{};
+                  // Accumulate base-currency amounts per (cat, ccy) for annotation.
+                  // Uses frozen baseCurrencyAmount when available; falls back to
+                  // universalUsdAmount (always USD). effectiveBaseCcy tracks which.
+                  final spendBase    = <String, Map<String, Decimal>>{};
+                  final spendBaseCcy = <String, Map<String, String>>{};
                   for (final e in exp) {
                     if (e.isIncome) continue;
                     final cat = e.category.isEmpty ? 'Other' : e.category;
@@ -568,13 +569,18 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
                     spend.putIfAbsent(cat, () => {})[ccy] =
                         (spend[cat]![ccy] ?? Decimal.zero) + amt;
-                    final baseAmt = Decimal.tryParse(e.baseCurrencyAmount ?? '') ?? Decimal.zero;
+                    final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
+                    final baseAmt = Decimal.tryParse(
+                        hasFrozen ? e.baseCurrencyAmount! : e.universalUsdAmount,
+                      ) ?? Decimal.zero;
+                    final effectiveCcy = hasFrozen ? baseCurrency : 'USD';
                     spendBase.putIfAbsent(cat, () => {})[ccy] =
                         (spendBase[cat]?[ccy] ?? Decimal.zero) + baseAmt;
+                    spendBaseCcy.putIfAbsent(cat, () => {})[ccy] = effectiveCcy;
                   }
                   if (spend.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
                   // Build flat rows: one per (cat, ccy) pair.
-                  final rows = <({String cat, Decimal amt, String ccy, Decimal baseAmt})>[];
+                  final rows = <({String cat, Decimal amt, String ccy, Decimal baseAmt, String annotCcy})>[];
                   for (final catEntry in spend.entries) {
                     for (final ccyEntry in catEntry.value.entries) {
                       rows.add((
@@ -582,6 +588,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         amt: ccyEntry.value,
                         ccy: ccyEntry.key,
                         baseAmt: spendBase[catEntry.key]?[ccyEntry.key] ?? Decimal.zero,
+                        annotCcy: spendBaseCcy[catEntry.key]?[ccyEntry.key] ?? baseCurrency,
                       ));
                     }
                   }
@@ -598,7 +605,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         amount: rows[i].amt,
                         total: totals[rows[i].ccy] ?? rows[i].amt,
                         currency: rows[i].ccy,
-                        baseCurrency: baseCurrency,
+                        baseCurrency: rows[i].annotCcy,
                         baseCurrencyAmount: rows[i].baseAmt,
                         accentColor: _purple,
                         onTap: () {
@@ -631,8 +638,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               ),
               entriesAsync.when(
                 data: (exp) {
-                  final income     = <String, Map<String, Decimal>>{};
-                  final incomeBase = <String, Map<String, Decimal>>{};
+                  final income        = <String, Map<String, Decimal>>{};
+                  final incomeBase    = <String, Map<String, Decimal>>{};
+                  final incomeBaseCcy = <String, Map<String, String>>{};
                   for (final e in exp) {
                     if (!e.isIncome) continue;
                     final cat = e.category.isEmpty ? 'Other' : e.category;
@@ -640,12 +648,17 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                     final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
                     income.putIfAbsent(cat, () => {})[ccy] =
                         (income[cat]![ccy] ?? Decimal.zero) + amt;
-                    final baseAmt = Decimal.tryParse(e.baseCurrencyAmount ?? '') ?? Decimal.zero;
+                    final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
+                    final baseAmt = Decimal.tryParse(
+                        hasFrozen ? e.baseCurrencyAmount! : e.universalUsdAmount,
+                      ) ?? Decimal.zero;
+                    final effectiveCcy = hasFrozen ? baseCurrency : 'USD';
                     incomeBase.putIfAbsent(cat, () => {})[ccy] =
                         (incomeBase[cat]?[ccy] ?? Decimal.zero) + baseAmt;
+                    incomeBaseCcy.putIfAbsent(cat, () => {})[ccy] = effectiveCcy;
                   }
                   if (income.isEmpty) return const SliverToBoxAdapter(child: SizedBox.shrink());
-                  final rows = <({String cat, Decimal amt, String ccy, Decimal baseAmt})>[];
+                  final rows = <({String cat, Decimal amt, String ccy, Decimal baseAmt, String annotCcy})>[];
                   for (final catEntry in income.entries) {
                     for (final ccyEntry in catEntry.value.entries) {
                       rows.add((
@@ -653,6 +666,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         amt: ccyEntry.value,
                         ccy: ccyEntry.key,
                         baseAmt: incomeBase[catEntry.key]?[ccyEntry.key] ?? Decimal.zero,
+                        annotCcy: incomeBaseCcy[catEntry.key]?[ccyEntry.key] ?? baseCurrency,
                       ));
                     }
                   }
@@ -668,7 +682,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                         amount: rows[i].amt,
                         total: totals[rows[i].ccy] ?? rows[i].amt,
                         currency: rows[i].ccy,
-                        baseCurrency: baseCurrency,
+                        baseCurrency: rows[i].annotCcy,
                         baseCurrencyAmount: rows[i].baseAmt,
                         accentColor: _teal,
                         onTap: () {

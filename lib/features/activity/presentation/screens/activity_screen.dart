@@ -1730,8 +1730,8 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('RESTORE',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                      child: Text('activity_screen.restore_btn'.tr(),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
                     ),
           ],
         ),
@@ -2021,8 +2021,8 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('RESTORE',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                      child: Text('activity_screen.restore_btn'.tr(),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
                     ),
           ],
         ),
@@ -2100,7 +2100,7 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'You deleted "$label"',
+                    'activity_screen.you_deleted'.tr(namedArgs: {'label': label}),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600, fontSize: 13,
                     ),
@@ -2115,7 +2115,7 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
                         borderRadius: BorderRadius.circular(5),
                       ),
                       child: Text(
-                        ev.isIncome ? 'Wallet Income' : 'Wallet',
+                        ev.isIncome ? 'activity_screen.wallet_income_tag'.tr() : 'activity_screen.wallet_tag'.tr(),
                         style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: _red),
                       ),
                     ),
@@ -2143,8 +2143,8 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text('RESTORE',
-                          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
+                      child: Text('activity_screen.restore_btn'.tr(),
+                          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 11)),
                     ),
             ],
           ],
@@ -2175,8 +2175,8 @@ class _GroupSettledTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final title = event.settledByYou
-        ? 'You settled up "${event.groupName}"'
-        : '${event.settledByName} settled up "${event.groupName}"';
+        ? 'activity_screen.you_settled'.tr(namedArgs: {'group': event.groupName})
+        : 'activity_screen.settled_by'.tr(namedArgs: {'name': event.settledByName, 'group': event.groupName});
 
     return _buildEventTile(
       context:        context,

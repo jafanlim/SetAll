@@ -1232,14 +1232,14 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
           controller: ctrl,
           autofocus: true,
           textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(hintText: 'Group name'),
+          decoration: InputDecoration(hintText: 'groups_screen.group_name_hint'.tr()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Save'),
+            child: Text('common.save'.tr()),
           ),
         ],
       ),
@@ -1265,9 +1265,9 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('groups_screen.settle_group_title'.tr()),
-        content: Text('Mark "${widget.group.name}" as settled? All debts will show as zero.'),
+        content: Text('groups_screen.settle_body'.tr(namedArgs: {'name': widget.group.name})),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
@@ -1306,21 +1306,21 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(force ? 'Force delete group?' : 'Delete group?'),
+        title: Text(force ? 'groups_screen.force_delete_group_title'.tr() : 'groups_screen.delete_group'.tr()),
         content: Text(
           force
-              ? 'Force-delete "${widget.group.name}"? This will also purge all its expenses and splits from the server.'
-              : 'Delete "${widget.group.name}"? You can restore it from the Activity screen within 12 months.',
+              ? 'groups_screen.force_delete_group_body'.tr(namedArgs: {'name': widget.group.name})
+              : 'groups_screen.delete_group_body'.tr(namedArgs: {'name': widget.group.name}),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: force ? _brandOrange : Colors.redAccent,
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(force ? 'Force Delete' : 'Delete'),
+            child: Text(force ? 'common.force_delete'.tr() : 'common.delete'.tr()),
           ),
         ],
       ),
@@ -1365,7 +1365,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                 color: isSettled ? _orange : _teal,
               ),
               title: Text(
-                isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
+                isSettled ? 'groups_screen.reopen_group'.tr() : 'groups_screen.settle_group_title'.tr(),
                 style: TextStyle(color: isSettled ? _orange : _teal, fontWeight: FontWeight.w600),
               ),
               onTap: () => Navigator.of(ctx).pop(isSettled ? 'reopen' : 'settle'),
@@ -1377,13 +1377,13 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              title: const Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+              title: Text('groups_screen.delete_group'.tr(), style: const TextStyle(color: Colors.redAccent)),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
             ListTile(
               leading: const Icon(Icons.delete_forever_outlined, color: _brandOrange),
-              title: const Text('Force Delete', style: TextStyle(color: _brandOrange)),
-              subtitle: const Text('Purges all expenses from server', style: TextStyle(fontSize: 11)),
+              title: Text('common.force_delete'.tr(), style: const TextStyle(color: _brandOrange)),
+              subtitle: Text('common.force_delete_purge'.tr(), style: const TextStyle(fontSize: 11)),
               onTap: () => Navigator.of(ctx).pop('force_delete'),
             ),
           ],
@@ -1423,7 +1423,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Align(
                 alignment: Alignment.centerLeft,
-                child: Text('Download "${widget.group.name}" report',
+                child: Text('groups_screen.download_group_report'.tr(namedArgs: {'name': widget.group.name}),
                     style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ),
@@ -1438,7 +1438,7 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
                   await PdfExportService().exportGroupAsPdf(widget.group.id, widget.group.name);
                 } catch (e) {
                   messenger.showSnackBar(SnackBar(
-                      content: Text('Export failed: $e'),
+                      content: Text('groups_screen.export_failed'.tr(namedArgs: {'error': e.toString()})),
                       backgroundColor: Colors.red));
                 }
               },
@@ -1475,25 +1475,25 @@ class _GroupCardState extends ConsumerState<_GroupCard> {
             ),
             const SizedBox(width: 8),
             Text(
-              isSettled ? 'Reopen group' : 'groups_screen.settle_group_title'.tr(),
+              isSettled ? 'groups_screen.reopen_group'.tr() : 'groups_screen.settle_group_title'.tr(),
               style: TextStyle(color: isSettled ? _orange : _teal),
             ),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'delete',
           child: Row(children: [
-            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-            SizedBox(width: 8),
-            Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+            const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text('groups_screen.delete_group'.tr(), style: const TextStyle(color: Colors.redAccent)),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'force_delete',
           child: Row(children: [
-            Icon(Icons.delete_forever_outlined, size: 16, color: _brandOrange),
-            SizedBox(width: 8),
-            Text('Force Delete', style: TextStyle(color: _brandOrange)),
+            const Icon(Icons.delete_forever_outlined, size: 16, color: _brandOrange),
+            const SizedBox(width: 8),
+            Text('common.force_delete'.tr(), style: const TextStyle(color: _brandOrange)),
           ]),
         ),
       ],
@@ -1768,16 +1768,16 @@ class _ActivityTile extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete expense?'),
+        title: Text('expense_detail.delete_title'.tr()),
         content: Text(
-          'Remove "${expense.description.isEmpty ? expense.category : expense.description}"?',
+          'groups_screen.delete_expense_body'.tr(namedArgs: {'name': expense.description.isEmpty ? expense.category : expense.description}),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -1790,7 +1790,7 @@ class _ActivityTile extends ConsumerWidget {
     if (context.mounted) {
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense deleted')),
+        SnackBar(content: Text('groups_screen.expense_deleted'.tr())),
       );
     }
   }
@@ -1805,12 +1805,12 @@ class _ActivityTile extends ConsumerWidget {
           children: [
             ListTile(
               leading: Icon(Icons.edit_outlined, color: _teal),
-              title: const Text('Edit expense'),
+              title: Text('groups_screen.edit_expense'.tr()),
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              title: const Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+              title: Text('groups_screen.delete_expense_title'.tr(), style: const TextStyle(color: Colors.redAccent)),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
           ],
@@ -1835,15 +1835,15 @@ class _ActivityTile extends ConsumerWidget {
           child: Row(children: [
             Icon(Icons.edit_outlined, size: 16, color: _teal),
             const SizedBox(width: 8),
-            const Text('Edit expense'),
+            Text('groups_screen.edit_expense'.tr()),
           ]),
         ),
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'delete',
           child: Row(children: [
-            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-            SizedBox(width: 8),
-            Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+            const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text('groups_screen.delete_expense_title'.tr(), style: const TextStyle(color: Colors.redAccent)),
           ]),
         ),
       ],

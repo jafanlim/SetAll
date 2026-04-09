@@ -2,10 +2,10 @@ import 'dart:io' as io;
 import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import 'package:pdfx/pdfx.dart';
 
 import '../../../../core/services/date_format_service.dart';
@@ -109,12 +109,12 @@ class _GroupExpenseDetailScreenState
     final confirm1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete expense?'),
-        content: Text('Remove "$label"?'),
+        title: Text('expense_detail.delete_title'.tr()),
+        content: Text('expense_detail.delete_body'.tr(namedArgs: {'label': label})),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -122,7 +122,7 @@ class _GroupExpenseDetailScreenState
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -132,14 +132,12 @@ class _GroupExpenseDetailScreenState
     final confirm2 = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Are you sure?'),
-        content: const Text(
-          'This action is irreversible. The expense and all its splits will be permanently deleted.',
-        ),
+        title: Text('expense_detail.delete_sure_title'.tr()),
+        content: Text('expense_detail.delete_sure_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -147,7 +145,7 @@ class _GroupExpenseDetailScreenState
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Yes, delete forever'),
+            child: Text('expense_detail.yes_delete_forever'.tr()),
           ),
         ],
       ),
@@ -161,7 +159,7 @@ class _GroupExpenseDetailScreenState
     ref.invalidate(balanceSummaryProvider);
     ref.invalidate(omniActivityProvider);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Expense deleted')),
+      SnackBar(content: Text('expense_detail.expense_deleted'.tr())),
     );
     if (context.canPop()) context.pop();
   }
@@ -183,11 +181,11 @@ class _GroupExpenseDetailScreenState
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   String _memberName(String userId) {
-    if (userId == _currentUid) return 'You';
+    if (userId == _currentUid) return 'expense_detail.you'.tr();
     try {
       return _members.firstWhere((m) => m.id == userId).name;
     } catch (_) {
-      return 'Member';
+      return 'expense_detail.member'.tr();
     }
   }
 
@@ -303,13 +301,13 @@ class _GroupExpenseDetailScreenState
           TextButton.icon(
             onPressed: _edit,
             icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Edit'),
+            label: Text('expense_detail.edit'.tr()),
             style: TextButton.styleFrom(foregroundColor: _teal),
           ),
           TextButton.icon(
             onPressed: _delete,
             icon: const Icon(Icons.delete_outline, size: 16),
-            label: const Text('Delete'),
+            label: Text('expense_detail.delete'.tr()),
             style: TextButton.styleFrom(foregroundColor: _brandOrange),
           ),
           const SizedBox(width: 4),

@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -82,14 +83,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete expenses?'),
+        title: Text('group_detail.delete_expenses_title'.tr()),
         content: Text(
-          'Are you sure you want to delete $count expense${count == 1 ? '' : 's'}?\n\nThis is irreversible.',
+          count == 1
+              ? 'group_detail.delete_expenses_confirm'.tr(namedArgs: {'count': count.toString()})
+              : 'group_detail.delete_expenses_confirm_plural'.tr(namedArgs: {'count': count.toString()}),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton.icon(
             style: FilledButton.styleFrom(
@@ -97,7 +100,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               foregroundColor: Colors.white,
             ),
             icon: const Icon(Icons.delete_outline, size: 16),
-            label: Text('Delete ($count)'),
+            label: Text('common.delete_count'.tr(namedArgs: {'count': count.toString()})),
             onPressed: () => Navigator.of(ctx).pop(true),
           ),
         ],
@@ -119,7 +122,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       });
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete some expenses.')),
+        SnackBar(content: Text('group_detail.could_not_delete_expenses'.tr())),
       );
     }
   }
@@ -130,19 +133,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final newName = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Rename group'),
+        title: Text('group_detail.rename_group'.tr()),
         content: TextField(
           controller: ctrl,
           autofocus: true,
-          decoration: const InputDecoration(labelText: 'Group name'),
+          decoration: InputDecoration(labelText: 'group_detail.group_name_label'.tr()),
           onSubmitted: (v) => Navigator.of(ctx).pop(v.trim()),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(ctrl.text.trim()),
-            child: const Text('Rename'),
+            child: Text('common.rename'.tr()),
           ),
         ],
       ),
@@ -159,7 +162,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       HapticUtils.success();
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not rename group')),
+        SnackBar(content: Text('group_detail.could_not_rename'.tr())),
       );
     }
   }
@@ -169,17 +172,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark group as settled?'),
-        content: const Text(
-          'This marks all debts in the group as settled. '
-          'No payments are recorded — you can reopen the group at any time.',
-        ),
+        title: Text('group_detail.settle_title'.tr()),
+        content: Text('group_detail.settle_body'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Settle'),
+            child: Text('common.settle'.tr()),
           ),
         ],
       ),
@@ -194,11 +194,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       ref.invalidate(omniActivityProvider);
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group marked as settled ✓')),
+        SnackBar(content: Text('group_detail.settled_snack'.tr())),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settlement failed. Please try again.'), backgroundColor: Colors.red),
+        SnackBar(content: Text('group_detail.settle_failed'.tr()), backgroundColor: Colors.red),
       );
     }
   }
@@ -208,16 +208,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Reopen group?'),
-        content: const Text(
-          'This restores all outstanding debts. Members will owe each other as before.',
-        ),
+        title: Text('group_detail.reopen_title'.tr()),
+        content: Text('group_detail.reopen_body'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: _teal, foregroundColor: Colors.black),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reopen'),
+            child: Text('common.reopen'.tr()),
           ),
         ],
       ),
@@ -232,11 +230,11 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       ref.invalidate(omniActivityProvider);
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group reopened')),
+        SnackBar(content: Text('group_detail.reopened_snack'.tr())),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not reopen group. Please try again.'), backgroundColor: Colors.red),
+        SnackBar(content: Text('group_detail.reopen_failed'.tr()), backgroundColor: Colors.red),
       );
     }
   }
@@ -248,14 +246,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete group?'),
-        content: Text('Delete "$_groupName"? You can restore it from the Activity screen within 90 days.'),
+        title: Text('group_detail.delete_title'.tr()),
+        content: Text('group_detail.delete_body'.tr(namedArgs: {'name': _groupName})),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -265,14 +263,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     final doubleConfirm = await showDialog<bool>(
       context: context, // ignore: use_build_context_synchronously
       builder: (ctx) => AlertDialog(
-        title: const Text('Are you sure?'),
-        content: const Text('The group will be hidden immediately. As the owner, you can restore it from the Activity screen within 90 days.'),
+        title: Text('group_detail.delete_sure_title'.tr()),
+        content: Text('group_detail.delete_sure_body'.tr()),
         actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Yes, delete forever'),
+            child: Text('common.yes_delete_forever'.tr()),
           ),
         ],
       ),
@@ -288,7 +286,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
       router.pop();
     } else {
       messenger.showSnackBar(
-        const SnackBar(content: Text('Could not delete group.')),
+        SnackBar(content: Text('group_detail.could_not_delete'.tr())),
       );
     }
   }
@@ -326,19 +324,19 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     onPressed: allSelected
                         ? _deselectAllExpenses
                         : () => _selectAllExpenses(expenses.map((e) => e.id).toList()),
-                    child: Text(allSelected ? 'Deselect All' : 'Select All'),
+                    child: Text(allSelected ? 'group_detail.deselect_all'.tr() : 'group_detail.select_all'.tr()),
                   );
                 }).valueOrNull ?? const SizedBox.shrink(),
                 TextButton(
                   onPressed: _toggleEditMode,
-                  child: const Text('Cancel'),
+                  child: Text('common.cancel'.tr()),
                 ),
                 if (_selected.isNotEmpty)
                   TextButton.icon(
                     onPressed: _deleteBatchExpenses,
                     icon: const Icon(Icons.delete_outline, size: 16, color: _brandOrange),
                     label: Text(
-                      'Delete (${_selected.length})',
+                      'common.delete_count'.tr(namedArgs: {'count': _selected.length.toString()}),
                       style: const TextStyle(color: _brandOrange),
                     ),
                   ),
@@ -347,20 +345,20 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 if (group?.isSettled == true)
                   TextButton.icon(
                     icon: const Icon(Icons.lock_open_outlined, size: 16),
-                    label: const Text('Reopen'),
+                    label: Text('common.reopen'.tr()),
                     style: TextButton.styleFrom(foregroundColor: _orange),
                     onPressed: _reopenGroup,
                   )
                 else
                   TextButton.icon(
                     icon: const Icon(Icons.check_circle_outline, size: 16),
-                    label: const Text('Settle'),
+                    label: Text('common.settle'.tr()),
                     style: TextButton.styleFrom(foregroundColor: _teal),
                     onPressed: _settleGroup,
                   ),
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined),
-                  tooltip: 'Invite member',
+                  tooltip: 'group_detail.invite_member'.tr(),
                   onPressed: () {
                     HapticUtils.primaryTap();
                     context.push(
@@ -380,16 +378,16 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     if (value == 'reopen') _reopenGroup();
                   },
                   itemBuilder: (_) => [
-                    const PopupMenuItem(value: 'editGroup', child: Text('Edit group')),
-                    const PopupMenuItem(value: 'rename', child: Text('Rename group')),
-                    const PopupMenuItem(value: 'editExpenses', child: Text('Select expenses')),
+                    PopupMenuItem(value: 'editGroup', child: Text('group_detail.edit_group'.tr())),
+                    PopupMenuItem(value: 'rename', child: Text('group_detail.rename_group'.tr())),
+                    PopupMenuItem(value: 'editExpenses', child: Text('group_detail.select_expenses'.tr())),
                     if (group?.isSettled == true)
-                      const PopupMenuItem(value: 'reopen', child: Text('Reopen group'))
+                      PopupMenuItem(value: 'reopen', child: Text('group_detail.reopen_group'.tr() ))
                     else
-                      const PopupMenuItem(value: 'settle', child: Text('Settle group')),
-                    const PopupMenuItem(
+                      PopupMenuItem(value: 'settle', child: Text('group_detail.settle_group'.tr())),
+                    PopupMenuItem(
                       value: 'delete',
-                      child: Text('Delete group', style: TextStyle(color: Colors.redAccent)),
+                      child: Text('group_detail.delete_group'.tr(), style: const TextStyle(color: Colors.redAccent)),
                     ),
                   ],
                 ),
@@ -430,7 +428,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            'This group is settled up — no one owes anything.',
+                            'common.settled_group_banner'.tr(),
                             style: TextStyle(
                               color: _teal,
                               fontWeight: FontWeight.w600,
@@ -446,7 +444,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          child: const Text('Reopen', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                          child: Text('common.reopen'.tr(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                         ),
                       ],
                     ),
@@ -477,7 +475,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
                 child: Text(
-                  'Members',
+                  'group_detail.members'.tr(),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -501,7 +499,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     ),
                   ),
                   error: (e, _) => Text(
-                    'Could not load members',
+                    'common.could_not_load_members'.tr(),
                     style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
                   ),
                 ),
@@ -513,7 +511,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
                 child: Text(
-                  'Expenses',
+                  'group_detail.expenses'.tr(),
                   style: theme.textTheme.titleMedium?.copyWith(
                     fontWeight: FontWeight.w700,
                     fontSize: 15,
@@ -528,7 +526,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         child: Text(
-                          'No expenses yet. Tap + to add one.',
+                          'common.no_expenses_yet_tap'.tr(),
                           style: TextStyle(
                             color: theme.colorScheme.onSurfaceVariant,
                             fontSize: 13,
@@ -576,7 +574,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
-                    'Could not load expenses',
+                    'common.could_not_load_expenses'.tr(),
                     style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
                   ),
                 ),
@@ -604,7 +602,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add),
         label: Text(
-          'Add expense',
+          'group_detail.add_expense'.tr(),
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
         ),
       ),
@@ -634,7 +632,7 @@ class _GroupBalanceCard extends StatelessWidget {
             const SizedBox(width: 8),
             Expanded(
               child: Text(
-                'All settled up in this group',
+                'common.all_settled_group'.tr(),
                 style: const TextStyle(
                   color: _teal,
                   fontWeight: FontWeight.w600,
@@ -657,7 +655,7 @@ class _GroupBalanceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Owed to you',
+                    'common.owed_to_you'.tr(),
                     style: TextStyle(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -680,7 +678,7 @@ class _GroupBalanceCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'You owe',
+                    'common.you_owe'.tr(),
                     style: TextStyle(
                       fontSize: 11,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -724,12 +722,12 @@ class _MemberList extends ConsumerWidget {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Remove member?'),
-        content: Text('Remove "${member.name}" from this group?'),
+        title: Text('common.remove_member_title'.tr()),
+        content: Text('common.remove_member_confirm'.tr(namedArgs: {'name': member.name})),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -737,7 +735,7 @@ class _MemberList extends ConsumerWidget {
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Remove'),
+            child: Text('common.remove'.tr()),
           ),
         ],
       ),
@@ -755,7 +753,7 @@ class _MemberList extends ConsumerWidget {
       HapticUtils.success();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.error ?? 'Could not remove member.')),
+        SnackBar(content: Text(result.error ?? 'common.could_not_remove_member'.tr())),
       );
     }
   }
@@ -769,7 +767,7 @@ class _MemberList extends ConsumerWidget {
 
     if (members.isEmpty) {
       return Text(
-        'No members yet',
+        'common.no_members_yet'.tr(),
         style: theme.textTheme.bodyMedium?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
           fontSize: 13,
@@ -803,7 +801,7 @@ class _MemberList extends ConsumerWidget {
               ),
             ),
             title: Text(
-              isCreatorMember ? '${m.name} (creator)' : m.name,
+              isCreatorMember ? 'common.you_creator'.tr(namedArgs: {'name': m.name}) : m.name,
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
             ),
             subtitle: m.defaultCurrency != 'USD'
@@ -819,7 +817,7 @@ class _MemberList extends ConsumerWidget {
                 ? IconButton(
                     icon: const Icon(Icons.person_remove_outlined, size: 18),
                     color: Colors.redAccent,
-                    tooltip: 'Remove member',
+                    tooltip: 'common.remove_member_title'.tr(),
                     onPressed: () => _removeMember(context, ref, m),
                   )
                 : null,
@@ -985,7 +983,7 @@ class _ExpenseTile extends ConsumerWidget {
         actions: [
           SwipeAction(
             icon: Icons.edit_outlined,
-            label: 'Edit',
+            label: 'common.edit'.tr(),
             color: _teal,
             onTap: () => context.push(
               '/group/$groupId/expense/${expense.id}',
@@ -994,7 +992,7 @@ class _ExpenseTile extends ConsumerWidget {
           ),
           SwipeAction(
             icon: Icons.delete_outline,
-            label: 'Delete',
+            label: 'common.delete'.tr(),
             color: Colors.redAccent,
             onTap: () => _confirmDelete(context, ref),
           ),
@@ -1097,86 +1095,6 @@ class _ExpenseTile extends ConsumerWidget {
     );
   }
 
-  Future<void> _showRightClickMenu(
-    BuildContext context, WidgetRef ref, Offset position) async {
-    final result = await showMenu<String>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-          position.dx, position.dy, position.dx + 1, position.dy + 1),
-      items: [
-        PopupMenuItem(
-          value: 'edit',
-          child: Row(children: [
-            Icon(Icons.edit_outlined, size: 16, color: _teal),
-            const SizedBox(width: 8),
-            const Text('Edit expense'),
-          ]),
-        ),
-        PopupMenuItem(
-          value: 'delete',
-          child: Row(children: const [
-            Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
-            SizedBox(width: 8),
-            Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
-          ]),
-        ),
-      ],
-    );
-    if (!context.mounted) return;
-    if (result == 'edit') {
-      context.push('/group/$groupId/expense/${expense.id}',
-          extra: {'groupName': groupName});
-    } else if (result == 'delete') {
-      _confirmDelete(context, ref);
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
-    HapticUtils.primaryTap();
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete expense?'),
-        content: Text(
-          'Remove "${expense.description.isEmpty ? expense.category : expense.description}"?',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-    if (confirm != true || !context.mounted) return;
-    final doubleConfirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Are you sure?'),
-        content: const Text('This action is irreversible. This expense and its splits will be permanently deleted.'),
-        actions: [
-          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Yes, delete forever'),
-          ),
-        ],
-      ),
-    );
-    if (doubleConfirm != true || !context.mounted) return;
-    await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
-    if (context.mounted) {
-      onDeleted();
-      HapticUtils.success();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense deleted')),
-      );
-    }
-  }
-
   Future<void> _showContextMenu(BuildContext context, WidgetRef ref) async {
     HapticUtils.primaryTap();
     final uid = await ref.read(setAllRepositoryProvider).ensureUser();
@@ -1194,19 +1112,19 @@ class _ExpenseTile extends ConsumerWidget {
           children: [
             ListTile(
               leading: Icon(Icons.edit_outlined, color: _teal),
-              title: const Text('Edit expense'),
+              title: Text('groups_screen.edit_expense'.tr()),
               onTap: () => Navigator.of(ctx).pop('edit'),
             ),
             if (canSettle)
               ListTile(
                 leading: const Icon(Icons.check_circle_outline, color: Colors.green),
-                title: const Text('Mark as settled'),
+                title: Text('group_detail.settle_group'.tr()),
                 subtitle: Text('${expense.currency} ${expense.amount} owed to you'),
                 onTap: () => Navigator.of(ctx).pop('settle'),
               ),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.redAccent),
-              title: const Text('Delete expense', style: TextStyle(color: Colors.redAccent)),
+              title: Text('groups_screen.delete_expense_title'.tr(), style: const TextStyle(color: Colors.redAccent)),
               onTap: () => Navigator.of(ctx).pop('delete'),
             ),
           ],
@@ -1223,24 +1141,101 @@ class _ExpenseTile extends ConsumerWidget {
     }
   }
 
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    HapticUtils.primaryTap();
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('expense_detail.delete_title'.tr()),
+        content: Text(
+          'expense_detail.delete_body'.tr(namedArgs: {'label': expense.description.isEmpty ? expense.category : expense.description}),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('common.delete'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true || !context.mounted) return;
+    final doubleConfirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('expense_detail.delete_sure_title'.tr()),
+        content: Text('expense_detail.delete_sure_body'.tr()),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: Text('common.cancel'.tr())),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text('common.yes_delete_forever'.tr()),
+          ),
+        ],
+      ),
+    );
+    if (doubleConfirm != true || !context.mounted) return;
+    await ref.read(setAllRepositoryProvider).deleteExpense(expense.id);
+    if (context.mounted) {
+      onDeleted();
+      HapticUtils.success();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('groups_screen.expense_deleted'.tr())),
+      );
+    }
+  }
+
+  Future<void> _showRightClickMenu(
+    BuildContext context, WidgetRef ref, Offset position) async {
+    final result = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+          position.dx, position.dy, position.dx + 1, position.dy + 1),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Row(children: [
+            Icon(Icons.edit_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.edit_expense'.tr()),
+          ]),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Row(children: [
+            const Icon(Icons.delete_outline, size: 16, color: Colors.redAccent),
+            const SizedBox(width: 8),
+            Text('groups_screen.delete_expense_title'.tr(), style: const TextStyle(color: Colors.redAccent)),
+          ]),
+        ),
+      ],
+    );
+    if (!context.mounted) return;
+    if (result == 'edit') {
+      context.push('/group/$groupId/expense/${expense.id}',
+          extra: {'groupName': groupName});
+    } else if (result == 'delete') {
+      _confirmDelete(context, ref);
+    }
+  }
+
   Future<void> _settleExpense(BuildContext context, WidgetRef ref, String uid) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark group as settled?'),
-        content: const Text(
-          'This marks the whole group as settled up. '
-          'No one will owe anything. You can reopen it at any time.',
-        ),
+        title: Text('group_detail.settle_title'.tr()),
+        content: Text('group_detail.settle_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: _teal),
-            child: const Text('Settle'),
+            child: Text('common.settle'.tr()),
           ),
         ],
       ),
@@ -1256,12 +1251,12 @@ class _ExpenseTile extends ConsumerWidget {
       ref.invalidate(omniActivityProvider);
       HapticUtils.success();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Group marked as settled ✓')),
+        SnackBar(content: Text('group_detail.settled_snack'.tr())),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Settlement failed. Please try again.'),
+        SnackBar(
+          content: Text('group_detail.settle_failed'.tr()),
           backgroundColor: Colors.red,
         ),
       );
@@ -1300,20 +1295,17 @@ class _SettleButtonState extends ConsumerState<_SettleButton> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Mark group as settled?'),
-        content: const Text(
-          'This marks the whole group as settled up. No one will owe anything. '
-          'You can reopen it at any time.',
-        ),
+        title: Text('group_detail.settle_title'.tr()),
+        content: Text('group_detail.settle_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: _teal),
-            child: const Text('Settle'),
+            child: Text('common.settle'.tr()),
           ),
         ],
       ),

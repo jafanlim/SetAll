@@ -1243,9 +1243,9 @@ class _ProfileSection extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Currency dropdown
+// Currency picker — tappable tile that opens a searchable bottom sheet
 // ---------------------------------------------------------------------------
-class _CurrencyDropdown extends StatelessWidget {
+class _CurrencyDropdown extends StatefulWidget {
   const _CurrencyDropdown({
     required this.selected,
     required this.saving,
@@ -1256,7 +1256,11 @@ class _CurrencyDropdown extends StatelessWidget {
   final bool saving;
   final ValueChanged<String> onSelected;
 
-  // Build ordered list: most-used first (deduped), then remaining.
+  @override
+  State<_CurrencyDropdown> createState() => _CurrencyDropdownState();
+}
+
+class _CurrencyDropdownState extends State<_CurrencyDropdown> {
   static List<Map<String, String>> get _orderedCurrencies {
     final mostUsedCodes = kMostUsedCurrencies.map((c) => c['code']!).toSet();
     final rest = kAllSupportedCurrencies
@@ -1265,98 +1269,182 @@ class _CurrencyDropdown extends StatelessWidget {
     return [...kMostUsedCurrencies, ...rest];
   }
 
+  void _openPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _CurrencySearchSheet(
+        all: _orderedCurrencies,
+        selected: widget.selected,
+        onSelected: (code) {
+          Navigator.of(ctx).pop();
+          widget.onSelected(code);
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme    = Theme.of(context);
-    final ordered  = _orderedCurrencies;
-    final selected = this.selected;
+    final theme   = Theme.of(context);
+    final ordered = _orderedCurrencies;
+    final cur     = ordered.firstWhere(
+      (c) => c['code'] == widget.selected,
+      orElse: () => ordered.first,
+    );
 
     return GlassCard(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-      child: saving
+      child: widget.saving
           ? const Padding(
               padding: EdgeInsets.symmetric(vertical: 14),
-              child: Center(
-                child: SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+              child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))),
+            )
+          : InkWell(
+              onTap: _openPicker,
+              borderRadius: BorderRadius.circular(12),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Row(
+                  children: [
+                    Text(cur['flag']!, style: const TextStyle(fontSize: 20)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${cur['code']!}  —  ${cur['name']!}',
+                        style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600,
+                          color: theme.colorScheme.onSurface,
+                        ),
+                      ),
+                    ),
+                    Icon(Icons.expand_more, color: theme.colorScheme.onSurfaceVariant),
+                  ],
                 ),
               ),
-            )
-          : DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: ordered.any((c) => c['code'] == selected)
-                    ? selected
-                    : ordered.first['code'],
-                isExpanded: true,
-                icon: const Icon(Icons.expand_more),
-                borderRadius: BorderRadius.circular(12),
-                onChanged: saving
-                    ? null
-                    : (code) {
-                        if (code != null) onSelected(code);
-                      },
-                selectedItemBuilder: (context) => ordered
-                    .map((c) => Align(
-                          alignment: Alignment.centerLeft,
-                          child: Row(
-                            children: [
-                              Text(c['flag']!, style: const TextStyle(fontSize: 18)),
-                              const SizedBox(width: 10),
-                              Text(
-                                '${c['code']!}  —  ${c['name']!}',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: theme.colorScheme.onSurface,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ))
-                    .toList(),
-                items: ordered.map((c) {
-                  final isSelected = c['code'] == selected;
-                  return DropdownMenuItem<String>(
-                    value: c['code'],
-                    child: Row(
-                      children: [
-                        Text(c['flag']!, style: const TextStyle(fontSize: 18)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                c['code']!,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: isSelected
-                                      ? _teal
-                                      : theme.colorScheme.onSurface,
-                                ),
-                              ),
-                              Text(
-                                c['name']!,
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isSelected)
-                          const Icon(Icons.check_circle, color: _teal, size: 14),
-                      ],
-                    ),
-                  );
-                }).toList(),
+            ),
+    );
+  }
+}
+
+class _CurrencySearchSheet extends StatefulWidget {
+  const _CurrencySearchSheet({
+    required this.all,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final List<Map<String, String>> all;
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  @override
+  State<_CurrencySearchSheet> createState() => _CurrencySearchSheetState();
+}
+
+class _CurrencySearchSheetState extends State<_CurrencySearchSheet> {
+  final _ctrl = TextEditingController();
+  List<Map<String, String>> _filtered = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _filtered = widget.all;
+    _ctrl.addListener(_onSearch);
+  }
+
+  void _onSearch() {
+    final q = _ctrl.text.trim().toLowerCase();
+    setState(() {
+      _filtered = q.isEmpty
+          ? widget.all
+          : widget.all
+              .where((c) =>
+                  c['code']!.toLowerCase().contains(q) ||
+                  c['name']!.toLowerCase().contains(q))
+              .toList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _ctrl.removeListener(_onSearch);
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DraggableScrollableSheet(
+      initialChildSize: 0.85,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (ctx, scrollCtrl) => Container(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+            Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.onSurfaceVariant.withAlpha(80),
+                borderRadius: BorderRadius.circular(2),
               ),
             ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: TextField(
+                controller: _ctrl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'settings.currency_search_hint'.tr(),
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  filled: true,
+                  fillColor: theme.colorScheme.onSurface.withAlpha(12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                controller: scrollCtrl,
+                itemCount: _filtered.length,
+                itemBuilder: (_, i) {
+                  final c = _filtered[i];
+                  final isSelected = c['code'] == widget.selected;
+                  return ListTile(
+                    leading: Text(c['flag']!, style: const TextStyle(fontSize: 22)),
+                    title: Text(
+                      c['code']!,
+                      style: TextStyle(
+                        fontWeight: FontWeight.w700, fontSize: 14,
+                        color: isSelected ? _teal : theme.colorScheme.onSurface,
+                      ),
+                    ),
+                    subtitle: Text(c['name']!, style: const TextStyle(fontSize: 12)),
+                    trailing: isSelected
+                        ? const Icon(Icons.check_circle, color: _teal, size: 18)
+                        : null,
+                    onTap: () => widget.onSelected(c['code']!),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
