@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 import 'dart:io';
 
@@ -114,6 +115,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
       await repo.deleteWalletEntry(id);
     }
     if (!mounted) return;
+    unawaited(ref.read(syncServiceProvider).writeWidgetData());
     HapticUtils.success();
     ref.invalidate(walletEntriesProvider);
     ref.invalidate(walletEntryTotalsProvider);
@@ -142,6 +144,7 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     if (confirmed != true || !mounted) return;
     await ref.read(setAllRepositoryProvider).deleteWalletEntry(id);
     if (!mounted) return;
+    unawaited(ref.read(syncServiceProvider).writeWidgetData());
     HapticUtils.success();
     ref.invalidate(walletEntriesProvider);
     ref.invalidate(walletEntryTotalsProvider);

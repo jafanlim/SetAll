@@ -809,21 +809,30 @@ class SyncService {
   /// appGroupId on iOS/macOS to target the correct suite; falls back to
   /// default SharedPreferences on Android.
   /// This is best-effort — never blocks or fails a sync on error.
+  /// Public so wallet add/edit/delete screens can refresh the widget immediately.
+  Future<void> writeWidgetData() => _writeWidgetData();
+
   Future<void> _writeWidgetData() async {
     if (kIsWeb) return;
     try {
       final profile  = await _repo.getCurrentUserProfile();
-      final currency = profile?.defaultCurrency ?? 'USD';
 
-      final walletEntries = await _repo.getPersonalExpenses();
-      var income  = 0.0;
-      var expense = 0.0;
-      for (final e in walletEntries) {
-        final amt = double.tryParse(e.universalUsdAmount ?? '0') ?? 0;
-        if (e.isIncome == true) { income += amt; } else { expense += amt; }
+      final base = profile?.defaultCurrency ?? 'USD';
+      final totals = await _repo.getWalletEntryTotals(baseCurrency: base);
+      final income    = totals.income.toDouble();
+      final expense   = totals.spend.toDouble();
+      final walletNet = totals.net.toDouble();
+      // Fetch the USD→base rate once for per-entry fallback (pre-v33 entries
+      // without a frozen baseCurrencyAmount). rate = 1 / (base→USD rate).
+      double usdToBase = 1.0;
+      if (base != 'USD') {
+        try {
+          final baseToUsd = await _repo.resolveRateToUsd(base);
+          if (baseToUsd.toDouble() > 0) usdToBase = 1.0 / baseToUsd.toDouble();
+        } catch (_) {}
       }
-      final walletNet = income - expense;
-      debugPrint('[_writeWidgetData] ${walletEntries.length} entries: income=$income expense=$expense net=$walletNet');
+      final walletEntries = await _repo.getPersonalExpenses();
+      debugPrint('[_writeWidgetData] ${walletEntries.length} entries: income=$income expense=$expense net=$walletNet ($base)');
 
       // Group balances (best-effort — ignore if unavailable)
       double sharedOwed = 0;
@@ -850,7 +859,7 @@ class SyncService {
         await widgetPrefs.setDouble('widget_shared_owe',   sharedOwe);
         await widgetPrefs.setDouble('widget_income',       income);
         await widgetPrefs.setDouble('widget_expenses',     expense);
-        await widgetPrefs.setString('widget_currency',     currency);
+        await widgetPrefs.setString('widget_currency',     base);
         await widgetPrefs.setString('widget_updated',      DateTime.now().toIso8601String());
         // Prefer entries with real descriptions; fall back to most-recent 3.
         final withDesc = walletEntries
@@ -860,11 +869,18 @@ class SyncService {
         final recent = withDesc.length >= 3 ? withDesc : walletEntries.take(3).toList();
         for (int i = 0; i < 3; i++) {
           final e = i < recent.length ? recent[i] : null;
+          double entryAmt = 0;
+          if (e != null) {
+            // Prefer frozen base-currency amount (schema v33+); fall back to
+            // converting universalUsdAmount at the same rate used for totals.
+            final frozen = double.tryParse(e.baseCurrencyAmount ?? '');
+            entryAmt = frozen ?? ((double.tryParse(e.universalUsdAmount ?? '0') ?? 0) * usdToBase);
+          }
           await widgetPrefs.setString('widget_entry_${i + 1}_desc',   e?.description ?? '');
-          await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', e != null ? (double.tryParse(e.universalUsdAmount ?? '0') ?? 0) : 0);
+          await widgetPrefs.setDouble('widget_entry_${i + 1}_amount', entryAmt);
           await widgetPrefs.setBool(  'widget_entry_${i + 1}_income', e?.isIncome ?? false);
         }
-        debugPrint('[SyncService] widget data written: $currency wallet=$walletNet true=$trueNetWorth owed=$sharedOwed owe=$sharedOwe → $appGroup');
+        debugPrint('[SyncService] widget data written: $base wallet=$walletNet true=$trueNetWorth owed=$sharedOwed owe=$sharedOwe → $appGroup');
         try { await HomeWidget.updateWidget(iOSName: 'SetAllWidget'); }
         catch (_) { /* not available in this build config */ }
       } else {
@@ -875,7 +891,7 @@ class SyncService {
         await prefs.setDouble('widget_shared_owe',  sharedOwe);
         await prefs.setDouble('widget_income',      income);
         await prefs.setDouble('widget_expenses',    expense);
-        await prefs.setString('widget_currency',    currency);
+        await prefs.setString('widget_currency',    base);
         await prefs.setString('widget_updated',     DateTime.now().toIso8601String());
       }
     } catch (e, st) {

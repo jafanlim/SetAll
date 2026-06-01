@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io';
 
 import 'package:decimal/decimal.dart';
@@ -311,6 +312,11 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
   }
 
   // ---------------------------------------------------------------------------
+  DateTime _composeCreatedAt(DateTime d, {DateTime? preserveTimeFrom}) {
+    final t = preserveTimeFrom ?? DateTime.now();
+    return DateTime(d.year, d.month, d.day, t.hour, t.minute, t.second).toUtc();
+  }
+
   // Submit
   // ---------------------------------------------------------------------------
 
@@ -357,6 +363,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       final existing = widget.existingWalletEntry;
       final entryId = existing?.id ?? const Uuid().v4();
       final now = DateTime.now().toUtc().toIso8601String();
+      final composedCreatedAt = existing == null
+          ? _composeCreatedAt(_selectedDate).toIso8601String()
+          : _composeCreatedAt(
+              _selectedDate,
+              preserveTimeFrom: DateTime.tryParse(existing.createdAt!)?.toLocal(),
+            ).toIso8601String();
 
       // Compute USD equivalent for totals / sorting.
       final rateToUsd = await repo.resolveRateToUsd(_currency);
@@ -373,11 +385,12 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         iconCodepoint: _entryIcon.codePoint,
         iconColor:   _entryColor.toARGB32(),
         notes:       _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
-        createdAt:   existing?.createdAt ?? now,
+        createdAt:   composedCreatedAt,
         updatedAt:   now,
         universalUsdAmount: usdAmount.toString(),
       );
       await repo.upsertWalletEntry(entry);
+      unawaited(ref.read(syncServiceProvider).writeWidgetData());
       if (mounted) {
         setState(() => _isSubmitting = false);
         HapticUtils.success(); // HAPTIC-01: wallet creation — heavy confirms high-value action
@@ -495,6 +508,7 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
       iconColor: _entryColor.toARGB32(),
       attachmentPaths: List.unmodifiable(_attachmentPaths),
       notes: _notesCtrl.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesCtrl.text.trim()),
+      entryDate: _selectedDate,
     );
 
 

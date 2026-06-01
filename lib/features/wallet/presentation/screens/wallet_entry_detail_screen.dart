@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:io' as io;
 import 'dart:typed_data';
 
@@ -91,6 +92,7 @@ class _WalletEntryDetailScreenState
     if (confirmed != true || !mounted) return;
     await ref.read(setAllRepositoryProvider).deleteWalletEntry(widget.expense.id);
     if (!mounted) return;
+    unawaited(ref.read(syncServiceProvider).writeWidgetData());
     HapticUtils.success();
     ref.invalidate(walletEntriesProvider);
     ref.invalidate(walletEntryTotalsProvider);
