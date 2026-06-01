@@ -67,9 +67,11 @@ struct SAProvider: TimelineProvider {
         completion(SAEntry(date: Date(), data: .load()))
     }
     func getTimeline(in context: Context, completion: @escaping (Timeline<SAEntry>) -> Void) {
-        let e = SAEntry(date: Date(), data: .load())
-        let next = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        completion(Timeline(entries: [e], policy: .after(next)))
+        let now  = Date()
+        let e    = SAEntry(date: now, data: .load())
+        let next = Calendar.current.date(byAdding: .minute, value: 30, to: now)!
+        let e2   = SAEntry(date: next, data: .load())
+        completion(Timeline(entries: [e, e2], policy: .atEnd))
     }
 }
 
