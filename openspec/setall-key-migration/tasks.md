@@ -28,7 +28,7 @@ OPEN-1  Secret hygiene after in-chat leak  [YOU — do not paste values in any A
   -- EXIT: one rotated value everywhere; old values 403/dead.
 
 OPEN-2  Get CI green, then decouple it from this work  [CASCADE for the YAML, YOU for secrets/tags]
-  2.1 Confirm release.yml has: Android job, Windows --no-tree-shake-icons, correct Firebase secret name (FIREBASE_SERVICE_ACCOUNT_SETALL_45861), if-guards on artifact downloads.
+  2.1 Confirm release.yml has: Android job, Windows --no-tree-shake-icons, correct Firebase secret name (FIREBASE_SERVICE_ACCOUNT_SETALL_45061), if-guards on artifact downloads.
   2.2 Decide tag hygiene: the force --tags re-pointed 33 tags. Either accept current state or delete stale tags. Cut ONE fresh tag (e.g. v1.6.3) for a clean trigger rather than reusing rewritten ones.
   2.3 One green run across desktop + Android. Treat any remaining failure as a normal CI bug (separate spec), not part of the migration.
   -- EXIT: green release run on a fresh tag.
