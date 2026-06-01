@@ -33,7 +33,7 @@ class AuthConfig {
   /// Your Project Anon Public Key
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
-    defaultValue: 'REDACTED_JWT',
+    defaultValue: 'sb_publishable_HAOfBmXozIHoIJVgiSgs6Q_zopu6KJ-',
   );
 
   // 2. OAUTH CREDENTIALS (For Phase 0: Google Sign-In)
