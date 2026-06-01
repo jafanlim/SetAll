@@ -90,7 +90,7 @@ dependencies:
   quick_actions: ^1.0.0
 
   # Voice input (FEAT-01)
-  speech_to_text: ^7.0.0
+  speech_to_text: ^7.4.0
 
   # QR code generation (FEAT-03)
   qr_flutter: ^4.1.0
