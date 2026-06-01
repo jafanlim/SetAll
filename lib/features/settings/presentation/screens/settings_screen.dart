@@ -433,6 +433,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ref.invalidate(currentProfileProvider);
       ref.invalidate(baseCurrencyProvider);
       ref.invalidate(balanceSummaryProvider);
+      unawaited(Future.delayed(const Duration(milliseconds: 300), () => ref.read(syncServiceProvider).writeWidgetData()));
       HapticUtils.success();
     } catch (e) {
       if (mounted) {

@@ -882,7 +882,7 @@ class SyncService {
         }
         debugPrint('[SyncService] widget data written: $base wallet=$walletNet true=$trueNetWorth owed=$sharedOwed owe=$sharedOwe → $appGroup');
         try { await HomeWidget.updateWidget(iOSName: 'SetAllWidget'); }
-        catch (_) { /* not available in this build config */ }
+        catch (e) { debugPrint('[SyncService] HomeWidget.updateWidget error: $e'); }
       } else {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setDouble('widget_net_worth',   walletNet);
