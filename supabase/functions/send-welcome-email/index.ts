@@ -4,6 +4,15 @@
 // Requires secrets:
 //   RESEND_API_KEY       — Resend API key
 //   WELCOME_HOOK_SECRET  — Shared secret set in both this function and the DB trigger
+//
+// ── AUTH MODEL (OPEN-3) ────────────────────────────────────────────────────────
+// DO NOT add an x-edge-secret guard to this function.
+// This function is called by a Supabase Auth trigger (on_profile_created), which
+// sends its own webhook secret in the x-webhook-secret header (WELCOME_HOOK_SECRET).
+// The x-edge-secret pattern is for DB trigger / cron functions only. Replacing or
+// supplementing WELCOME_HOOK_SECRET with x-edge-secret would break the welcome email
+// flow because the Auth trigger sends x-webhook-secret, not x-edge-secret.
+// See docs/setall-supabase-key-migration.md §"send-welcome-email" for the exception rationale.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 

@@ -40,13 +40,22 @@ Because disabling legacy keys removes platform JWT verification, each function d
 | `monthly-digest` | `cron.schedule` | Shared-secret header |
 | `weekly-analysis` | `cron.schedule` | Shared-secret header |
 | `sync-exchange-rates` | cron | Shared-secret header |
-| `send-email` | DB hook (`net.http_post`) | Shared-secret header |
+| `send-email` | **Supabase Auth Hook** | ⚠️ **No x-edge-secret** — see exception below |
 | `send-group-notification` | DB trigger | Shared-secret header |
 | `notify-group-invite` | DB trigger | Shared-secret header |
-| `send-welcome-email` | Auth trigger | **Already checks `WELCOME_HOOK_SECRET`** — keep / template |
+| `send-welcome-email` | **Auth trigger** | ⚠️ **No x-edge-secret** — uses `WELCOME_HOOK_SECRET` in `x-webhook-secret`; see exception below |
 | `send-test-email` | Manual/dev | Shared-secret header, or delete if unused |
 
 **Pattern:** one user-auth function (`ai-analyst`), nine internal callers that just need a shared secret in a header. All the internal callers go through `net.http_post` in your trigger/cron migrations — today they send `Authorization: Bearer <service_role>`; you'll switch them to a custom header (a secret key can't be a Bearer token anyway).
+
+### ⚠️ Exception: `send-email` and `send-welcome-email` — do NOT add x-edge-secret
+
+These two functions are **Supabase Auth Hooks**, called directly by the Supabase Auth subsystem, not by your DB triggers or cron jobs. The Auth system does not send `x-edge-secret` headers:
+
+- **`send-email`** is wired as the "Send Email" Auth Hook (Dashboard → Authentication → Hooks). Supabase Auth calls it with `{ user, email_data }` and no custom secret header. Adding an `x-edge-secret` check would cause every auth email (confirm, recovery, magic-link, email-change) to return 403 and silently break authentication.
+- **`send-welcome-email`** is called by the `on_profile_created` DB trigger, which sends its own secret in the `x-webhook-secret` header (`WELCOME_HOOK_SECRET`). This is a different header name and value from `x-edge-secret`; do not replace or supplement it.
+
+The security model for both is: (1) the function URL is not exposed to end users, (2) `--no-verify-jwt` is set, (3) each has its own appropriate guard (`send-email` relies on network-layer protection; `send-welcome-email` checks `WELCOME_HOOK_SECRET`).
 
 ---
 

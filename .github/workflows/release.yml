@@ -29,11 +29,16 @@ jobs:
           echo "${{ secrets.FIREBASE_OPTIONS_DART_B64 }}" | base64 --decode > lib/firebase_options.dart
           echo "${{ secrets.GOOGLE_SERVICES_JSON_B64 }}" | base64 --decode > android/app/google-services.json
 
+      - name: Restore .env.client
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env.client
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env.client
+
       - name: Install Dependencies
         run: flutter pub get
 
       - name: Build APK
-        run: flutter build apk --release --no-tree-shake-icons
+        run: flutter build apk --release --no-tree-shake-icons --dart-define-from-file=.env.client
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
@@ -92,11 +97,17 @@ jobs:
         run: flutter pub get
 
       # ── macOS Build & Package ────────────────────────────────────────────────
+      - name: Restore .env.client
+        shell: bash
+        run: |
+          echo "SUPABASE_URL=${{ secrets.SUPABASE_URL }}" > .env.client
+          echo "SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}" >> .env.client
+
       - name: Build macOS
         if: matrix.os == 'macos-latest'
         run: |
           flutter config --enable-macos-desktop
-          flutter build macos --release --no-tree-shake-icons
+          flutter build macos --release --no-tree-shake-icons --dart-define-from-file=.env.client
 
       - name: Import Developer ID certificate
         if: matrix.os == 'macos-latest' && env.CERT_P12_B64 != ''
@@ -181,7 +192,7 @@ jobs:
         if: matrix.os == 'windows-latest'
         run: |
           flutter config --enable-windows-desktop
-          flutter build windows --release --no-tree-shake-icons
+          flutter build windows --release --no-tree-shake-icons --dart-define-from-file=.env.client
 
       - name: Package Windows installer
         if: matrix.os == 'windows-latest'
@@ -208,18 +219,21 @@ jobs:
     steps:
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: SetAll-macOS.dmg
           path: dist
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: SetAll-Windows.exe
           path: dist
 
       - name: Download Android artifact
         uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           name: SetAll-Android.apk
           path: dist

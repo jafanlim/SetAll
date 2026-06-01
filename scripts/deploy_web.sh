@@ -37,7 +37,7 @@ echo ""
 
 # ── 3. Flutter web build ─────────────────────────────────────────────────────
 echo "▶ Building Flutter web (release)…"
-flutter build web --release --no-tree-shake-icons
+flutter build web --release --no-tree-shake-icons --dart-define-from-file=.env.client
 echo "✓ Build complete → build/web"
 echo ""
 

@@ -31,6 +31,10 @@ class AuthConfig {
   );
 
   /// Your Project Anon Public Key
+  // NOTE (OPEN-4): SUPABASE_ANON_KEY holds the publishable key (sb_publishable_…) and
+  // SUPABASE_SERVICE_ROLE_KEY would hold the secret — the SUPABASE_ prefix is reserved
+  // by Supabase and auto-injected into Edge Functions, so these variable names are
+  // intentional. The value here is publishable (RLS-enforced, safe to ship in the client).
   static const supabaseAnonKey = String.fromEnvironment(
     'SUPABASE_ANON_KEY',
     defaultValue: 'sb_publishable_HAOfBmXozIHoIJVgiSgs6Q_zopu6KJ-',

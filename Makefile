@@ -26,7 +26,7 @@ tailwind:
 
 # 6. Build Flutter web (release, JS renderer default in Flutter 3.22+)
 build-web: tailwind
-	flutter build web --release --no-tree-shake-icons
+	flutter build web --release --no-tree-shake-icons --dart-define-from-file=.env.client
 	cp web/app.html        build/web/app.html
 	cp "new website/landing page.html" build/web/index.html
 	cp web/login.html      build/web/login.html

@@ -15,6 +15,16 @@
  *
  * Deploy:
  *   supabase functions deploy send-email --no-verify-jwt
+ *
+ * ── AUTH MODEL (OPEN-3) ───────────────────────────────────────────────────────
+ * DO NOT add an x-edge-secret guard to this function.
+ * This is a Supabase Auth Hook — Supabase Auth calls it directly using its own
+ * internal webhook mechanism (configured in Dashboard → Auth → Hooks). It does
+ * NOT send x-edge-secret headers; adding that check would cause every auth email
+ * (confirm, recovery, magic-link, email-change) to return 403 and break the auth
+ * flow entirely. The security boundary here is the --no-verify-jwt deploy flag
+ * plus the fact that the function URL is not exposed to end users.
+ * See docs/setall-supabase-key-migration.md §"send-email" for the exception rationale.
  */
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
