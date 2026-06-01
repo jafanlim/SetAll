@@ -53,6 +53,8 @@ app.*.map.json
 .env
 .env.*
 !.env.example
+!.env.client.example
+!.env.server.example
 
 # Firebase config files — contain API keys, never commit these
 # Keep local copies but do NOT push to public repos.
