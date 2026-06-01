@@ -42,11 +42,10 @@ jobs:
           path: build/app/outputs/flutter-apk/app-release.apk
 
       - name: Distribute to Firebase App Distribution
-        if: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON != '' }}
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
-          appId: ${{ secrets.FIREBASE_ANDROID_APP_ID }}
-          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          appId: "1:41197170572:android:c3eebac88b48955e5ef0a9"
+          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SETALL_45861 }}
           groups: testers
           file: build/app/outputs/flutter-apk/app-release.apk
           releaseNotes: "v${{ github.ref_name }} — key migration + security hardening"
