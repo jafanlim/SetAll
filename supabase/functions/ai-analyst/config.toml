@@ -1,2 +1,3 @@
+# RETIRED — function superseded by netlify/functions/ai-analyst.js
+# verify_jwt = false removed as part of retirement (chore: retire supabase edge ai-analyst)
 [functions.ai-analyst]
-verify_jwt = false

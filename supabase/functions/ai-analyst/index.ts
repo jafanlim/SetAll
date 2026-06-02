@@ -1,5 +1,9 @@
 /**
- * SetAll — ai-analyst Edge Function
+ * RETIRED — superseded by netlify/functions/ai-analyst.js
+ * All clients call https://setall.app/.netlify/functions/ai-analyst directly.
+ * This Supabase Edge function is no longer invoked and is kept as a stub only.
+ * ─────────────────────────────────────────────────────────────────────────────
+ * SetAll — ai-analyst Edge Function (RETIRED)
  * ─────────────────────────────────────────────────────────────────────────────
  * Receives a user message + financial context from the Insights Hub and returns
  * a structured AI reply powered by Google Gemini (gemini-2.5-flash).
