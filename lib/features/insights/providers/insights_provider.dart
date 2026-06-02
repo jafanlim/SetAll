@@ -23,6 +23,7 @@ class InsightsState {
     this.sessionIds = const [],
     this.isLoading = false,
     this.error,
+    this.pendingAction,
   });
 
   final List<AiChatMessage> messages;
@@ -30,6 +31,8 @@ class InsightsState {
   final List<String> sessionIds;
   final bool isLoading;
   final String? error;
+  /// Parsed action suggestion from the AI — non-null triggers confirmation sheet.
+  final Map<String, dynamic>? pendingAction;
 
   InsightsState copyWith({
     List<AiChatMessage>? messages,
@@ -38,6 +41,8 @@ class InsightsState {
     bool? isLoading,
     String? error,
     bool clearError = false,
+    Map<String, dynamic>? pendingAction,
+    bool clearAction = false,
   }) {
     return InsightsState(
       messages: messages ?? this.messages,
@@ -45,6 +50,7 @@ class InsightsState {
       sessionIds: sessionIds ?? this.sessionIds,
       isLoading: isLoading ?? this.isLoading,
       error: clearError ? null : (error ?? this.error),
+      pendingAction: clearAction ? null : (pendingAction ?? this.pendingAction),
     );
   }
 }
@@ -93,6 +99,12 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
         clearError: true,
       ),
     );
+  }
+
+  void clearAction() {
+    final current = state.valueOrNull;
+    if (current == null) return;
+    state = AsyncData(current.copyWith(clearAction: true));
   }
 
   Future<void> sendMessage(String userText, {String mode = 'chat'}) async {
@@ -226,6 +238,16 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           ? '$replyText\n__CANVAS__:${jsonEncode(report)}'
           : replyText;
 
+      // Parse optional action suggestion (chat mode only). Validate enum.
+      const validActionTypes = {'add_expense', 'query_total', 'create_group'};
+      Map<String, dynamic>? parsedAction;
+      if (!isCanvas && report?['action'] is Map) {
+        final a = (report!['action'] as Map).cast<String, dynamic>();
+        if (validActionTypes.contains(a['type'] as String?)) {
+          parsedAction = a;
+        }
+      }
+
       final assistantMsg = AiChatMessage.create(
         sessionId: current.sessionId,
         role: AiChatRole.assistant,
@@ -242,6 +264,8 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
         messages: [...updatedMessages, assistantMsg],
         sessionIds: sessionIds,
         isLoading: false,
+        pendingAction: parsedAction,
+        clearAction: parsedAction == null,
       ));
     } catch (e) {
       state = AsyncData(current.copyWith(

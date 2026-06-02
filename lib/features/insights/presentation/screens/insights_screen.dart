@@ -1,12 +1,15 @@
+import 'dart:convert';
+
+import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:intl/intl.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../domain/entities/expense.dart' show SplitType;
 import '../../../../core/utils/haptic_utils.dart';
 import '../../models/ai_chat_message.dart';
 import '../../models/canvas_data.dart';
@@ -93,6 +96,23 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show action confirmation sheet whenever AI returns a pending action.
+    ref.listen<AsyncValue<InsightsState>>(insightsProvider, (prev, next) {
+      final action = next.valueOrNull?.pendingAction;
+      if (action == null) return;
+      final prevAction = prev?.valueOrNull?.pendingAction;
+      if (action == prevAction) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        showModalBottomSheet<void>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _AiActionSheet(action: action),
+        ).then((_) => ref.read(insightsProvider.notifier).clearAction());
+      });
+    });
+
     final width = MediaQuery.of(context).size.width;
     final isTablet = width >= 600 && width < 900;
     final isDesktop = width >= 900;
@@ -1158,7 +1178,7 @@ class _LatestAnalysisCardState extends ConsumerState<_LatestAnalysisCard> {
 
     return insights.when(
       loading: () => _buildShimmer(theme),
-      error:   (_, __) => const SizedBox.shrink(),
+      error:   (_, _) => const SizedBox.shrink(),
       data: (list) {
         if (list.isEmpty) return _buildEmpty(theme);
         final latest = list.first;
@@ -1289,5 +1309,155 @@ class _LatestAnalysisCardState extends ConsumerState<_LatestAnalysisCard> {
     } catch (_) {
       return '';
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// AI Action Confirmation Sheet
+// ---------------------------------------------------------------------------
+// Shows when the AI returns an action suggestion in chat mode.
+// query_total: display only (no write).
+// add_expense / create_group: confirm before calling repo.
+class _AiActionSheet extends ConsumerStatefulWidget {
+  const _AiActionSheet({required this.action});
+  final Map<String, dynamic> action;
+
+  @override
+  ConsumerState<_AiActionSheet> createState() => _AiActionSheetState();
+}
+
+class _AiActionSheetState extends ConsumerState<_AiActionSheet> {
+  bool _busy = false;
+  String? _error;
+
+  String get _type => widget.action['type'] as String? ?? '';
+
+  Future<void> _confirm() async {
+    setState(() { _busy = true; _error = null; });
+    try {
+      final repo = ref.read(setAllRepositoryProvider);
+      if (_type == 'add_expense') {
+        final uid = await repo.ensureUser();
+        if (uid == null) throw Exception('Not signed in');
+        final raw = widget.action['amount'];
+        final amount = Decimal.tryParse(raw?.toString() ?? '0') ?? Decimal.zero;
+        final description = widget.action['description'] as String? ?? 'AI Expense';
+        final currency = widget.action['currency'] as String? ?? 'USD';
+        final category = widget.action['category'] as String? ?? 'General';
+        await repo.addExpense(
+          payerId: uid,
+          amount: amount,
+          description: description,
+          currency: currency,
+          splitType: SplitType.even,
+          splits: [],
+          category: category,
+          entryDate: DateTime.now(),
+        );
+      } else if (_type == 'create_group') {
+        final name = widget.action['name'] as String? ?? 'New Group';
+        await repo.createGroup(name);
+      }
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      setState(() { _busy = false; _error = e.toString(); });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isWrite = _type == 'add_expense' || _type == 'create_group';
+
+    String title;
+    String subtitle;
+    if (_type == 'add_expense') {
+      final amt = widget.action['amount'];
+      final cur = widget.action['currency'] as String? ?? '';
+      final desc = widget.action['description'] as String? ?? '';
+      title = 'Log expense?';
+      subtitle = '$cur ${amt ?? '?'} — $desc';
+    } else if (_type == 'create_group') {
+      title = 'Create group?';
+      subtitle = widget.action['name'] as String? ?? '';
+    } else {
+      title = 'Query result';
+      subtitle = jsonEncode(widget.action);
+    }
+
+    return Container(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: EdgeInsets.fromLTRB(
+          24, 20, 24, 24 + MediaQuery.of(context).viewInsets.bottom),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 36, height: 4,
+              decoration: BoxDecoration(
+                color: theme.colorScheme.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(title,
+              style: theme.textTheme.titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(subtitle,
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          if (_error != null) ...[
+            const SizedBox(height: 8),
+            Text(_error!,
+                style: TextStyle(
+                    color: theme.colorScheme.error, fontSize: 13)),
+          ],
+          const SizedBox(height: 24),
+          if (isWrite)
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _busy
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                        backgroundColor: _teal,
+                        foregroundColor: Colors.white),
+                    onPressed: _busy ? null : _confirm,
+                    child: _busy
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white))
+                        : const Text('Confirm'),
+                  ),
+                ),
+              ],
+            )
+          else
+            FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: _teal,
+                  foregroundColor: Colors.white),
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('OK'),
+            ),
+        ],
+      ),
+    );
   }
 }

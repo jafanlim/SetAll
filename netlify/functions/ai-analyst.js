@@ -126,6 +126,11 @@ Rules:
 - You may ask one follow-up question if genuinely useful.
 - Respond in plain conversational text. No bullet points unless explicitly asked.
 - IMPORTANT: Always express monetary amounts in the user's currency: ${currency}. Do not use USD unless ${currency} is USD.${langLine}
+- OPTIONAL: If the user clearly requests to add an expense, log a transaction, or create a group, append exactly one action on its own line at the very end of your response in this format (no other text after it):
+  ACTION:{"type":"add_expense","amount":0,"description":"","currency":"${currency}","category":"General"}
+  or ACTION:{"type":"create_group","name":""}
+  or ACTION:{"type":"query_total"}
+  Only include an action when the user explicitly requests it. Never guess or invent one.
 ${groundingBlock}`;
 
     const maxTokens   = isCanvas ? 2048 : 1024;
@@ -191,7 +196,23 @@ ${groundingBlock}`;
       if (!parsed.summary) parsed.summary = rawText.slice(0, 300);
       return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify(parsed), mode: 'canvas' }) };
     } else {
-      return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify({ summary: rawText }), mode: 'chat' }) };
+      // Parse optional ACTION:{} sentinel from chat response.
+      const VALID_ACTION_TYPES = ['add_expense', 'query_total', 'create_group'];
+      let summary = rawText;
+      let action = null;
+      const actionMatch = rawText.match(/\nACTION:(\{[^\n]+\})\s*$/);
+      if (actionMatch) {
+        try {
+          const parsed = JSON.parse(actionMatch[1]);
+          if (parsed && VALID_ACTION_TYPES.includes(parsed.type)) {
+            action = parsed;
+          }
+        } catch (_) {}
+        summary = rawText.slice(0, actionMatch.index).trim();
+      }
+      const report = { summary };
+      if (action) report.action = action;
+      return { statusCode: 200, headers, body: JSON.stringify({ report: JSON.stringify(report), mode: 'chat' }) };
     }
 
   } catch (error) {
