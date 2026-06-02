@@ -54,7 +54,7 @@ exports.handler = async (event) => {
     if (typeof query === 'string' && query.length > MAX_INPUT_CHARS) {
       return { statusCode: 413, headers, body: JSON.stringify({ error: 'Query too long. Maximum 8000 characters.' }) };
     }
-    const apiKey = process.env.GROQ_API_KEY || process.env.Gemini || process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
     if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GROQ_API_KEY not configured' }) };
 
     const isCanvas = mode === 'canvas';
