@@ -118,20 +118,9 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
     ));
 
     try {
-      // Build financial context from analyticsDataProvider.
+      // Build financial context.
       final analyticsData = await ref.read(analyticsDataProvider.future);
-      final topCats = analyticsData.categoryTotals.entries.toList()
-        ..sort((a, b) => b.value.compareTo(a.value));
       final baseCurrency = await ref.read(baseCurrencyProvider.future);
-      final topCatsStr = topCats
-          .take(5)
-          .map((e) => '${e.key}: $baseCurrency ${e.value.toStringAsFixed(2)}')
-          .join(', ');
-      final recentRows = analyticsData.allExpenses
-          .take(20)
-          .map((e) =>
-              '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
-          .join('\n');
 
       // Build history: last K=8 turns BEFORE the current user message, each capped at 600 chars.
       const int kHistoryTurns = 8;
@@ -154,17 +143,60 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       // ARCH-01: Migrated from supabase.functions.invoke.
       // FEAT-06-P3: Canvas mode is live — pass mode:'canvas' to this function.
       // Netlify fn returns: {summary, insights, charts[], actions[]} at 8192t.
-      // query is the bare user message; history and context are sent separately.
-      final isCasualChat = mode == 'chat' && userText.trim().length <= 20;
-      final financialContext = isCasualChat ? '' :
-          '\n\nFinancial data (last 30 days, all amounts in $baseCurrency):'
-          '\nTotal Expenses: $baseCurrency ${analyticsData.totalSpend.toStringAsFixed(2)}'
-          '\nDaily Burn: $baseCurrency ${analyticsData.burnRate.toStringAsFixed(2)}'
-          '\nTotal Income: $baseCurrency ${analyticsData.totalIncome.toStringAsFixed(2)}'
-          '\nNet: $baseCurrency ${analyticsData.netFlow.toStringAsFixed(2)}'
-          '\nTop Categories: $topCatsStr'
-          '\n\nRecent 20 transactions (native currency per entry):\n$recentRows';
-      final query = '${userText.trim()}$financialContext';
+      // Chat: query = bare user message; structured context{} sent separately.
+      // Canvas: data inlined in query (unchanged path).
+      final isCanvas = mode == 'canvas';
+
+      // Build structured grounding context (chat only — no user PII, no server URLs).
+      Map<String, dynamic>? contextPayload;
+      if (!isCanvas) {
+        final walletTotals = await repo.getWalletEntryTotals(baseCurrency: baseCurrency);
+        final balanceSummary = await repo.getBalanceSummary();
+        final categoryTotals = Map<String, double>.from(analyticsData.categoryTotals);
+        // Build monthly totals from ivePeriods (granularity matches analytics window).
+        final monthlyTotals = <String, double>{};
+        for (final p in analyticsData.ivePeriods) {
+          monthlyTotals[p.label] = p.expense;
+        }
+        contextPayload = {
+          'currency': baseCurrency,
+          'baseBalance': walletTotals.net.toDouble(),
+          'income': walletTotals.income.toDouble(),
+          'spend': walletTotals.spend.toDouble(),
+          'sharedOwed': double.tryParse(balanceSummary.youAreOwed) ?? 0.0,
+          'sharedOwe': double.tryParse(balanceSummary.youOwe) ?? 0.0,
+          'categoryTotals': categoryTotals,
+          'monthlyTotals': monthlyTotals,
+          'asOf': DateTime.now().toIso8601String().substring(0, 10),
+        };
+      }
+
+      // Canvas: inline raw data in query (existing path, unchanged).
+      String query;
+      if (isCanvas) {
+        final topCats = analyticsData.categoryTotals.entries.toList()
+          ..sort((a, b) => b.value.compareTo(a.value));
+        final topCatsStr = topCats
+            .take(5)
+            .map((e) => '${e.key}: $baseCurrency ${e.value.toStringAsFixed(2)}')
+            .join(', ');
+        final recentRows = analyticsData.allExpenses
+            .take(20)
+            .map((e) =>
+                '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
+            .join('\n');
+        query = '${userText.trim()}'
+            '\n\nFinancial data (last 30 days, all amounts in $baseCurrency):'
+            '\nTotal Expenses: $baseCurrency ${analyticsData.totalSpend.toStringAsFixed(2)}'
+            '\nDaily Burn: $baseCurrency ${analyticsData.burnRate.toStringAsFixed(2)}'
+            '\nTotal Income: $baseCurrency ${analyticsData.totalIncome.toStringAsFixed(2)}'
+            '\nNet: $baseCurrency ${analyticsData.netFlow.toStringAsFixed(2)}'
+            '\nTop Categories: $topCatsStr'
+            '\n\nRecent 20 transactions (native currency per entry):\n$recentRows';
+      } else {
+        query = userText.trim();
+      }
+
       final accessToken = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
       final httpRes = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
@@ -174,7 +206,8 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           'mode': mode,
           'currency': baseCurrency,
           'language': ref.read(localeProvider).languageCode,
-          if (mode != 'canvas') 'messages': history,
+          if (!isCanvas) 'messages': history,
+          if (contextPayload != null) 'context': contextPayload,
         }),
       );
 
