@@ -48,7 +48,7 @@ exports.handler = async (event) => {
       rateLimitMap.set(userId, { count: 1, windowStart });
     }
 
-    const { query, mode = 'chat', currency = 'USD', language = 'en' } = JSON.parse(event.body);
+    const { query, mode = 'chat', currency = 'USD', language = 'en', messages: historyRaw = [] } = JSON.parse(event.body);
 
     // ── Input cap ──
     if (typeof query === 'string' && query.length > MAX_INPUT_CHARS) {
@@ -101,6 +101,15 @@ Rules:
     const temperature = isCanvas ? 0.2 : 0.9;
     const model       = isCanvas ? 'llama-3.3-70b-versatile' : 'llama-3.1-8b-instant';
 
+    // ── Build messages array for Groq ──────────────────────────────────────
+    // Canvas: single-turn only (no history). Chat: include last K=8 turns, each capped at 600 chars.
+    const MSG_CAP  = 600;
+    const K_TURNS  = 8;
+    const historyMessages = isCanvas ? [] : (Array.isArray(historyRaw) ? historyRaw : [])
+      .filter(m => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+      .slice(-K_TURNS)
+      .map(m => ({ role: m.role, content: m.content.slice(0, MSG_CAP) }));
+
     const callGroq = async () => fetch(GROQ_API_URL, {
       method: 'POST',
       headers: {
@@ -111,6 +120,7 @@ Rules:
         model,
         messages: [
           { role: 'system', content: systemPrompt },
+          ...historyMessages,
           { role: 'user',   content: query },
         ],
         max_tokens:  maxTokens,

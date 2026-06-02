@@ -133,27 +133,28 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
               '${e.createdAt?.substring(0, 10) ?? ''} ${e.category} ${e.currency} ${e.amount}')
           .join('\n');
 
-      // Build history (last 10 messages before current).
+      // Build history: last K=8 turns BEFORE the current user message, each capped at 600 chars.
+      const int kHistoryTurns = 8;
+      const int kMsgCap = 600;
       final history = updatedMessages
           .where((m) => m.id != userMsg.id)
           .toList()
           .reversed
-          .take(10)
+          .take(kHistoryTurns)
           .toList()
           .reversed
           .map((m) => {
                 'role': m.role == AiChatRole.user ? 'user' : 'assistant',
-                'content': m.content,
+                'content': m.content.length > kMsgCap
+                    ? m.content.substring(0, kMsgCap)
+                    : m.content,
               })
           .toList();
 
       // ARCH-01: Migrated from supabase.functions.invoke.
       // FEAT-06-P3: Canvas mode is live — pass mode:'canvas' to this function.
       // Netlify fn returns: {summary, insights, charts[], actions[]} at 8192t.
-      // Remaining TODO: wire _CanvasPanel in insights_screen.dart to this response.
-      final historyStr = history
-          .map((m) => '${m['role']}: ${m['content']}')
-          .join('\n');
+      // query is the bare user message; history and context are sent separately.
       final isCasualChat = mode == 'chat' && userText.trim().length <= 20;
       final financialContext = isCasualChat ? '' :
           '\n\nFinancial data (last 30 days, all amounts in $baseCurrency):'
@@ -163,9 +164,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           '\nNet: $baseCurrency ${analyticsData.netFlow.toStringAsFixed(2)}'
           '\nTop Categories: $topCatsStr'
           '\n\nRecent 20 transactions (native currency per entry):\n$recentRows';
-      final query = 'User: ${userText.trim()}'
-          '$financialContext'
-          '${historyStr.isNotEmpty ? '\n\nRecent chat:\n$historyStr' : ''}';
+      final query = '${userText.trim()}$financialContext';
       final accessToken = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
       final httpRes = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
@@ -175,6 +174,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           'mode': mode,
           'currency': baseCurrency,
           'language': ref.read(localeProvider).languageCode,
+          if (mode != 'canvas') 'messages': history,
         }),
       );
 
