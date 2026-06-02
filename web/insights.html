@@ -128,6 +128,7 @@
         const sb = createClient(SUPABASE_URL, SUPABASE_ANON);
 
         window.currentUser     = null;
+        window.sessionToken    = null;
         window.userCurrency    = localStorage.getItem('setall_currency') || 'USD';
         window.exchangeRate    = 1;
         window.fetchInProgress = false;
@@ -192,7 +193,8 @@
                 window.location.href = '/login?next=/insights';
                 return;
             }
-            window.currentUser = session.user;
+            window.currentUser  = session.user;
+            window.sessionToken  = session.access_token;
             // Fetch profile (same as app getCurrentUserProfile: select* + maybeSingle)
             try {
                 const { data: profile } = await sb
@@ -532,7 +534,7 @@
                 .join('\n');
             const res = await fetch('/.netlify/functions/ai-analyst', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (window.sessionToken || '') },
                 body: JSON.stringify({
                     mode,
                     language: lang,
@@ -779,7 +781,8 @@
                 if (!error) {
                     const { data: { user } } = await sb.auth.getUser();
                     if (user) {
-                        window.currentUser = user;
+                        window.currentUser  = user;
+                        window.sessionToken = event.data.token;
                         await loadLiveData();
                         await loadWidgetLayout();
                         document.getElementById('auth-gate').style.display = 'none';
