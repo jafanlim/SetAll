@@ -53,7 +53,7 @@ class AuthConfig {
   static const String googleIosClientId = '41197170572-cbv1qbr8m2s7hk3s2nc9delqsd55usil.apps.googleusercontent.com';
 
   // ARCH-01: Netlify ai-analyst endpoint — replaces Supabase edge fn (persistent 401).
-  // No caller auth required — Gemini key is a Netlify env var, handled server-side.
+  // SECURITY: Requires Authorization: Bearer <supabase_access_token> — 401 if absent/invalid.
   static const String netlifyAiUrl =
       'https://setall.app/.netlify/functions/ai-analyst';
 
