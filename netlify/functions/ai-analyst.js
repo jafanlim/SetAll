@@ -4,8 +4,19 @@
 // CHORE-01: Active path for setall.app web portal ONLY.
 // Flutter client uses supabase/functions/ai-analyst/index.ts directly.
 // Keep both in sync when changing model, prompt, or response shape.
+// SECURITY: Bearer token verified via supabase.auth.getUser; per-user rate limit 20/60s.
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+const { createClient } = require('@supabase/supabase-js');
+
+const GROQ_API_URL     = 'https://api.groq.com/openai/v1/chat/completions';
+const SUPABASE_URL     = process.env.SUPABASE_URL     || 'https://vrsmsgyxeyzyrdonsnrk.supabase.co';
+const SUPABASE_ANON    = process.env.SUPABASE_ANON_KEY || '';
+const RATE_LIMIT       = 20;
+const RATE_WINDOW_MS   = 60_000;
+const MAX_INPUT_CHARS  = 8_000;
+
+// In-memory rate-limit store: userId → { count, windowStart }
+const rateLimitMap = new Map();
 
 exports.handler = async (event) => {
   const headers = {
@@ -16,7 +27,33 @@ exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
 
   try {
+    // ── Auth gate ──
+    const token = (event.headers['authorization'] || event.headers['Authorization'] || '').replace(/^Bearer\s+/i, '');
+    if (!token) return { statusCode: 401, headers, body: JSON.stringify({ error: 'unauthorized' }) };
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, { auth: { persistSession: false } });
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) return { statusCode: 401, headers, body: JSON.stringify({ error: 'unauthorized' }) };
+    const userId = user.id;
+
+    // ── Per-user rate limit (20 req / 60 s, in-memory) ──
+    const now = Date.now();
+    const windowStart = Math.floor(now / RATE_WINDOW_MS) * RATE_WINDOW_MS;
+    const rl = rateLimitMap.get(userId);
+    if (rl && rl.windowStart === windowStart) {
+      if (rl.count >= RATE_LIMIT) {
+        return { statusCode: 429, headers: { ...headers, 'Retry-After': '60' }, body: JSON.stringify({ error: 'Rate limit exceeded. Try again in a minute.' }) };
+      }
+      rl.count += 1;
+    } else {
+      rateLimitMap.set(userId, { count: 1, windowStart });
+    }
+
     const { query, mode = 'chat', currency = 'USD', language = 'en' } = JSON.parse(event.body);
+
+    // ── Input cap ──
+    if (typeof query === 'string' && query.length > MAX_INPUT_CHARS) {
+      return { statusCode: 413, headers, body: JSON.stringify({ error: 'Query too long. Maximum 8000 characters.' }) };
+    }
     const apiKey = process.env.GROQ_API_KEY || process.env.Gemini || process.env.GEMINI_API_KEY;
     if (!apiKey) return { statusCode: 500, headers, body: JSON.stringify({ error: 'GROQ_API_KEY not configured' }) };
 

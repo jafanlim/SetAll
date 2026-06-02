@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/config/auth_config.dart';
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/services/quick_actions_service.dart';
@@ -100,9 +101,11 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       '\n\nRecent 20 transactions (native currency per entry):\n$recentRows';
 
   try {
+    final accessToken = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
+    final authHeaders = {'Content-Type': 'application/json', 'Authorization': 'Bearer $accessToken'};
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyAiUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: authHeaders,
       body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency, 'language': ref.read(localeProvider).languageCode}),
     );
 
@@ -111,7 +114,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       await Future.delayed(const Duration(seconds: 3));
       final retry = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: authHeaders,
         body: jsonEncode({'query': query, 'mode': 'chat', 'currency': baseCurrency, 'language': ref.read(localeProvider).languageCode}),
       );
       if (retry.statusCode != 200) return '';
@@ -157,8 +160,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (previous != next) ref.invalidate(_aiInsightProvider);
     });
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(baseCurrencyProvider.future).then((c) => debugPrint('[Dashboard initState] baseCurrency on mount = $c'));
       ref.read(syncServiceProvider).performFullSync().then((_) {
         if (mounted) {
+          debugPrint('[Dashboard] sync done — invalidating providers');
           ref.invalidate(masterBalanceProvider);
           ref.invalidate(walletBalanceProvider);
           ref.invalidate(balanceSummaryProvider);

@@ -6,6 +6,7 @@ import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:speech_to_text/speech_to_text.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../config/auth_config.dart';
 import '../models/voice_entry_result.dart';
@@ -63,10 +64,12 @@ class VoiceEntryService {
           if (!completer.isCompleted) completer.complete(lastResult);
         }
       },
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 3),
-      localeId: localeToUse,
-      listenOptions: SpeechListenOptions(cancelOnError: true),
+      listenOptions: SpeechListenOptions(
+        cancelOnError: true,
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 3),
+        localeId: localeToUse,
+      ),
     );
 
     // Timeout fallback
@@ -100,9 +103,10 @@ class VoiceEntryService {
       'Other',
     ],
   }) async {
+    final accessToken = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
     final response = await http.post(
       Uri.parse(AuthConfig.netlifyVoiceEntryUrl),
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $accessToken'},
       body: jsonEncode({
         'transcript': transcript,
         'groups': groups,

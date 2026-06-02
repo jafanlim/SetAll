@@ -36,11 +36,19 @@
  *   }
  */
 
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
+import { serve }        from 'https://deno.land/std@0.168.0/http/server.ts'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const GEMINI_API_KEY = Deno.env.get('GEMINI_API_KEY') ?? ''
-const GEMINI_MODEL   = 'gemini-2.5-flash'
-const GEMINI_URL     = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
+const GEMINI_API_KEY  = Deno.env.get('GEMINI_API_KEY') ?? ''
+const GEMINI_MODEL    = 'gemini-2.5-flash'
+const GEMINI_URL      = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`
+
+const SUPABASE_URL    = Deno.env.get('SUPABASE_URL') ?? ''
+const SUPABASE_ANON   = Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+
+const RATE_LIMIT      = 20
+const RATE_WINDOW_MS  = 60_000
+const MAX_INPUT_CHARS = 8_000
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
@@ -135,9 +143,8 @@ serve(async (req) => {
   }
 
   try {
-    // ── Lightweight auth gate (verify_jwt is off to avoid gateway 401 race) ──
-    // We still require a Bearer token with a valid-looking sub claim.
-    const authHeader = req.headers.get('authorization') ?? ''
+    // ── Auth gate: verify JWT via Supabase auth.getUser (signature-checked) ──
+    const authHeader  = req.headers.get('authorization') ?? ''
     const bearerToken = authHeader.replace(/^Bearer\s+/i, '')
     if (!bearerToken) {
       return new Response(
@@ -145,26 +152,51 @@ serve(async (req) => {
         { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       )
     }
-    let userId = ''
-    try {
-      const parts = bearerToken.split('.')
-      if (parts.length !== 3) throw new Error(`JWT has ${parts.length} parts, expected 3`)
-      // URL-safe base64 → standard base64, then pad to 4-char boundary
-      let b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
-      while (b64.length % 4 !== 0) b64 += '='
-      const payload = JSON.parse(atob(b64))
-      userId = payload.sub ?? ''
-      console.log(`ai-analyst: JWT sub=${userId}, exp=${payload.exp}, iss=${payload.iss}`)
-    } catch (jwtErr) {
-      console.error('ai-analyst: JWT decode failed:', jwtErr)
-    }
-    if (!userId) {
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON, {
+      global: { headers: { Authorization: `Bearer ${bearerToken}` } },
+      auth:   { persistSession: false },
+    })
+    const { data: { user }, error: authError } = await supabase.auth.getUser(bearerToken)
+    if (authError || !user) {
       return new Response(
         JSON.stringify({ error: 'Invalid authorization token.' }),
         { status: 401, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
       )
     }
+    const userId = user.id
     console.log(`ai-analyst: authenticated user ${userId}`)
+
+    // ── Per-user rate limit (20 req / 60 s) via ai_rate_limit table ──
+    const windowStart = Math.floor(Date.now() / RATE_WINDOW_MS) * (RATE_WINDOW_MS / 1000)
+    const { data: rlData, error: rlErr } = await supabase
+      .from('ai_rate_limit')
+      .upsert(
+        { user_id: userId, window_start: windowStart, count: 1 },
+        { onConflict: 'user_id,window_start', ignoreDuplicates: false }
+      )
+      .select('count')
+      .single()
+    // If upsert returned existing row, increment manually
+    let currentCount = rlData?.count ?? 1
+    if (!rlErr && currentCount === 1) {
+      // Row was newly inserted — count is already 1, nothing extra needed
+    } else if (!rlErr) {
+      const { data: inc } = await supabase
+        .from('ai_rate_limit')
+        .update({ count: currentCount + 1 })
+        .eq('user_id', userId)
+        .eq('window_start', windowStart)
+        .select('count')
+        .single()
+      currentCount = inc?.count ?? currentCount + 1
+    }
+    if (currentCount > RATE_LIMIT) {
+      return new Response(
+        JSON.stringify({ error: 'Rate limit exceeded. Try again in a minute.' }),
+        { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json', 'Retry-After': '60' } }
+      )
+    }
 
     if (!GEMINI_API_KEY) {
       return new Response(
@@ -174,6 +206,14 @@ serve(async (req) => {
     }
 
     const { message, history = [], context } = await req.json()
+
+    // ── Input cap ──
+    if (typeof message === 'string' && message.length > MAX_INPUT_CHARS) {
+      return new Response(
+        JSON.stringify({ error: 'Query too long. Maximum 8000 characters.' }),
+        { status: 413, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (!message || !context) {
       return new Response(

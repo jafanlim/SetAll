@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/config/auth_config.dart';
@@ -146,7 +147,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
               })
           .toList();
 
-      // ARCH-01: Migrated from supabase.functions.invoke — no JWT, no auth header.
+      // ARCH-01: Migrated from supabase.functions.invoke.
       // FEAT-06-P3: Canvas mode is live — pass mode:'canvas' to this function.
       // Netlify fn returns: {summary, insights, charts[], actions[]} at 8192t.
       // Remaining TODO: wire _CanvasPanel in insights_screen.dart to this response.
@@ -165,9 +166,10 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       final query = 'User: ${userText.trim()}'
           '$financialContext'
           '${historyStr.isNotEmpty ? '\n\nRecent chat:\n$historyStr' : ''}';
+      final accessToken = Supabase.instance.client.auth.currentSession?.accessToken ?? '';
       final httpRes = await http.post(
         Uri.parse(AuthConfig.netlifyAiUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $accessToken'},
         body: jsonEncode({
           'query': query,
           'mode': mode,
