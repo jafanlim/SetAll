@@ -2381,11 +2381,13 @@ class SetAllRepository {
     int? iconColor,
     List<String> attachmentPaths = const [],
     String? notes,
+    DateTime? entryDate,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
     final expenseId = const Uuid().v4();
-    final now = _now();
+    // entryDate lets the caller backdate an expense; falls back to now.
+    final now = entryDate?.toUtc().toIso8601String() ?? _now();
 
     // Upload any local file paths to Supabase Storage.
     final attachmentUrls = !kIsWeb
