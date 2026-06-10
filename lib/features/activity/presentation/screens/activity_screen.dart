@@ -1660,7 +1660,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
       ref.invalidate(omniActivityProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
+          content: Text('${'activity_screen.restore_btn'.tr()}: ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -1886,7 +1886,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('${'activity_screen.restore_btn'.tr()}: $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1905,7 +1905,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
+          content: Text('${'activity_screen.restore_btn'.tr()}: ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -2070,7 +2070,7 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('${'activity_screen.restore_btn'.tr()}: $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

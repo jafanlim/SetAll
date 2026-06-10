@@ -219,7 +219,7 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           'currency': baseCurrency,
           'language': ref.read(localeProvider).languageCode,
           if (!isCanvas) 'messages': history,
-          if (contextPayload != null) 'context': contextPayload,
+          'context': ?contextPayload,
         }),
       );
 
