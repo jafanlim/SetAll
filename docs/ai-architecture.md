@@ -1,58 +1,58 @@
 # SetAll AI Architecture
 
+## Providers
+
+- **Groq** (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`) — powers the AI analyst
+  (dashboard card, Insights Panel, web portal) and voice-entry parsing.
+- **OpenAI** — standard provider for **new** AI features going forward (vision /
+  Structured Outputs), starting with receipt-ingest (`openspec/setall-ai-receipt-ingest`).
+- **Gemini** — fully removed. The retired Supabase edge `ai-analyst` (its only caller)
+  was deleted; no `GEMINI_API_KEY` is used anywhere.
+
 ## Active AI Paths
 
-### Flutter client (dashboard card + Insights Panel)
+### AI analyst — `netlify/functions/ai-analyst.js`
 
 - **Endpoint:** `https://setall.app/.netlify/functions/ai-analyst`
-- **Auth:** NONE required from caller
-- **How Gemini is authenticated:** Netlify environment variable (`process.env.GEMINI_API_KEY`),
-  handled entirely server-side. Flutter sends a plain POST with `Content-Type` only.
-- **Models:** `gemini-2.5-flash-lite` (chat, 1024t, temp 0.9) /
-  `gemini-2.5-flash` (canvas, 8192t, temp 0.2)
+- **Provider:** Groq, server-side via `process.env.GROQ_API_KEY`.
+- **Models:** `llama-3.1-8b-instant` (chat) / `llama-3.3-70b-versatile` (canvas)
+- **Auth:** Bearer token verified via `supabase.auth.getUser`; per-user rate limit 20/60s.
 - **Request body:** `{ query: string, mode?: 'chat'|'canvas' }`
   - `query` — single pre-formatted string embedding message + financial context + history
   - `mode` — defaults to `'chat'`
 - **Response (chat):** `{ report: '{"summary":"..."}', mode: 'chat' }`
   - Parse: `jsonDecode(data['report'])['summary']`
 - **Response (canvas):** `{ report: '{"summary":"...","insights":[...],"charts":[...],"actions":[]}', mode: 'canvas' }`
-  - Parse: `jsonDecode(data['report'])` → access `summary`, `insights`, `charts`, `actions`
+  - Parse: `jsonDecode(data['report'])` → `summary`, `insights`, `charts`, `actions`
 - **Call sites:**
   - `lib/features/dashboard/presentation/screens/dashboard_screen.dart` — `_aiInsightProvider`
   - `lib/features/insights/providers/insights_provider.dart` — `InsightsNotifier.sendMessage()`
-- **Migration:** Previously called `supabase/functions/ai-analyst/index.ts` (ARCH-01).
-  Reason: persistent `FunctionException(401)` — JWT session race in `FunctionsClient` SDK.
+  - `web/insights.html` (web portal, relative URL)
 
----
+### Voice entry — `netlify/functions/voice-entry.js`
 
-### Web portal (web/insights.html)
+- **Endpoint:** `https://setall.app/.netlify/functions/voice-entry`
+- **Provider:** Groq (`llama-3.3-70b-versatile`), server-side via `process.env.GROQ_API_KEY`.
+- **Auth:** Bearer token verified; per-user rate limit 20/60s.
+- **Call site:** `lib/core/services/voice_entry_service.dart`
 
-- **Endpoint:** `/.netlify/functions/ai-analyst` (same function, relative URL)
-- **Auth:** NONE — plain `fetch()`, `Content-Type` only
-- **Callers:** `web/insights.html:504`
+## Planned
 
----
+### Receipt ingest — `netlify/functions/receipt-ingest.js` (proposed)
 
-## Inactive / Retired
+- **Provider:** OpenAI vision + Structured Outputs (`gpt-4.1-mini` default).
+- **Spec:** `openspec/setall-ai-receipt-ingest/`. Key: `process.env.OPENAI_API_KEY` (server-only).
 
-### supabase/functions/ai-analyst/index.ts
+## Server Environment Variables (Netlify dashboard / `.env.server`)
 
-- **Status:** Deployed (v14) but not called by any active code.
-- **Reason:** Persistent 401 JWT errors (ARCH-01). Retained, not deleted.
+- `GROQ_API_KEY` — Groq key, used by ai-analyst + voice-entry server-side.
+- `OPENAI_API_KEY` — OpenAI key, used by receipt-ingest (and future AI features) server-side.
+- *(No `GEMINI_API_KEY` — Gemini removed.)*
 
----
+## Sync Checklist (when changing an AI function)
 
-## Netlify Environment Variables (set in Netlify dashboard)
-
-- `GEMINI_API_KEY` — Gemini API key, used by the function server-side
-  - Note: the function also checks `process.env.Gemini` as a fallback alias
-- *(No other secrets required for AI functionality)*
-
----
-
-## Sync Checklist (when changing the AI function)
-
-- Edit `netlify/functions/ai-analyst.js`
-- Update response parsing in: `dashboard_screen.dart` + `insights_provider.dart`
-- Deploy: `netlify deploy --prod`
-- Smoke test: dashboard AI card + Insights Panel on a physical device
+- Edit the relevant `netlify/functions/*.js`.
+- Update response parsing in the Flutter/web call sites listed above.
+- Deploy: `netlify deploy --prod`.
+- Smoke test the affected surface on a physical device.
+- Re-run the promptfoo eval suite (`promptfoo/`) before merge.

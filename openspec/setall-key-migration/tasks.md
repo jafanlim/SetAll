@@ -58,10 +58,11 @@ OPEN-6  Split .env into client vs server (the original intent)  [CASCADE for tem
   6.4 Verify no secret name is referenced via String.fromEnvironment anywhere in lib/.
   -- EXIT: a client build cannot read any server secret.
 
-OPEN-7  Confirm Gemini vs Groq on mobile analyst  [CASCADE to inspect]
-  7.1 Read supabase/functions/ai-analyst/index.ts: is GEMINI_API_KEY actually used, or dead fallback? (Web ai-analyst.js uses Groq.)
-  7.2 If dead → remove the reference + drop GEMINI_API_KEY from secrets/.env. If live → keep and ensure it was rotated in Step 2.
-  -- EXIT: no dead key retained; provider confirmed.
+OPEN-7  ✅ RESOLVED (2026-06-21) — Gemini removed completely.
+  7.1 The Supabase edge ai-analyst (the only GEMINI_API_KEY caller) was dead code (retired bb8ff50) → DELETED (dir removed).
+  7.2 Stale Gemini comments cleaned in netlify/functions/ai-analyst.js, dashboard_screen.dart, voice_input_button.dart; docs/ai-architecture.md rewritten.
+  7.3 Provider stance: Groq for existing analyst+voice; OpenAI standard for new AI features. No GEMINI_API_KEY used anywhere in code.
+  -- MANUAL (env guardrail): remove GEMINI_API_KEY line from .env.server(.example) + drop from Netlify/Supabase secrets.
 ```
 
 ## Cross-cutting

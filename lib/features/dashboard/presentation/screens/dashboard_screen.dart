@@ -89,7 +89,7 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
       .join('\n');
 
   // ARCH-01: Migrated from supabase.functions.invoke — plain HTTPS, no JWT.
-  // Netlify fn authenticates to Gemini server-side via process.env.GEMINI_API_KEY.
+  // Netlify fn authenticates to Groq server-side via process.env.GROQ_API_KEY.
   // No caller auth required: mirrors web/insights.html:504 fetch() exactly.
   final query = 'Give me a concise 1-sentence financial insight about my spending this month.'
       '\n\nFinancial data (last 30 days, all amounts in $baseCurrency):'

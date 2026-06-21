@@ -1,9 +1,7 @@
-// FEAT-13b: Migrated from Gemini API (suspended a.setall.app@gmail.com account)
-// to Groq API (llama-3.3-70b-versatile). Same request/response shape.
+// FEAT-13b: AI analyst powered by Groq API (llama-3.3-70b-versatile).
 // API key: process.env.GROQ_API_KEY (set in Netlify environment variables)
-// CHORE-01: Active path for setall.app web portal ONLY.
-// Flutter client uses supabase/functions/ai-analyst/index.ts directly.
-// Keep both in sync when changing model, prompt, or response shape.
+// ARCH-01: Sole active path — serves both the Flutter client and the
+// setall.app web portal. (The legacy Supabase edge ai-analyst was removed.)
 // SECURITY: Bearer token verified via supabase.auth.getUser; per-user rate limit 20/60s.
 
 const { createClient } = require('@supabase/supabase-js');

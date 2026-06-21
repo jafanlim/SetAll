@@ -4,7 +4,7 @@ import 'package:speech_to_text/speech_to_text.dart';
 import '../../../core/utils/haptic_utils.dart';
 
 /// Standalone mic button for voice-to-text expense input.
-/// // TODO(FEAT-01-P2): wire transcript to Gemini parsing
+/// Transcript is parsed server-side by the Netlify voice-entry fn (Groq).
 class VoiceInputButton extends StatefulWidget {
   const VoiceInputButton({super.key, required this.onTranscript});
   final void Function(String transcript) onTranscript;
