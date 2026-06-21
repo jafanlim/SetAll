@@ -28,7 +28,7 @@ Status: `[ ]` = pending, `[x]` = complete, `[~]` = in-progress
 
 Depends on: Phase 0 complete
 
-- [ ] **1.1** Write migration `supabase/migrations/20260621000001_receipt_memory_tables.sql`
+- [x] **1.1** Write migration `supabase/migrations/20260621000001_receipt_memory_tables.sql`
   - Creates `payment_methods`, `merchant_memory`, `item_memory` (exact DDL in spec.md §2)
   - RLS on all three tables per spec §4
   - `is_group_member()` function if not already in a prior migration
