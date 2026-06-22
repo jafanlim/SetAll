@@ -13,6 +13,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/expense_model.dart';
@@ -403,7 +404,11 @@ class _GroupExpenseDetailScreenState
                       if (expense.exchangeRateApplied != null && showConversion) ...[
                         const SizedBox(height: 6),
                         Text(
-                          'Rate at entry: 1 $entryCcy = ${expense.exchangeRateApplied} $baseCcy',
+                          'expense_detail.rate_at_entry'.tr(namedArgs: {
+                            'fromCcy': entryCcy,
+                            'rate': expense.exchangeRateApplied ?? '',
+                            'toCcy': baseCcy,
+                          }),
                           style: TextStyle(
                             fontSize: 10,
                             color: theme.colorScheme.onSurfaceVariant
@@ -439,7 +444,7 @@ class _GroupExpenseDetailScreenState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Category',
+                        'expense_detail.category_label'.tr(),
                         style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w600,
@@ -449,7 +454,7 @@ class _GroupExpenseDetailScreenState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        expense.category.isEmpty ? 'General' : expense.category,
+                        expense.category.isEmpty ? categoryTr('General') : categoryTr(expense.category),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -479,7 +484,7 @@ class _GroupExpenseDetailScreenState
                         size: 16, color: accentColor),
                     const SizedBox(width: 6),
                     Text(
-                      'Amount Breakdown',
+                      'expense_detail.amount_breakdown'.tr(),
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 12,
                       ),
@@ -510,7 +515,7 @@ class _GroupExpenseDetailScreenState
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Paid by $payerName',
+                              'expense_detail.paid_by'.tr(namedArgs: {'name': payerName}),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w700,
@@ -545,7 +550,7 @@ class _GroupExpenseDetailScreenState
                 ] else if (_splits.isEmpty) ...[
                   const SizedBox(height: 12),
                   Text(
-                    'No split details recorded.',
+                    'expense_detail.no_split_details'.tr(),
                     style: TextStyle(
                       fontSize: 12,
                       color: theme.colorScheme.onSurfaceVariant,
@@ -621,7 +626,11 @@ class _GroupExpenseDetailScreenState
                     Icon(Icons.bar_chart_rounded, size: 16, color: accentColor),
                     const SizedBox(width: 6),
                     Text(
-                      'Monthly Spending — ${expense.category.isEmpty ? 'General' : expense.category}',
+                      'expense_detail.monthly_spending'.tr(namedArgs: {
+                        'category': expense.category.isEmpty
+                            ? categoryTr('General')
+                            : categoryTr(expense.category),
+                      }),
                       style: theme.textTheme.labelMedium?.copyWith(
                         fontWeight: FontWeight.w700, fontSize: 12,
                       ),
@@ -630,7 +639,9 @@ class _GroupExpenseDetailScreenState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'This group · ${DateFormat('MMMM yyyy').format(now)}',
+                  'expense_detail.this_group_month'.tr(namedArgs: {
+                    'monthYear': DateFormat('MMMM yyyy').format(now),
+                  }),
                   style: TextStyle(
                     fontSize: 10,
                     color: theme.colorScheme.onSurfaceVariant,
@@ -664,17 +675,19 @@ class _GroupExpenseDetailScreenState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     _AnalyticPill(
-                      label: expense.category.isEmpty ? 'General' : expense.category,
+                      label: expense.category.isEmpty
+                          ? categoryTr('General')
+                          : categoryTr(expense.category),
                       value: '≈ $baseCcy ${catBase.toStringAsFixed(0)}',
                       color: categoryColor,
                     ),
                     _AnalyticPill(
-                      label: 'Group total',
+                      label: 'expense_detail.group_total'.tr(),
                       value: '≈ $baseCcy ${totalBase2.toStringAsFixed(0)}',
                       color: accentColor,
                     ),
                     _AnalyticPill(
-                      label: 'Share',
+                      label: 'expense_detail.share_pct'.tr(),
                       value: '${(gaugeRatio * 100).toStringAsFixed(1)}%',
                       color: _teal,
                     ),
@@ -682,7 +695,7 @@ class _GroupExpenseDetailScreenState
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Approximated in $baseCcy via USD anchor.',
+                  'expense_detail.approximated_in_base'.tr(namedArgs: {'baseCcy': baseCcy}),
                   style: TextStyle(
                     fontSize: 9,
                     color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
@@ -713,7 +726,7 @@ class _GroupExpenseDetailScreenState
                       Icon(Icons.notes_outlined, size: 16, color: _teal),
                       const SizedBox(width: 6),
                       Text(
-                        'Notes',
+                        'expense_detail.notes_label'.tr(),
                         style: theme.textTheme.labelMedium?.copyWith(
                           fontWeight: FontWeight.w700, fontSize: 12,
                         ),
@@ -739,7 +752,7 @@ class _GroupExpenseDetailScreenState
           GlassCard(
             padding: const EdgeInsets.all(16),
             child: _MetaRow(
-              label: 'Original',
+              label: 'expense_detail.original_label'.tr(),
               value: '${expense.originalCurrency} '
                   '${expense.originalAmount ?? '—'}',
             ),
@@ -781,7 +794,9 @@ class _SplitRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = isPayerSplit ? 'share' : 'owes';
+    final label = isPayerSplit
+        ? 'expense_detail.share_label'.tr()
+        : 'expense_detail.owes'.tr();
     final labelColor = isPayerSplit
         ? const Color(0xFF64748B)
         : const Color(0xFF8B5CF6);
@@ -900,9 +915,9 @@ class _SplitBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color) = switch (splitType) {
-      SplitType.even   => ('Evenly',   const Color(0xFF22C55E)),
-      SplitType.manual => ('Exact',    const Color(0xFF3B82F6)),
-      SplitType.parts  => ('By Parts', const Color(0xFFF59E0B)),
+      SplitType.even   => ('expense_detail.split_evenly'.tr(),     const Color(0xFF22C55E)),
+      SplitType.manual => ('expense_detail.split_exact'.tr(),      const Color(0xFF3B82F6)),
+      SplitType.parts  => ('expense_detail.split_by_parts'.tr(),   const Color(0xFFF59E0B)),
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1055,7 +1070,7 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
         mode: LaunchMode.externalApplication)) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Could not open attachment')),
+          SnackBar(content: Text('expense_detail.could_not_open_attachment'.tr())),
         );
       }
     }
@@ -1075,7 +1090,7 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
               Icon(Icons.attach_file_outlined, size: 16, color: _teal),
               const SizedBox(width: 6),
               Text(
-                'Attachments (${paths.length})',
+                'expense_detail.attachments_count'.tr(namedArgs: {'count': paths.length.toString()}),
                 style: theme.textTheme.labelMedium?.copyWith(
                   fontWeight: FontWeight.w700, fontSize: 12,
                 ),
@@ -1134,7 +1149,7 @@ class _AttachmentsCardState extends ConsumerState<_AttachmentsCard> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           if (signedUrl == null)
-                            Text('Loading…',
+                            Text('common.loading'.tr(),
                                 style: TextStyle(
                                   fontSize: 10,
                                   color: theme.colorScheme.onSurfaceVariant,
