@@ -116,6 +116,7 @@ class WalletEntryTypeScreen extends StatelessWidget {
                 },
               ),
 
+
               const Spacer(),
 
               // ── Hint ─────────────────────────────────────────────────────
