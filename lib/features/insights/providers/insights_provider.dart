@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -78,6 +79,19 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
   Future<void> newSession() async {
     final newId = const Uuid().v4();
     final repo = ref.read(setAllRepositoryProvider);
+    // Signal: dismissed — user cleared the session before starting a new one.
+    final current = state.valueOrNull;
+    if (current != null && current.messages.isNotEmpty) {
+      final lastAssistant = current.messages.lastWhere(
+        (m) => m.role == AiChatRole.assistant,
+        orElse: () => current.messages.last,
+      );
+      unawaited(repo.insertInsightSignal(
+        sessionId: current.sessionId,
+        messageId: lastAssistant.id,
+        signalType: 'dismissed',
+      ));
+    }
     final sessionIds = await repo.getChatSessionIds();
     state = AsyncData(
       (state.valueOrNull ?? const InsightsState()).copyWith(
@@ -112,6 +126,20 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
     if (userText.trim().isEmpty) return;
 
     final repo = ref.read(setAllRepositoryProvider);
+
+    // Signal: followup — user sends a message when at least one assistant reply exists.
+    final hasAssistantReply =
+        current.messages.any((m) => m.role == AiChatRole.assistant);
+    if (hasAssistantReply) {
+      final lastAssistant = current.messages.lastWhere(
+          (m) => m.role == AiChatRole.assistant);
+      unawaited(repo.insertInsightSignal(
+        sessionId: current.sessionId,
+        messageId: lastAssistant.id,
+        signalType: 'followup',
+        extra: {'mode': mode},
+      ));
+    }
 
     // Build and persist user message.
     final userMsg = AiChatMessage.create(
@@ -256,6 +284,14 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
         userId: repo.currentUserId,
       );
       await repo.insertChatMessage(assistantMsg);
+
+      // Signal: shown — assistant reply rendered to user.
+      unawaited(repo.insertInsightSignal(
+        sessionId: current.sessionId,
+        messageId: assistantMsg.id,
+        signalType: 'shown',
+        extra: {'mode': mode, 'is_canvas': hasCanvas},
+      ));
 
       // Refresh session list after new messages.
       final sessionIds = await repo.getChatSessionIds();

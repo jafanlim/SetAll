@@ -13,6 +13,7 @@ import '../providers/desktop_providers.dart';
 import '../providers/setall_providers.dart';
 import '../widgets/bug_report_button.dart';
 import '../../features/voice/presentation/voice_entry_sheet.dart';
+import '../../features/alerts/presentation/widgets/alert_banner.dart';
 
 /// Breakpoint: side rail replaces bottom nav (tablet / small desktop).
 const double kAdaptiveBreakpoint = 600;
@@ -166,6 +167,11 @@ class _DesktopLayout extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final currentLocale = context.locale;
+    if (ref.read(localeProvider) != currentLocale) {
+      Future.microtask(() =>
+          ref.read(localeProvider.notifier).state = currentLocale);
+    }
     return Scaffold(
       backgroundColor: _kContentBg,
       body: Stack(
@@ -184,7 +190,7 @@ class _DesktopLayout extends ConsumerWidget {
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: kContentMaxWidth),
-                        child: child,
+                        child: AlertBannerOverlay(child: child),
                       ),
                     ),
                   ),
@@ -418,7 +424,7 @@ class _MobileLayout extends ConsumerWidget {
             Row(
               children: [
                 if (useRail) _buildRail(context),
-                Expanded(child: child),
+                Expanded(child: AlertBannerOverlay(child: child)),
               ],
             ),
             const BugReportButton(),
