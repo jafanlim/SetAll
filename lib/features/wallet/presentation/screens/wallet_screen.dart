@@ -13,6 +13,7 @@ import 'package:share_plus/share_plus.dart' show XFile;
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/share_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
@@ -318,6 +319,9 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
     final usdRateAsync   = ref.watch(usdToBaseCurrencyRateProvider);
     final usdToBase      = usdRateAsync.valueOrNull ?? Decimal.one;
 
+    final budgetProgressAsync = ref.watch(budgetProgressProvider);
+    final budgets = budgetProgressAsync.valueOrNull ?? [];
+
     final allExpenses = entriesAsync.valueOrNull ?? [];
     final expenses    = _applyFilterSort(allExpenses);
     final allIds      = expenses.map((e) => e.id).toList();
@@ -551,11 +555,27 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 6),
-                  child: Text('wallet_screen.spending_breakdown'.tr(),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        fontWeight: FontWeight.w700, fontSize: 13,
-                        letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
-                      )),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('wallet_screen.spending_breakdown'.tr(),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700, fontSize: 13,
+                            letterSpacing: 0.5, color: theme.colorScheme.onSurfaceVariant,
+                          )),
+                      GestureDetector(
+                        onTap: () => context.push(AppRouter.budgets),
+                        child: Text(
+                          '${'budget.title'.tr()} →',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF8B5CF6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               entriesAsync.when(
@@ -608,19 +628,33 @@ class _WalletScreenState extends ConsumerState<WalletScreen> {
                   }
                   return SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (ctx, i) => _CategoryRow(
-                        category: rows[i].cat,
-                        amount: rows[i].amt,
-                        total: totals[rows[i].ccy] ?? rows[i].amt,
-                        currency: rows[i].ccy,
-                        baseCurrency: rows[i].annotCcy,
-                        baseCurrencyAmount: rows[i].baseAmt,
-                        accentColor: _purple,
-                        onTap: () {
-                          HapticUtils.selection();
-                          setState(() => _catFilter = rows[i].cat);
-                        },
-                      ),
+                      (ctx, i) {
+                        final cat = rows[i].cat;
+                        // Find a matching category budget (or overall budget if
+                        // no per-category row exists) for this category.
+                        BudgetProgress? bp;
+                        for (final b in budgets) {
+                          if (b.category == cat) { bp = b; break; }
+                        }
+                        bp ??= budgets.where((b) => b.category == null).firstOrNull;
+                        return _CategoryRow(
+                          category: cat,
+                          amount: rows[i].amt,
+                          total: totals[rows[i].ccy] ?? rows[i].amt,
+                          currency: rows[i].ccy,
+                          baseCurrency: rows[i].annotCcy,
+                          baseCurrencyAmount: rows[i].baseAmt,
+                          accentColor: _purple,
+                          budgetAmount: bp?.amount,
+                          budgetSpend: bp?.spend,
+                          budgetCurrency: bp?.currency,
+                          budgetIsOver: bp?.isOver ?? false,
+                          onTap: () {
+                            HapticUtils.selection();
+                            setState(() => _catFilter = cat);
+                          },
+                        );
+                      },
                       childCount: rows.length,
                     ),
                   );
@@ -952,7 +986,9 @@ class _WalletEntryRow extends ConsumerWidget {
     final isIncome  = entry.isIncome;
     final amt       = Decimal.tryParse(entry.amount) ?? Decimal.zero;
     final ccy       = entry.currency.isEmpty ? 'USD' : entry.currency;
-    final desc      = entry.description.isEmpty ? 'Wallet entry' : entry.description;
+    final desc      = (entry.description.isEmpty || entry.description == 'Wallet entry')
+        ? categoryTr(entry.category)
+        : entry.description;
     final baseCcy   = ref.watch(baseCurrencyProvider).valueOrNull ?? 'USD';
     final usdAmt    = Decimal.tryParse(entry.universalUsdAmount) ?? Decimal.zero;
 
@@ -1045,7 +1081,7 @@ class _WalletEntryRow extends ConsumerWidget {
                             fontWeight: FontWeight.w600, fontSize: 13),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     const SizedBox(height: 2),
-                    Text(entry.category.isEmpty ? 'common.general'.tr() : entry.category,
+                    Text(entry.category.isEmpty ? 'common.general'.tr() : categoryTr(entry.category),
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
                   ],
@@ -1119,6 +1155,10 @@ class _CategoryRow extends StatelessWidget {
     this.baseCurrencyAmount,
     this.onTap,
     this.accentColor = _purple,
+    this.budgetAmount,
+    this.budgetSpend,
+    this.budgetCurrency,
+    this.budgetIsOver = false,
   });
 
   final String       category;
@@ -1133,6 +1173,11 @@ class _CategoryRow extends StatelessWidget {
   final Decimal?     baseCurrencyAmount;
   final VoidCallback? onTap;
   final Color        accentColor;
+  /// When set, a second budget progress bar is shown inside the card.
+  final Decimal?     budgetAmount;
+  final Decimal?     budgetSpend;
+  final String?      budgetCurrency;
+  final bool         budgetIsOver;
 
   static const Map<String, IconData> _icons = {
     'Food & drink':      Icons.restaurant_outlined,
@@ -1174,7 +1219,7 @@ class _CategoryRow extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(category,
+                  Text(categoryTr(category),
                       style: theme.textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600, fontSize: 13)),
                   const SizedBox(height: 4),
@@ -1187,6 +1232,27 @@ class _CategoryRow extends StatelessWidget {
                       minHeight: 4,
                     ),
                   ),
+                  if (budgetAmount != null && budgetSpend != null) ...[  
+                    const SizedBox(height: 3),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(3),
+                      child: LinearProgressIndicator(
+                        value: budgetAmount! > Decimal.zero
+                            ? ((budgetSpend! / budgetAmount!)
+                                    .toDecimal(scaleOnInfinitePrecision: 6)
+                                    .toDouble())
+                                .clamp(0.0, 1.0)
+                            : 0.0,
+                        backgroundColor: budgetIsOver
+                            ? const Color(0xFFF97316).withAlpha(22)
+                            : const Color(0xFF22C55E).withAlpha(22),
+                        color: budgetIsOver
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFF22C55E),
+                        minHeight: 3,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1199,6 +1265,17 @@ class _CategoryRow extends StatelessWidget {
                         fontWeight: FontWeight.w700, fontSize: 13, color: accentColor)),
                 Text('${pct.toStringAsFixed(1)}%',
                     style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8))),
+                if (budgetAmount != null && budgetSpend != null)
+                  Text(
+                    budgetIsOver
+                        ? 'budget.over'.tr()
+                        : '${budgetCurrency ?? ''} ${budgetSpend!.toStringAsFixed(0)}/${budgetAmount!.toStringAsFixed(0)}',
+                    style: TextStyle(
+                        fontSize: 9,
+                        color: budgetIsOver
+                            ? const Color(0xFFF97316)
+                            : const Color(0xFF22C55E)),
+                  ),
                 if (baseCurrency != null &&
                     baseCurrency != currency &&
                     baseCurrencyAmount != null &&
