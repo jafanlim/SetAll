@@ -41,6 +41,9 @@ class ReceiptIngestService {
   ///
   /// [knownCategories] should be the user's localized category list (mirror
   /// voice_entry_sheet) so the returned category matches the app language.
+  /// [locale] is the app's current locale (e.g. 'en', 'es', 'ka') — the AI
+  /// translates line items & description to this language while preserving
+  /// originals in [LineItem.originalName] / [ReceiptDraft.originalDescription].
   ///
   /// Returns a parsed [ReceiptIngestResponse] — either a draft or a
   /// clarification request.
@@ -59,6 +62,7 @@ class ReceiptIngestService {
       'Other',
     ],
     String timezone = 'UTC',
+    String locale = 'en',
   }) async {
     if (webpBytes.isEmpty) throw Exception('Empty receipt image');
 
@@ -80,6 +84,7 @@ class ReceiptIngestService {
             'defaultCurrency': defaultCurrency,
             'knownCategories': knownCategories,
             'timezone': timezone,
+            'locale': locale,
           }),
         )
         .timeout(const Duration(seconds: 30));

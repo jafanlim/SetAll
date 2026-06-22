@@ -8,11 +8,13 @@ import 'package:decimal/decimal.dart';
 
 class LineItem {
   final String name;
+  final String? originalName;
   final Decimal amount;
   final int quantity;
 
   const LineItem({
     required this.name,
+    this.originalName,
     required this.amount,
     required this.quantity,
   });
@@ -20,6 +22,7 @@ class LineItem {
   factory LineItem.fromJson(Map<String, dynamic> json) {
     return LineItem(
       name: json['name'] as String? ?? '',
+      originalName: json['originalName'] as String?,
       amount: Decimal.parse(json['amount'] as String? ?? '0'),
       quantity: json['quantity'] as int? ?? 1,
     );
@@ -27,6 +30,7 @@ class LineItem {
 
   Map<String, dynamic> toJson() => {
         'name': name,
+        'originalName': originalName,
         'amount': amount.toString(),
         'quantity': quantity,
       };
@@ -38,6 +42,7 @@ class ReceiptDraft {
   final Decimal amount;
   final String currency;
   final String description;
+  final String? originalDescription;
   final String category;
   final bool isIncome;
   final String merchantName;
@@ -52,6 +57,7 @@ class ReceiptDraft {
     required this.amount,
     required this.currency,
     required this.description,
+    this.originalDescription,
     required this.category,
     required this.isIncome,
     required this.merchantName,
@@ -68,6 +74,7 @@ class ReceiptDraft {
       amount: Decimal.parse(json['amount'] as String? ?? '0'),
       currency: json['currency'] as String? ?? 'USD',
       description: json['description'] as String? ?? '',
+      originalDescription: json['originalDescription'] as String?,
       category: json['category'] as String? ?? 'General',
       isIncome: json['isIncome'] as bool? ?? false,
       merchantName: json['merchantName'] as String? ?? '',
@@ -90,6 +97,7 @@ class ReceiptDraft {
         'amount': amount.toString(),
         'currency': currency,
         'description': description,
+        'originalDescription': originalDescription,
         'category': category,
         'isIncome': isIncome,
         'merchantName': merchantName,

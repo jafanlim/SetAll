@@ -29,7 +29,10 @@ defaultTest:
                   description: "ISO 4217 3-letter code"
                 description:
                   type: string
-                  description: "Short label 3-6 words"
+                  description: "Short label 3-6 words translated to locale"
+                original_description:
+                  type: string
+                  description: "Description in original language/script verbatim"
                 category:
                   type: string
                 merchant_name:
@@ -47,11 +50,14 @@ defaultTest:
                     properties:
                       name:
                         type: string
+                      original_name:
+                        type: string
+                        description: "Item name exactly as printed, original script"
                       amount:
                         type: string
                       quantity:
                         type: integer
-                    required: ["name", "amount", "quantity"]
+                    required: ["name", "original_name", "amount", "quantity"]
                     additionalProperties: false
                 confidence:
                   type: number
@@ -60,7 +66,7 @@ defaultTest:
                   type: ["string", "null"]
                   enum: ["amount", "currency", "date", null]
               required:
-                ["amount", "currency", "description", "category", "merchant_name",
+                ["amount", "currency", "description", "original_description", "category", "merchant_name",
                  "last4", "entry_date", "line_items", "confidence", "needs_clarification"]
               additionalProperties: false
   vars:
@@ -243,14 +249,15 @@ tests:
         value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
 
   # ── 3. ka_gel_market — Georgian / GEL (ქართული) ─────────────────────
-  # Non-Latin script may be hard for vision model; accept needs_clarification
-  # or amount=0.00 (model knows its limits) as valid.
-  # LOCKED EVAL: description + line item names must preserve Georgian script —
-  # regression to anglicization is a prompt failure.
-  - description: "ka_gel_market: ნიკორა ₾33.70 — must be GEL, Georgian script preserved"
+  # v2.1 LOCKED EVAL: name + description are English (translated to locale=en);
+  # original_name + original_description preserve Georgian script.
+  # Regression to anglicization of originals OR Georgian in translated fields
+  # is a prompt failure.
+  - description: "ka_gel_market: ნიკორა ₾33.70 — must be GEL, translated to English, Georgian originals preserved"
     vars:
       fixtureImage: "ka_gel_market.png"
       defaultCurrency: "GEL"
+      locale: "en"
     assert:
       - type: javascript
         value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&(a>0||p.needs_clarification==='amount');})(output)"
@@ -261,9 +268,11 @@ tests:
       - type: javascript
         value: "(function(p){return typeof p.confidence==='number'&&(p.confidence>=0.7||p.needs_clarification!==null&&p.needs_clarification!==undefined)})(output)"
       - type: javascript
-        value: "(function(p){return typeof p.description==='string'&&/[\\u10A0-\\u10FF]/.test(p.description)})(output)"
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0&&!/[\\u10A0-\\u10FF]/.test(p.description)})(output)"
       - type: javascript
-        value: "(function(p){var items=p.line_items||[];if(items.length===0)return true;return items.some(function(li){return li.name&&/[\\u10A0-\\u10FF]/.test(li.name)});})(output)"
+        value: "(function(p){return typeof p.original_description==='string'&&/[\\u10A0-\\u10FF]/.test(p.original_description)})(output)"
+      - type: javascript
+        value: "(function(p){var items=p.line_items||[];if(items.length===0)return true;return items.every(function(li){return li.name&&!/[\\u10A0-\\u10FF]/.test(li.name)})&&items.some(function(li){return li.original_name&&/[\\u10A0-\\u10FF]/.test(li.original_name)});})(output)"
 
   # ── 4. ru_rub_pharmacy — Russian / RUB (кириллица) ──────────────────
   - description: "ru_rub_pharmacy: Аптека Горздрав ₽890.00 — must be RUB"

@@ -6,8 +6,8 @@
 //   It exists only in-memory for the duration of this request ("get context, don't store").
 // SECURITY: Bearer token verified via supabase.auth.getUser; per-user rate limit 10/60s.
 //
-// Request:  { imageBase64, contentType, groupId?, defaultCurrency?, knownCategories?, timezone? }
-// Response: { draft: { amount, currency, description, ... }, escalated: bool }
+// Request:  { imageBase64, contentType, groupId?, defaultCurrency?, knownCategories?, timezone?, locale? }
+// Response: { draft: { amount, currency, description, originalDescription, ... }, escalated: bool }
 //           { needsClarification: "amount"|"currency"|"date", partial: { ... } }
 
 const { createClient } = require('@supabase/supabase-js');
@@ -77,9 +77,10 @@ async function openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownC
           properties: {
             amount:        { type: 'string', description: "Total amount as decimal string, e.g. '45.50'" },
             currency:      { type: 'string', description: 'ISO 4217 3-letter code' },
-            description:   { type: 'string', description: 'Short label 3-6 words' },
-            category:      { type: 'string' },
-            merchant_name: { type: 'string' },
+            description:            { type: 'string', description: 'Short label 3-6 words translated to locale' },
+            original_description:  { type: 'string', description: 'Description in original language/script verbatim' },
+            category:               { type: 'string' },
+            merchant_name:          { type: 'string' },
             last4:         { type: ['string', 'null'], description: 'Card last 4 digits if visible, else null' },
             entry_date:    { type: 'string', description: 'ISO date YYYY-MM-DD from receipt, or today' },
             line_items:    {
@@ -87,18 +88,19 @@ async function openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownC
               items: {
                 type: 'object',
                 properties: {
-                  name:     { type: 'string' },
-                  amount:   { type: 'string' },
-                  quantity: { type: 'integer' },
+                  name:          { type: 'string' },
+                  original_name: { type: 'string', description: 'Item name exactly as printed, original script' },
+                  amount:        { type: 'string' },
+                  quantity:      { type: 'integer' },
                 },
-                required: ['name', 'amount', 'quantity'],
+                required: ['name', 'original_name', 'amount', 'quantity'],
                 additionalProperties: false,
               },
             },
             confidence:    { type: 'number', description: '0.0–1.0' },
             needs_clarification: { type: ['string', 'null'], enum: ['amount', 'currency', 'date', null] },
           },
-          required: ['amount', 'currency', 'description', 'category', 'merchant_name',
+          required: ['amount', 'currency', 'description', 'original_description', 'category', 'merchant_name',
                      'last4', 'entry_date', 'line_items', 'confidence', 'needs_clarification'],
           additionalProperties: false,
         },
@@ -157,17 +159,19 @@ function validateAndBuild(draft, defaultCurrency, knownCategories, paymentMethod
     last4 = null;
   }
 
-  // 7. lineItems: normalise
+  // 7. lineItems: normalise (passthrough originalName for UI)
   const lineItems = (draft.line_items || []).map(li => ({
-    name:     li.name || '',
-    amount:   li.amount || '0',
-    quantity: li.quantity || 1,
+    name:         li.name || '',
+    originalName: li.original_name || '',
+    amount:       li.amount || '0',
+    quantity:     li.quantity || 1,
   }));
 
   const responseDraft = {
     amount,
     currency,
     description,
+    originalDescription: (draft.original_description || '').substring(0, MAX_DESCRIPTION),
     category,
     isIncome: false,
     merchantName: draft.merchant_name || '',
@@ -213,6 +217,7 @@ function buildPartial(draft, defaultCurrency, knownCategories, paymentMethods, t
     amount: draft.amount || '0',
     currency,
     description: (draft.description || '').substring(0, MAX_DESCRIPTION),
+    originalDescription: (draft.original_description || '').substring(0, MAX_DESCRIPTION),
     category,
     isIncome: false,
     merchantName: draft.merchant_name || '',
@@ -220,9 +225,10 @@ function buildPartial(draft, defaultCurrency, knownCategories, paymentMethods, t
     payerLabel,
     payerProfileId,
     lineItems: (draft.line_items || []).map(li => ({
-      name:     li.name || '',
-      amount:   li.amount || '0',
-      quantity: li.quantity || 1,
+      name:         li.name || '',
+      originalName: li.original_name || '',
+      amount:       li.amount || '0',
+      quantity:     li.quantity || 1,
     })),
     entryDate: draft.entry_date || today,
     confidence: typeof draft.confidence === 'number' ? draft.confidence : 0,
@@ -336,7 +342,17 @@ exports.handler = async (event) => {
     // ── Today's date ──
     const today = new Date().toISOString().split('T')[0];
 
-    // ── System prompt (canonical from spec §1.1) ──
+    // ── System prompt (canonical from spec §2.1 — translate + keep original) ──
+    const locale = (body.locale || 'en').substring(0, 2);
+    const localeName = { en:'English', es:'Spanish', ru:'Russian', ar:'Arabic',
+      ka:'Georgian', zh:'Chinese', ja:'Japanese', ko:'Korean', vi:'Vietnamese',
+      fr:'French', de:'German', pt:'Portuguese', it:'Italian', nl:'Dutch',
+      tr:'Turkish', th:'Thai', hi:'Hindi', id:'Indonesian', ms:'Malay',
+      he:'Hebrew', pl:'Polish', uk:'Ukrainian', ro:'Romanian', hu:'Hungarian',
+      cs:'Czech', sk:'Slovak', bg:'Bulgarian', sr:'Serbian', hr:'Croatian',
+      fi:'Finnish', sv:'Swedish', da:'Danish', no:'Norwegian', el:'Greek',
+    }[locale] || 'English';
+
     const systemPrompt = `You are a receipt parser for the SetAll expense-tracking app.
 Extract structured data from the receipt image.
 
@@ -344,17 +360,24 @@ Rules:
 - amount: the TOTAL amount paid (after tax, tips, discounts). Decimal string, e.g. "45.50".
 - currency: 3-letter ISO code. Infer from symbol ($→USD, €→EUR, £→GBP, ₾→GEL, ₽→RUB, ¥→CNY).
   If ambiguous use defaultCurrency from context.
-- description: merchant name or top item, 3-6 words, in the receipt's original language —
-  do NOT translate to English.
+- description: merchant name or top item, 3-6 words, translated into ${localeName}.
+- original_description: the receipt description in its ORIGINAL language and script, EXACTLY as
+  printed. Do NOT translate or transliterate — keep original characters (Georgian, Cyrillic,
+  Arabic, CJK, etc.) verbatim.
 - category: pick exactly one from knownCategories.
-- merchant_name: normalized merchant/store name.
+- merchant_name: normalized merchant/store name. Do NOT translate merchant_name — it is a
+  proper noun; keep it as printed.
 - last4: last 4 digits of the card used, if visible on receipt. null if not visible.
   NEVER guess or invent a last4. Extract only if clearly printed.
 - entry_date: date from receipt in YYYY-MM-DD. If not readable use today's date from context.
-- line_items: array of individual line items (name, amount, quantity). Empty array if not parseable.
-  Preserve each item's name EXACTLY as printed on the receipt, in its original language and script
-  (Georgian, Cyrillic, Arabic, CJK, etc.). Do NOT translate, transliterate, or reduce a name to only
-  its Latin/SKU/brand fragment — keep the full descriptive text as shown, including non-Latin characters.
+- line_items: array of individual line items. Empty array if not parseable.
+  For each item:
+  - name: the item name translated into ${localeName}.
+  - original_name: the item name EXACTLY as printed on the receipt, in its original language
+    and script (Georgian, Cyrillic, Arabic, CJK, etc.). Do NOT translate, transliterate, or
+    reduce — keep the full descriptive text as shown, including non-Latin characters.
+  - amount: the item price as a decimal string.
+  - quantity: integer quantity (default 1).
 - confidence: your confidence 0.0–1.0 that the amount and currency are correct.
 - needs_clarification: "amount" if total is unreadable, "currency" if indeterminate, "date" if
   date is critical and missing, null otherwise.
@@ -365,7 +388,7 @@ ${merchantHints || '(none yet)'}
 Group item hints (for group_id ${groupId || 'none'}):
 ${itemHints || '(none yet)'}
 
-Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurrency}`;
+Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurrency}  Locale: ${localeName}`;
 
     // ── API key check ──
     const apiKey = process.env.OPENAI_API_KEY;

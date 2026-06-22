@@ -67,6 +67,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   String _editCurrency = 'USD';
   String _editCategory = 'General';
   DateTime _editDate = DateTime.now();
+  String? _originalDescription;
   List<_EditableLineItem> _lineItems = [];
 
   // Clarification target.
@@ -159,6 +160,9 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     if (!mounted) return;
     setState(() => _state = ReceiptEntryState.processing);
 
+    // Capture locale before any async gap (lint: use_build_context_synchronously).
+    final locale = context.locale.languageCode;
+
     try {
       // 1. Compress.
       final bytes = await ReceiptIngestService.instance.compressReceipt(imagePath);
@@ -194,6 +198,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         defaultCurrency: widget.defaultCurrency,
         knownCategories: translatedCategories,
         timezone: timezone,
+        locale: locale,
       );
 
       if (!mounted) return;
@@ -248,6 +253,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         ? draft.amount.toStringAsFixed(2)
         : '';
     _descCtrl.text   = draft.description;
+    _originalDescription = draft.originalDescription;
     _payerCtrl.text  = draft.payerLabel ?? '';
     // Dispose any existing line-item controllers before replacing.
     for (final li in _lineItems) {
@@ -257,6 +263,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         .map((li) => _EditableLineItem(
               id: const Uuid().v4(),
               nameCtrl: TextEditingController(text: li.name),
+              originalName: li.originalName,
               amountCtrl: TextEditingController(
                 text: li.amount > Decimal.zero ? li.amount.toStringAsFixed(2) : '',
               ),
@@ -620,6 +627,19 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
                 controller: _descCtrl,
                 label: 'voice_entry.description_label'.tr(),
               ),
+              if (_originalDescription != null &&
+                  _originalDescription!.isNotEmpty &&
+                  _originalDescription != _descCtrl.text)
+                Padding(
+                  padding: const EdgeInsets.only(left: 4, top: 2),
+                  child: Text(
+                    _originalDescription!,
+                    style: const TextStyle(
+                        fontSize: 10, color: Colors.white38),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
               const SizedBox(height: 10),
 
               // Payer label
@@ -805,29 +825,54 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   }
 
   Widget _buildLineItemRow(_EditableLineItem li) {
+    final showOriginalName = li.originalName != null &&
+        li.originalName!.isNotEmpty &&
+        li.originalName != li.nameCtrl.text;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
+        crossAxisAlignment:
+            showOriginalName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
         children: [
           Expanded(
             flex: 3,
-            child: SizedBox(
-              height: 36,
-              child: TextField(
-                controller: li.nameCtrl,
-                style: const TextStyle(color: Colors.white, fontSize: 13),
-                decoration: InputDecoration(
-                  hintText: 'receipt.item_name'.tr(),
-                  hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                  filled: true,
-                  fillColor: Colors.white10,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide.none,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 36,
+                  child: TextField(
+                    controller: li.nameCtrl,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'receipt.item_name'.tr(),
+                      hintStyle:
+                          const TextStyle(color: Colors.white30, fontSize: 12),
+                      filled: true,
+                      fillColor: Colors.white10,
+                      contentPadding:
+                          const EdgeInsets.symmetric(horizontal: 10),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                if (showOriginalName)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, top: 2),
+                    child: Text(
+                      li.originalName!,
+                      style: const TextStyle(
+                          fontSize: 10, color: Colors.white38),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
             ),
           ),
           const SizedBox(width: 6),
@@ -1001,12 +1046,14 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
 class _EditableLineItem {
   final String id;
   final TextEditingController nameCtrl;
+  final String? originalName;
   final TextEditingController amountCtrl;
   final TextEditingController qtyCtrl;
 
   _EditableLineItem({
     required this.id,
     required this.nameCtrl,
+    this.originalName,
     required this.amountCtrl,
     required this.qtyCtrl,
   });

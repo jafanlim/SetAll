@@ -69,5 +69,6 @@ class AuthConfig {
   // NOTE: prod URL — the fn is currently only on the receipt-ingest-test preview;
   // point at the preview alias (or deploy --prod) for end-to-end testing before merge.
   static const String netlifyReceiptIngestUrl =
-      'https://setall.app/.netlify/functions/receipt-ingest';
+      // TEMP(on-device smoke): preview alias — REVERT to setall.app before merge.
+      'https://receipt-ingest-test--setall.netlify.app/.netlify/functions/receipt-ingest';
 }
