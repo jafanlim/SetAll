@@ -10,6 +10,9 @@
 [functions."voice-entry"]
   timeout = 20
 
+[functions."receipt-ingest"]
+  timeout = 30
+
 [build.environment]
   NODE_VERSION = "18"
 
