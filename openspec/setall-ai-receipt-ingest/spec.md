@@ -366,8 +366,15 @@ Enum `ReceiptEntryState`:
 - **Human in the loop — pre-fill only**: the draft is a suggestion, never authoritative.
   Every field is editable before confirm: amount, currency, description, category, payer, date,
   and the **line items** (add / edit / remove rows). The user can change everything.
-- **No image stored**: the scanned image is shown in the confirm sheet from the on-device file
-  for reference only; it is NOT uploaded and NOT attached to the saved expense.
+- **No server storage; local-only cache**: the image is NEVER uploaded or attached to the
+  saved expense. The device keeps a **local-only** copy (WebP, in the app support dir, keyed by
+  expense id) so the user can see "where the numbers came from." Auto-purged 30 days after
+  **last view** (viewing refreshes the timer). Local-only → not visible cross-device or to other
+  group members (privacy-first v1). Web: shown during the session only, not persisted.
+- **Multi-language**: receipts in ANY language must work. Pass the user's localized category
+  list + language code (mirror `voice_entry_sheet`); the model returns the category in the app
+  language and the description in the receipt's language. Never assume English.
+- **Line items editable**: user can add / edit / remove line-item rows in the confirm sheet.
 - **Write-back on confirm**: after successful save, call `service.writeBackMemory(...)` — this is
   best-effort (fire-and-forget, errors logged not thrown).
 - **Native capture**: use the platform document scanner (iOS VisionKit / Android ML Kit) via a
