@@ -8,10 +8,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pdfx/pdfx.dart';
 
+import 'package:easy_localization/easy_localization.dart';
 import '../../../../core/services/date_format_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
@@ -71,12 +73,12 @@ class _WalletEntryDetailScreenState
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete entry?'),
-        content: const Text('This wallet entry will be permanently removed.'),
+        title: Text('activity_screen.delete_entry_title'.tr()),
+        content: Text('wallet_detail.delete_body'.tr()),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text('common.cancel'.tr()),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -84,7 +86,7 @@ class _WalletEntryDetailScreenState
               foregroundColor: Colors.white,
             ),
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text('common.delete'.tr()),
           ),
         ],
       ),
@@ -112,7 +114,14 @@ class _WalletEntryDetailScreenState
   @override
   Widget build(BuildContext context) {
     final theme       = Theme.of(context);
-    final expense     = widget.expense;
+    // Source the entry from the live provider so edits (date, amount, etc.)
+    // reflect immediately after the edit screen pops. The navigation argument
+    // is an immutable snapshot and would otherwise show stale values.
+    final entries     = ref.watch(walletEntriesProvider).valueOrNull;
+    final expense     = entries == null
+        ? widget.expense
+        : entries.firstWhere((e) => e.id == widget.expense.id,
+            orElse: () => widget.expense);
     final isIncome    = expense.isIncome;
     final accentColor = isIncome ? _green : _purple;
 
@@ -171,7 +180,7 @@ class _WalletEntryDetailScreenState
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          isIncome ? 'Income Entry' : 'Expense Entry',
+          isIncome ? 'wallet.income'.tr() : 'wallet.expenses'.tr(),
           style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
         ),
         backgroundColor: theme.colorScheme.surface,
@@ -183,14 +192,14 @@ class _WalletEntryDetailScreenState
           TextButton.icon(
             onPressed: _edit,
             icon: const Icon(Icons.edit_outlined, size: 16),
-            label: const Text('Edit'),
+            label: Text('common.edit'.tr()),
             style: TextButton.styleFrom(foregroundColor: _teal),
           ),
           // Delete button
           TextButton.icon(
             onPressed: _delete,
             icon: const Icon(Icons.delete_outline, size: 16),
-            label: const Text('Delete'),
+            label: Text('common.delete'.tr()),
             style: TextButton.styleFrom(foregroundColor: _brandOrange),
           ),
           const SizedBox(width: 4),
@@ -221,7 +230,9 @@ class _WalletEntryDetailScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            expense.description.isEmpty ? 'Wallet entry' : expense.description,
+                            (expense.description.isEmpty || expense.description == 'Wallet entry')
+                                ? categoryTr(expense.category)
+                                : expense.description,
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w700, fontSize: 15,
                             ),
@@ -330,7 +341,7 @@ class _WalletEntryDetailScreenState
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        expense.category.isEmpty ? 'General' : expense.category,
+                        expense.category.isEmpty ? 'General' : categoryTr(expense.category),
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,

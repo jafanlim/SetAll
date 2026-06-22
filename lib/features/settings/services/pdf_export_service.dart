@@ -163,7 +163,7 @@ Future<Uint8List> _buildWalletPdf(_WalletPdfPayload p) async {
               _fmtDate(e['created_at'] as String?),
               (e['description'] as String?)?.isNotEmpty == true
                   ? e['description'] as String
-                  : 'Wallet entry',
+                  : ((cat == null || cat.isEmpty) ? 'Other' : cat),
               (cat == null || cat.isEmpty) ? 'Other' : cat,
               _fmtAmount(cur, amt, isIncome: isIncome),
               isIncome ? 'Income' : 'Expense',

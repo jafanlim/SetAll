@@ -397,6 +397,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       iconColor:      _entryColor.toARGB32(),
       attachmentPaths: List.unmodifiable(_attachmentPaths),
       notes: _notesController.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesController.text.trim()),
+      createdAt:      _entryDate,
     );
 
     if (mounted) {

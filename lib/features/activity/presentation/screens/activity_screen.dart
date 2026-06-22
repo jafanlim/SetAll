@@ -12,6 +12,7 @@ import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/amount_formatter.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/wallet_entry_model.dart';
@@ -110,7 +111,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
               ? 'activity_screen.delete_items_one'.tr()
               : 'activity_screen.delete_items_other'.tr(namedArgs: {'count': _selected.length.toString()}),
         ),
-        content: Text('common.cannot_be_undone'.tr()),
+        content: Text('activity_screen.delete_soft_body'.tr()),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('common.cancel'.tr())),
           FilledButton(
@@ -1202,14 +1203,14 @@ class _ExpenseTile extends ConsumerWidget {
         : defaultIcon;
 
     final desc   = e.description.isEmpty ? e.category : e.description;
-    final byWhom = event.payerName.isEmpty ? 'You' : event.payerName;
+    final byWhom = event.payerName.isEmpty ? 'activity_screen.by_you'.tr() : event.payerName;
     final title  = isSettlement
         ? 'Settlement: $desc'
         : e.isIncome
-            ? '$desc · Income by $byWhom'
-            : '$desc · by $byWhom';
+            ? '$desc · ${'activity_screen.income_by'.tr()} $byWhom'
+            : '$desc · ${'activity_screen.by'.tr()} $byWhom';
 
-    final badge = isPersonal ? 'Wallet' : (event.groupName.isEmpty ? 'Group' : event.groupName);
+    final badge = isPersonal ? 'activity_screen.badge_wallet'.tr() : (event.groupName.isEmpty ? 'activity_screen.badge_group'.tr() : event.groupName);
 
     // ── Currency fix: always use the expense's own currency ──────────────
     final primaryAmt = formatAmount(e.amount);
@@ -1363,7 +1364,7 @@ class _ExpenseTile extends ConsumerWidget {
                         context: context,
                         builder: (d) => AlertDialog(
                           title: Text('activity_screen.delete_expense_title'.tr()),
-                          content: Text('common.cannot_be_undone'.tr()),
+                          content: Text('activity_screen.delete_soft_body'.tr()),
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(d, false), child: const Text('Cancel')),
                             FilledButton(
@@ -1467,7 +1468,7 @@ class _WalletEntryTile extends StatelessWidget {
       accent:         accent,
       icon:           icon,
       title:          '$desc · Wallet',
-      badge:          e.isIncome ? 'Income' : 'Expense',
+      badge:          e.isIncome ? 'activity_screen.badge_income'.tr() : 'activity_screen.badge_expense'.tr(),
       timestamp:      e.createdAt,
       amount:         amtStr,
       amountPositive: e.isIncome,
@@ -1485,7 +1486,7 @@ class _WalletEntryTile extends StatelessWidget {
               context: context,
               builder: (ctx) => AlertDialog(
                 title: Text('activity_screen.delete_entry_title'.tr()),
-                content: Text('common.cannot_be_undone'.tr()),
+                content: Text('activity_screen.delete_soft_body'.tr()),
                 actions: [
                   TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
                   FilledButton(
@@ -1660,7 +1661,7 @@ class _GroupDeletedTileState extends ConsumerState<_GroupDeletedTile> {
       ref.invalidate(omniActivityProvider);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
+          content: Text('${'activity_screen.restore_btn'.tr()}: ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -1886,7 +1887,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('${'activity_screen.restore_btn'.tr()}: $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1905,7 +1906,7 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
       _invalidateProviders();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('activity_screen.restore_btn'.tr() + ': ${widget.event.groupName}'),
+          content: Text('${'activity_screen.restore_btn'.tr()}: ${widget.event.groupName}'),
           backgroundColor: _teal.withAlpha(220),
         ),
       );
@@ -1954,17 +1955,17 @@ class _ExpenseDeletedTileState extends ConsumerState<_ExpenseDeletedTile> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ev    = widget.event;
-    final label = ev.description.isEmpty ? ev.category : ev.description;
+    final localizedLabel = ev.description.isEmpty ? categoryTr(ev.category) : ev.description;
     final title = ev.deletedByYou
-        ? 'You deleted "$label"'
-        : '${ev.deletedByName} deleted "$label"';
+        ? 'activity_screen.you_deleted'.tr(namedArgs: {'label': localizedLabel})
+        : 'activity_screen.deleted_by'.tr(namedArgs: {'name': ev.deletedByName, 'label': localizedLabel});
     final badge = ev.deletedWithGroupId != null
         ? '${ev.groupName.isEmpty ? 'Group' : ev.groupName} (deleted)'
         : ev.groupId != null
             ? (ev.groupName.isEmpty ? 'Group' : ev.groupName)
-            : 'Wallet';
+            : 'activity_screen.badge_wallet'.tr();
     final amountStr = '${ev.currency} ${formatAmount(ev.amount)}';
-    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 30;
+    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 90;
     final canRestore = ev.deletedByYou && withinWindow;
 
     return Padding(
@@ -2070,7 +2071,7 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
       _invalidateProviders();
       final label = widget.event.description.isEmpty ? widget.event.category : widget.event.description;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('activity_screen.restore_btn'.tr() + ': $label'), backgroundColor: _teal.withAlpha(220)),
+        SnackBar(content: Text('${'activity_screen.restore_btn'.tr()}: $label'), backgroundColor: _teal.withAlpha(220)),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2083,9 +2084,9 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final ev    = widget.event;
-    final label = ev.description.isEmpty ? ev.category : ev.description;
+    final localizedLabel = ev.description.isEmpty ? categoryTr(ev.category) : ev.description;
     final amountStr = '${ev.currency} ${formatAmount(ev.amount)}';
-    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 30;
+    final withinWindow = DateTime.now().difference(ev.deletedAt).inDays < 90;
 
     final tile = Padding(
       padding: EdgeInsets.fromLTRB(widget.editMode ? 52 : 16, 4, 16, 4),
@@ -2100,7 +2101,7 @@ class _WalletEntryDeletedTileState extends ConsumerState<_WalletEntryDeletedTile
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'activity_screen.you_deleted'.tr(namedArgs: {'label': label}),
+                    'activity_screen.you_deleted'.tr(namedArgs: {'label': localizedLabel}),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600, fontSize: 13,
                     ),
