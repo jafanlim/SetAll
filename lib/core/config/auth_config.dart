@@ -71,4 +71,9 @@ class AuthConfig {
   static const String netlifyReceiptIngestUrl =
       // TEMP(on-device smoke): preview alias — REVERT to setall.app before merge.
       'https://receipt-ingest-test--setall.netlify.app/.netlify/functions/receipt-ingest';
+
+  // setall-ingestion-pipeline: bank statement ingestion (CSV + text-PDF → classify → rows).
+  // Requires Authorization: Bearer <supabase_access_token>.
+  static const String netlifyIngestUrl =
+      'https://setall.app/.netlify/functions/ingest';
 }

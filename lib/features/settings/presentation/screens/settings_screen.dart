@@ -425,17 +425,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _saveCurrency(String code) async {
     setState(() { _currencySaving = true; _selectedCurrency = code; _currencyUserSelected = true; });
     HapticUtils.selection();
+    // Push the new currency synchronously so baseCurrencyProvider (and all
+    // downstream providers) reflect it immediately — no async round-trip needed.
+    ref.read(currencyOverrideProvider.notifier).state = code;
     try {
       await ref.read(setAllRepositoryProvider).updateProfile(defaultCurrency: code);
+      debugPrint('[_saveCurrency] updateProfile done for $code — invalidating providers');
       // Invalidate profile + balance providers so the new currency is picked
       // up by baseCurrencyProvider immediately. The _currencyUserSelected flag
       // prevents _seedFromProfile from overwriting the user's selection.
       ref.invalidate(currentProfileProvider);
-      ref.invalidate(baseCurrencyProvider);
       ref.invalidate(balanceSummaryProvider);
       ref.invalidate(walletBalanceProvider);
       ref.invalidate(walletEntryTotalsProvider);
       ref.invalidate(masterBalanceProvider);
+      debugPrint('[_saveCurrency] all providers invalidated');
       unawaited(Future.delayed(const Duration(milliseconds: 300), () => ref.read(syncServiceProvider).writeWidgetData()));
       HapticUtils.success();
     } catch (e) {
@@ -446,8 +450,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-        // Revert to the last known-good value from the DB, not null
-        // (null would cause the ?? 'USD' fallback to show incorrectly).
+        // Clear the override and revert UI to the last known-good DB value.
+        ref.read(currencyOverrideProvider.notifier).state = null;
         final profile = ref.read(currentProfileProvider).valueOrNull;
         if (mounted) setState(() => _selectedCurrency = profile?.defaultCurrency ?? 'USD');
       }
@@ -629,6 +633,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   label: 'settings_ext.regional'.tr(),
                   subtitle: 'settings_ext.regional_subtitle'.tr(),
                   onTap: () => context.push(AppRouter.settingsRegional),
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: LucideIcons.piggyBank,
+                  iconColor: const Color(0xFF8B5CF6),
+                  label: 'settings_ext.budgets'.tr(),
+                  subtitle: 'settings_ext.budgets_subtitle'.tr(),
+                  onTap: () => context.push(AppRouter.budgets),
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: LucideIcons.repeat,
+                  iconColor: const Color(0xFF14B8A6),
+                  label: 'settings_ext.recurring'.tr(),
+                  subtitle: 'settings_ext.recurring_subtitle'.tr(),
+                  onTap: () => context.push(AppRouter.recurring),
+                ),
+                const Divider(height: 1, indent: 56, endIndent: 0),
+                _NavRow(
+                  icon: LucideIcons.bellRing,
+                  iconColor: const Color(0xFFF59E0B),
+                  label: 'settings_ext.alert_prefs'.tr(),
+                  subtitle: 'settings_ext.alert_prefs_subtitle'.tr(),
+                  onTap: () => context.push(AppRouter.alertPrefs),
                 ),
                 const Divider(height: 1, indent: 56, endIndent: 0),
                 _LanguageRow(),

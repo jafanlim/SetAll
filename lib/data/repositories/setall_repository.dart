@@ -105,7 +105,8 @@ class SetAllRepository {
   String? _deviceUserId;
 
   final _changeController = StreamController<void>.broadcast();
-  final _pendingDeletedGroups = <_DeletedGroupRecord>[];
+  final _pendingDeletedGroups   = <_DeletedGroupRecord>[];
+  final _pendingDeletedExpenses = <_DeletedExpenseRecord>[];
 
   /// Emits a change event so all active [watchGroups] / [watchGroupExpenses]
   /// streams re-query SQLite and push fresh data to the UI.
@@ -772,6 +773,62 @@ class SetAllRepository {
     }
   }
 
+  /// Watches all expenses where the current user is the payer, including both
+  /// personal wallet entries (group_id IS NULL) and group expenses.
+  /// Used by recurring-charge detection so group-paid recurring bills are found.
+  Stream<List<ExpenseModel>> watchAllPayerExpenses({int limit = 10000}) async* {
+    List<ExpenseModel> last;
+    try { last = await getAllPayerExpenses(limit: limit); } catch (e) {
+      debugPrint('[watchAllPayerExpenses] initial load error (yielding []): $e');
+      last = [];
+    }
+    yield last;
+    await for (final _ in _changeController.stream) {
+      List<ExpenseModel> next;
+      try { next = await getAllPayerExpenses(limit: limit); } catch (e) {
+        debugPrint('[watchAllPayerExpenses] reload error (keeping last): $e');
+        continue;
+      }
+      if (_expenseListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
+  /// Returns all expenses where the current user is the payer — both personal
+  /// wallet entries and group expenses.
+  Future<List<ExpenseModel>> getAllPayerExpenses({int limit = 10000}) async {
+    final uid = await ensureUser();
+    if (uid == null) {
+      debugPrint('[getAllPayerExpenses] uid=null — returning []');
+      return [];
+    }
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('expenses')
+          .select()
+          .eq('payer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      final result = rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
+      debugPrint('[getAllPayerExpenses] web uid=$uid returned ${result.length} entries');
+      return result;
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'expenses',
+      where: 'payer_id = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    final result = rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
+    debugPrint('[getAllPayerExpenses] sqlite uid=$uid returned ${result.length} entries');
+    return result;
+  }
+
   static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
     if (a.length != b.length) return true;
     for (var i = 0; i < a.length; i++) {
@@ -1235,13 +1292,45 @@ class SetAllRepository {
         } catch (_) {}
 
         if (creatorId == uid) {
-          // Owner: use SECURITY DEFINER RPC so it can cascade-delete splits/
-          // expenses paid by OTHER members (plain RLS would block those deletes).
-          await _client.rpc('delete_group', params: {'p_group_id': groupId});
-        } else {
-          // Non-owner: leave via RPC.
-          await _client.rpc('leave_group', params: {'p_group_id': groupId});
+          // Owner: snapshot + delete all group expenses, then soft-delete group.
+          final expRows = await _client.from('expenses').select()
+              .eq('group_id', groupId) as List;
+          for (final ex in expRows) {
+            final m = ex as Map<String, dynamic>;
+            await _client.from('deleted_expenses').insert({
+              'expense_id':             m['id'],
+              'description':            m['description'] ?? '',
+              'amount':                 m['universal_usd_amount'] ?? m['amount'] ?? '0',
+              'original_amount':        m['amount'],
+              'currency':               m['original_currency'] ?? m['currency'] ?? 'USD',
+              'group_id':               groupId,
+              'group_name':             webGroupName,
+              'is_income':              m['is_income'] ?? false,
+              'category':               m['category'] ?? 'Other',
+              'deleted_by':             uid,
+              'deleted_at':             _now(),
+              'is_wallet':              false,
+              'created_at':             m['created_at'],
+              'deleted_with_group_id':  groupId,
+              'exchange_rate_applied':  m['exchange_rate_applied']?.toString(),
+              'base_currency_amount':   m['base_currency_amount']?.toString(),
+              'payer_id':               m['payer_id'],
+              'split_type':             m['split_type'],
+              'icon_codepoint':         m['icon_codepoint'],
+              'icon_color':             m['icon_color'],
+              'notes':                  m['notes'],
+              'attachment_urls':        m['attachment_urls'],
+            });
+            await _client.from('splits').delete().eq('expense_id', m['id']);
+            await _client.from('expenses').delete().eq('id', m['id']);
+          }
+          await _client.from('groups').update({
+            'is_deleted': true,
+          }).eq('id', groupId).eq('creator_id', uid);
         }
+        // Remove self from group_members so the group disappears from lists.
+        await _client.from('group_members').delete()
+            .eq('group_id', groupId).eq('user_id', uid);
         _logGroupDeletedEvents(uid, {groupId: (webGroupName, creatorId ?? uid)});
         _notify();
         return true;
@@ -1401,11 +1490,45 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        // No is_deleted column in Supabase — restore is local-only for native platforms.
+        // Re-insert only expenses that were cascade-deleted with this group
+        // (identified by deleted_with_group_id, not just group_id — that way
+        // individually-deleted expenses from the same group are NOT restored.)
+        final tombRows = await _client.from('deleted_expenses').select()
+            .eq('deleted_with_group_id', groupId) as List;
+        for (final t in tombRows) {
+          final m = t as Map<String, dynamic>;
+          await _client.from('expenses').insert({
+            'id':                    m['expense_id'],
+            'group_id':              groupId,
+            'payer_id':              m['payer_id'] ?? uid,
+            'amount':                m['original_amount'] ?? m['amount'],
+            'is_income':             m['is_income'] ?? false,
+            'description':           m['description'] ?? '',
+            'currency':              m['currency'] ?? 'USD',
+            'category':              m['category'] ?? 'Other',
+            'universal_usd_amount':  m['amount'],
+            'created_at':            m['created_at'],
+            'exchange_rate_applied': m['exchange_rate_applied'],
+            'base_currency_amount':  m['base_currency_amount'],
+            'split_type':            m['split_type'] ?? 'even',
+            'icon_codepoint':        m['icon_codepoint'],
+            'icon_color':            m['icon_color'],
+            'notes':                 m['notes'],
+            'attachment_urls':       m['attachment_urls'],
+          });
+        }
+        // Clear cascade tombstones only (not individually-deleted ones).
+        await _client.from('deleted_expenses').delete()
+            .eq('deleted_with_group_id', groupId);
+        // Clear is_deleted — group reappears via get_my_groups() UNION.
+        await _client.from('groups').update({
+          'is_deleted': false,
+        }).eq('id', groupId);
         _pendingDeletedGroups.removeWhere((r) => r.id == groupId);
         _notify();
         return true;
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[restoreGroup] web restore failed: $e');
         return false;
       }
     }
@@ -1726,10 +1849,10 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').update({
-          'settled_at': now,
-          'settled_by': uid,
-        }).eq('id', groupId);
+        // Membership-checked SECURITY DEFINER RPC: any group member can settle,
+        // not just the creator (groups UPDATE stays creator-only).
+        await _client.rpc('set_group_settlement',
+            params: {'p_group_id': groupId, 'p_settled': true});
         _notify();
         return true;
       } catch (e) {
@@ -1746,10 +1869,8 @@ class SetAllRepository {
     );
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('groups').update({
-          'settled_at': now,
-          'settled_by': uid,
-        }).eq('id', groupId);
+        await _client.rpc('set_group_settlement',
+            params: {'p_group_id': groupId, 'p_settled': true});
       } catch (_) {}
     }
     _notify();
@@ -1763,10 +1884,8 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').update({
-          'settled_at': null,
-          'settled_by': null,
-        }).eq('id', groupId);
+        await _client.rpc('set_group_settlement',
+            params: {'p_group_id': groupId, 'p_settled': false});
         _notify();
         return true;
       } catch (e) {
@@ -1783,10 +1902,8 @@ class SetAllRepository {
     );
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('groups').update({
-          'settled_at': null,
-          'settled_by': null,
-        }).eq('id', groupId);
+        await _client.rpc('set_group_settlement',
+            params: {'p_group_id': groupId, 'p_settled': false});
       } catch (_) {}
     }
     _notify();
@@ -2618,6 +2735,243 @@ class SetAllRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Budget spend query (owned by setall-budgets)
+  // ---------------------------------------------------------------------------
+
+  /// Returns per-category spend in the user's base currency for all personal
+  /// expenses whose [createdAt] falls in [[from], [to]).
+  ///
+  /// Conversion priority (mirrors [getWalletEntryTotals]):
+  ///   1. frozen [baseCurrencyAmount] stored at save time (schema v33+)
+  ///   2. [universalUsdAmount] × live USD→base rate (fallback for older entries)
+  ///
+  /// Income entries are skipped. The null / empty category maps to `"General"`.
+  Future<Map<String, Decimal>> getCategorySpend(
+    DateTime from,
+    DateTime to, {
+    String baseCurrency = 'USD',
+  }) async {
+    final all = await getPersonalExpenses();
+    final result = <String, Decimal>{};
+
+    // Fetch USD→baseCurrency rate at most once across all entries.
+    Decimal usdToBase = Decimal.one;
+    if (baseCurrency != 'USD' && _currencyService != null) {
+      usdToBase = await _currencyService.getRate('USD', baseCurrency);
+    }
+
+    for (final e in all) {
+      if (e.isIncome) continue;
+      final createdAt = DateTime.tryParse(e.createdAt ?? '')?.toLocal();
+      if (createdAt == null) continue;
+      if (createdAt.isBefore(from) || !createdAt.isBefore(to)) continue;
+
+      final cat = (e.category.isEmpty) ? 'General' : e.category;
+
+      final Decimal amt;
+      final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
+      if (hasFrozen) {
+        amt = Decimal.tryParse(e.baseCurrencyAmount!) ?? Decimal.zero;
+      } else {
+        final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
+        amt = baseCurrency == 'USD' ? usd : (usd * usdToBase).round(scale: 2);
+      }
+
+      result[cat] = (result[cat] ?? Decimal.zero) + amt;
+    }
+
+    debugPrint('[getCategorySpend] from=$from to=$to base=$baseCurrency '
+        'categories=${result.keys.join(",")}');
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Budgets (CRUD — Supabase only; mobile uses local SQLite mirror via sync)
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all budget rows for the current user.
+  Future<List<Map<String, dynamic>>> getBudgets() async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('budgets')
+          .select()
+          .eq('user_id', uid)
+          .order('created_at', ascending: true) as List;
+      return rows.cast<Map<String, dynamic>>();
+    }
+
+    // SQLite path (mobile) — table may not exist on older installs; guard it.
+    try {
+      final rows = await LocalDatabase.db.query(
+        'budgets',
+        where: 'user_id = ?',
+        whereArgs: [uid],
+        orderBy: 'created_at ASC',
+      );
+      return rows.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Upsert a budget row (insert or overwrite by id).
+  Future<void> upsertBudget(Map<String, dynamic> budget) async {
+    final uid = await ensureUser();
+    if (uid == null) throw StateError('No authenticated user');
+    final row = {...budget, 'user_id': uid};
+
+    if (_isWeb && _client != null) {
+      await _client.from('budgets').upsert(row);
+      return;
+    }
+
+    try {
+      await LocalDatabase.db.insert(
+        'budgets',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {
+      // Table may not exist on very old local DBs — silently skip.
+    }
+  }
+
+  /// Delete a budget row by id.
+  Future<void> deleteBudget(String id) async {
+    if (_isWeb && _client != null) {
+      await _client.from('budgets').delete().eq('id', id);
+      return;
+    }
+    try {
+      await LocalDatabase.db.delete('budgets', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recurring Rules (setall-recurring-detection — Supabase-direct on web)
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all confirmed recurring rules for the current user.
+  Future<List<Map<String, dynamic>>> getRecurringRules() async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+    if (_client == null) return [];
+    final rows = await _client
+        .from('recurring_rules')
+        .select()
+        .eq('user_id', uid)
+        .eq('status', 'confirmed')
+        .order('created_at', ascending: false) as List;
+    return rows.cast<Map<String, dynamic>>();
+  }
+
+  /// Insert a confirmed recurring rule.
+  Future<void> insertRecurringRule(Map<String, dynamic> rule) async {
+    final uid = await ensureUser();
+    if (uid == null) throw StateError('No authenticated user');
+    if (_client == null) return;
+    await _client.from('recurring_rules').insert({...rule, 'user_id': uid});
+  }
+
+  /// Dismiss a recurring rule by id (set status = dismissed).
+  Future<void> dismissRecurringRule(String id) async {
+    if (_client == null) return;
+    await _client
+        .from('recurring_rules')
+        .update({'status': 'dismissed'})
+        .eq('id', id);
+  }
+
+  /// Delete a recurring rule by id.
+  Future<void> deleteRecurringRule(String id) async {
+    if (_client == null) return;
+    await _client.from('recurring_rules').delete().eq('id', id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Proactive Alerts (setall-proactive-alerts — Supabase-direct on web)
+  // ---------------------------------------------------------------------------
+
+  /// Returns the alert_prefs row for the current user, or null if not set.
+  Future<Map<String, dynamic>?> getAlertPrefs() async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return null;
+    final rows = await _client
+        .from('alert_prefs')
+        .select()
+        .eq('user_id', uid)
+        .limit(1) as List;
+    if (rows.isEmpty) return null;
+    return (rows.first as Map<String, dynamic>);
+  }
+
+  /// Upsert alert_prefs for the current user.
+  Future<void> upsertAlertPrefs(Map<String, dynamic> prefs) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('alert_prefs').upsert({
+      ...prefs,
+      'user_id': uid,
+    }, onConflict: 'user_id');
+  }
+
+  /// Returns true if an alert_log row already exists for this (alertType, refKey).
+  Future<bool> alertLogContains({
+    required String alertType,
+    required String refKey,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return false;
+    final rows = await _client
+        .from('alert_log')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('alert_type', alertType)
+        .eq('ref_key', refKey)
+        .limit(1) as List;
+    return rows.isNotEmpty;
+  }
+
+  /// Insert an alert_log entry to mark an alert as fired.
+  Future<void> insertAlertLog({
+    required String alertType,
+    required String refKey,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('alert_log').insert({
+      'user_id': uid,
+      'alert_type': alertType,
+      'ref_key': refKey,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Insight Signal (setall-insight-self-improvement Stage 1)
+  // ---------------------------------------------------------------------------
+
+  /// Emit an insight_signal row. Fire-and-forget — caller does not await errors.
+  Future<void> insertInsightSignal({
+    required String sessionId,
+    required String messageId,
+    required String signalType,
+    Map<String, dynamic>? extra,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('insight_signal').insert({
+      'user_id':     uid,
+      'session_id':  sessionId,
+      'message_id':  messageId,
+      'signal_type': signalType,
+      if (extra != null && extra.isNotEmpty) 'extra': extra,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
   // User Categories
   // ---------------------------------------------------------------------------
 
@@ -2923,7 +3277,7 @@ class SetAllRepository {
     // Used to annotate each expense event with the payer's name.
     final profileNameCache = <String, String>{};
     Future<String> payerName(String payerId) async {
-      if (payerId == uid) return 'You';
+      if (payerId == uid) return ''; // empty → activity screen falls back to localized by_you
       if (profileNameCache.containsKey(payerId)) return profileNameCache[payerId]!;
       String name = 'Someone';
       try {
@@ -3018,6 +3372,31 @@ class SetAllRepository {
           expense: e,
           groupName: '',
           payerName: await payerName(e.payerId),
+        ));
+      }
+      // Deleted expenses (tombstones from deleted_expenses table).
+      final deleted = await _client
+          .from('deleted_expenses')
+          .select()
+          .eq('deleted_by', uid)
+          .order('deleted_at', ascending: false)
+          .limit(limit) as List;
+      for (final r in deleted) {
+        final m = r as Map<String, dynamic>;
+        final gid = m['group_id'] as String?;
+        events.add(ExpenseDeletedEvent(
+          timestamp:    (m['deleted_at'] as String?) ?? '',
+          expenseId:    m['expense_id'] as String,
+          description:  (m['description'] as String?) ?? '',
+          amount:       (m['amount'] ?? '0').toString(),
+          currency:     (m['currency'] as String?) ?? 'USD',
+          groupId:      gid,
+          groupName:    (m['group_name'] as String?) ?? '',
+          isIncome:     m['is_income'] == true || m['is_income'] == 1,
+          deletedByYou: true,
+          deletedByName: '',
+          deletedAt:    DateTime.tryParse((m['deleted_at'] as String?) ?? '') ?? DateTime.now(),
+          category:     (m['category'] as String?) ?? 'Other',
         ));
       }
     } else {
@@ -3144,7 +3523,25 @@ class SetAllRepository {
     }
 
     // ── 6. Expense-deleted events from persistent snapshot table ─────────────
-    if (!_isWeb) {
+    if (_isWeb) {
+      for (final rec in _pendingDeletedExpenses.where((r) => !r.isWallet)) {
+        events.add(ExpenseDeletedEvent(
+          timestamp:          rec.deletedAt,
+          expenseId:          rec.expenseId,
+          description:        rec.description,
+          amount:             rec.amount,
+          currency:           rec.currency,
+          groupId:            rec.groupId,
+          groupName:          rec.groupName,
+          isIncome:           rec.isIncome,
+          deletedByYou:       rec.deletedByUid == uid,
+          deletedByName:      'You',
+          deletedAt:          DateTime.tryParse(rec.deletedAt) ?? DateTime.now(),
+          category:           rec.category,
+          deletedWithGroupId: null,
+        ));
+      }
+    } else {
       try {
         final deletedRows = await LocalDatabase.db.query(
           'deleted_expenses',
@@ -3179,7 +3576,20 @@ class SetAllRepository {
     //    WalletActivityEvent would duplicate every entry. Skipped intentionally.
 
     // ── 7. Deleted wallet entry events ──────────────────────────────────────
-    if (!_isWeb) {
+    if (_isWeb) {
+      for (final rec in _pendingDeletedExpenses.where((r) => r.isWallet)) {
+        events.add(WalletEntryDeletedEvent(
+          timestamp:   rec.deletedAt,
+          entryId:     rec.expenseId,
+          description: rec.description,
+          amount:      rec.amount,
+          currency:    rec.currency,
+          isIncome:    rec.isIncome,
+          category:    rec.category,
+          deletedAt:   DateTime.tryParse(rec.deletedAt) ?? DateTime.now(),
+        ));
+      }
+    } else {
       try {
         final delRows = await LocalDatabase.db.query(
           'deleted_wallet_entries',
@@ -3261,6 +3671,7 @@ class SetAllRepository {
     List<String> attachmentPaths = const [],
     String? notes,
     List<ExpenseLineItem> lineItems = const [],
+    DateTime? createdAt,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -3300,8 +3711,12 @@ class SetAllRepository {
 
           // Full data for local SQLite.
           final expenseData = expense.toJson()
-            ..remove('created_at')
             ..remove('created_by');
+          if (createdAt != null) {
+            expenseData['created_at'] = createdAt.toUtc().toIso8601String();
+          } else {
+            expenseData.remove('created_at');
+          }
         // When all attachments were removed, toJson omits the key → old SQLite
         // value is never cleared.  Explicitly null it so the UPDATE wipes it.
         if (finalAttachmentUrls.isEmpty) expenseData['attachment_urls'] = null;
@@ -3318,6 +3733,7 @@ class SetAllRepository {
                     ...supabaseExpenseData,
                     'is_income': expense.isIncome,
                     'group_id': (supabaseExpenseData['group_id'] as String?)?.isEmpty == true ? null : supabaseExpenseData['group_id'],
+                    if (createdAt != null) 'created_at': createdAt.toUtc().toIso8601String(),
                   })
                   .eq('id', expenseId);
               await _client.from('splits').delete().eq('expense_id', expenseId);
@@ -3437,6 +3853,7 @@ class SetAllRepository {
                 'group_id': (supabaseExpenseData['group_id'] as String?)?.isEmpty == true
                     ? null
                     : supabaseExpenseData['group_id'],
+                if (createdAt != null) 'created_at': createdAt.toUtc().toIso8601String(),
               };
               await _client
                   .from('expenses')
@@ -3507,10 +3924,52 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
+        // Snapshot to deleted_expenses (Supabase) — mirrors non-web SQLite path.
+        final snapRows = await _client.from('expenses').select()
+            .eq('id', expenseId).limit(1) as List;
+        if (snapRows.isNotEmpty) {
+          final s = snapRows.first as Map<String, dynamic>;
+          final gid = s['group_id'] as String?;
+          String groupName = '';
+          if (gid != null) {
+            final gRows = await _client.from('groups').select('name')
+                .eq('id', gid).limit(1) as List;
+            if (gRows.isNotEmpty) {
+              groupName = (gRows.first as Map<String, dynamic>)['name'] as String? ?? '';
+            }
+          }
+          await _client.from('deleted_expenses').insert({
+            'expense_id':             expenseId,
+            'description':            s['description'] ?? '',
+            'amount':                 s['universal_usd_amount'] ?? s['amount'] ?? '0',
+            'original_amount':        s['amount'],
+            'currency':               s['original_currency'] ?? s['currency'] ?? 'USD',
+            'group_id':               gid,
+            'group_name':             groupName,
+            'is_income':              s['is_income'] ?? false,
+            'category':               s['category'] ?? 'Other',
+            'deleted_by':             uid,
+            'deleted_at':             _now(),
+            'is_wallet':              gid == null,
+            'created_at':             s['created_at'],
+            'exchange_rate_applied':  s['exchange_rate_applied']?.toString(),
+            'base_currency_amount':   s['base_currency_amount']?.toString(),
+            'payer_id':               s['payer_id'],
+            'split_type':             s['split_type'],
+            'icon_codepoint':         s['icon_codepoint'],
+            'icon_color':             s['icon_color'],
+            'notes':                  s['notes'],
+            'attachment_urls':        s['attachment_urls'],
+          });
+        }
+        // Hard-delete from expenses (DELETE RLS works, INSERT into deleted_expenses also works).
         await _client.from('splits').delete().eq('expense_id', expenseId);
         await _client.from('expenses').delete().eq('id', expenseId);
+        debugPrint('[deleteExpense] deleted $expenseId (tombstone in deleted_expenses)');
+        _notify();
         return true;
-      } catch (_) {
+      } catch (e) {
+        debugPrint('[deleteExpense] error: $e');
         return false;
       }
     }
@@ -3580,26 +4039,58 @@ class SetAllRepository {
     return true;
   }
 
-  /// Restores a previously-deleted expense from the [deleted_expenses] snapshot.
-  /// Re-inserts it into the local [expenses] table and removes the deletion record.
-  /// Best-effort re-push to Supabase when online.
+  /// Restores a previously-deleted expense.
+  /// Web: clears deleted_at (soft-delete → visible again).
+  /// Native: re-inserts from local deleted_expenses snapshot.
   Future<bool> restoreExpense(String expenseId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
 
+    // ── Web: read tombstone from deleted_expenses (Supabase), re-insert ──
+    if (_isWeb && _client != null) {
+      try {
+        final tombRows = await _client.from('deleted_expenses').select()
+            .eq('expense_id', expenseId).limit(1) as List;
+        if (tombRows.isEmpty) return false;
+        final t = tombRows.first as Map<String, dynamic>;
+        await _client.from('expenses').insert({
+          'id':                    expenseId,
+          'group_id':              t['group_id'],
+          'payer_id':              t['payer_id'] ?? uid,
+          'amount':                t['original_amount'] ?? t['amount'],
+          'is_income':             t['is_income'] ?? false,
+          'description':           t['description'] ?? '',
+          'currency':              t['currency'] ?? 'USD',
+          'category':              t['category'] ?? 'Other',
+          'universal_usd_amount':  t['amount'],
+          'created_at':            t['created_at'],
+          'exchange_rate_applied': t['exchange_rate_applied'],
+          'base_currency_amount':  t['base_currency_amount'],
+          'split_type':            t['split_type'] ?? 'even',
+          'icon_codepoint':        t['icon_codepoint'],
+          'icon_color':            t['icon_color'],
+          'notes':                 t['notes'],
+          'attachment_urls':       t['attachment_urls'],
+        });
+        await _client.from('deleted_expenses').delete().eq('expense_id', expenseId);
+        _pendingDeletedExpenses.removeWhere((r) => r.expenseId == expenseId);
+        debugPrint('[restoreExpense] restored $expenseId from tombstone');
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[restoreExpense] restore failed: $e');
+        return false;
+      }
+    }
+
+    // ── Non-web: look up from local deleted_expenses table ──────────────
     final snapRows = await LocalDatabase.db.query(
       'deleted_expenses', where: 'expense_id = ?', whereArgs: [expenseId]);
     if (snapRows.isEmpty) return false;
     final snap = snapRows.first;
-
-    // Only the deleter can restore.
     if ((snap['deleted_by'] as String?) != uid) return false;
 
     final now = _now();
-    // original_amount is the raw entered amount (e.g. 15000 VND).
-    // amount (USD anchor) is stored in snap['amount'].
-    // Prefer original_amount for the live expenses.amount column so the UI
-    // shows the correct value; keep USD anchor in universal_usd_amount.
     final originalAmount = snap['original_amount'] ?? snap['amount'];
     final usdAnchor = snap['amount'];
     // Verbatim restore: re-create with the original entry date. Fall back to the
@@ -3623,20 +4114,19 @@ class SetAllRepository {
 
     await LocalDatabase.db.insert(
       'expenses', restoredExpense,
-      conflictAlgorithm: ConflictAlgorithm.replace);
-
-    // Remove from deletion log.
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
     await LocalDatabase.db.delete(
       'deleted_expenses', where: 'expense_id = ?', whereArgs: [expenseId]);
 
-    // Best-effort re-push to Supabase.
+    // Best-effort push to Supabase.
     if (await _isOnline && _client != null) {
       try {
         await _client.from('expenses').upsert({
           'id':                   expenseId,
           'group_id':             snap['group_id'],
           'payer_id':             uid,
-          'amount':               originalAmount,
+          'amount':               double.tryParse(originalAmount.toString()) ?? 0,
           'is_income':            (snap['is_income'] as int?) == 1,
           'description':          snap['description'] ?? '',
           'currency':             snap['currency'] ?? 'USD',
@@ -3644,11 +4134,8 @@ class SetAllRepository {
           'universal_usd_amount': usdAnchor,
           'created_at':           restoredCreatedAt,
         });
-        await LocalDatabase.db.update(
-          'expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
-          where: 'id = ?', whereArgs: [expenseId]);
       } catch (e) {
-        debugPrint('[restoreExpense] Supabase upsert failed (will sync later): $e');
+        debugPrint('[restoreExpense] Supabase upsert failed: $e');
       }
     }
 
@@ -4153,12 +4640,39 @@ class SetAllRepository {
     final deletedAt = _now();
 
     if (_isWeb && _client != null) {
-      await _client
-          .from('expenses')
-          .update({'deleted_at': deletedAt})
-          .eq('id', id)
-          .eq('payer_id', uid)
-          .isFilter('group_id', null);
+      // Snapshot to deleted_expenses, then hard-delete.
+      final snapRows = await _client.from('expenses').select()
+          .eq('id', id).eq('payer_id', uid).isFilter('group_id', null).limit(1) as List;
+      if (snapRows.isNotEmpty) {
+        final s = snapRows.first as Map<String, dynamic>;
+        await _client.from('deleted_expenses').insert({
+          'expense_id':             id,
+          'description':            s['description'] ?? '',
+          'amount':                 s['universal_usd_amount'] ?? s['amount'] ?? '0',
+          'original_amount':        s['amount'],
+          'currency':               s['original_currency'] ?? s['currency'] ?? 'USD',
+          'group_id':               null,
+          'group_name':             '',
+          'is_income':              s['is_income'] ?? false,
+          'category':               s['category'] ?? 'Other',
+          'deleted_by':             uid,
+          'deleted_at':             deletedAt,
+          'is_wallet':              true,
+          'created_at':             s['created_at'],
+          'exchange_rate_applied':  s['exchange_rate_applied']?.toString(),
+          'base_currency_amount':   s['base_currency_amount']?.toString(),
+          'payer_id':               s['payer_id'],
+          'split_type':             s['split_type'],
+          'icon_codepoint':         s['icon_codepoint'],
+          'icon_color':             s['icon_color'],
+          'notes':                  s['notes'],
+          'attachment_urls':        s['attachment_urls'],
+        });
+      }
+      await _client.from('expenses').delete()
+          .eq('id', id).eq('payer_id', uid).isFilter('group_id', null);
+      debugPrint('[deleteWalletEntry] deleted $id (tombstone in deleted_expenses)');
+      _notify();
     } else {
       // Snapshot into deleted_expenses so the activity feed can show a
       // deletion event with a Restore button (mirrors deleteExpense logic).
@@ -4236,25 +4750,74 @@ class SetAllRepository {
     _notify();
   }
 
-  /// Restores a previously-deleted wallet entry from the [deleted_expenses] snapshot
-  /// (personal entries with group_id IS NULL). Falls back to [deleted_wallet_entries]
-  /// for entries deleted before HOTFIX-07 so existing snapshots still restore.
+  /// Restores a previously-deleted wallet entry.
+  /// Web: clears deleted_at (soft-delete → visible again).
+  /// Native: re-inserts from local deleted_expenses snapshot.
   Future<bool> restoreWalletEntry(String entryId) async {
     final uid = await ensureUser();
     if (uid == null) return false;
 
-    // ── Try deleted_expenses first (new path after HOTFIX-07) ──────────────
+    // ── Web: read tombstone from deleted_expenses, re-insert ────────────
+    if (_isWeb && _client != null) {
+      try {
+        final tombRows = await _client.from('deleted_expenses').select()
+            .eq('expense_id', entryId).limit(1) as List;
+        if (tombRows.isEmpty) return false;
+        final t = tombRows.first as Map<String, dynamic>;
+        await _client.from('expenses').insert({
+          'id':                    entryId,
+          'group_id':              null,
+          'payer_id':              t['payer_id'] ?? uid,
+          'amount':                t['original_amount'] ?? t['amount'],
+          'is_income':             t['is_income'] ?? false,
+          'description':           t['description'] ?? '',
+          'currency':              t['currency'] ?? 'USD',
+          'category':              t['category'] ?? 'Other',
+          'universal_usd_amount':  t['amount'],
+          'created_at':            t['created_at'],
+          'exchange_rate_applied': t['exchange_rate_applied'],
+          'base_currency_amount':  t['base_currency_amount'],
+          'split_type':            t['split_type'] ?? 'even',
+          'icon_codepoint':        t['icon_codepoint'],
+          'icon_color':            t['icon_color'],
+          'notes':                 t['notes'],
+          'attachment_urls':       t['attachment_urls'],
+        });
+        await _client.from('deleted_expenses').delete().eq('expense_id', entryId);
+        _pendingDeletedExpenses.removeWhere((r) => r.expenseId == entryId);
+        debugPrint('[restoreWalletEntry] restored $entryId from tombstone');
+        _notify();
+        return true;
+      } catch (e) {
+        debugPrint('[restoreWalletEntry] restore failed: $e');
+        return false;
+      }
+    }
+
+    // ── Non-web: try deleted_expenses table ─────────────────────────────
+    Map<String, dynamic>? snap;
     final newSnapRows = await LocalDatabase.db.query(
       'deleted_expenses', where: 'expense_id = ?', whereArgs: [entryId]);
-    if (newSnapRows.isNotEmpty) {
-      final snap = newSnapRows.first;
-      if ((snap['deleted_by'] as String?) != uid) return false;
-      final now = _now();
-      // Verbatim restore: re-create with the original entry date. Fall back to
-      // the deletion time for legacy snapshots captured before schema v36.
-      final restoredCreatedAt = (snap['original_created_at'] as String?) ??
-          (snap['deleted_at'] as String?) ?? now;
-      final restoredExpense = {
+    if (newSnapRows.isNotEmpty) snap = newSnapRows.first;
+
+    // Fall back to deleted_wallet_entries (legacy pre-HOTFIX-07).
+    if (snap == null) {
+      final snapRows = await LocalDatabase.db.query(
+        'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
+      if (snapRows.isNotEmpty) snap = snapRows.first;
+    }
+
+    if (snap == null) return false;
+    if ((snap['deleted_by'] as String?) != uid) return false;
+
+    final now = _now();
+    // Verbatim restore: re-create with the original entry date. Fall back to
+    // the deletion time for legacy snapshots captured before schema v36.
+    final restoredCreatedAt = (snap['original_created_at'] as String?) ??
+        (snap['deleted_at'] as String?) ?? now;
+
+    await LocalDatabase.db.insert(
+      'expenses', {
         'id':                   entryId,
         'group_id':             null,
         'payer_id':             uid,
@@ -4267,70 +4830,21 @@ class SetAllRepository {
         'created_at':           restoredCreatedAt,
         'updated_at':           now,
         'synced_at':            null,
-      };
-      await LocalDatabase.db.insert(
-        'expenses', restoredExpense,
-        conflictAlgorithm: ConflictAlgorithm.replace);
-      await LocalDatabase.db.delete(
-        'deleted_expenses', where: 'expense_id = ?', whereArgs: [entryId]);
-      if (await _isOnline && _client != null) {
-        try {
-          await _client.from('expenses').upsert({
-            'id':                   entryId,
-            'group_id':             null,
-            'payer_id':             uid,
-            'amount':               double.tryParse((snap['original_amount'] ?? snap['amount']).toString()) ?? 0,
-            'is_income':            (snap['is_income'] as int?) == 1,
-            'description':          snap['description'] ?? '',
-            'category':             snap['category'] ?? 'Other',
-            'currency':             snap['currency'] ?? 'USD',
-            'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
-            'created_at':           restoredCreatedAt,
-          });
-        } catch (e) {
-          debugPrint('[restoreWalletEntry] Supabase upsert failed (expenses): $e');
-        }
-      }
-      _notify();
-      return true;
-    }
-
-    // ── Fall back to deleted_wallet_entries (legacy path pre-HOTFIX-07) ────
-    final snapRows = await LocalDatabase.db.query(
-      'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
-    if (snapRows.isEmpty) return false;
-    final snap = snapRows.first;
-
-    final now = _now();
-    // Legacy snapshots never captured the original entry date; the deletion time
-    // is the closest available value for a verbatim-ish restore.
-    final restoredCreatedAt = (snap['deleted_at'] as String?) ?? now;
-    final restoredExpense = {
-      'id':                   entryId,
-      'group_id':             null,
-      'payer_id':             uid,
-      'amount':               snap['amount'],
-      'is_income':            snap['is_income'] ?? 0,
-      'description':          snap['description'] ?? '',
-      'category':             snap['category'] ?? 'Other',
-      'currency':             snap['currency'] ?? 'USD',
-      'universal_usd_amount': snap['amount'],
-      'created_at':           restoredCreatedAt,
-      'updated_at':           now,
-      'synced_at':            null,
-    };
-    await LocalDatabase.db.insert(
-      'expenses', restoredExpense,
-      conflictAlgorithm: ConflictAlgorithm.replace);
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+    await LocalDatabase.db.delete(
+      'deleted_expenses', where: 'expense_id = ?', whereArgs: [entryId]);
     await LocalDatabase.db.delete(
       'deleted_wallet_entries', where: 'entry_id = ?', whereArgs: [entryId]);
+
     if (await _isOnline && _client != null) {
       try {
         await _client.from('expenses').upsert({
           'id':                   entryId,
           'group_id':             null,
           'payer_id':             uid,
-          'amount':               double.tryParse(snap['amount'].toString()) ?? 0,
+          'amount':               double.tryParse((snap['original_amount'] ?? snap['amount']).toString()) ?? 0,
           'is_income':            (snap['is_income'] as int?) == 1,
           'description':          snap['description'] ?? '',
           'category':             snap['category'] ?? 'Other',
@@ -4339,13 +4853,43 @@ class SetAllRepository {
           'created_at':           restoredCreatedAt,
         });
       } catch (e) {
-        debugPrint('[restoreWalletEntry] Supabase upsert failed (legacy): $e');
+        debugPrint('[restoreWalletEntry] Supabase upsert failed: $e');
       }
     }
 
     _notify();
     return true;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Internal record for pending deleted-expense activity events (web session)
+// ---------------------------------------------------------------------------
+class _DeletedExpenseRecord {
+  const _DeletedExpenseRecord({
+    required this.expenseId,
+    required this.description,
+    required this.amount,
+    required this.currency,
+    required this.groupId,
+    required this.groupName,
+    required this.isIncome,
+    required this.category,
+    required this.deletedByUid,
+    required this.deletedAt,
+    required this.isWallet,
+  });
+  final String  expenseId;
+  final String  description;
+  final String  amount;
+  final String  currency;
+  final String? groupId;
+  final String  groupName;
+  final bool    isIncome;
+  final String  category;
+  final String  deletedByUid;
+  final String  deletedAt;
+  final bool    isWallet;
 }
 
 // ---------------------------------------------------------------------------
