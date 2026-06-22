@@ -94,25 +94,40 @@ Gate: `flutter analyze` exits 0. ✅
 
 Depends on: Phase 3 complete
 
-- [ ] **4.1** Create `lib/features/receipt/presentation/receipt_entry_sheet.dart`
-  - States: uploading → processing → confirming → saving → done | error (spec.md §3)
-  - `confirming` state: editable form matching voice_entry_sheet.dart confirming layout
-    - amount (Decimal text field), currency dropdown, description, category chip, payer,
-      date, image thumbnail
-  - `error` state: retry button + "Enter manually" TextButton
-  - On confirm: call `repo.addExpense(attachmentPaths: [storagePath])` or
-    `repo.upsertWalletEntry()` depending on groupId; then `service.writeBackMemory(...)`
+- [x] **4.0** Local-only receipt cache (no server storage)
+  - `lib/data/local/local_database.dart` — schema v34, `receipt_cache` table
+    (`expense_id`, `path`, `last_viewed_at`) in `_onCreate` + `oldVersion < 34` upgrade
+  - `lib/core/services/receipt_cache_service.dart` — `cache()`/`pathFor()` (refreshes TTL)
+    /`purgeExpired()` (30 days from last view); web no-op
+  - `main.dart` — `purgeExpired()` fire-and-forget on launch
+
+- [x] **4.1** Create `lib/features/receipt/presentation/receipt_entry_sheet.dart`
+  - States: scanning → processing → confirming → saving → done | error (spec.md §3)
+  - `confirming`: editable form — amount (Decimal), currency dropdown, description,
+    category chips, payer label, date, **editable line items (add/edit/remove)**,
+    scanned-image preview
+  - Multi-language: `knownCategories` built via `.tr()` (mirrors voice_entry_sheet)
+  - `needsClarification` handled (focuses the ambiguous field)
+  - `error`: retry + "Enter manually" TextButton
+  - On confirm: `repo.addExpense(...)` (groups) or `repo.upsertWalletEntry()` (wallet) —
+    **no attachmentPaths** — then cache WebP locally, then `service.writeBackMemory(...)`
   - Invalidate `balanceSummaryProvider`, `recentExpensesProvider` on success
 
-- [ ] **4.2** Add camera trigger in Wallet screen
-  - Camera icon button in AppBar or alongside FAB
-  - `ImagePicker` (gallery + camera options) → `showModalBottomSheet(ReceiptEntrySheet)`
+- [x] **4.2** Wallet trigger — "Scan a bill" tile in `wallet_entry_type_screen.dart`
+  - Opens `ReceiptEntrySheet(groupId: null)`
 
-- [ ] **4.3** Add camera trigger in Group detail screen
-  - Alongside existing "+" add-expense button
+- [x] **4.3** Group trigger — scanner action in `group_detail_screen.dart` appBar
+  - Opens `ReceiptEntrySheet(groupId: <group>)`
 
-Gate: `flutter analyze` exits 0. Manual smoke: photograph a café receipt; correct draft
-appears; confirm saves expense with image attached.
+- [x] **4.4** Native document scanner — `cunning_document_scanner` (VisionKit + ML Kit);
+  falls back to `image_picker` (camera → gallery) on failure/web
+
+- [x] **4.5** Show cached receipt in detail screens (wallet + group expense) —
+  thumbnail + tap-to-view; viewing refreshes the 30-day TTL
+
+Gate: `flutter analyze` exits 0 ✅. Manual smoke (pending): scan a non-English receipt →
+correct draft, description in its language, category in app language; edit a line item;
+confirm saves; reopen → receipt shows from local cache.
 
 ---
 

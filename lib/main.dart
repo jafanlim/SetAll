@@ -22,6 +22,7 @@ import 'core/services/date_format_service.dart';
 import 'core/services/deep_link_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/config/auth_config.dart';
+import 'core/services/receipt_cache_service.dart';
 import 'data/local/local_database.dart';
 
 /// Base URL for email confirmation and OAuth redirects. Set this to your deployed web app URL (e.g. https://your-app.vercel.app) so links work on mobile. When null, web uses current origin.
@@ -160,6 +161,9 @@ class _AppLoaderState extends State<_AppLoader> {
       }
       // Load date format preference before UI renders.
       await DateFormatService.instance.reload();
+
+      // Purge expired receipt cache (30-day TTL) on app start — fire-and-forget.
+      ReceiptCacheService.instance.purgeExpired();
 
       // Initialise Firebase (graceful no-op if GoogleService-Info.plist /
       // google-services.json not yet added) then request push permission.

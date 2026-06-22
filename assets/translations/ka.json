@@ -788,5 +788,33 @@
     "search_hint": "მოძებნეთ სახელით, @ნიქნეიმით ან ელ-ფოსტით",
     "no_results": "შედეგები არ არის",
     "no_results_hint": "სცადეთ სხვა საძიებო ტერმინი ან ფილტრი."
+  },
+  "receipt": {
+    "scan_bill": "Scan a bill",
+    "scan_bill_subtitle": "AI reads the receipt — pre-fills the form",
+    "scanning": "Opening scanner…",
+    "opening_scanner": "Position the receipt in frame",
+    "processing": "Reading receipt…",
+    "analyzing": "AI is extracting amounts, merchant, and line items",
+    "error_title": "Could not read receipt",
+    "scan_failed": "Could not open scanner. Try again.",
+    "compress_failed": "Could not process the image. Try a different receipt.",
+    "parse_empty": "AI could not extract data from this receipt. Try entering manually.",
+    "rate_limit": "Too many scans. Please wait a moment.",
+    "confirm_title": "Review receipt",
+    "payer_label": "Paid by (name)",
+    "category": "Category",
+    "date": "Date",
+    "line_items": "Line items",
+    "add_item": "Add item",
+    "item_name": "Item name",
+    "clarify_amount": "Enter the total amount",
+    "missing_amount": "Please enter an amount",
+    "invalid_amount": "Amount must be greater than zero",
+    "save_failed": "Could not save. Check your connection.",
+    "enter_manually": "Enter manually",
+    "saving": "Saving…",
+    "saved": "Saved!",
+    "confidence": "{pct}% confidence"
   }
 }

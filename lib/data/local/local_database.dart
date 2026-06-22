@@ -92,7 +92,9 @@ class LocalDatabase {
   /// Schema v33 adds:
   ///   • expenses.base_currency_amount – frozen total in user's base currency at
   ///     entry time; eliminates USD-rate drift in wallet totals
-  static const int _version = 33;
+  /// Schema v34 adds:
+  ///   • receipt_cache – local-only 30-day receipt image cache keyed by expense_id
+  static const int _version = 34;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -512,6 +514,16 @@ class LocalDatabase {
       // rows fall back to live-rate conversion in getWalletEntryTotals().
       await _addColumnIfNotExists(db, 'expenses', 'base_currency_amount', 'TEXT');
     }
+    if (oldVersion < 34) {
+      // Schema v34: local-only receipt image cache (30-day TTL from last view).
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS receipt_cache (
+          expense_id     TEXT PRIMARY KEY,
+          path           TEXT NOT NULL,
+          last_viewed_at TEXT NOT NULL
+        )
+      ''');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -742,6 +754,13 @@ class LocalDatabase {
         is_income   INTEGER NOT NULL DEFAULT 0,
         deleted_at  TEXT NOT NULL,
         deleted_by  TEXT
+      )
+    ''');
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS receipt_cache (
+        expense_id     TEXT PRIMARY KEY,
+        path           TEXT NOT NULL,
+        last_viewed_at TEXT NOT NULL
       )
     ''');
   }

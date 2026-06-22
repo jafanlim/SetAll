@@ -74,6 +74,9 @@ dependencies:
   # Image picker (profile avatar + wallet attachments)
   image_picker: ^1.1.2
 
+  # Document scanner (iOS VisionKit + Android ML Kit) for receipt ingest
+  cunning_document_scanner: ^1.2.3
+
   # File picker (wallet entry attachments)
   file_picker: ^8.1.2
 

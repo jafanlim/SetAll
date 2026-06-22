@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import 'package:pdfx/pdfx.dart';
 
 import '../../../../core/services/date_format_service.dart';
+import '../../../../core/services/receipt_cache_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/providers/setall_providers.dart';
@@ -66,6 +67,18 @@ class WalletEntryDetailScreen extends ConsumerStatefulWidget {
 
 class _WalletEntryDetailScreenState
     extends ConsumerState<WalletEntryDetailScreen> {
+  String? _receiptPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadReceipt();
+  }
+
+  Future<void> _loadReceipt() async {
+    final path = await ReceiptCacheService.instance.pathFor(widget.expense.id);
+    if (mounted) setState(() => _receiptPath = path);
+  }
 
   Future<void> _delete() async {
     final confirmed = await showDialog<bool>(
@@ -300,6 +313,59 @@ class _WalletEntryDetailScreenState
           ),
 
           const SizedBox(height: 12),
+
+          // ── Receipt thumbnail (from local cache, resets 30-day TTL) ──────
+          if (_receiptPath != null) ...[
+            GlassCard(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.receipt_long_rounded, size: 16, color: _teal),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Scanned receipt',
+                        style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  GestureDetector(
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (_) => Dialog(
+                          backgroundColor: Colors.transparent,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(16),
+                            child: Image.file(
+                              io.File(_receiptPath!),
+                              fit: BoxFit.contain,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        io.File(_receiptPath!),
+                        height: 140,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+          ],
 
           // ── Category Card ────────────────────────────────────────────────
           GlassCard(

@@ -1,0 +1,1019 @@
+import 'dart:io' show File;
+
+import 'package:cunning_document_scanner/cunning_document_scanner.dart';
+import 'package:decimal/decimal.dart';
+import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:uuid/uuid.dart';
+
+import '../../../core/models/receipt_ingest_result.dart';
+import '../../../core/providers/setall_providers.dart';
+import '../../../core/services/receipt_cache_service.dart';
+import '../../../core/services/receipt_ingest_service.dart';
+import '../../../core/utils/haptic_utils.dart';
+import '../../../data/models/wallet_entry_model.dart';
+import '../../../data/repositories/setall_repository.dart' show SplitInsert;
+import '../../../domain/entities/expense.dart' show SplitType;
+
+// ── Brand colours ──────────────────────────────────────────────────────────
+const _teal        = Color(0xFF00D9B0);
+const _purple      = Color(0xFF7C3AED);
+const _orange      = Color(0xFFFF8C42);
+const _surfaceDark = Color(0xFF0F172A);
+
+enum ReceiptEntryState {
+  scanning,
+  processing,
+  confirming,
+  saving,
+  done,
+  error,
+}
+
+class ReceiptEntrySheet extends ConsumerStatefulWidget {
+  const ReceiptEntrySheet({
+    super.key,
+    this.groupId,
+    required this.defaultCurrency,
+  });
+
+  /// null = wallet entry; non-null = group expense.
+  final String? groupId;
+  final String defaultCurrency;
+
+  @override
+  ConsumerState<ReceiptEntrySheet> createState() => _ReceiptEntrySheetState();
+}
+
+class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
+  ReceiptEntryState _state = ReceiptEntryState.scanning;
+  String _errorMsg = '';
+
+  // Compressed image bytes (kept for caching after save).
+  List<int>? _webpBytes;
+  // Path to the scanned image file for preview.
+  String? _imagePath;
+
+  // Parsed draft from AI.
+  ReceiptDraft? _draft;
+
+  // Editable fields.
+  final _amountCtrl  = TextEditingController();
+  final _descCtrl    = TextEditingController();
+  final _payerCtrl   = TextEditingController();
+  String _editCurrency = 'USD';
+  String _editCategory = 'General';
+  DateTime _editDate = DateTime.now();
+  List<_EditableLineItem> _lineItems = [];
+
+  // Clarification target.
+  String? _clarifyField;
+
+  static const _commonCurrencies = [
+    'USD', 'AED', 'GEL', 'EUR', 'GBP', 'RUB', 'CNY', 'VND', 'INR',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startScan());
+  }
+
+  @override
+  void dispose() {
+    _amountCtrl.dispose();
+    _descCtrl.dispose();
+    _payerCtrl.dispose();
+    for (final li in _lineItems) {
+      li.dispose();
+    }
+    super.dispose();
+  }
+
+  // ── Core flow ──────────────────────────────────────────────────────────
+
+  Future<void> _startScan() async {
+    if (!mounted) return;
+    setState(() => _state = ReceiptEntryState.scanning);
+
+    String? path;
+
+    if (kIsWeb) {
+      // Web fallback: launch image_picker camera.
+      try {
+        final picker = ImagePicker();
+        final xfile = await picker.pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        path = xfile?.path;
+      } catch (_) {
+        try {
+          final picker = ImagePicker();
+          final xfile = await picker.pickImage(source: ImageSource.gallery);
+          path = xfile?.path;
+        } catch (_) {}
+      }
+    } else {
+      // Native: cunning_document_scanner (VisionKit / ML Kit).
+      try {
+        final pictures = await CunningDocumentScanner.getPictures(
+          noOfPages: 1,
+          isGalleryImportAllowed: true,
+        );
+        if (pictures != null && pictures.isNotEmpty) path = pictures.first;
+      } catch (e) {
+        // Fallback to image_picker on native too.
+        try {
+          final picker = ImagePicker();
+          final xfile = await picker.pickImage(source: ImageSource.camera);
+          path = xfile?.path;
+        } catch (_) {
+          try {
+            final picker = ImagePicker();
+            final xfile = await picker.pickImage(source: ImageSource.gallery);
+            path = xfile?.path;
+          } catch (_) {}
+        }
+      }
+    }
+
+    if (path == null || path.isEmpty) {
+      if (mounted) {
+        setState(() {
+          _state    = ReceiptEntryState.error;
+          _errorMsg = 'receipt.scan_failed'.tr();
+        });
+      }
+      return;
+    }
+
+    _imagePath = path;
+    await _processReceipt(path);
+  }
+
+  Future<void> _processReceipt(String imagePath) async {
+    if (!mounted) return;
+    setState(() => _state = ReceiptEntryState.processing);
+
+    try {
+      // 1. Compress.
+      final bytes = await ReceiptIngestService.instance.compressReceipt(imagePath);
+      if (bytes == null || bytes.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _state    = ReceiptEntryState.error;
+            _errorMsg = 'receipt.compress_failed'.tr();
+          });
+        }
+        return;
+      }
+      _webpBytes = bytes;
+
+      // 2. Build localized categories (mirror voice_entry_sheet:178-194).
+      final translatedCategories = [
+        'categories.food_drink'.tr(),
+        'categories.transport'.tr(),
+        'categories.travel'.tr(),
+        'categories.entertainment'.tr(),
+        'categories.bills_utilities'.tr(),
+        'categories.shopping'.tr(),
+        'categories.general'.tr(),
+        'categories.other'.tr(),
+      ];
+
+      final timezone = DateTime.now().timeZoneName;
+
+      // 3. Ingest.
+      final response = await ReceiptIngestService.instance.ingest(
+        bytes,
+        groupId: widget.groupId,
+        defaultCurrency: widget.defaultCurrency,
+        knownCategories: translatedCategories,
+        timezone: timezone,
+      );
+
+      if (!mounted) return;
+
+      // 4. Handle clarification.
+      if (response.hasClarification) {
+        _draft = response.partial ?? ReceiptDraft(
+          amount: Decimal.zero,
+          currency: widget.defaultCurrency,
+          description: '',
+          category: 'General',
+          isIncome: false,
+          merchantName: '',
+          lineItems: const [],
+          entryDate: DateTime.now(),
+          confidence: 0.0,
+        );
+        _clarifyField = response.needsClarification;
+        _populateEditableFields(_draft!);
+        // Focus the field that needs clarification.
+        setState(() => _state = ReceiptEntryState.confirming);
+        return;
+      }
+
+      if (response.hasDraft && response.draft != null) {
+        _draft = response.draft!;
+        _populateEditableFields(_draft!);
+        setState(() => _state = ReceiptEntryState.confirming);
+      } else {
+        setState(() {
+          _state    = ReceiptEntryState.error;
+          _errorMsg = 'receipt.parse_empty'.tr();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _state    = ReceiptEntryState.error;
+          _errorMsg = e.toString().contains('Rate limit')
+              ? 'receipt.rate_limit'.tr()
+              : 'receipt.error_title'.tr();
+        });
+      }
+    }
+  }
+
+  void _populateEditableFields(ReceiptDraft draft) {
+    _editCurrency  = draft.currency.isNotEmpty ? draft.currency : widget.defaultCurrency;
+    _editCategory  = draft.category.isNotEmpty ? draft.category : 'General';
+    _editDate      = draft.entryDate;
+    _amountCtrl.text = draft.amount > Decimal.zero
+        ? draft.amount.toStringAsFixed(2)
+        : '';
+    _descCtrl.text   = draft.description;
+    _payerCtrl.text  = draft.payerLabel ?? '';
+    // Dispose any existing line-item controllers before replacing.
+    for (final li in _lineItems) {
+      li.dispose();
+    }
+    _lineItems = draft.lineItems
+        .map((li) => _EditableLineItem(
+              id: const Uuid().v4(),
+              nameCtrl: TextEditingController(text: li.name),
+              amountCtrl: TextEditingController(
+                text: li.amount > Decimal.zero ? li.amount.toStringAsFixed(2) : '',
+              ),
+              qtyCtrl: TextEditingController(text: li.quantity.toString()),
+            ))
+        .toList();
+  }
+
+  // ── Save ───────────────────────────────────────────────────────────────
+
+  Future<void> _confirm() async {
+    HapticUtils.primaryTap();
+
+    final amountText = _amountCtrl.text.trim();
+    if (amountText.isEmpty) {
+      setState(() {
+        _state    = ReceiptEntryState.error;
+        _errorMsg = 'receipt.missing_amount'.tr();
+      });
+      return;
+    }
+    final amount = Decimal.tryParse(amountText);
+    if (amount == null || amount <= Decimal.zero) {
+      setState(() {
+        _state    = ReceiptEntryState.error;
+        _errorMsg = 'receipt.invalid_amount'.tr();
+      });
+      return;
+    }
+
+    setState(() => _state = ReceiptEntryState.saving);
+
+    try {
+      final repo = ref.read(setAllRepositoryProvider);
+      final uid  = await repo.ensureUser();
+      if (uid == null) throw Exception('Not authenticated');
+
+      final description = _descCtrl.text.trim().isNotEmpty
+          ? _descCtrl.text.trim()
+          : _draft?.merchantName ?? 'Receipt entry';
+      final category = _editCategory;
+      final currency = _editCurrency;
+      final isIncome = _draft?.isIncome ?? false;
+
+      String expenseId;
+
+      if (widget.groupId != null) {
+        // ── Group expense ──
+        final splits = <SplitInsert>[
+          SplitInsert(userId: uid, universalUsdOwed: amount),
+        ];
+
+        final expense = await repo.addExpense(
+          groupId:     widget.groupId,
+          payerId:     uid,
+          amount:      amount,
+          description: description,
+          currency:    currency,
+          splitType:   SplitType.manual,
+          splits:      splits,
+          category:    category,
+          isIncome:    isIncome,
+          entryDate:   _editDate,
+        );
+        if (expense == null) throw Exception('Failed to save group expense');
+        expenseId = expense.id;
+      } else {
+        // ── Wallet entry ──
+        final entry = WalletEntryModel(
+          id:          const Uuid().v4(),
+          userId:      uid,
+          amount:      amount.toString(),
+          isIncome:    isIncome,
+          description: description,
+          category:    category,
+          currency:    currency,
+          createdAt:   _editDate.toUtc().toIso8601String(),
+        );
+        final saved = await repo.upsertWalletEntry(entry);
+        expenseId = saved.id;
+      }
+
+      // Cache the receipt image.
+      if (_webpBytes != null) {
+        await ReceiptCacheService.instance.cache(expenseId, _webpBytes!);
+      }
+
+      // Write-back memory (fire-and-forget).
+      final merchantName = _draft?.merchantName ?? description;
+      final firstLineItemName = _lineItems.isNotEmpty
+          ? _lineItems.first.nameCtrl.text.trim()
+          : null;
+      ReceiptIngestService.instance.writeBackMemory(
+        merchantName: merchantName,
+        category: category,
+        groupId: widget.groupId,
+        itemName: (firstLineItemName != null && firstLineItemName.isNotEmpty)
+            ? firstLineItemName
+            : null,
+      );
+
+      // Invalidate relevant providers.
+      ref.invalidate(balanceSummaryProvider);
+      ref.invalidate(recentExpensesProvider);
+
+      if (!mounted) return;
+      setState(() => _state = ReceiptEntryState.done);
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) Navigator.of(context).pop();
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _state    = ReceiptEntryState.error;
+          _errorMsg = 'receipt.save_failed'.tr();
+        });
+      }
+    }
+  }
+
+  // ── Line item helpers ───────────────────────────────────────────────────
+
+  void _addLineItem() {
+    setState(() {
+      _lineItems.add(_EditableLineItem(
+        id: const Uuid().v4(),
+        nameCtrl: TextEditingController(),
+        amountCtrl: TextEditingController(),
+        qtyCtrl: TextEditingController(text: '1'),
+      ));
+    });
+  }
+
+  void _removeLineItem(String id) {
+    setState(() {
+      final idx = _lineItems.indexWhere((li) => li.id == id);
+      if (idx != -1) {
+        _lineItems[idx].dispose();
+        _lineItems.removeAt(idx);
+      }
+    });
+  }
+
+  // ── UI ──────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    return DraggableScrollableSheet(
+      initialChildSize: 0.55,
+      minChildSize: 0.4,
+      maxChildSize: 0.9,
+      builder: (context, scrollController) => Container(
+        decoration: const BoxDecoration(
+          color: _surfaceDark,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          children: [
+            _buildHandle(),
+            Expanded(
+              child: SingleChildScrollView(
+                controller: scrollController,
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                child: _buildBody(),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHandle() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 12, bottom: 4),
+      child: Container(
+        width: 40, height: 4,
+        decoration: BoxDecoration(
+          color: Colors.white24,
+          borderRadius: BorderRadius.circular(2),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    switch (_state) {
+      case ReceiptEntryState.scanning:   return _buildScanning();
+      case ReceiptEntryState.processing: return _buildProcessing();
+      case ReceiptEntryState.confirming: return _buildConfirming();
+      case ReceiptEntryState.saving:     return _buildSaving();
+      case ReceiptEntryState.done:       return _buildDone();
+      case ReceiptEntryState.error:      return _buildError();
+    }
+  }
+
+  // ── SCANNING ────────────────────────────────────────────────────────────
+
+  Widget _buildScanning() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(height: 40),
+        Container(
+          width: 72, height: 72,
+          decoration: BoxDecoration(
+            color: _purple.withValues(alpha: 0.15),
+            shape: BoxShape.circle,
+            border: Border.all(color: _purple.withValues(alpha: 0.4), width: 2),
+          ),
+          child: const Icon(Icons.document_scanner_rounded, color: _purple, size: 34),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'receipt.scanning'.tr(),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'receipt.opening_scanner'.tr(),
+          style: const TextStyle(fontSize: 13, color: Colors.white54),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  // ── PROCESSING ───────────────────────────────────────────────────────────
+
+  Widget _buildProcessing() {
+    return Column(
+      children: [
+        const SizedBox(height: 60),
+        const CircularProgressIndicator(color: _teal),
+        const SizedBox(height: 24),
+        Text(
+          'receipt.processing'.tr(),
+          style: const TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'receipt.analyzing'.tr(),
+          style: const TextStyle(fontSize: 12, color: Colors.white38),
+        ),
+        const SizedBox(height: 60),
+      ],
+    );
+  }
+
+  // ── CONFIRMING ──────────────────────────────────────────────────────────
+
+  Widget _buildConfirming() {
+    final amountColor = (_draft?.isIncome ?? false) ? _teal : _orange;
+    final sign        = (_draft?.isIncome ?? false) ? '+' : '-';
+
+    final currencyValue = _commonCurrencies.contains(_editCurrency)
+        ? _editCurrency
+        : _commonCurrencies.first;
+
+    final parsedAmount = Decimal.tryParse(_amountCtrl.text) ?? Decimal.zero;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+
+        // ── Scanned image preview ──
+        if (_imagePath != null && File(_imagePath!).existsSync()) ...[
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Image.file(
+              File(_imagePath!),
+              height: 160,
+              width: double.infinity,
+              fit: BoxFit.cover,
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        // ── Amount & Currency ──
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Merchant / header
+              if (_draft?.merchantName != null && _draft!.merchantName.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: Text(
+                    _draft!.merchantName,
+                    style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600,
+                      color: Colors.white54, letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+
+              Text(
+                '$sign$_editCurrency ${parsedAmount.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontSize: 28, fontWeight: FontWeight.w800, color: amountColor,
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Amount + currency row
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: _darkField(
+                      controller: _amountCtrl,
+                      label: 'voice_entry.amount_label'.tr(),
+                      keyboard: const TextInputType.numberWithOptions(decimal: true),
+                      hint: _clarifyField == 'amount'
+                          ? 'receipt.clarify_amount'.tr()
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    flex: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: currencyValue,
+                          dropdownColor: const Color(0xFF1E293B),
+                          style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.w600,
+                          ),
+                          items: _commonCurrencies
+                              .map((c) => DropdownMenuItem(value: c, child: Text(c)))
+                              .toList(),
+                          onChanged: (v) {
+                            if (v != null) setState(() => _editCurrency = v);
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+
+              // Description
+              _darkField(
+                controller: _descCtrl,
+                label: 'voice_entry.description_label'.tr(),
+              ),
+              const SizedBox(height: 10),
+
+              // Payer label
+              _darkField(
+                controller: _payerCtrl,
+                label: 'receipt.payer_label'.tr(),
+              ),
+              const SizedBox(height: 12),
+
+              // Category chip selector
+              Text(
+                'receipt.category'.tr(),
+                style: const TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 6),
+              _buildCategoryChips(),
+              const SizedBox(height: 12),
+
+              // Date picker
+              Row(
+                children: [
+                  const Icon(Icons.calendar_today_rounded, size: 14, color: Colors.white38),
+                  const SizedBox(width: 6),
+                  Text(
+                    'receipt.date'.tr(),
+                    style: const TextStyle(fontSize: 11, color: Colors.white38, fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () async {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: _editDate,
+                        firstDate: DateTime(2020),
+                        lastDate: DateTime.now().add(const Duration(days: 1)),
+                        builder: (ctx, child) => Theme(
+                          data: Theme.of(ctx).copyWith(
+                            colorScheme: const ColorScheme.dark(
+                              primary: _teal,
+                              onPrimary: Colors.black,
+                              surface: _surfaceDark,
+                              onSurface: Colors.white,
+                            ),
+                          ),
+                          child: child!,
+                        ),
+                      );
+                      if (picked != null) setState(() => _editDate = picked);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white10,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        '${_editDate.year}-${_editDate.month.toString().padLeft(2, '0')}-${_editDate.day.toString().padLeft(2, '0')}',
+                        style: const TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Confidence badge
+              if (_draft?.confidence != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _teal.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'receipt.confidence'.tr(namedArgs: {
+                      'pct': (_draft!.confidence * 100).toStringAsFixed(0),
+                    }),
+                    style: const TextStyle(fontSize: 10, color: _teal),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+
+        // ── Line items ──
+        Row(
+          children: [
+            Text(
+              'receipt.line_items'.tr(),
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white70),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _addLineItem,
+              icon: const Icon(Icons.add_rounded, size: 16),
+              label: Text('receipt.add_item'.tr(), style: const TextStyle(fontSize: 12)),
+              style: TextButton.styleFrom(foregroundColor: _teal, padding: EdgeInsets.zero),
+            ),
+          ],
+        ),
+        if (_lineItems.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          ..._lineItems.map((li) => _buildLineItemRow(li)),
+        ],
+
+        const SizedBox(height: 20),
+
+        // ── Confirm button ──
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            onPressed: _confirm,
+            icon: const Icon(Icons.check_rounded),
+            label: Text(
+              'voice_entry.confirm_btn'.tr(),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
+            ),
+            style: FilledButton.styleFrom(
+              backgroundColor: _teal,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () {
+              HapticUtils.lightTap();
+              Navigator.of(context).pop();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.white38),
+            child: Text('voice_entry.cancel_btn'.tr()),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCategoryChips() {
+    final categories = [
+      'categories.food_drink'.tr(),
+      'categories.transport'.tr(),
+      'categories.travel'.tr(),
+      'categories.entertainment'.tr(),
+      'categories.bills_utilities'.tr(),
+      'categories.shopping'.tr(),
+      'categories.general'.tr(),
+      'categories.other'.tr(),
+    ];
+
+    return Wrap(
+      spacing: 6,
+      runSpacing: 6,
+      children: categories.map((cat) {
+        final selected = _editCategory == cat;
+        return GestureDetector(
+          onTap: () => setState(() => _editCategory = cat),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: selected ? _purple.withValues(alpha: 0.2) : Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: selected ? _purple.withValues(alpha: 0.5) : Colors.white24,
+              ),
+            ),
+            child: Text(
+              cat,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: selected ? _purple : Colors.white54,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildLineItemRow(_EditableLineItem li) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 3,
+            child: SizedBox(
+              height: 36,
+              child: TextField(
+                controller: li.nameCtrl,
+                style: const TextStyle(color: Colors.white, fontSize: 13),
+                decoration: InputDecoration(
+                  hintText: 'receipt.item_name'.tr(),
+                  hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                  filled: true,
+                  fillColor: Colors.white10,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 80,
+            height: 36,
+            child: TextField(
+              controller: li.amountCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                hintText: '0.00',
+                hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                filled: true,
+                fillColor: Colors.white10,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 44,
+            height: 36,
+            child: TextField(
+              controller: li.qtyCtrl,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                hintText: 'x1',
+                hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                filled: true,
+                fillColor: Colors.white10,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          GestureDetector(
+            onTap: () => _removeLineItem(li.id),
+            child: const Icon(Icons.close_rounded, size: 18, color: Colors.white38),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── SAVING ───────────────────────────────────────────────────────────────
+
+  Widget _buildSaving() {
+    return Column(
+      children: [
+        const SizedBox(height: 60),
+        const SizedBox(
+          width: 28, height: 28,
+          child: CircularProgressIndicator(color: _teal, strokeWidth: 2.5),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          'receipt.saving'.tr(),
+          style: const TextStyle(fontSize: 16, color: Colors.white70),
+        ),
+        const SizedBox(height: 60),
+      ],
+    );
+  }
+
+  // ── DONE ─────────────────────────────────────────────────────────────────
+
+  Widget _buildDone() {
+    return Column(
+      children: [
+        const SizedBox(height: 48),
+        const Icon(Icons.check_circle_rounded, color: _teal, size: 64),
+        const SizedBox(height: 16),
+        Text(
+          'receipt.saved'.tr(),
+          style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700, color: Colors.white),
+        ),
+        const SizedBox(height: 48),
+      ],
+    );
+  }
+
+  // ── ERROR ─────────────────────────────────────────────────────────────────
+
+  Widget _buildError() {
+    return Column(
+      children: [
+        const SizedBox(height: 40),
+        const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 52),
+        const SizedBox(height: 16),
+        Text(
+          _errorMsg,
+          style: const TextStyle(fontSize: 15, color: Colors.white70),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: 28),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            onPressed: _startScan,
+            style: FilledButton.styleFrom(
+              backgroundColor: _purple,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 14),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text('voice_entry.error_retry'.tr(), style: const TextStyle(fontWeight: FontWeight.w700)),
+          ),
+        ),
+        const SizedBox(height: 10),
+        SizedBox(
+          width: double.infinity,
+          child: TextButton(
+            onPressed: () {
+              HapticUtils.lightTap();
+              Navigator.of(context).pop();
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.white38),
+            child: Text('receipt.enter_manually'.tr()),
+          ),
+        ),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  // ── Shared field widget ───────────────────────────────────────────────────
+
+  Widget _darkField({
+    required TextEditingController controller,
+    required String label,
+    TextInputType keyboard = TextInputType.text,
+    String? hint,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboard,
+      style: const TextStyle(color: Colors.white),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        labelStyle: const TextStyle(color: Colors.white54, fontSize: 12),
+        hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+        filled: true,
+        fillColor: Colors.white10,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: const BorderSide(color: _teal),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Editable line item model ─────────────────────────────────────────────
+
+class _EditableLineItem {
+  final String id;
+  final TextEditingController nameCtrl;
+  final TextEditingController amountCtrl;
+  final TextEditingController qtyCtrl;
+
+  _EditableLineItem({
+    required this.id,
+    required this.nameCtrl,
+    required this.amountCtrl,
+    required this.qtyCtrl,
+  });
+
+  void dispose() {
+    nameCtrl.dispose();
+    amountCtrl.dispose();
+    qtyCtrl.dispose();
+  }
+}

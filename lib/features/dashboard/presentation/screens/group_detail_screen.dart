@@ -17,6 +17,7 @@ import '../../../../core/widgets/swipe_action_card.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
 import '../../../../domain/entities/expense.dart' show SplitType;
+import '../../../receipt/presentation/receipt_entry_sheet.dart';
 
 const _teal = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
@@ -305,6 +306,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
         ?.where((g) => g.id == groupId)
         .firstOrNull;
 
+    final baseCcyAsync = ref.watch(baseCurrencyProvider);
+    final baseCurrency = group?.defaultCurrency ?? baseCcyAsync.valueOrNull ?? 'USD';
+
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
@@ -356,6 +360,22 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     style: TextButton.styleFrom(foregroundColor: _teal),
                     onPressed: _settleGroup,
                   ),
+                IconButton(
+                  icon: const Icon(Icons.document_scanner_rounded),
+                  tooltip: 'receipt.scan_bill'.tr(),
+                  onPressed: () {
+                    HapticUtils.primaryTap();
+                    showModalBottomSheet<void>(
+                      context: context,
+                      isScrollControlled: true,
+                      backgroundColor: Colors.transparent,
+                      builder: (_) => ReceiptEntrySheet(
+                        groupId: groupId,
+                        defaultCurrency: baseCurrency,
+                      ),
+                    );
+                  },
+                ),
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined),
                   tooltip: 'group_detail.invite_member'.tr(),

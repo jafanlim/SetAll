@@ -1,9 +1,12 @@
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../receipt/presentation/receipt_entry_sheet.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -12,16 +15,19 @@ const _purple     = Color(0xFF8B5CF6);
 const _purpleDim  = Color(0x1A8B5CF6);
 const _green      = Color(0xFF22C55E);
 const _greenDim   = Color(0x1A22C55E);
+const _blue       = Color(0xFF3B82F6);
+const _blueDim    = Color(0x1A3B82F6);
 
 /// Step 0 of the two-step wallet entry flow.
-/// The user chooses between [ADD AN INCOME] and [ADD AN EXPENSE].
-/// The choice is forwarded to [AddExpenseScreen] via route extras.
-class WalletEntryTypeScreen extends StatelessWidget {
+/// The user chooses between [ADD AN INCOME], [ADD AN EXPENSE], or [SCAN A BILL].
+class WalletEntryTypeScreen extends ConsumerWidget {
   const WalletEntryTypeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
+    final baseCurrency = baseCurrencyAsync.valueOrNull ?? 'USD';
 
     return Scaffold(
       backgroundColor: theme.colorScheme.surface,
@@ -109,9 +115,33 @@ class WalletEntryTypeScreen extends StatelessWidget {
                     extra: {
                       'groupId':       '',
                       'groupName':     '',
-                      'isIncome':      false,  // ← fixed: expense is not income
+                      'isIncome':      false,
                       'isWalletEntry': true,
                     },
+                  );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Scan a Bill Card ─────────────────────────────────────────
+              _EntryTypeCard(
+                icon: Icons.document_scanner_rounded,
+                iconColor: _blue,
+                iconBg: _blueDim,
+                title: 'receipt.scan_bill'.tr(),
+                subtitle: 'receipt.scan_bill_subtitle'.tr(),
+                accentColor: _blue,
+                onTap: () {
+                  HapticUtils.primaryTap();
+                  showModalBottomSheet<void>(
+                    context: context,
+                    isScrollControlled: true,
+                    backgroundColor: Colors.transparent,
+                    builder: (_) => ReceiptEntrySheet(
+                      groupId: null,
+                      defaultCurrency: baseCurrency,
+                    ),
                   );
                 },
               ),
