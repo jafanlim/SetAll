@@ -91,3 +91,7 @@ wiki doc.md
 .env
 .env.local
 .env.*.local
+
+# Promptfoo eval output (generated)
+promptfoo/*_results.json
+promptfoo/.cache/

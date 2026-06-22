@@ -1,0 +1,444 @@
+# promptfoo/receipt_ingest_config.yaml — SetAll receipt-ingest eval
+# Spec: Phase 5 receipt-ingest eval harness
+# Provider: openai:gpt-4.1-mini, temperature 0.0, json_schema response_format
+# Run: npx promptfoo eval -c promptfoo/receipt_ingest_config.yaml
+#       (requires OPENAI_API_KEY env var)
+description: "SetAll receipt-ingest — multi-language OCR + structured extraction"
+
+# ── Default test config ──
+defaultTest:
+  options:
+    provider:
+      id: openai:gpt-4.1-mini
+      config:
+        temperature: 0.0
+        max_tokens: 1024
+        response_format:
+          type: json_schema
+          json_schema:
+            name: receipt_draft
+            strict: true
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: string
+                  description: "Total amount as decimal string, e.g. '45.50'"
+                currency:
+                  type: string
+                  description: "ISO 4217 3-letter code"
+                description:
+                  type: string
+                  description: "Short label 3-6 words"
+                category:
+                  type: string
+                merchant_name:
+                  type: string
+                last4:
+                  type: ["string", "null"]
+                  description: "Card last 4 digits if visible, else null"
+                entry_date:
+                  type: string
+                  description: "ISO date YYYY-MM-DD from receipt, or today"
+                line_items:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      amount:
+                        type: string
+                      quantity:
+                        type: integer
+                    required: ["name", "amount", "quantity"]
+                    additionalProperties: false
+                confidence:
+                  type: number
+                  description: "0.0–1.0"
+                needs_clarification:
+                  type: ["string", "null"]
+                  enum: ["amount", "currency", "date", null]
+              required:
+                ["amount", "currency", "description", "category", "merchant_name",
+                 "last4", "entry_date", "line_items", "confidence", "needs_clarification"]
+              additionalProperties: false
+  vars:
+    defaultCurrency: "USD"
+    timezone: "UTC"
+    today: "2026-06-22"
+
+# ── Provider ──
+providers:
+  - id: openai:gpt-4.1-mini
+    config:
+      temperature: 0.0
+      max_tokens: 1024
+      response_format:
+        type: json_schema
+        json_schema:
+          name: receipt_draft
+          strict: true
+          schema:
+            type: object
+            properties:
+              amount:
+                type: string
+                description: "Total amount as decimal string, e.g. '45.50'"
+              currency:
+                type: string
+                description: "ISO 4217 3-letter code"
+              description:
+                type: string
+                description: "Short label 3-6 words"
+              category:
+                type: string
+              merchant_name:
+                type: string
+              last4:
+                type: ["string", "null"]
+                description: "Card last 4 digits if visible, else null"
+              entry_date:
+                type: string
+                description: "ISO date YYYY-MM-DD from receipt, or today"
+              line_items:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    amount:
+                      type: string
+                    quantity:
+                      type: integer
+                  required: ["name", "amount", "quantity"]
+                  additionalProperties: false
+              confidence:
+                type: number
+                description: "0.0–1.0"
+              needs_clarification:
+                type: ["string", "null"]
+                enum: ["amount", "currency", "date", null]
+            required:
+              ["amount", "currency", "description", "category", "merchant_name",
+               "last4", "entry_date", "line_items", "confidence", "needs_clarification"]
+            additionalProperties: false
+
+# ── Prompt ──
+prompts:
+  - id: file://receipt_prompt.js
+    label: "receipt-ingest-prod-prompt"
+
+# ═══════════════════════════════════════════════════════════════
+# Reusable assertion fragments (YAML anchors)
+# ═══════════════════════════════════════════════════════════════
+# All javascript assertions must be single expressions — no top-level
+# const/let/return. Multi-statement checks use IIFE wrappers.
+#
+# Helper: (function(p){ ... })(output)
+# where p = the parsed JSON draft object.
+
+# ── Common: JSON parse + basic validation ──
+.json_valid: &json_valid
+  type: javascript
+  value: "(function(){try{JSON.parse(output);return true}catch(e){return false}})()"
+
+# ── Amount within range (inclusive) ──
+.amount_range: &amount_range
+  type: javascript
+  value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>$MIN&&a<$MAX})(output)"
+
+# ── Currency exact match ──
+.currency_eq: &currency_eq
+  type: javascript
+  value: "(function(p){return p.currency==='$CUR'})(output)"
+
+# ── Category in canonical set ──
+.category_known: &category_known
+  type: javascript
+  value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+
+# ── Category exact ──
+.category_eq: &category_eq
+  type: javascript
+  value: "(function(p){return p.category==='$CAT'})(output)"
+
+# ── Confidence ≥ threshold ──
+.confidence_ge: &confidence_ge
+  type: javascript
+  value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=$THR})(output)"
+
+# ── Description non-empty ──
+.desc_nonempty: &desc_nonempty
+  type: javascript
+  value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+# ── No needs_clarification ──
+.no_clarification: &no_clarification
+  type: javascript
+  value: "(function(p){return p.needs_clarification===null||p.needs_clarification===undefined})(output)"
+
+# ── last4 match ──
+.last4_eq: &last4_eq
+  type: javascript
+  value: "(function(p){return p.last4==='$L4'})(output)"
+
+# ── line_items count ≥ N ──
+.line_items_ge: &line_items_ge
+  type: javascript
+  value: "(function(p){return Array.isArray(p.line_items)&&p.line_items.length>=$N})(output)"
+
+# ── Degraded: low confidence or needs_clarification ──
+.confidence_low_or_clarify: &confidence_low_or_clarify
+  type: javascript
+  value: "(function(p){return (typeof p.confidence==='number'&&p.confidence<0.7)||(p.needs_clarification!==null&&p.needs_clarification!==undefined)})(output)"
+
+# ── Ambiguous: needs_clarification=amount or low confidence ──
+.clarify_amount_or_low: &clarify_amount_or_low
+  type: javascript
+  value: "(function(p){return p.needs_clarification==='amount'||(typeof p.confidence==='number'&&p.confidence<0.7)})(output)"
+
+# ═══════════════════════════════════════════════════════════════
+# Tests — 13 fixtures
+# ═══════════════════════════════════════════════════════════════
+
+tests:
+  # ── 1. en_usd_cafe — English / USD café, clean ──────────────────────
+  - description: "en_usd_cafe: Blue Bottle Coffee $12.50 — must be Food & drink, USD"
+    vars:
+      fixtureImage: "en_usd_cafe.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>10&&a<15})(output)"
+      - type: javascript
+        value: "output.currency==='USD'"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "output.category==='Food & drink'"
+      - type: javascript
+        value: "typeof output.confidence==='number' && output.confidence>=0.7"
+      - type: javascript
+        value: "typeof output.description==='string' && output.description.trim().length>0"
+      - type: javascript
+        value: "output.needs_clarification===null || output.needs_clarification===undefined"
+
+  # ── 2. en_eur_grocery — English / EUR grocery, clean ────────────────
+  - description: "en_eur_grocery: ALDI Berlin €16.75 — must be EUR, Food & drink"
+    vars:
+      fixtureImage: "en_eur_grocery.png"
+      defaultCurrency: "EUR"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>14&&a<20})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='EUR'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 3. ka_gel_market — Georgian / GEL (ქართული) ─────────────────────
+  # Non-Latin script may be hard for vision model; accept needs_clarification
+  # or amount=0.00 (model knows its limits) as valid.
+  # LOCKED EVAL: description + line item names must preserve Georgian script —
+  # regression to anglicization is a prompt failure.
+  - description: "ka_gel_market: ნიკორა ₾33.70 — must be GEL, Georgian script preserved"
+    vars:
+      fixtureImage: "ka_gel_market.png"
+      defaultCurrency: "GEL"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&(a>0||p.needs_clarification==='amount');})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='GEL'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&(p.confidence>=0.7||p.needs_clarification!==null&&p.needs_clarification!==undefined)})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&/[\\u10A0-\\u10FF]/.test(p.description)})(output)"
+      - type: javascript
+        value: "(function(p){var items=p.line_items||[];if(items.length===0)return true;return items.some(function(li){return li.name&&/[\\u10A0-\\u10FF]/.test(li.name)});})(output)"
+
+  # ── 4. ru_rub_pharmacy — Russian / RUB (кириллица) ──────────────────
+  - description: "ru_rub_pharmacy: Аптека Горздрав ₽890.00 — must be RUB"
+    vars:
+      fixtureImage: "ru_rub_pharmacy.png"
+      defaultCurrency: "RUB"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>700&&a<1100})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='RUB'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 5. ar_aed_restaurant — Arabic / AED (right-to-left) ─────────────
+  # Arabic RTL script may be hard for vision model; accept needs_clarification
+  # or amount=0.00 (model knows its limits) as valid.
+  - description: "ar_aed_restaurant: مطعم البيت 150 AED — must be AED, Arabic description"
+    vars:
+      fixtureImage: "ar_aed_restaurant.png"
+      defaultCurrency: "AED"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&(a>0||p.needs_clarification==='amount');})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='AED'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&(p.confidence>=0.7||p.needs_clarification!==null&&p.needs_clarification!==undefined)})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 6. en_usd_tip — English / USD with tip line ─────────────────────
+  - description: "en_usd_tip: The River Grill $54.00 total ($45+$9 tip) — must parse total, not subtotal"
+    vars:
+      fixtureImage: "en_usd_tip.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return a>50&&a<60})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='USD'})(output)"
+      - type: javascript
+        value: "(function(p){return p.category==='Food & drink'})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 7. en_gbp_multi — English / GBP, 7 line items ──────────────────
+  - description: "en_gbp_multi: Tesco £17.95 — must be GBP, Food & drink, multi-item"
+    vars:
+      fixtureImage: "en_gbp_multi.png"
+      defaultCurrency: "GBP"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>14&&a<22})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='GBP'})(output)"
+      - type: javascript
+        value: "(function(p){return p.category==='Food & drink'})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return Array.isArray(p.line_items)&&p.line_items.length>=3})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 8. en_usd_card — English / USD with card last-4 ────────────────
+  - description: "en_usd_card: Whole Foods $26.55 — must extract last4=9876"
+    vars:
+      fixtureImage: "en_usd_card.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>22&&a<32})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='USD'})(output)"
+      - type: javascript
+        value: "(function(p){return p.category==='Food & drink'})(output)"
+      - type: javascript
+        value: "(function(p){return p.last4==='9876'})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 9. en_eur_refund — English / EUR refund (income) ────────────────
+  - description: "en_eur_refund: Zara Returns -€64.99 — should parse negative amount or refund context"
+    vars:
+      fixtureImage: "en_eur_refund.png"
+      defaultCurrency: "EUR"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&Math.abs(a)>50&&Math.abs(a)<80})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='EUR'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 10. en_usd_illegible — near-illegible, degraded receipt ──────────
+  # Heavily blurred + low contrast: model may hallucinate amount but should
+  # still identify currency and category. Accept any positive amount.
+  - description: "en_usd_illegible: Faded Print Diner — heavily degraded, check currency/category only"
+    vars:
+      fixtureImage: "en_usd_illegible.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>0})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='USD'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 11. en_usd_ambiguous — total line obscured, model sums items ─────
+  # Total is blacked out but model can compute it from visible line items
+  # (2.99+1.99+1.50=6.48). Accept amount 5-8, currency USD, category.
+  - description: "en_usd_ambiguous: total smudged — model should infer from line items (2.99+1.99+1.50=6.48)"
+    vars:
+      fixtureImage: "en_usd_ambiguous.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>4&&a<10})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='USD'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 12. es_mxn_restaurant — Spanish / MXN ──────────────────────────
+  - description: "es_mxn_restaurant: Taquería El Pastor 230 MXN — Spanish language receipt"
+    vars:
+      fixtureImage: "es_mxn_restaurant.png"
+      defaultCurrency: "MXN"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>180&&a<280})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='MXN'})(output)"
+      - type: javascript
+        value: "(function(p){return p.category==='Food & drink'})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
+
+  # ── 13. en_usd_quantity — line items with quantities ────────────────
+  - description: "en_usd_quantity: Office Depot $34.35 — line items with quantities"
+    vars:
+      fixtureImage: "en_usd_quantity.png"
+      defaultCurrency: "USD"
+    assert:
+      - type: javascript
+        value: "(function(p){var a=parseFloat(p.amount);return !isNaN(a)&&a>28&&a<40})(output)"
+      - type: javascript
+        value: "(function(p){return p.currency==='USD'})(output)"
+      - type: javascript
+        value: "(function(p){var c=['Food & drink','Transport','Shopping','Entertainment','Bills','Health','Travel','General'];return c.indexOf(p.category)!==-1})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.confidence==='number'&&p.confidence>=0.7})(output)"
+      - type: javascript
+        value: "(function(p){return Array.isArray(p.line_items)&&p.line_items.length>=2})(output)"
+      - type: javascript
+        value: "(function(p){return typeof p.description==='string'&&p.description.trim().length>0})(output)"
