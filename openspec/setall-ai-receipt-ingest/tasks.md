@@ -71,26 +71,22 @@ Deploy to Netlify preview and confirm 401 for unauthenticated POST.
 
 Depends on: Phase 0 open decisions confirmed, Phase 2 deployed to preview
 
-- [ ] **3.1** Add URL constants to `lib/core/config/auth_config.dart`:
-  ```dart
-  static const String netlifyReceiptIngestUrl =
-      'https://setall.app/.netlify/functions/receipt-ingest';
-  ```
+- [x] **3.1** Add `netlifyReceiptIngestUrl` const to `lib/core/config/auth_config.dart`.
 
-- [ ] **3.2** Create `lib/core/models/receipt_ingest_result.dart`
+- [x] **3.2** Create `lib/core/models/receipt_ingest_result.dart`
   - `ReceiptDraft` model (all money fields as `Decimal`, see spec.md §3)
   - `LineItem` model
-  - `ReceiptIngestResponse` model (draft + escalated + imageStoragePath)
+  - `ReceiptIngestResponse` model (draft? + escalated + needsClarification? + partial?) — no imageStoragePath (image never stored)
   - `fromJson` constructors — parse `amount` as `Decimal.parse(json['amount'])` strictly
 
-- [ ] **3.3** Create `lib/core/services/receipt_ingest_service.dart`
-  - `uploadAndIngest(imagePath, {...})` → uploads to `expense-attachments` bucket via
-    `_uploadAttachments`-style logic, generates signed URL, POSTs to fn
-  - `writeBackMemory({merchantName, category, groupId?, itemName?})` → upserts to
+- [x] **3.3** Create `lib/core/services/receipt_ingest_service.dart` (no-store)
+  - `compressReceipt(imagePath)` → WebP ≤1200px bytes (call once; reused for ingest + local cache)
+  - `ingest(webpBytes, {...})` → base64 → POST to fn (image inline, never uploaded/stored)
+  - `writeBackMemory({merchantName, category, groupId?, itemName?})` → best-effort upserts to
     `merchant_memory` + `item_memory` via Supabase client directly
   - Mirror singleton pattern from VoiceEntryService
 
-Gate: `flutter analyze` exits 0.
+Gate: `flutter analyze` exits 0. ✅
 
 ---
 

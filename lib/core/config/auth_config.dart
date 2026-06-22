@@ -62,4 +62,12 @@ class AuthConfig {
   // Switch to prod URL ('https://setall.app/.netlify/functions/voice-entry') when merging to main.
   static const String netlifyVoiceEntryUrl =
       'https://setall.app/.netlify/functions/voice-entry';
+
+  // FEAT-RECEIPT: Receipt image ingest endpoint. The image is sent inline as
+  // base64 (never stored); the function returns a validated expense draft.
+  // Requires Authorization: Bearer <supabase_access_token>.
+  // NOTE: prod URL — the fn is currently only on the receipt-ingest-test preview;
+  // point at the preview alias (or deploy --prod) for end-to-end testing before merge.
+  static const String netlifyReceiptIngestUrl =
+      'https://setall.app/.netlify/functions/receipt-ingest';
 }
