@@ -45,7 +45,7 @@ Check existing migrations for `is_group_member` before recreating it.
 
 Depends on: Phase 1 complete
 
-- [ ] **2.1** Create `netlify/functions/receipt-ingest.js`
+- [x] **2.1** Create `netlify/functions/receipt-ingest.js`
   - Mirror auth gate + rate-limit + CORS from voice-entry.js exactly
   - Rate limit: 10/60s (not 20)
   - Memory retrieval: `merchant_memory` top-5 + `item_memory` top-10 (if groupId present)
@@ -57,7 +57,7 @@ Depends on: Phase 1 complete
   - Generic error bodies only — no leakage
   - `process.env.OPENAI_API_KEY` — code against name, do not print value
 
-- [ ] **2.2** Add `OPENAI_API_KEY` stub to `.env.server` (Aleksei will set the real value):
+- [x] **2.2** Add `OPENAI_API_KEY` stub to `.env.server` (Aleksei will set the real value):
   ```
   OPENAI_API_KEY=<set-by-aleksei>
   ```
