@@ -62,4 +62,10 @@ class AuthConfig {
   // Switch to prod URL ('https://setall.app/.netlify/functions/voice-entry') when merging to main.
   static const String netlifyVoiceEntryUrl =
       'https://setall.app/.netlify/functions/voice-entry';
+
+  // setall-ingestion-pipeline: bank statement ingestion (CSV + text-PDF → classify → rows).
+  // Requires Authorization: Bearer <supabase_access_token>.
+  static const String netlifyIngestUrl =
+      'https://setall.app/.netlify/functions/ingest';
+
 }

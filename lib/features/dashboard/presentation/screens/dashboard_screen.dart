@@ -18,6 +18,7 @@ import '../../../../core/services/quick_actions_service.dart';
 import '../../../../core/router/app_router.dart';
 import '../../../../core/services/dashboard_preferences_service.dart';
 import '../../../../core/utils/haptic_utils.dart';
+import '../../../../core/utils/category_utils.dart';
 import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../analytics/presentation/screens/analytics_screen.dart'
@@ -1014,7 +1015,7 @@ class _DashboardDonutChart extends StatelessWidget {
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
-                            e.key,
+                            categoryTr(e.key),
                             style: const TextStyle(fontSize: 11, color: _kLabel),
                             overflow: TextOverflow.ellipsis,
                           ),

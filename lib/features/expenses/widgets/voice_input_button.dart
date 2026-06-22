@@ -66,8 +66,10 @@ class _VoiceInputButtonState extends State<VoiceInputButton>
     _pulseController.repeat(reverse: true);
 
     _speech.listen(
-      listenFor: const Duration(seconds: 30),
-      pauseFor: const Duration(seconds: 5),
+      listenOptions: SpeechListenOptions(
+        listenFor: const Duration(seconds: 30),
+        pauseFor: const Duration(seconds: 5),
+      ),
       onResult: (result) {
         if (result.finalResult) {
           final transcript = result.recognizedWords;

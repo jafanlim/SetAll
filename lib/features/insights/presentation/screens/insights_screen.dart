@@ -1,3 +1,4 @@
+import 'dart:async' show unawaited;
 import 'dart:convert';
 
 import 'package:decimal/decimal.dart';
@@ -5,10 +6,11 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/router/app_router.dart' show AppRouter;
 import '../../../../domain/entities/expense.dart' show SplitType;
 import '../../../../core/utils/haptic_utils.dart';
 import '../../models/ai_chat_message.dart';
@@ -73,6 +75,20 @@ class _InsightsScreenState extends ConsumerState<InsightsScreen> {
   }
 
   void _showMobileCanvas(BuildContext context) {
+    // Signal: expanded — user opened the canvas panel.
+    final insState = ref.read(insightsProvider).valueOrNull;
+    if (insState != null) {
+      final canvasMsg = insState.messages.cast<AiChatMessage?>().lastWhere(
+            (m) => m!.role == AiChatRole.assistant && m.isCanvas,
+            orElse: () => null,
+          );
+      final messageId = canvasMsg?.id ?? insState.sessionId;
+      unawaited(ref.read(setAllRepositoryProvider).insertInsightSignal(
+        sessionId: insState.sessionId,
+        messageId: messageId,
+        signalType: 'expanded',
+      ));
+    }
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -195,6 +211,7 @@ class _MobileLayout extends ConsumerWidget {
     return Column(
       children: [
         const _LatestAnalysisCard(),
+        const _BudgetPanel(),
         Expanded(child: _ChatPanel(scrollCtrl: scrollCtrl)),
         if (hasCanvas)
           Align(
@@ -462,28 +479,42 @@ class _CanvasPanel extends ConsumerWidget {
 
     Widget body;
     if (isEmpty) {
-      body = Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.auto_awesome_outlined,
-              size: 40,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+      body = ListView(
+        controller: scrollController,
+        padding: const EdgeInsets.all(16),
+        physics: const ClampingScrollPhysics(),
+        shrinkWrap: scrollable,
+        children: [
+          const _BudgetPanel(),
+          const SizedBox(height: 24),
+          Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.auto_awesome_outlined,
+                  size: 40,
+                  color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'insights.tap_deep_hint'.tr(),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
-            Text(
-              'insights.tap_deep_hint'.tr(),
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       );
     } else {
       final widgets = <Widget>[
+        // Budget progress (always visible at top of canvas)
+        const _BudgetPanel(),
+        const SizedBox(height: 12),
+
         // Header
         Text(
           'insights.analysis_header'.tr(),
@@ -1309,6 +1340,131 @@ class _LatestAnalysisCardState extends ConsumerState<_LatestAnalysisCard> {
     } catch (_) {
       return '';
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Budget progress panel — shown in insights screen (mobile + canvas)
+// ---------------------------------------------------------------------------
+class _BudgetPanel extends ConsumerWidget {
+  const _BudgetPanel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme    = Theme.of(context);
+    final progress = ref.watch(budgetProgressProvider);
+    final budgets  = progress.valueOrNull ?? [];
+
+    if (budgets.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+        child: GestureDetector(
+          onTap: () => context.push(AppRouter.budgets),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              border: Border.all(color: _teal.withValues(alpha: 0.18)),
+              borderRadius: BorderRadius.circular(12),
+              color: _teal.withValues(alpha: 0.03),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.savings_outlined, size: 15, color: _teal),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'budget.set_budget_hint'.tr(),
+                    style: TextStyle(
+                        fontSize: 12,
+                        color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 16, color: _teal),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+      child: GestureDetector(
+        onTap: () => context.push(AppRouter.budgets),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+          decoration: BoxDecoration(
+            border: Border.all(color: _teal.withValues(alpha: 0.22)),
+            borderRadius: BorderRadius.circular(12),
+            color: _teal.withValues(alpha: 0.04),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.savings_outlined, size: 14, color: _teal),
+                  const SizedBox(width: 6),
+                  Text(
+                    'budget.monthly_budgets'.tr(),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: _teal,
+                        letterSpacing: 0.3),
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.chevron_right, size: 14, color: _teal),
+                ],
+              ),
+              const SizedBox(height: 8),
+              ...budgets.map((b) {
+                final label = b.category ?? 'budget.overall'.tr();
+                final isOver = b.isOver;
+                final barColor = isOver
+                    ? const Color(0xFFF97316)
+                    : const Color(0xFF22C55E);
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(label,
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: theme.colorScheme.onSurface)),
+                          Text(
+                            '${b.currency} ${b.spend.toStringAsFixed(0)} / ${b.amount.toStringAsFixed(0)}',
+                            style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: isOver ? const Color(0xFFF97316) : const Color(0xFF22C55E)),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 3),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(3),
+                        child: LinearProgressIndicator(
+                          value: b.fraction,
+                          minHeight: 4,
+                          backgroundColor: barColor.withAlpha(28),
+                          valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:decimal/decimal.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart' show Locale;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -14,6 +15,11 @@ import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
 import '../../data/models/wallet_entry_model.dart';
 import '../../data/models/ai_insight_model.dart';
+import '../../features/wallet/data/ingest_row.dart';
+import '../../features/wallet/data/ingest_service.dart';
+import '../../features/recurring/data/recurring_candidate.dart';
+import '../../features/recurring/data/recurring_detection_service.dart';
+import '../../features/alerts/data/alert_service.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -310,9 +316,25 @@ final simplifiedDebtsProvider =
 // Currency helpers
 // ---------------------------------------------------------------------------
 
+/// Synchronous currency override — written immediately by _saveCurrency so all
+/// downstream providers (walletBalanceProvider, masterBalanceProvider, etc.)
+/// see the new currency without waiting for an async DB/Supabase round-trip.
+/// Null means "no override — fall back to profile".
+final currencyOverrideProvider = StateProvider<String?>((ref) => null);
+
 /// User's base currency (from profile). Defaults to USD.
+/// Reads [currencyOverrideProvider] first so a currency change is reflected
+/// instantly in the UI without an async round-trip.
 final baseCurrencyProvider = FutureProvider<String>((ref) async {
-  return ref.watch(balanceServiceProvider).getBaseCurrency();
+  final override = ref.watch(currencyOverrideProvider);
+  if (override != null) {
+    debugPrint('[baseCurrencyProvider] override → $override');
+    return override;
+  }
+  debugPrint('[baseCurrencyProvider] rebuilding from DB...');
+  final currency = await ref.watch(balanceServiceProvider).getBaseCurrency();
+  debugPrint('[baseCurrencyProvider] resolved → $currency');
+  return currency;
 });
 
 /// Live display rate: 1 USD → [toCurrency]. Used for UI preview only.
@@ -409,3 +431,200 @@ final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));
 /// True while a screen (wallet / groups) is in edit mode.
 /// Shell reads this to hide the voice FAB, matching the screen's own FAB hide logic.
 final screenEditModeProvider = StateProvider<bool>((ref) => false);
+
+// ---------------------------------------------------------------------------
+// setall-budgets: canonical spend query + budget providers
+// ---------------------------------------------------------------------------
+
+/// Parameters for [categorySpendProvider] family.
+typedef CategorySpendParams = ({DateTime from, DateTime to});
+
+/// Per-category spend in the user's base currency for the given date window.
+/// Owned by setall-budgets; setall-proactive-alerts reads this.
+/// Backed by [getCategorySpend] which filters [getPersonalExpenses()].
+final categorySpendProvider =
+    FutureProvider.family<Map<String, Decimal>, CategorySpendParams>(
+        (ref, params) async {
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  // React to new expenses so budget progress updates live.
+  ref.watch(personalExpensesProvider);
+  return ref
+      .watch(setAllRepositoryProvider)
+      .getCategorySpend(params.from, params.to, baseCurrency: baseCurrency);
+});
+
+/// Raw budget rows for the current user.
+final budgetsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(baseCurrencyProvider);
+  return ref.watch(setAllRepositoryProvider).getBudgets();
+});
+
+/// One budget row with its current-period spend attached.
+class BudgetProgress {
+  const BudgetProgress({
+    required this.id,
+    required this.category,
+    required this.period,
+    required this.amount,
+    required this.currency,
+    required this.spend,
+  });
+
+  final String  id;
+  final String? category;   // null = overall
+  final String  period;
+  final Decimal amount;
+  final String  currency;
+  final Decimal spend;
+
+  double get fraction =>
+      amount > Decimal.zero
+          ? (spend / amount)
+              .toDecimal(scaleOnInfinitePrecision: 6)
+              .toDouble()
+              .clamp(0.0, 1.0)
+          : 0.0;
+  bool get isOver => spend >= amount;
+}
+
+/// Current-month budget progress for all budget rows.
+final budgetProgressProvider =
+    FutureProvider<List<BudgetProgress>>((ref) async {
+  final budgets = await ref.watch(budgetsProvider.future);
+  if (budgets.isEmpty) return [];
+
+  final now  = DateTime.now();
+  final from = DateTime(now.year, now.month);
+  final to   = DateTime(now.year, now.month + 1);
+
+  final spendMap = await ref.watch(
+    categorySpendProvider((from: from, to: to)).future,
+  );
+
+  // Overall spend = sum of all categories.
+  final totalSpend = spendMap.values.fold(Decimal.zero, (a, b) => a + b);
+
+  return budgets.map((b) {
+    final cat    = b['category'] as String?;
+    final spend  = cat == null ? totalSpend : (spendMap[cat] ?? Decimal.zero);
+    return BudgetProgress(
+      id:       b['id']       as String,
+      category: cat,
+      period:   (b['period']  as String?) ?? 'monthly',
+      amount:   Decimal.tryParse(b['amount'].toString()) ?? Decimal.zero,
+      currency: (b['currency'] as String?) ?? 'USD',
+      spend:    spend,
+    );
+  }).toList();
+});
+
+// ---------------------------------------------------------------------------
+// setall-ingestion-pipeline providers
+// ---------------------------------------------------------------------------
+
+/// IngestService singleton — depends on repository for getUserCategories + upsertWalletEntry.
+final ingestServiceProvider = Provider<IngestService>((ref) {
+  return IngestService(repository: ref.watch(setAllRepositoryProvider));
+});
+
+/// Mutable list of pending IngestRows for the review screen.
+/// Notifier exposes mutation helpers (approve, reject, edit, setAll).
+class IngestNotifier extends Notifier<List<IngestRow>> {
+  @override
+  List<IngestRow> build() => [];
+
+  void setRows(List<IngestRow> rows) => state = List.unmodifiable(rows);
+
+  void clear() => state = [];
+
+  void approveAll() {
+    state = List.unmodifiable(
+      state.map((r) => r.status == IngestRowStatus.rejected
+          ? r
+          : r.copyWith(status: IngestRowStatus.approved)).toList(),
+    );
+  }
+
+  void toggleStatus(String id) {
+    state = List.unmodifiable(state.map((r) {
+      if (r.id != id) return r;
+      final next = r.status == IngestRowStatus.approved
+          ? IngestRowStatus.rejected
+          : r.status == IngestRowStatus.rejected
+              ? IngestRowStatus.pending
+              : IngestRowStatus.approved;
+      return r.copyWith(status: next);
+    }).toList());
+  }
+
+  void editRow(String id, {String? description, String? category, bool? isIncome}) {
+    state = List.unmodifiable(state.map((r) {
+      if (r.id != id) return r;
+      return r.copyWith(
+        description: description,
+        category:    category,
+        isIncome:    isIncome,
+      );
+    }).toList());
+  }
+}
+
+final ingestRowsProvider =
+    NotifierProvider<IngestNotifier, List<IngestRow>>(IngestNotifier.new);
+
+// ---------------------------------------------------------------------------
+// setall-recurring-detection providers
+// ---------------------------------------------------------------------------
+
+/// Runs heuristic detection over all user-paid expenses (personal + group)
+/// and returns candidates not already in confirmed recurring_rules.
+/// Uses FutureProvider to properly await the Supabase fetch before running
+/// detection — avoids the empty-initial-value timing issue with StreamProvider.
+final recurringCandidatesProvider =
+    FutureProvider<List<RecurringCandidate>>((ref) async {
+  final repo = ref.watch(setAllRepositoryProvider);
+  final expenses = await repo.getAllPayerExpenses();
+  return RecurringDetectionService.detect(expenses);
+});
+
+/// Confirmed recurring rules from Supabase.
+final recurringRulesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getRecurringRules();
+});
+
+// ---------------------------------------------------------------------------
+// setall-proactive-alerts providers
+// ---------------------------------------------------------------------------
+
+/// Singleton alert service.
+final alertServiceProvider = Provider<ProactiveAlertService>((ref) {
+  return ProactiveAlertService(ref.watch(setAllRepositoryProvider));
+});
+
+/// User's alert preferences (FutureProvider — re-read on invalidate).
+final alertPrefsProvider = FutureProvider<AlertPrefs>((ref) async {
+  return ref.watch(alertServiceProvider).getPrefs();
+});
+
+/// Live in-app alert queue.  Notifier accumulates alerts; UI dismisses them.
+class AlertQueueNotifier extends Notifier<List<ProactiveAlert>> {
+  @override
+  List<ProactiveAlert> build() => [];
+
+  void enqueue(List<ProactiveAlert> alerts) {
+    if (alerts.isEmpty) return;
+    state = [...state, ...alerts];
+  }
+
+  void dismiss(String refKey) {
+    state = state.where((a) => a.refKey != refKey).toList();
+  }
+
+  void clear() => state = [];
+}
+
+final alertQueueProvider =
+    NotifierProvider<AlertQueueNotifier, List<ProactiveAlert>>(
+        AlertQueueNotifier.new);

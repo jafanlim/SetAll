@@ -19,6 +19,7 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
+import '../../features/wallet/presentation/screens/import_ingest_screen.dart';
 import '../../features/dashboard/presentation/screens/group_expense_detail_screen.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/wallet_entry_model.dart';
@@ -37,6 +38,9 @@ import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 import '../../features/web/download_screen.dart';
 import '../../features/web/legal_screen.dart';
 import '../../features/insights/presentation/screens/insights_screen.dart';
+import '../../features/budget/presentation/screens/budgets_screen.dart';
+import '../../features/recurring/presentation/screens/recurring_screen.dart';
+import '../../features/alerts/presentation/screens/alert_prefs_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -69,10 +73,14 @@ final class AppRouter {
   static const String walletEntryType       = '/wallet/add';
   static const String walletEntryDetail      = '/wallet/entry';
   static const String walletEntryEdit        = '/wallet/entry/edit/:id';
+  static const String walletImport           = '/wallet/import';
   static const String groupExpenseDetail     = '/group-expense-detail';
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
   static const String insights = '/insights';
+  static const String budgets    = '/budgets';
+  static const String recurring   = '/recurring';
+  static const String alertPrefs  = '/alert-prefs';
   static const String download = '/download';
   static const String privacy  = '/privacy';
   static const String terms    = '/terms';
@@ -365,6 +373,18 @@ final class AppRouter {
           ),
         ),
 
+        // ── Wallet: bank statement import (setall-ingestion-pipeline) ────
+        GoRoute(
+          path: walletImport,
+          name: 'walletImport',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const ImportIngestScreen(),
+            ),
+          ),
+        ),
+
         // ── Group: info screen (tap from groups list) ─────────────────
         GoRoute(
           path: groupInfo,
@@ -537,6 +557,42 @@ final class AppRouter {
               },
             ),
           ],
+        ),
+
+        // ── Budgets screen ─────────────────────────────────────────────────
+        GoRoute(
+          path: budgets,
+          name: 'budgets',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const BudgetsScreen(),
+            ),
+          ),
+        ),
+
+        // ── Recurring charges screen ────────────────────────────────────────
+        GoRoute(
+          path: recurring,
+          name: 'recurring',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const RecurringScreen(),
+            ),
+          ),
+        ),
+
+        // ── Alert preferences screen ─────────────────────────────────────────
+        GoRoute(
+          path: alertPrefs,
+          name: 'alertPrefs',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const AlertPrefsScreen(),
+            ),
+          ),
         ),
 
         // ── AI Insights Panel (pushed over dashboard, back-swipe supported) ──
