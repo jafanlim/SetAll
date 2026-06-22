@@ -1,12 +1,14 @@
-// FEAT-RECEIPT: Receipt image ingest — receives a Supabase signed URL for a
-// receipt image, fetches it server-side, sends base64 to OpenAI vision model,
-// and returns a validated expense draft. Uses gpt-4.1-mini (escalates to
-// gpt-4.1 on confidence < 0.7). API key: process.env.OPENAI_API_KEY.
+// FEAT-RECEIPT: Receipt image ingest — receives the receipt image inline as base64,
+// sends it to the OpenAI vision model, and returns a validated expense draft.
+// Uses gpt-4.1-mini (escalates to gpt-4.1 on confidence < 0.7).
+// API key: process.env.OPENAI_API_KEY.
+// PRIVACY: the image is NEVER persisted — no Storage, no signed URL, no attachment.
+//   It exists only in-memory for the duration of this request ("get context, don't store").
 // SECURITY: Bearer token verified via supabase.auth.getUser; per-user rate limit 10/60s.
 //
-// Response shape:
-//   { draft: { amount, currency, description, ... }, escalated: bool, imageStoragePath: "..." }
-//   { needsClarification: "amount"|"currency"|"date", partial: { ... } }
+// Request:  { imageBase64, contentType, groupId?, defaultCurrency?, knownCategories?, timezone? }
+// Response: { draft: { amount, currency, description, ... }, escalated: bool }
+//           { needsClarification: "amount"|"currency"|"date", partial: { ... } }
 
 const { createClient } = require('@supabase/supabase-js');
 
@@ -47,25 +49,6 @@ function centsToAmount(cents) {
   const intPart  = Math.floor(cents / 100);
   const fracPart = String(cents % 100).padStart(2, '0');
   return `${intPart}.${fracPart}`;
-}
-
-// ── Image path parser ──
-
-// Parse object path from Supabase signed URL:
-//   .../storage/v1/object/sign/<bucket>/<path>?token=...
-// Returns the path without the bucket prefix (matching repo attachment paths).
-function parseImageStoragePath(signedUrl) {
-  try {
-    const url = new URL(signedUrl);
-    const marker = '/object/sign/';
-    const idx = url.pathname.indexOf(marker);
-    if (idx === -1) return null;
-    const bucketAndPath = url.pathname.slice(idx + marker.length); // "<bucket>/<path>"
-    const slash = bucketAndPath.indexOf('/');
-    return slash === -1 ? null : decodeURIComponent(bucketAndPath.slice(slash + 1));
-  } catch {
-    return null;
-  }
 }
 
 // ── OpenAI call helper (returns fetch Response or null on network error) ──
@@ -285,48 +268,35 @@ exports.handler = async (event) => {
     }
 
     // ── Parse + validate body ──
+    // Privacy: the receipt image is sent inline as base64 and used only to extract
+    // a draft. It is NEVER persisted — no Supabase Storage, no signed URL, no
+    // attachment on the saved expense. The image exists only in-memory for this call.
     const body = JSON.parse(event.body || '{}');
     const {
-      signedUrl,
+      imageBase64,
+      contentType      = 'image/webp',
       groupId          = null,
       defaultCurrency  = 'USD',
       knownCategories  = STANDARD_CATEGORIES,
       timezone         = 'UTC',
     } = body;
 
-    if (!signedUrl || !signedUrl.startsWith('https://')) {
+    if (!imageBase64 || typeof imageBase64 !== 'string') {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'bad_request' }) };
     }
 
-    // ── Derive image storage path from signed URL ──
-    const imageStoragePath = parseImageStoragePath(signedUrl);
-
-    // ── Fetch image server-side ──
-    let imageResponse;
-    try {
-      imageResponse = await fetch(signedUrl);
-    } catch (_) {
+    // Size check on the decoded image (defense in depth; Netlify also caps the payload).
+    const decodedBytes = Buffer.from(imageBase64, 'base64').length;
+    if (decodedBytes === 0) {
       return { statusCode: 400, headers, body: JSON.stringify({ error: 'bad_request' }) };
     }
-    if (!imageResponse.ok) {
-      return { statusCode: 400, headers, body: JSON.stringify({ error: 'bad_request' }) };
-    }
-
-    // Size check (try content-length header first, then actual buffer)
-    const contentLength = imageResponse.headers.get('content-length');
-    if (contentLength && parseInt(contentLength, 10) > MAX_IMAGE_BYTES) {
+    if (decodedBytes > MAX_IMAGE_BYTES) {
       return { statusCode: 413, headers, body: JSON.stringify({ error: 'image_too_large' }) };
     }
 
-    const imageBuffer = await imageResponse.arrayBuffer();
-    if (imageBuffer.byteLength > MAX_IMAGE_BYTES) {
-      return { statusCode: 413, headers, body: JSON.stringify({ error: 'image_too_large' }) };
-    }
-
-    // Base64-encode → data: URL (send to OpenAI, NOT the raw signedUrl)
-    const base64Image = Buffer.from(imageBuffer).toString('base64');
-    const imageContentType = imageResponse.headers.get('content-type') || 'image/jpeg';
-    const dataUrl = `data:${imageContentType};base64,${base64Image}`;
+    // Build data: URL straight from the provided base64 (sent to OpenAI).
+    const imageContentType = /^image\/(webp|jpeg|jpg|png|heic)$/i.test(contentType) ? contentType : 'image/webp';
+    const dataUrl = `data:${imageContentType};base64,${imageBase64}`;
 
     // ── Memory retrieval (RLS-scoped via user JWT) ──
     const merchantPromise = supabase
@@ -484,7 +454,6 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
       body: JSON.stringify({
         draft: validated.draft,
         escalated,
-        imageStoragePath,
       }),
     };
 

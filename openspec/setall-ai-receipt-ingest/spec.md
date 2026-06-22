@@ -32,7 +32,8 @@ Return `200` for `OPTIONS` preflight.
 
 ```jsonc
 {
-  "signedUrl": "https://...",          // required — Supabase signed URL for the receipt image
+  "imageBase64": "<base64>",           // required — receipt image bytes, base64 (no data: prefix)
+  "contentType": "image/webp",         // image/webp|jpeg|png|heic; defaults to image/webp
   "groupId": "uuid | null",            // null = wallet entry
   "defaultCurrency": "USD",            // ISO 4217
   "knownCategories": ["Food & drink", "Transport", ...],
@@ -40,8 +41,15 @@ Return `200` for `OPTIONS` preflight.
 }
 ```
 
+**Privacy — the image is never stored.** It is sent inline as base64, used only to
+extract the draft, and discarded when the request ends. No Supabase Storage, no signed
+URL, no attachment on the saved expense. (Client compresses to WebP ≤1200px first, so the
+base64 payload stays well under Netlify's request cap.)
+
 Validation:
-- `signedUrl` must be present and start with `https://` — return `400` if missing/malformed.
+- `imageBase64` must be a present, non-empty string — return `400` if missing.
+- Decoded image > 4 MB — return `413`.
+- `contentType` defaults to `image/webp` if absent/unrecognized.
 - `defaultCurrency` defaults to `"USD"` if absent.
 - `knownCategories` defaults to the standard 8 if absent.
 
@@ -66,7 +74,7 @@ Message structure:
   {
     "role": "user",
     "content": [
-      { "type": "image_url", "image_url": { "url": "<signedUrl>", "detail": "high" } },
+      { "type": "image_url", "image_url": { "url": "data:<contentType>;base64,<imageBase64>", "detail": "high" } },
       { "type": "text", "text": "<context injection>" }
     ]
   }
@@ -175,8 +183,7 @@ After model response:
     "entryDate": "2026-06-21",
     "confidence": 0.95
   },
-  "escalated": false,              // true if gpt-4.1 was used
-  "imageStoragePath": "uid/uuid/receipt.webp"  // for attaching to saved expense
+  "escalated": false               // true if gpt-4.1 was used
 }
 ```
 
@@ -193,9 +200,9 @@ After model response:
 
 | Code | Body | Condition |
 |---|---|---|
-| 400 | `{ "error": "bad_request" }` | Missing/malformed signedUrl |
+| 400 | `{ "error": "bad_request" }` | Missing/empty `imageBase64` |
 | 401 | `{ "error": "unauthorized" }` | Missing or invalid Bearer token |
-| 413 | `{ "error": "image_too_large" }` | Signed URL fetch returns >4 MB |
+| 413 | `{ "error": "image_too_large" }` | Decoded image > 4 MB |
 | 429 | `{ "error": "rate_limit_exceeded" }` + `Retry-After: 60` | >10 req/60s |
 | 500 | `{ "error": "parse_failed" }` | Model error, JSON parse failure, or unhandled exception |
 | 503 | `{ "error": "upstream_unavailable" }` | OpenAI 429 persists after 1 retry |
@@ -306,8 +313,9 @@ static const String netlifyReceiptMemoryUrl =
 
 ```dart
 class ReceiptIngestService {
-  // uploadAndIngest(imagePath, {groupId, defaultCurrency, knownCategories, timezone})
-  //   → uploads to Storage, gets signed URL, calls fn, returns ReceiptIngestResponse
+  // ingest(imagePath, {groupId, defaultCurrency, knownCategories, timezone})
+  //   → reads the LOCAL scanned image, base64-encodes it, POSTs to the fn, returns
+  //     ReceiptIngestResponse. NO upload, NO Storage — the image is never persisted.
   //
   // writeBackMemory({merchantName, category, groupId, itemName})
   //   → upserts merchant_memory + item_memory via Supabase client directly
@@ -318,10 +326,10 @@ class ReceiptIngestService {
 
 ```dart
 class ReceiptIngestResponse {
-  final ReceiptDraft draft;
+  final ReceiptDraft? draft;
   final bool escalated;
-  final String imageStoragePath;
-  // + needsClarification: String?  (present instead of draft when clarification needed)
+  final String? needsClarification;  // "amount"|"currency"|"date" — present instead of draft
+  final ReceiptDraft? partial;       // present with needsClarification
 }
 
 class ReceiptDraft {
@@ -343,8 +351,8 @@ class ReceiptDraft {
 ### ReceiptEntrySheet States
 
 Enum `ReceiptEntryState`:
-- `uploading` — image upload in progress
-- `processing` — fn call in progress
+- `scanning` — native document scanner active (capture/crop/de-skew on device)
+- `processing` — base64 + fn call in progress
 - `confirming` — pre-filled form shown, user can edit all fields
 - `saving` — `repo.addExpense()` / `repo.upsertWalletEntry()` in progress
 - `done` — auto-dismiss after 1.2 s
@@ -355,13 +363,17 @@ Enum `ReceiptEntryState`:
 - **Decimal everywhere**: `amount` from the response is parsed as `Decimal.parse(draft.amount)`.
   Never use `double.parse`. The confirm form field stores edits as text and parses to `Decimal`
   on save.
-- **Every field editable**: amount, currency, description, category, payer, date — all user-
-  editable before confirm.
-- **Image attached**: `imageStoragePath` passed to `repo.addExpense(attachmentPaths: [storagePath])`.
+- **Human in the loop — pre-fill only**: the draft is a suggestion, never authoritative.
+  Every field is editable before confirm: amount, currency, description, category, payer, date,
+  and the **line items** (add / edit / remove rows). The user can change everything.
+- **No image stored**: the scanned image is shown in the confirm sheet from the on-device file
+  for reference only; it is NOT uploaded and NOT attached to the saved expense.
 - **Write-back on confirm**: after successful save, call `service.writeBackMemory(...)` — this is
   best-effort (fire-and-forget, errors logged not thrown).
-- **Offline fallback**: if upload or fn call fails, show "Enter manually" button that dismisses the
-  sheet and opens the standard manual entry flow.
+- **Native capture**: use the platform document scanner (iOS VisionKit / Android ML Kit) via a
+  Flutter plugin; fall back to the plain image picker on web/unsupported.
+- **Offline fallback**: if the scan or fn call fails, show "Enter manually" button that dismisses
+  the sheet and opens the standard manual entry flow.
 - **Trigger points**:
   - Wallet screen: camera icon in FAB or AppBar action
   - Group detail screen: camera icon alongside the existing "+" expense button
