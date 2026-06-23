@@ -484,7 +484,9 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
     const googleKey = process.env.GOOGLE_VISION_API_KEY;
     let ocrText = null;
     if (googleKey) {
-      ocrText = await googleVisionOcr(googleKey, imageBase64, [locale, 'en']);
+      // No languageHints — let Vision AUTO-DETECT the script. Hinting the user's UI
+      // locale (e.g. 'ru') on a Georgian receipt produced mojibake / gibberish.
+      ocrText = await googleVisionOcr(googleKey, imageBase64);
     }
     const ocrUsed = !!(ocrText && ocrText.trim().length > 0);
     console.log('[receipt] OCR path', { keyPresent: !!googleKey, ocrUsed });
