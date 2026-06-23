@@ -37,6 +37,11 @@ class QuickActionsService {
         localizedTitle: 'Groups',
         icon: 'person.3',
       ),
+      ShortcutItem(
+        type: 'action_scan_receipt',
+        localizedTitle: 'Scan Receipt',
+        icon: 'doc.text.viewfinder',
+      ),
     ]);
   }
 
@@ -69,6 +74,9 @@ class QuickActionsService {
         Future.microtask(() => r.push('/wallet/add'));
       case 'action_open_groups':
         r.go('/groups');
+      case 'action_scan_receipt':
+        r.go('/');
+        Future.microtask(() => r.push('/scan-receipt'));
     }
   }
 }

@@ -1,12 +1,14 @@
-import 'dart:io' show File;
+import 'dart:io' show Directory, File;
 
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:pdfx/pdfx.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/receipt_ingest_result.dart';
@@ -22,16 +24,12 @@ import '../../../domain/entities/expense.dart' show SplitType;
 const _teal        = Color(0xFF00D9B0);
 const _purple      = Color(0xFF7C3AED);
 const _orange      = Color(0xFFFF8C42);
+const _blue = Color(0xFF3B82F6);
 const _surfaceDark = Color(0xFF0F172A);
 
-enum ReceiptEntryState {
-  scanning,
-  processing,
-  confirming,
-  saving,
-  done,
-  error,
-}
+enum ReceiptEntryState { scanning, processing, confirming, saving, done, error }
+
+enum _ScanSource { camera, gallery, file }
 
 class ReceiptEntrySheet extends ConsumerStatefulWidget {
   const ReceiptEntrySheet({
@@ -96,56 +94,137 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
 
   // ── Core flow ──────────────────────────────────────────────────────────
 
+  Future<_ScanSource?> _chooseSource() async {
+    return showModalBottomSheet<_ScanSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (_) => Container(
+        decoration: const BoxDecoration(
+          color: _surfaceDark,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Handle
+              Padding(
+                padding: const EdgeInsets.only(top: 12, bottom: 8),
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              // Title
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 4, 24, 16),
+                child: Text(
+                  'receipt.source_title'.tr(),
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              // Camera
+              _sourceTile(
+                icon: Icons.document_scanner_rounded,
+                color: _purple,
+                title: 'receipt.source_camera'.tr(),
+                onTap: () => Navigator.pop(context, _ScanSource.camera),
+              ),
+              // Gallery
+              _sourceTile(
+                icon: Icons.photo_library_rounded,
+                color: _blue,
+                title: 'receipt.source_gallery'.tr(),
+                onTap: () => Navigator.pop(context, _ScanSource.gallery),
+              ),
+              // File
+              _sourceTile(
+                icon: Icons.insert_drive_file_rounded,
+                color: _orange,
+                title: 'receipt.source_file'.tr(),
+                onTap: () => Navigator.pop(context, _ScanSource.file),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _sourceTile({
+    required IconData icon,
+    required Color color,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      child: ListTile(
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: color, size: 24),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            fontSize: 15,
+            fontWeight: FontWeight.w600,
+            color: Colors.white,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right_rounded,
+          color: Colors.white24,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        tileColor: Colors.white.withValues(alpha: 0.04),
+        onTap: onTap,
+      ),
+    );
+  }
+
   Future<void> _startScan() async {
     if (!mounted) return;
+
+    final source = await _chooseSource();
+    if (!mounted) return;
+    if (source == null) {
+      Navigator.of(context).pop();
+      return;
+    }
+
     setState(() => _state = ReceiptEntryState.scanning);
 
     String? path;
 
-    if (kIsWeb) {
-      // Web fallback: launch image_picker camera.
-      try {
-        final picker = ImagePicker();
-        final xfile = await picker.pickImage(
-          source: ImageSource.camera,
-          imageQuality: 85,
-        );
-        path = xfile?.path;
-      } catch (_) {
-        try {
-          final picker = ImagePicker();
-          final xfile = await picker.pickImage(source: ImageSource.gallery);
-          path = xfile?.path;
-        } catch (_) {}
-      }
-    } else {
-      // Native: cunning_document_scanner (VisionKit / ML Kit).
-      try {
-        final pictures = await CunningDocumentScanner.getPictures(
-          noOfPages: 1,
-          isGalleryImportAllowed: true,
-        );
-        if (pictures != null && pictures.isNotEmpty) path = pictures.first;
-      } catch (e) {
-        // Fallback to image_picker on native too.
-        try {
-          final picker = ImagePicker();
-          final xfile = await picker.pickImage(source: ImageSource.camera);
-          path = xfile?.path;
-        } catch (_) {
-          try {
-            final picker = ImagePicker();
-            final xfile = await picker.pickImage(source: ImageSource.gallery);
-            path = xfile?.path;
-          } catch (_) {}
-        }
-      }
+    switch (source) {
+      case _ScanSource.camera:
+        path = await _captureCamera();
+      case _ScanSource.gallery:
+        path = await _pickGallery();
+      case _ScanSource.file:
+        path = await _pickFile();
     }
 
     if (path == null || path.isEmpty) {
       if (mounted) {
         setState(() {
-          _state    = ReceiptEntryState.error;
+          _state = ReceiptEntryState.error;
           _errorMsg = 'receipt.scan_failed'.tr();
         });
       }
@@ -154,6 +233,106 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
 
     _imagePath = path;
     await _processReceipt(path);
+  }
+
+  Future<String?> _captureCamera() async {
+    if (kIsWeb) {
+      try {
+        final xfile = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        return xfile?.path;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    // Native: cunning_document_scanner.
+    try {
+      final pictures = await CunningDocumentScanner.getPictures(
+        noOfPages: 1,
+        isGalleryImportAllowed: false,
+      );
+      if (pictures != null && pictures.isNotEmpty) return pictures.first;
+    } catch (_) {
+      // Fallback to image_picker camera on native.
+      try {
+        final xfile = await ImagePicker().pickImage(
+          source: ImageSource.camera,
+          imageQuality: 85,
+        );
+        return xfile?.path;
+      } catch (_) {
+        return null;
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _pickGallery() async {
+    try {
+      final xfile = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+      );
+      return xfile?.path;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf', 'jpg', 'jpeg', 'png', 'heic', 'webp'],
+      );
+      if (result == null || result.files.isEmpty) return null;
+
+      final file = result.files.first;
+      final filePath = file.path;
+      if (filePath == null) return null;
+
+      // If PDF, rasterize page 1 to PNG.
+      final ext = file.extension?.toLowerCase();
+      if (ext == 'pdf') {
+        return await _rasterizePdf(filePath);
+      }
+
+      return filePath;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _rasterizePdf(String pdfPath) async {
+    try {
+      final doc = await PdfDocument.openFile(pdfPath);
+      try {
+        final page = await doc.getPage(1);
+        try {
+          final img = await page.render(
+            width: page.width * 2,
+            height: page.height * 2,
+            format: PdfPageImageFormat.png,
+            backgroundColor: '#FFFFFF',
+          );
+          if (img == null) return null;
+
+          final dir = Directory.systemTemp.createTempSync('receipt_');
+          final pngPath = '${dir.path}/r_${const Uuid().v4()}.png';
+          File(pngPath).writeAsBytesSync(img.bytes);
+          return pngPath;
+        } finally {
+          await page.close();
+        }
+      } finally {
+        await doc.close();
+      }
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _processReceipt(String imagePath) async {

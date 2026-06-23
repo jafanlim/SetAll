@@ -792,6 +792,8 @@
   "receipt": {
     "scan_bill": "Сканировать чек",
     "scan_bill_subtitle": "ИИ читает чек — автозаполнение формы",
+    "scan_destination_title": "Куда отправить этот чек?",
+    "destination_personal": "Личный кошелёк",
     "scanning": "Открытие сканера…",
     "opening_scanner": "Разместите чек в кадре",
     "processing": "Чтение чека…",
@@ -815,6 +817,10 @@
     "enter_manually": "Ввести вручную",
     "saving": "Сохранение…",
     "saved": "Сохранено!",
-    "confidence": "{pct}% уверенности"
+    "confidence": "{pct}% уверенности",
+    "source_title": "Выберите источник",
+    "source_camera": "Камера / Скан",
+    "source_gallery": "Фотоальбом",
+    "source_file": "Файл (PDF или изображение)"
   }
 }

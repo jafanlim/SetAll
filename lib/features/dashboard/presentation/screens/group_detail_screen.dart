@@ -23,6 +23,7 @@ const _teal = Color(0xFF00D9B0);
 const _tealDim = Color(0x2600D9B0);
 const _orange = Color(0xFFFF8C42);
 const _brandOrange = Color(0xFFF97316);
+const _blue = Color(0xFF3B82F6);
 
 class GroupDetailScreen extends ConsumerStatefulWidget {
   const GroupDetailScreen({
@@ -292,6 +293,21 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
     }
   }
 
+  void _openReceiptScan(
+    BuildContext context,
+    String groupId,
+    String baseCurrency,
+  ) {
+    HapticUtils.primaryTap();
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) =>
+          ReceiptEntrySheet(groupId: groupId, defaultCurrency: baseCurrency),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -363,18 +379,8 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 IconButton(
                   icon: const Icon(Icons.document_scanner_rounded),
                   tooltip: 'receipt.scan_bill'.tr(),
-                  onPressed: () {
-                    HapticUtils.primaryTap();
-                    showModalBottomSheet<void>(
-                      context: context,
-                      isScrollControlled: true,
-                      backgroundColor: Colors.transparent,
-                      builder: (_) => ReceiptEntrySheet(
-                        groupId: groupId,
-                        defaultCurrency: baseCurrency,
-                      ),
-                    );
-                  },
+                  onPressed: () =>
+                      _openReceiptScan(context, groupId, baseCurrency),
                 ),
                 IconButton(
                   icon: const Icon(Icons.person_add_outlined),
@@ -391,7 +397,9 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
                     if (value == 'rename') _renameGroup(context);
-                    if (value == 'editGroup' && group != null) context.push('/group/$groupId/edit', extra: group);
+                    if (value == 'editGroup' && group != null) {
+                      context.push('/group/$groupId/edit', extra: group);
+                    }
                     if (value == 'delete') _deleteGroup(context);
                     if (value == 'editExpenses') _toggleEditMode();
                     if (value == 'settle') _settleGroup();
@@ -544,13 +552,62 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 if (expenses.isEmpty) {
                   return SliverToBoxAdapter(
                     child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        child: Text(
-                          'common.no_expenses_yet_tap'.tr(),
-                          style: TextStyle(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontSize: 13,
-                        ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
+                      child: Column(
+                        children: [
+                          Text(
+                            'common.no_expenses_yet_tap'.tr(),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: _blue,
+                                side: BorderSide(
+                                  color: _blue.withValues(alpha: 0.4),
+                                ),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 14,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(
+                                Icons.document_scanner_rounded,
+                                size: 20,
+                              ),
+                              label: Text(
+                                'receipt.scan_bill'.tr(),
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              onPressed: () => _openReceiptScan(
+                                context,
+                                groupId,
+                                baseCurrency,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'receipt.scan_bill_subtitle'.tr(),
+                            style: TextStyle(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -605,26 +662,45 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
           ],
         ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          HapticUtils.primaryTap();
-          context.push(
-            AppRouter.addExpense,
-            extra: {
-              'groupId': groupId,
-              'groupName': groupName,
-              if (group?.defaultCurrency != null)
-                'groupCurrency': group!.defaultCurrency!,
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          FloatingActionButton.extended(
+            heroTag: 'scan_bill',
+            onPressed: () => _openReceiptScan(context, groupId, baseCurrency),
+            backgroundColor: _blue,
+            foregroundColor: Colors.white,
+            icon: const Icon(Icons.document_scanner_rounded),
+            label: Text(
+              'receipt.scan_bill'.tr(),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'add_expense',
+            onPressed: () {
+              HapticUtils.primaryTap();
+              context.push(
+                AppRouter.addExpense,
+                extra: {
+                  'groupId': groupId,
+                  'groupName': groupName,
+                  if (group?.defaultCurrency != null)
+                    'groupCurrency': group!.defaultCurrency!,
+                },
+              );
             },
-          );
-        },
-        backgroundColor: _teal,
-        foregroundColor: Colors.black,
-        icon: const Icon(Icons.add),
-        label: Text(
-          'group_detail.add_expense'.tr(),
-          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
-        ),
+            backgroundColor: _teal,
+            foregroundColor: Colors.black,
+            icon: const Icon(Icons.add),
+            label: Text(
+              'group_detail.add_expense'.tr(),
+              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+            ),
+          ),
+        ],
       ),
     );
   }

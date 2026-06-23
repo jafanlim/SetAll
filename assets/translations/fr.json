@@ -792,6 +792,8 @@
   "receipt": {
     "scan_bill": "Scan a bill",
     "scan_bill_subtitle": "AI reads the receipt — pre-fills the form",
+    "scan_destination_title": "Où doit aller cette facture ?",
+    "destination_personal": "Portefeuille personnel",
     "scanning": "Opening scanner…",
     "opening_scanner": "Position the receipt in frame",
     "processing": "Reading receipt…",
@@ -815,6 +817,10 @@
     "enter_manually": "Enter manually",
     "saving": "Saving…",
     "saved": "Saved!",
-    "confidence": "{pct}% confidence"
+    "confidence": "{pct}% de confiance",
+    "source_title": "Choisir la source",
+    "source_camera": "Appareil photo / Scan",
+    "source_gallery": "Galerie photo",
+    "source_file": "Fichier (PDF ou image)"
   }
 }

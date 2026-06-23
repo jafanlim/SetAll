@@ -37,6 +37,7 @@ import '../../features/friends/presentation/screens/invite_friend_screen.dart';
 import '../../features/web/download_screen.dart';
 import '../../features/web/legal_screen.dart';
 import '../../features/insights/presentation/screens/insights_screen.dart';
+import '../../features/receipt/presentation/scan_destination_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -73,6 +74,7 @@ final class AppRouter {
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
   static const String insights = '/insights';
+  static const String scanReceipt = '/scan-receipt';
   static const String download = '/download';
   static const String privacy  = '/privacy';
   static const String terms    = '/terms';
@@ -95,7 +97,9 @@ final class AppRouter {
             if (user == null) return login;
             return dashboard;
           }
-          if (user == null && !isLogin && !isRegister && !isPublic) return login;
+          if (user == null && !isLogin && !isRegister && !isPublic) {
+            return login;
+          }
           if (user != null && isLogin) {
             // Guard: only users who completed registration may proceed.
             // handle_new_user trigger creates a profile for every OAuth user
@@ -537,6 +541,18 @@ final class AppRouter {
               },
             ),
           ],
+        ),
+
+        // ── Scan Receipt destination chooser (quick action) ─────────────
+        GoRoute(
+          path: scanReceipt,
+          name: 'scanReceipt',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const ScanDestinationScreen(),
+            ),
+          ),
         ),
 
         // ── AI Insights Panel (pushed over dashboard, back-swipe supported) ──

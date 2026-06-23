@@ -66,6 +66,9 @@ lib/firebase_options.dart
 # Firebase CLI cache
 .firebase/
 
+# Supabase local dev temp files (auto-generated)
+supabase/.temp/
+
 # Xcode / test artifacts (large)
 xcresult_*.json
 *.xcresult
