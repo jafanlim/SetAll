@@ -19,7 +19,7 @@ import '../../../core/utils/haptic_utils.dart';
 import '../../../data/models/wallet_entry_model.dart';
 import '../../../data/models/profile_model.dart';
 import '../../../data/repositories/setall_repository.dart' show SplitInsert;
-import '../../../domain/entities/expense.dart' show SplitType;
+import '../../../domain/entities/expense.dart' show ExpenseLineItem, LineItemAssignment, SplitType;
 
 // ── Brand colours ──────────────────────────────────────────────────────────
 const _teal        = Color(0xFF00D9B0);
@@ -502,6 +502,24 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           SplitInsert(userId: payerId, universalUsdOwed: amount),
         ];
 
+        // Build line-item breakdown (Phase 2a-i: all items assigned to payer).
+        final lineItems = _lineItems
+            .map((li) => ExpenseLineItem(
+                  name: li.nameCtrl.text.trim(),
+                  originalName: li.originalName,
+                  amount: (Decimal.tryParse(li.amountCtrl.text.trim()) ??
+                          Decimal.zero)
+                      .toString(),
+                  qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
+                  assignments: [
+                    LineItemAssignment(
+                      userId: payerId,
+                      qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
+                    ),
+                  ],
+                ))
+            .toList();
+
         final expense = await repo.addExpense(
           groupId:     widget.groupId,
           payerId:     payerId,
@@ -513,6 +531,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           category:    category,
           isIncome:    isIncome,
           entryDate:   _editDate,
+          lineItems:   lineItems,
         );
         if (expense == null) throw Exception('Failed to save group expense');
         expenseId = expense.id;

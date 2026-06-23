@@ -13,6 +13,62 @@ const List<String> kExpenseCategories = [
   'Other',
 ];
 
+/// Assignment of a line item to a member (qty the member is responsible for).
+class LineItemAssignment {
+  final String userId;
+  final int qty;
+
+  const LineItemAssignment({required this.userId, required this.qty});
+
+  Map<String, dynamic> toJson() => {'user_id': userId, 'qty': qty};
+
+  factory LineItemAssignment.fromJson(Map<String, dynamic> json) {
+    return LineItemAssignment(
+      userId: json['user_id'] as String? ?? '',
+      qty: json['qty'] as int? ?? 1,
+    );
+  }
+}
+
+/// One itemized line on a group expense.
+class ExpenseLineItem {
+  final String name;
+  final String? originalName;
+  final String amount;
+  final int qty;
+  final List<LineItemAssignment> assignments;
+
+  const ExpenseLineItem({
+    required this.name,
+    this.originalName,
+    required this.amount,
+    required this.qty,
+    this.assignments = const [],
+  });
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'original_name': originalName,
+        'amount': amount,
+        'qty': qty,
+        'assignments': assignments.map((a) => a.toJson()).toList(),
+      };
+
+  factory ExpenseLineItem.fromJson(Map<String, dynamic> json) {
+    return ExpenseLineItem(
+      name: json['name'] as String? ?? '',
+      originalName: json['original_name'] as String?,
+      amount: (json['amount'] ?? '0').toString(),
+      qty: json['qty'] as int? ?? 1,
+      assignments: (json['assignments'] as List<dynamic>?)
+              ?.map((e) =>
+                  LineItemAssignment.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          const [],
+    );
+  }
+}
+
 class Expense {
   const Expense({
     required this.id,
@@ -35,6 +91,7 @@ class Expense {
     this.iconColor,
     this.attachmentUrls,
     this.notes,
+    this.lineItems = const [],
   });
 
   final String id;
@@ -95,4 +152,7 @@ class Expense {
 
   /// Long-form notes. Also populated with content of .txt / .md attachments.
   final String? notes;
+
+  /// Itemized line items for group expenses (Phase 2a-i).
+  final List<ExpenseLineItem> lineItems;
 }

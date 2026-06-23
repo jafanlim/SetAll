@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:decimal/decimal.dart';
@@ -2382,6 +2383,7 @@ class SetAllRepository {
     List<String> attachmentPaths = const [],
     String? notes,
     DateTime? entryDate,
+    List<ExpenseLineItem> lineItems = const [],
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -2418,6 +2420,7 @@ class SetAllRepository {
             iconColor: iconColor,
             attachmentUrls: attachmentUrls.isEmpty ? null : attachmentUrls,
             notes: notes,
+            lineItems: lineItems,
           );
     
           final expenseData = expense.toJson();
@@ -2431,7 +2434,8 @@ class SetAllRepository {
                 : expenseData['group_id']
             // Postgres INTEGER (INT4) max is 2147483647; ARGB uint32 overflows it.
             // toSigned(32) reinterprets the bits as signed — Color() reads them back correctly.
-            ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
+            ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32)
+            ..['line_items'] = lineItems.map((e) => e.toJson()).toList();
     
           if (_isWeb && _client != null) {
             try {
@@ -3678,6 +3682,11 @@ class SetAllRepository {
 
     // Local-first path: write to SQLite immediately, sync later.
     try {
+      // If line_items arrived from Supabase as a List (jsonb), collapse to a
+      // JSON string so SQLite can store it in its TEXT column.
+      if (expenseRow['line_items'] is List) {
+        expenseRow['line_items'] = jsonEncode(expenseRow['line_items']);
+      }
       await LocalDatabase.db.insert('expenses', {...expenseRow, 'synced_at': null});
       await LocalDatabase.db.insert('splits',   {...splitRow,   'synced_at': null});
     } catch (e) {
