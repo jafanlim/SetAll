@@ -1,6 +1,6 @@
 // FEAT-RECEIPT: Receipt image ingest — receives the receipt image inline as base64,
 // sends it to the OpenAI vision model, and returns a validated expense draft.
-// Uses gpt-4.1-mini (escalates to gpt-4.1 on confidence < 0.7).
+// Uses gpt-4.1 (single vision call; the app's 30s timeout + Netlify's ~26s sync cap rule out a 2-call escalation).
 // API key: process.env.OPENAI_API_KEY.
 // PRIVACY: the image is NEVER persisted — no Storage, no signed URL, no attachment.
 //   It exists only in-memory for the duration of this request ("get context, don't store").
@@ -400,14 +400,14 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
     // ── Call helper ──
     const call = (model) => openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownCategories);
 
-    // ── Primary call: gpt-4.1-mini ──
-    let openaiResponse = await call('gpt-4.1-mini');
+    // ── Single vision call: gpt-4.1 (accurate OCR on non-Latin scripts) ──
+    let openaiResponse = await call('gpt-4.1');
 
     // 429 retry (once)
     if (openaiResponse && openaiResponse.status === 429) {
       const retryAfter = openaiResponse.headers.get('retry-after') || '3';
       await new Promise(r => setTimeout(r, parseInt(retryAfter, 10) * 1000));
-      openaiResponse = await call('gpt-4.1-mini');
+      openaiResponse = await call('gpt-4.1');
     }
 
     // Still 429 after retry → 503
@@ -434,33 +434,10 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
       return { statusCode: 500, headers, body: JSON.stringify({ error: 'parse_failed' }) };
     }
 
-    // ── Escalation: confidence < 0.7 → retry with gpt-4.1 (max 1 escalation) ──
-    let escalated = false;
-    if (typeof draft.confidence === 'number' && draft.confidence < 0.7) {
-      let esResponse = await call('gpt-4.1');
-
-      if (esResponse && esResponse.status === 429) {
-        const retryAfter = esResponse.headers.get('retry-after') || '3';
-        await new Promise(r => setTimeout(r, parseInt(retryAfter, 10) * 1000));
-        esResponse = await call('gpt-4.1');
-      }
-
-      if (esResponse && esResponse.status === 429) {
-        return { statusCode: 503, headers, body: JSON.stringify({ error: 'upstream_unavailable' }) };
-      }
-
-      if (esResponse && esResponse.ok) {
-        const esResult  = await esResponse.json();
-        const esRawText = esResult.choices?.[0]?.message?.content;
-        if (esRawText) {
-          try {
-            draft     = typeof esRawText === 'string' ? JSON.parse(esRawText) : esRawText;
-            escalated = true;
-          } catch (_) { /* keep original low-confidence draft, escalated stays false */ }
-        }
-      }
-      // If escalation call failed (non-429, non-ok), keep original draft
-    }
+    // ── No escalation: gpt-4.1 is already the primary model (see above). A second vision
+    //    call would push the request past the app's 30s timeout (Netlify caps sync fns at
+    //    ~26s) — exactly what broke non-Latin receipts ("could not read it"). One call only.
+    const escalated = false;
 
     // ── Server-side validation + clamping ──
     const validated = validateAndBuild(draft, defaultCurrency, knownCategories, paymentMethods, today);
