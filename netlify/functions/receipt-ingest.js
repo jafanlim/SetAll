@@ -377,8 +377,10 @@ Rules:
   - original_name: the item name EXACTLY as printed on the receipt, in its original language
     and script (Georgian, Cyrillic, Arabic, CJK, etc.). Do NOT translate, transliterate, or
     reduce — keep the full descriptive text as shown, including non-Latin characters.
-  - amount: the item price as a decimal string.
-  - quantity: integer quantity (default 1).
+  - amount: the LINE TOTAL for this item — the price for the FULL quantity, exactly as
+            printed on the receipt. Do NOT divide by quantity; do NOT return a per-unit price.
+  - quantity: how many units (integer, default 1). Informational only — `amount` already
+            covers the full quantity.
 - confidence: your confidence 0.0–1.0 that the amount and currency are correct.
 - needs_clarification: "amount" if total is unreadable, "currency" if indeterminate, "date" if
   date is critical and missing, null otherwise.

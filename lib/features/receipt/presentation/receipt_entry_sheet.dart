@@ -79,6 +79,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   @override
   void initState() {
     super.initState();
+    _amountCtrl.addListener(_onItemFieldChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) => _startScan());
   }
 
@@ -591,9 +592,8 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     Decimal total = Decimal.zero;
     for (final li in _lineItems) {
       final price = Decimal.tryParse(li.amountCtrl.text.trim()) ?? Decimal.zero;
-      final qty = int.tryParse(li.qtyCtrl.text.trim()) ?? 0;
-      if (price > Decimal.zero && qty > 0) {
-        total += price * Decimal.fromInt(qty);
+      if (price > Decimal.zero) {
+        total += price;
       }
     }
     return total;
@@ -646,10 +646,15 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           children: [
             _buildHandle(),
             Expanded(
-              child: SingleChildScrollView(
-                controller: scrollController,
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
-                child: _buildBody(),
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => FocusScope.of(context).unfocus(),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
+                  child: _buildBody(),
+                ),
               ),
             ),
           ],
@@ -1180,40 +1185,44 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     final itemsTotal = _computeItemsTotal();
     final parsedAmount =
         Decimal.tryParse(_amountCtrl.text.trim()) ?? Decimal.zero;
-    final mismatch = itemsTotal > Decimal.zero &&
-        (itemsTotal - parsedAmount).abs() > Decimal.parse('0.01');
+    final diff = (parsedAmount - itemsTotal).abs();
+    final showDiff = itemsTotal > Decimal.zero &&
+        diff > Decimal.parse('0.01');
 
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           '${'receipt.items_total'.tr()}: ${itemsTotal.toStringAsFixed(2)} $_editCurrency',
           style: const TextStyle(fontSize: 11, color: Colors.white54),
         ),
-        if (mismatch) ...[
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              'receipt.items_total_mismatch'.tr(),
-              style: const TextStyle(fontSize: 10, color: _orange),
-              overflow: TextOverflow.ellipsis,
-            ),
+        if (showDiff)
+          Row(
+            children: [
+              Flexible(
+                child: Text(
+                  '${'receipt.entered_total'.tr()} ${parsedAmount.toStringAsFixed(2)} $_editCurrency · ${'receipt.items_total_diff'.tr(namedArgs: {'diff': diff.toStringAsFixed(2)})}',
+                  style: const TextStyle(fontSize: 10, color: _orange),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 6),
+              GestureDetector(
+                onTap: () {
+                  _amountCtrl.text = itemsTotal.toStringAsFixed(2);
+                  setState(() {});
+                },
+                child: Text(
+                  'receipt.use_this'.tr(),
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: _teal,
+                      fontWeight: FontWeight.w600,
+                      decoration: TextDecoration.underline),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 6),
-          GestureDetector(
-            onTap: () {
-              _amountCtrl.text = itemsTotal.toStringAsFixed(2);
-              setState(() {});
-            },
-            child: Text(
-              'receipt.use_this'.tr(),
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: _teal,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.underline),
-            ),
-          ),
-        ],
       ],
     );
   }
