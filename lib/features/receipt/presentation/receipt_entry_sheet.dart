@@ -1191,9 +1191,12 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         ),
         if (mismatch) ...[
           const SizedBox(width: 8),
-          Text(
-            'receipt.items_total_mismatch'.tr(),
-            style: const TextStyle(fontSize: 10, color: _orange),
+          Flexible(
+            child: Text(
+              'receipt.items_total_mismatch'.tr(),
+              style: const TextStyle(fontSize: 10, color: _orange),
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
           const SizedBox(width: 6),
           GestureDetector(
@@ -1201,9 +1204,9 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
               _amountCtrl.text = itemsTotal.toStringAsFixed(2);
               setState(() {});
             },
-            child: const Text(
-              'use this',
-              style: TextStyle(
+            child: Text(
+              'receipt.use_this'.tr(),
+              style: const TextStyle(
                   fontSize: 11,
                   color: _teal,
                   fontWeight: FontWeight.w600,

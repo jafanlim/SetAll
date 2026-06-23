@@ -807,6 +807,7 @@
     "paid_by_member": "Кто платил",
     "items_total": "Сумма позиций",
     "items_total_mismatch": "Не совпадает с суммой",
+    "use_this": "применить",
     "category": "Категория",
     "date": "Дата",
     "line_items": "Позиции",
