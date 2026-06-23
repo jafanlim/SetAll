@@ -114,15 +114,20 @@ async function googleVisionOcr(apiKey, imageBase64, languageHints) {
         }],
       }),
     });
-    if (!resp || !resp.ok) return null;
+    if (!resp || !resp.ok) {
+      console.warn('[receipt] Google Vision HTTP', resp && resp.status);
+      return null;
+    }
     const json = await resp.json();
-    const text = json
-      && json.responses
-      && json.responses[0]
-      && json.responses[0].fullTextAnnotation
-      && json.responses[0].fullTextAnnotation.text;
+    const r0 = json && json.responses && json.responses[0];
+    if (r0 && r0.error) {
+      console.warn('[receipt] Google Vision error', r0.error.code, r0.error.message);
+      return null;
+    }
+    const text = r0 && r0.fullTextAnnotation && r0.fullTextAnnotation.text;
     return (typeof text === 'string' && text.trim().length > 0) ? text : null;
-  } catch (_) {
+  } catch (e) {
+    console.warn('[receipt] Google Vision exception', e && e.message);
     return null;
   }
 }
@@ -482,6 +487,7 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
       ocrText = await googleVisionOcr(googleKey, imageBase64, [locale, 'en']);
     }
     const ocrUsed = !!(ocrText && ocrText.trim().length > 0);
+    console.log('[receipt] OCR path', { keyPresent: !!googleKey, ocrUsed });
 
     const call = ocrUsed
       ? (model) => openaiChatCompletionFromText(apiKey, model, textSystemPrompt, ocrText, knownCategories)
