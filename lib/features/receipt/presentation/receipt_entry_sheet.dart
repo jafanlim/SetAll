@@ -17,6 +17,7 @@ import '../../../core/services/receipt_cache_service.dart';
 import '../../../core/services/receipt_ingest_service.dart';
 import '../../../core/utils/haptic_utils.dart';
 import '../../../data/models/wallet_entry_model.dart';
+import '../../../data/models/profile_model.dart';
 import '../../../data/repositories/setall_repository.dart' show SplitInsert;
 import '../../../domain/entities/expense.dart' show SplitType;
 
@@ -61,7 +62,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   // Editable fields.
   final _amountCtrl  = TextEditingController();
   final _descCtrl    = TextEditingController();
-  final _payerCtrl   = TextEditingController();
+  String? _selectedPayerId;
   String _editCurrency = 'USD';
   String _editCategory = 'General';
   DateTime _editDate = DateTime.now();
@@ -85,7 +86,6 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   void dispose() {
     _amountCtrl.dispose();
     _descCtrl.dispose();
-    _payerCtrl.dispose();
     for (final li in _lineItems) {
       li.dispose();
     }
@@ -433,7 +433,6 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         : '';
     _descCtrl.text   = draft.description;
     _originalDescription = draft.originalDescription;
-    _payerCtrl.text  = draft.payerLabel ?? '';
     // Dispose any existing line-item controllers before replacing.
     for (final li in _lineItems) {
       li.dispose();
@@ -449,6 +448,10 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
               qtyCtrl: TextEditingController(text: li.quantity.toString()),
             ))
         .toList();
+    for (final li in _lineItems) {
+      li.amountCtrl.addListener(_onItemFieldChanged);
+      li.qtyCtrl.addListener(_onItemFieldChanged);
+    }
   }
 
   // ── Save ───────────────────────────────────────────────────────────────
@@ -491,13 +494,16 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
 
       if (widget.groupId != null) {
         // ── Group expense ──
+        final members =
+            ref.read(groupMembersProvider(widget.groupId!)).valueOrNull ?? [];
+        final payerId = _resolvePayerId(members, uid);
         final splits = <SplitInsert>[
-          SplitInsert(userId: uid, universalUsdOwed: amount),
+          SplitInsert(userId: payerId, universalUsdOwed: amount),
         ];
 
         final expense = await repo.addExpense(
           groupId:     widget.groupId,
-          payerId:     uid,
+          payerId:     payerId,
           amount:      amount,
           description: description,
           currency:    currency,
@@ -566,14 +572,51 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   // ── Line item helpers ───────────────────────────────────────────────────
 
   void _addLineItem() {
-    setState(() {
-      _lineItems.add(_EditableLineItem(
-        id: const Uuid().v4(),
-        nameCtrl: TextEditingController(),
-        amountCtrl: TextEditingController(),
-        qtyCtrl: TextEditingController(text: '1'),
-      ));
-    });
+    final li = _EditableLineItem(
+      id: const Uuid().v4(),
+      nameCtrl: TextEditingController(),
+      amountCtrl: TextEditingController(),
+      qtyCtrl: TextEditingController(text: '1'),
+    );
+    li.amountCtrl.addListener(_onItemFieldChanged);
+    li.qtyCtrl.addListener(_onItemFieldChanged);
+    setState(() => _lineItems.add(li));
+  }
+
+  void _onItemFieldChanged() {
+    setState(() {});
+  }
+
+  Decimal _computeItemsTotal() {
+    Decimal total = Decimal.zero;
+    for (final li in _lineItems) {
+      final price = Decimal.tryParse(li.amountCtrl.text.trim()) ?? Decimal.zero;
+      final qty = int.tryParse(li.qtyCtrl.text.trim()) ?? 0;
+      if (price > Decimal.zero && qty > 0) {
+        total += price * Decimal.fromInt(qty);
+      }
+    }
+    return total;
+  }
+
+  String _resolvePayerId(List<ProfileModel> members, String currentUserId) {
+    if (_selectedPayerId != null &&
+        members.any((m) => m.id == _selectedPayerId)) {
+      return _selectedPayerId!;
+    }
+    if (_draft?.payerLabel != null && _draft!.payerLabel!.isNotEmpty) {
+      final label = _draft!.payerLabel!.toLowerCase();
+      final match = members.cast<ProfileModel?>().firstWhere(
+            (m) =>
+                m!.name.toLowerCase() == label ||
+                (m.nickname?.toLowerCase() ?? '') == label,
+            orElse: () => null,
+          );
+      if (match != null) return match.id;
+    }
+    if (members.any((m) => m.id == currentUserId)) return currentUserId;
+    if (members.isNotEmpty) return members.first.id;
+    return currentUserId;
   }
 
   void _removeLineItem(String id) {
@@ -821,12 +864,9 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
                 ),
               const SizedBox(height: 10),
 
-              // Payer label
-              _darkField(
-                controller: _payerCtrl,
-                label: 'receipt.payer_label'.tr(),
-              ),
-              const SizedBox(height: 12),
+              // Payer selector (group only)
+              if (widget.groupId != null)
+                _buildPayerDropdown(),
 
               // Category chip selector
               Text(
@@ -921,6 +961,10 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           ],
         ),
         if (_lineItems.isNotEmpty) ...[
+          const SizedBox(height: 4),
+          _buildItemsTotal(),
+        ],
+        if (_lineItems.isNotEmpty) ...[
           const SizedBox(height: 6),
           ..._lineItems.map((li) => _buildLineItemRow(li)),
         ],
@@ -1000,6 +1044,174 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           ),
         );
       }).toList(),
+    );
+  }
+
+  Widget _buildPayerDropdown() {
+    final membersAsync = ref.watch(groupMembersProvider(widget.groupId!));
+    final currentUserId = ref.watch(currentUserIdProvider);
+
+    return membersAsync.when(
+      data: (members) => _buildPayerSelector(members, currentUserId),
+      loading: () => _buildPayerLoading(),
+      error: (_, _) => _buildPayerFallback(currentUserId),
+    );
+  }
+
+  Widget _buildPayerSelector(List<ProfileModel> members, String? currentUserId) {
+    // Resolve effective payer ID.
+    String? effectiveId = _selectedPayerId;
+    if (effectiveId == null &&
+        _draft?.payerLabel != null &&
+        _draft!.payerLabel!.isNotEmpty) {
+      final label = _draft!.payerLabel!.toLowerCase();
+      effectiveId = members
+          .cast<ProfileModel?>()
+          .firstWhere(
+            (m) =>
+                m!.name.toLowerCase() == label ||
+                (m.nickname?.toLowerCase() ?? '') == label,
+            orElse: () => null,
+          )
+          ?.id;
+    }
+    effectiveId ??= currentUserId;
+    if (effectiveId != null && !members.any((m) => m.id == effectiveId)) {
+      effectiveId = currentUserId;
+    }
+    if (effectiveId == null && members.isNotEmpty) {
+      effectiveId = members.first.id;
+    }
+    if (effectiveId == null) {
+      return _buildPayerFallback(currentUserId);
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'receipt.paid_by_member'.tr(),
+            style: const TextStyle(
+                fontSize: 11, color: Colors.white38, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<String>(
+                value: effectiveId,
+                dropdownColor: const Color(0xFF1E293B),
+                style: const TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w600),
+                isExpanded: true,
+                items: members
+                    .map((m) => DropdownMenuItem(
+                          value: m.id,
+                          child: Text(
+                            m.nickname ?? m.name,
+                            style: const TextStyle(fontSize: 14),
+                          ),
+                        ))
+                    .toList(),
+                onChanged: (v) {
+                  if (v != null) setState(() => _selectedPayerId = v);
+                },
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPayerLoading() {
+    return const Padding(
+      padding: EdgeInsets.only(bottom: 12),
+      child: SizedBox(
+        height: 44,
+        child: Center(
+          child: SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _teal),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPayerFallback(String? currentUserId) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'receipt.paid_by_member'.tr(),
+            style: const TextStyle(
+                fontSize: 11, color: Colors.white38, fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: 6),
+          Container(
+            width: double.infinity,
+            padding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white10,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Text(
+              currentUserId ?? '—',
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildItemsTotal() {
+    final itemsTotal = _computeItemsTotal();
+    final parsedAmount =
+        Decimal.tryParse(_amountCtrl.text.trim()) ?? Decimal.zero;
+    final mismatch = itemsTotal > Decimal.zero &&
+        (itemsTotal - parsedAmount).abs() > Decimal.parse('0.01');
+
+    return Row(
+      children: [
+        Text(
+          '${'receipt.items_total'.tr()}: ${itemsTotal.toStringAsFixed(2)} $_editCurrency',
+          style: const TextStyle(fontSize: 11, color: Colors.white54),
+        ),
+        if (mismatch) ...[
+          const SizedBox(width: 8),
+          Text(
+            'receipt.items_total_mismatch'.tr(),
+            style: const TextStyle(fontSize: 10, color: _orange),
+          ),
+          const SizedBox(width: 6),
+          GestureDetector(
+            onTap: () {
+              _amountCtrl.text = itemsTotal.toStringAsFixed(2);
+              setState(() {});
+            },
+            child: const Text(
+              'use this',
+              style: TextStyle(
+                  fontSize: 11,
+                  color: _teal,
+                  fontWeight: FontWeight.w600,
+                  decoration: TextDecoration.underline),
+            ),
+          ),
+        ],
+      ],
     );
   }
 
