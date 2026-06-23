@@ -657,6 +657,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
                 ),
               ),
             ),
+            _buildKeyboardDismiss(),
           ],
         ),
       ),
@@ -674,6 +675,27 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         ),
       ),
     );
+  }
+
+  Widget _buildKeyboardDismiss() {
+    return MediaQuery.of(context).viewInsets.bottom > 0
+        ? Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8, bottom: 4),
+              child: IconButton(
+                icon: const Icon(Icons.keyboard_arrow_down, size: 22),
+                color: Colors.white38,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(
+                  minWidth: 36,
+                  minHeight: 36,
+                ),
+                onPressed: () => FocusScope.of(context).unfocus(),
+              ),
+            ),
+          )
+        : const SizedBox.shrink();
   }
 
   Widget _buildBody() {
