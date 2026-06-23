@@ -96,7 +96,10 @@ providers:
                 description: "ISO 4217 3-letter code"
               description:
                 type: string
-                description: "Short label 3-6 words"
+                description: "Short label 3-6 words translated to locale"
+              original_description:
+                type: string
+                description: "Description in original language/script verbatim"
               category:
                 type: string
               merchant_name:
@@ -114,11 +117,14 @@ providers:
                   properties:
                     name:
                       type: string
+                    original_name:
+                      type: string
+                      description: "Item name exactly as printed, original script"
                     amount:
                       type: string
                     quantity:
                       type: integer
-                  required: ["name", "amount", "quantity"]
+                  required: ["name", "original_name", "amount", "quantity"]
                   additionalProperties: false
               confidence:
                 type: number
@@ -127,7 +133,7 @@ providers:
                 type: ["string", "null"]
                 enum: ["amount", "currency", "date", null]
             required:
-              ["amount", "currency", "description", "category", "merchant_name",
+              ["amount", "currency", "description", "original_description", "category", "merchant_name",
                "last4", "entry_date", "line_items", "confidence", "needs_clarification"]
             additionalProperties: false
 

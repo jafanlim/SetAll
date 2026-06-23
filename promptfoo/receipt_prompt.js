@@ -44,8 +44,9 @@ Extract structured data from the receipt image.
 
 Rules:
 - amount: the TOTAL amount paid (after tax, tips, discounts). Decimal string, e.g. "45.50".
-- currency: 3-letter ISO code. Infer from symbol ($→USD, €→EUR, £→GBP, ₾→GEL, ₽→RUB, ¥→CNY).
-  If ambiguous use defaultCurrency from context.
+- currency: 3-letter ISO code. Unambiguous symbols: €→EUR, £→GBP, ₾→GEL, ₽→RUB.
+  '$' (USD/MXN/ARS/CLP/…) and '¥' (CNY/JPY) are REGION-AMBIGUOUS — for these use defaultCurrency
+  from context unless the receipt explicitly names the code (e.g. "MXN", "US$", "MX$").
 - description: merchant name or top item, 3-6 words, translated into ${localeName}.
 - original_description: the receipt description in its ORIGINAL language and script, EXACTLY as
   printed. Do NOT translate or transliterate — keep original characters (Georgian, Cyrillic,
