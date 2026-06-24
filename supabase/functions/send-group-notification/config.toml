@@ -1,0 +1,2 @@
+[functions.send-group-notification]
+verify_jwt = false
