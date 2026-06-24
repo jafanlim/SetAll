@@ -604,6 +604,7 @@
     "csv_adding_to_group": "Adding to {group}",
     "csv_adding_to_wallet": "Adding to Personal Wallet",
     "csv_imported_ok": "Imported {count} entries",
+    "csv_import_skipped": "{count} duplicates skipped",
     "csv_more_rows": "… and {count} more",
     "csv_skip": "— Skip —",
     "csv_col_date": "Date",

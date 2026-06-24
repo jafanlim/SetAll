@@ -529,6 +529,7 @@
     "csv_adding_to_group": "დამატება {group}-ში",
     "csv_adding_to_wallet": "დამატება პირად საფულეში",
     "csv_imported_ok": "იმპორტირებულია {count} ჩანაწერი",
+    "csv_import_skipped": "{count} დუბლიკატი გამოტოვებულია",
     "csv_more_rows": "… და კიდევ {count}",
     "csv_skip": "— გამოტოვება —",
     "csv_col_date": "თარიღი",

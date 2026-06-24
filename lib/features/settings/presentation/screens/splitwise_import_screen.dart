@@ -20,6 +20,16 @@ const _slate = Color(0xFF94A3B8);
 
 enum _Destination { wallet, group }
 
+/// Duplicate signature for import dedup: same calendar day + name +
+/// amount-to-cents + currency. Dates are normalised to local time so a stored
+/// UTC `created_at` and a locally-parsed CSV date compare on the same day.
+String _dedupSig(DateTime date, String description, Decimal amount, String currency) {
+  final d = date.toLocal();
+  final day = '${d.year}-${d.month}-${d.day}';
+  return '$day|${description.trim().toLowerCase()}'
+      '|${amount.round(scale: 2)}|${currency.trim().toUpperCase()}';
+}
+
 // ---------------------------------------------------------------------------
 // Parsed row from Splitwise CSV (or SetAll wallet export)
 // ---------------------------------------------------------------------------
@@ -377,9 +387,28 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
     }
 
     int count = 0;
+    int skipped = 0;
 
     if (_destination == _Destination.wallet) {
+      // Skip rows that already exist (same day + name + amount-to-cents + currency)
+      // so re-importing a statement doesn't create duplicates.
+      final existing = await repo.getPersonalExpenses();
+      final seen = <String>{
+        for (final e in existing)
+          if (e.createdAt != null)
+            _dedupSig(
+              DateTime.tryParse(e.createdAt!) ?? DateTime.now(),
+              e.description,
+              Decimal.tryParse(e.amount) ?? Decimal.zero,
+              e.currency),
+      };
       for (final row in _rows) {
+        final sig = _dedupSig(row.date, row.description, row.cost, row.currency);
+        if (!seen.add(sig)) {
+          skipped++;
+          if (mounted) setState(() => _imported = count + skipped);
+          continue;
+        }
         await repo.addExpense(
           groupId:     null,
           payerId:     uid,
@@ -390,9 +419,10 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           splits:      [SplitInsert(userId: uid, universalUsdOwed: row.cost)],
           category:    _mapCategory(row.category),
           isIncome:    row.isIncome,
+          entryDate:   row.date,
         );
         count++;
-        if (mounted) setState(() => _imported = count);
+        if (mounted) setState(() => _imported = count + skipped);
       }
       if (mounted) {
         ref.invalidate(walletEntriesProvider);
@@ -403,7 +433,25 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       }
     } else {
       final groupId = _selectedGroup!.id;
+      // Skip rows that already exist in this group (same day + name + amount-to-cents
+      // + currency) so re-importing doesn't create duplicates.
+      final existing = await repo.getExpensesForGroup(groupId);
+      final seen = <String>{
+        for (final e in existing)
+          if (e.createdAt != null)
+            _dedupSig(
+              DateTime.tryParse(e.createdAt!) ?? DateTime.now(),
+              e.description,
+              Decimal.tryParse(e.amount) ?? Decimal.zero,
+              e.currency),
+      };
       for (final row in _rows) {
+        final sig = _dedupSig(row.date, row.description, row.cost, row.currency);
+        if (!seen.add(sig)) {
+          skipped++;
+          if (mounted) setState(() => _imported = count + skipped);
+          continue;
+        }
         // ── Determine payer ──────────────────────────────────────────────────
         // Positive CSV column = that person paid the full cost.
         // If payer maps to a known member use their id, else fall back to uid.
@@ -446,9 +494,10 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           splits:      splits,
           category:    _mapCategory(row.category),
           isIncome:    false,
+          entryDate:   row.date,
         );
         count++;
-        if (mounted) setState(() => _imported = count);
+        if (mounted) setState(() => _imported = count + skipped);
       }
       if (mounted) {
         ref.invalidate(myGroupsProvider);
@@ -459,9 +508,13 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
 
     if (mounted) {
       HapticUtils.success();
+      final okMsg = 'settings_ext.csv_imported_ok'.tr(namedArgs: {'count': count.toString()});
+      final msg = skipped > 0
+          ? '$okMsg · ${'settings_ext.csv_import_skipped'.tr(namedArgs: {'count': skipped.toString()})}'
+          : okMsg;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('settings_ext.csv_imported_ok'.tr(namedArgs: {'count': count.toString()})),
+          content: Text(msg),
           backgroundColor: _teal.withValues(alpha: 0.9),
         ),
       );

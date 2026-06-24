@@ -529,6 +529,7 @@
     "csv_adding_to_group": "Hinzufügen zu {group}",
     "csv_adding_to_wallet": "Hinzufügen zur persönlichen Wallet",
     "csv_imported_ok": "{count} Einträge importiert",
+    "csv_import_skipped": "{count} Duplikate übersprungen",
     "csv_more_rows": "… und {count} weitere",
     "csv_skip": "— Überspringen —",
     "csv_col_date": "Datum",

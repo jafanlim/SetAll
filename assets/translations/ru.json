@@ -529,6 +529,7 @@
     "csv_adding_to_group": "Добавление в {group}",
     "csv_adding_to_wallet": "Добавление в личный кошелёк",
     "csv_imported_ok": "Импортировано {count} записей",
+    "csv_import_skipped": "{count} дубликатов пропущено",
     "csv_more_rows": "… и ещё {count}",
     "csv_skip": "— Пропустить —",
     "csv_col_date": "Дата",

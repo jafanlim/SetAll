@@ -529,6 +529,7 @@
     "csv_adding_to_group": "Ajout à {group}",
     "csv_adding_to_wallet": "Ajout au portefeuille personnel",
     "csv_imported_ok": "{count} entrées importées",
+    "csv_import_skipped": "{count} doublons ignorés",
     "csv_more_rows": "… et {count} de plus",
     "csv_skip": "— Ignorer —",
     "csv_col_date": "Date",
