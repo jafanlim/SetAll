@@ -244,24 +244,17 @@ class SyncService {
       try {
         // Use SECURITY DEFINER RPC to bypass RLS — direct insert on 'groups'
         // is blocked by policy on all platforms (macOS, Windows, Android, iOS).
+        // Identity columns are set atomically inside the RPC.
         final remoteId = await _client.rpc(
           'create_group',
-          params: {'p_name': groupName},
+          params: {
+            'p_name': groupName,
+            'p_icon_name': row['icon_name'],
+            'p_color_value': row['color_value'],
+            'p_avatar_url': row['avatar_url'],
+            'p_default_currency': row['default_currency'],
+          },
         ) as String;
-        final finalId = remoteId != localId ? remoteId : localId;
-        // Patch identity fields the RPC doesn't set.
-        final iconName   = row['icon_name']   as String?;
-        final colorValue = row['color_value'] as int?;
-        final avatarUrl  = row['avatar_url']  as String?;
-        if (iconName != null || colorValue != null || avatarUrl != null) {
-          try {
-            await _client.from('groups').update({
-              'icon_name':   ?iconName,
-              'color_value': ?colorValue,
-              'avatar_url':  ?avatarUrl,
-            }).eq('id', finalId);
-          } catch (_) {}
-        }
         if (remoteId != localId) {
           // RPC generated a new UUID — update local rows to match.
           await LocalDatabase.db.update('groups',

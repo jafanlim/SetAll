@@ -991,22 +991,16 @@ class SetAllRepository {
 
     if (await _isOnline && _client != null) {
       // Use SECURITY DEFINER RPC to bypass RLS — same pattern as add_member_by_id.
-      // The RPC also inserts the creator's group_members row atomically.
+      // The RPC inserts the group, the creator's group_members row, AND
+      // identity columns (icon/colour/avatar/currency) atomically.
       try {
-        final remoteId = await _client.rpc('create_group', params: {'p_name': name}) as String;
-        final finalId = remoteId != id ? remoteId : id;
-        // Patch identity columns on Supabase if provided.
-        if (iconName != null || colorValue != null || avatarUrl != null ||
-            defaultCurrency != null) {
-          try {
-            await _client.from('groups').update({
-              'icon_name': ?iconName,
-              'color_value': ?colorValue,
-              'avatar_url': ?avatarUrl,
-              'default_currency': ?defaultCurrency,
-            }).eq('id', finalId);
-          } catch (_) {}
-        }
+        final remoteId = await _client.rpc('create_group', params: {
+          'p_name': name,
+          'p_icon_name': iconName,
+          'p_color_value': colorValue,
+          'p_avatar_url': avatarUrl,
+          'p_default_currency': defaultCurrency,
+        }) as String;
         final millis = DateTime.now().millisecondsSinceEpoch;
         if (remoteId != id) {
           await db.update('groups', {'id': remoteId, 'synced_at': millis}, where: 'id = ?', whereArgs: [id]);
@@ -1056,10 +1050,18 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        await _client.from('groups').update(updates)
-            .eq('id', groupId).eq('creator_id', uid);
+        await _client.rpc('update_group_identity', params: {
+          'p_group_id': groupId,
+          'p_icon_name': iconName,
+          'p_color_value': colorValue,
+          'p_avatar_url': avatarUrl,
+          'p_default_currency': defaultCurrency,
+        });
         return true;
-      } catch (_) { return false; }
+      } catch (e) {
+        debugPrint('⚠️ updateGroupCustomization RPC failed (web): $e');
+        return false;
+      }
     }
 
     final rows = await LocalDatabase.db.query(
@@ -1071,9 +1073,23 @@ class SetAllRepository {
       'groups', updates, where: 'id = ?', whereArgs: [groupId]);
     if (await _isOnline && _client != null) {
       try {
-        await _client.from('groups').update(updates)
-            .eq('id', groupId).eq('creator_id', uid);
-      } catch (_) {}
+        await _client.rpc('update_group_identity', params: {
+          'p_group_id': groupId,
+          'p_icon_name': iconName,
+          'p_color_value': colorValue,
+          'p_avatar_url': avatarUrl,
+          'p_default_currency': defaultCurrency,
+        });
+      } catch (e) {
+        // Leave synced_at = NULL so the sync service retries.
+        await LocalDatabase.db.update(
+          'groups',
+          {'synced_at': null},
+          where: 'id = ?',
+          whereArgs: [groupId],
+        );
+        debugPrint('⚠️ updateGroupCustomization RPC failed (will retry via sync): $e');
+      }
     }
     _notify();
     return true;
