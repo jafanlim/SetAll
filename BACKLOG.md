@@ -37,7 +37,7 @@ legacy/initial-ios-debug · security-review-last-10-prs
 
 ### C. Integrate into `develop` THEN delete (real unmerged work — ordered by dependency)
 1. ✅ **DONE** `fix/security-rls-audit` — RLS gap closure, edge-secret triggers, replay-safe migrations — merged to `develop` via PR #9 (2026-06-24). Follow-up: BACKLOG P1 hardening (search_path on edge-secret trigger fns).
-2. `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests
+2. ✅ **DONE** `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests — merged to `develop` via PR #10 (2026-06-24). 18-assertion pgTAP RLS suite covers all 3 C-1 gaps.
 3. `feature/groups-overhaul` — fuller group customization + `group_identity_columns` migration (bug #3)
 4. `chore/shared-wiring` — repo/router/providers glue the features depend on
 5. `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests
@@ -80,6 +80,11 @@ See Phase-0 section C above (one task per branch, in order).
 - Google OAuth in-app browser auto-close
 - group invite search (email/nickname) returns nothing
 - "settled up" stale after account switch
+
+### Discovered during Phase-0 integration (new follow-ups)
+- **ci-ai-eval-green** (infra) — `AI Eval (promptfoo)` workflow has failed 9/9 runs, never green in CI. TWO root causes: (1) `package-lock.json` is gitignored (`.gitignore:83`) so `actions/setup-node cache:npm` + `npm ci` fail before promptfoo runs; (2) **`GROQ_API_KEY` repo secret is missing** (the eval step reads `secrets.GROQ_API_KEY`). Both must be fixed. Not a required check (didn't block C-1/C-2 merges). → `fix/ci-ai-eval-lockfile` + user adds the secret.
+- **edge-fn-secret-enforcement** (security, P1) — 7 edge fns deploy `verify_jwt=false` with NO `x-edge-secret` check in body → publicly invokable: bug-triage, monthly-digest, notify-group-invite, send-group-notification, send-test-email, sync-exchange-rates, weekly-analysis. C-1 made the DB triggers SEND `x-edge-secret`, but the functions don't VERIFY it → notification spoofing / Groq+email quota abuse. Add header check (exempt the 2 Auth-hook fns: send-email, send-welcome-email).
+- **edge-secret-search-path** (hardening, from C-1) — `trigger_bug_triage()` + `notify_group_members()` are SECURITY DEFINER without `SET search_path = public` (Supabase `function_search_path_mutable` advisor). Also guard the two `cron.unschedule(...)` calls in `20260601000001`.
 
 ---
 

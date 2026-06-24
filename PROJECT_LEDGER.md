@@ -60,6 +60,9 @@ have interdependencies — they must be integrated in order, into `develop`, eac
 **Phase-0 integration progress:**
 - ✅ C-1 `fix/security-rls-audit` → merged to `develop` (PR #9, 2026-06-24). 6 migrations
   (RLS gap closure, edge-secret triggers, replay-safe repairs); analyze green; verified surgical.
+- ✅ C-2 `chore/edge-fn-configs` → merged to `develop` (PR #10, 2026-06-24). 9 edge-fn
+  `config.toml` + 18-assertion pgTAP RLS suite. Surfaced 2 follow-ups (see BACKLOG): edge-fn
+  `x-edge-secret` enforcement (security) + the never-green `ai-eval` CI (lockfile + missing GROQ secret).
 
 ## 4. Open bugs / requested work (active backlog)
 
