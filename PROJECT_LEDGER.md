@@ -63,6 +63,12 @@ have interdependencies — they must be integrated in order, into `develop`, eac
 - ✅ C-2 `chore/edge-fn-configs` → merged to `develop` (PR #10, 2026-06-24). 9 edge-fn
   `config.toml` + 18-assertion pgTAP RLS suite. Surfaced 2 follow-ups (see BACKLOG): edge-fn
   `x-edge-secret` enforcement (security) + the never-green `ai-eval` CI (lockfile + missing GROQ secret).
+- ✅ C-13 `chore/chat-eval` → merged to `develop` (PR #12, 2026-06-24). Also the live test of the
+  ai-eval CI fix: **infra now fully green** (lockfile committed, workflow `npm ci`→`npm install`,
+  GROQ secret added) — CI runs all 28 eval cases (25 pass / 3 fail = content, tracked separately).
+- ▶️ C-3 reframed to a targeted bug-#3 fix (`fix/group-identity-persistence`), NOT a stale-branch
+  merge. Root cause: `groups.color_value` is `integer` (ARGB overflow) + missing `default_currency`
+  column + swallowed identity-UPDATE. See BACKLOG §C-3.
 
 ## 4. Open bugs / requested work (active backlog)
 

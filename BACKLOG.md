@@ -38,7 +38,7 @@ legacy/initial-ios-debug · security-review-last-10-prs
 ### C. Integrate into `develop` THEN delete (real unmerged work — ordered by dependency)
 1. ✅ **DONE** `fix/security-rls-audit` — RLS gap closure, edge-secret triggers, replay-safe migrations — merged to `develop` via PR #9 (2026-06-24). Follow-up: BACKLOG P1 hardening (search_path on edge-secret trigger fns).
 2. ✅ **DONE** `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests — merged to `develop` via PR #10 (2026-06-24). 18-assertion pgTAP RLS suite covers all 3 C-1 gaps.
-3. `feature/groups-overhaul` — fuller group customization + `group_identity_columns` migration (bug #3)
+3. ⚠️ **REFRAMED — targeted fix, branch NOT merged** `feature/groups-overhaul` is 427 behind with conflicts in 7/8 files, and its `group_identity_columns` migration is ALREADY on develop (`20260312000004` + `20260313000005`). Per user (2026-06-24): do NOT force-merge the stale branch — fix bug #3 directly per `openspec/setall-group-identity-persistence`. Controller-confirmed real root cause (spec missed it): `groups.color_value` is `integer` (created by `20260312000004`; the later `bigint` migration is a no-op) → ARGB `0xFFRRGGBB` overflows 32-bit → remote write throws → swallowed `catch(_){}` → colour reverts. Plus `groups.default_currency` column is missing from all migrations though the app writes it. Dispatching as `fix/group-identity-persistence`; purge groups-overhaul unmerged afterward.
 4. `chore/shared-wiring` — repo/router/providers glue the features depend on
 5. `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests
 6. `feat/soft-delete` — 90-day restore / deleted_expenses
@@ -48,7 +48,7 @@ legacy/initial-ios-debug · security-review-last-10-prs
 10. `chore/i18n-keys` — translations covering all the above (do near-last)
 11. `feature/website-2-0-integration` — portal/login/legal (independent; can parallel)
 12. `fix/crit-01-ai-provider-cache` — AI 15-min cache (drop the stray journals it carries)
-13. `chore/chat-eval` — promptfoo chat eval cases
+13. ✅ **DONE** `chore/chat-eval` — promptfoo chat eval cases — merged to `develop` via PR #12 (2026-06-24). Doubled as the live verification of the ai-eval CI fix.
 
 **Gate:** each integration is its own PR into `develop`, must pass `flutter analyze` (exit 0)
 before merge (see memory `flutter-analyze-gate-worktree`). Expect conflicts between
@@ -82,7 +82,7 @@ See Phase-0 section C above (one task per branch, in order).
 - "settled up" stale after account switch
 
 ### Discovered during Phase-0 integration (new follow-ups)
-- **ci-ai-eval-green** (infra) — `AI Eval (promptfoo)` workflow has failed 9/9 runs, never green in CI. TWO root causes: (1) `package-lock.json` is gitignored (`.gitignore:83`) so `actions/setup-node cache:npm` + `npm ci` fail before promptfoo runs; (2) **`GROQ_API_KEY` repo secret is missing** (the eval step reads `secrets.GROQ_API_KEY`). Both must be fixed. Not a required check (didn't block C-1/C-2 merges). → `fix/ci-ai-eval-lockfile` + user adds the secret.
+- **ci-ai-eval** — ✅ **INFRA FIXED 2026-06-24.** Was failing 9/9 (never ran). Three causes fixed: (1) gitignored `package-lock.json` → committed (PR #11); (2) sandboxed-npm lockfile drift vs CI npm (`gcp-metadata` 8.1.2 vs 7.0.1) → workflow switched `npm ci`→`npm install` (commit `e00ffe7`); (3) missing `GROQ_API_KEY` secret → user added it. CI now runs: install 37s, eval executes all 28 cases. **Remaining (separate, content not infra):** 3/28 assertions fail (`25 passed 89.29%`, exit 100). → new follow-up `ai-eval-3-failing-cases`: triage the 3 failing promptfoo cases (likely strict/flaky LLM asserts); decide fix-or-loosen. Not a required check.
 - **edge-fn-secret-enforcement** (security, P1) — 7 edge fns deploy `verify_jwt=false` with NO `x-edge-secret` check in body → publicly invokable: bug-triage, monthly-digest, notify-group-invite, send-group-notification, send-test-email, sync-exchange-rates, weekly-analysis. C-1 made the DB triggers SEND `x-edge-secret`, but the functions don't VERIFY it → notification spoofing / Groq+email quota abuse. Add header check (exempt the 2 Auth-hook fns: send-email, send-welcome-email).
 - **edge-secret-search-path** (hardening, from C-1) — `trigger_bug_triage()` + `notify_group_members()` are SECURITY DEFINER without `SET search_path = public` (Supabase `function_search_path_mutable` advisor). Also guard the two `cron.unschedule(...)` calls in `20260601000001`.
 
