@@ -19,7 +19,7 @@ import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
 import '../../../../data/models/split_model.dart';
-import '../../../../domain/entities/expense.dart' show SplitType;
+import '../../../../domain/entities/expense.dart' show SplitType, ExpenseLineItem;
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -100,11 +100,13 @@ class _GroupExpenseDetailScreenState
     if (widget.groupId.isNotEmpty) {
       members = await repo.getGroupMembers(widget.groupId);
     }
+    final fresh = await repo.getExpense(widget.expense.id);
     if (!mounted) return;
     setState(() {
       _splits      = splits;
       _members     = members;
       _loadingData = false;
+      if (fresh != null) _liveExpense = fresh;
     });
   }
 
@@ -213,6 +215,95 @@ class _GroupExpenseDetailScreenState
     ];
     final idx = userId.codeUnits.fold(0, (a, b) => a + b) % palette.length;
     return palette[idx];
+  }
+
+  // ── Itemized line-item breakdown ─────────────────────────────────────────
+  Widget _buildItemsBreakdown(ThemeData theme, Color accentColor, String entryCcy) {
+    final List<ExpenseLineItem> items = _liveExpense.lineItems;
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.receipt_long_outlined, size: 16, color: accentColor),
+              const SizedBox(width: 6),
+              Text(
+                'receipt.line_items'.tr(),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  fontWeight: FontWeight.w700, fontSize: 12,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          ...items.map((li) {
+            final amount = Decimal.tryParse(li.amount) ?? Decimal.zero;
+            final assignees = li.assignments
+                .map((a) => _memberName(a.userId) + (a.qty > 1 ? ' ×${a.qty}' : ''))
+                .join(', ');
+            final showOriginal = li.originalName != null &&
+                li.originalName!.isNotEmpty &&
+                li.originalName != li.name;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          li.qty > 1 ? '${li.name}  ×${li.qty}' : li.name,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                        ),
+                        if (showOriginal)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 1),
+                            child: Text(
+                              li.originalName!,
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        if (assignees.isNotEmpty) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            assignees,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: accentColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$entryCcy ${amount.toStringAsFixed(2)}',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.onSurface,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -670,6 +761,11 @@ class _GroupExpenseDetailScreenState
           ),
 
           const SizedBox(height: 12),
+
+          if (_liveExpense.lineItems.isNotEmpty) ...[
+            _buildItemsBreakdown(theme, accentColor, entryCcy),
+            const SizedBox(height: 12),
+          ],
 
           // ── Mini analytics (group-scoped) ────────────────────────────────
           GlassCard(
