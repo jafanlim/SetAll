@@ -80,7 +80,6 @@ build_log_*.txt
 
 # Node modules (Tailwind CLI)
 node_modules/
-package-lock.json
 
 # Generated Tailwind CSS (rebuild with: make tailwind)
 web/styles.css
