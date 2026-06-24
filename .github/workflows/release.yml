@@ -191,10 +191,14 @@ jobs:
       - name: Build Windows
         if: matrix.os == 'windows-latest'
         # CMake 4.x on the runner removed compatibility with cmake_minimum_required < 3.5,
-        # which the bundled firebase_cpp_sdk_windows still declares. This env var restores
-        # the old default policy version so configuration succeeds.
+        # which the bundled firebase_cpp_sdk_windows still declares. CMAKE_POLICY_VERSION_MINIMUM
+        # restores the old default policy version so configuration succeeds.
+        # The VS2026 MSVC promotes <experimental/coroutine> to a hard error (STL1011); some
+        # plugins (local_auth_windows, permission_handler_windows) still include it, so define
+        # the documented silence macro via the CL env var that cl.exe reads for extra options.
         env:
           CMAKE_POLICY_VERSION_MINIMUM: "3.5"
+          CL: "/D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS"
         run: |
           flutter config --enable-windows-desktop
           flutter build windows --release --no-tree-shake-icons --dart-define-from-file=.env.client
