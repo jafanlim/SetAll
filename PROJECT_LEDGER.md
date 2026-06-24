@@ -57,6 +57,10 @@ the rest of the "spring wave" never landed. This is the real Phase-0 work.
 have interdependencies — they must be integrated in order, into `develop`, each behind the
 `flutter analyze` green gate, not merged blindly.
 
+**Phase-0 integration progress:**
+- ✅ C-1 `fix/security-rls-audit` → merged to `develop` (PR #9, 2026-06-24). 6 migrations
+  (RLS gap closure, edge-secret triggers, replay-safe repairs); analyze green; verified surgical.
+
 ## 4. Open bugs / requested work (active backlog)
 
 New specs written 2026-06-24 (flat layout `openspec/<name>/`):

@@ -36,7 +36,7 @@ legacy/initial-ios-debug · security-review-last-10-prs
 - chore/infra-misc — only `.gitignore` + `CLAUDE.md` tweaks; cherry-pick if wanted, else drop.
 
 ### C. Integrate into `develop` THEN delete (real unmerged work — ordered by dependency)
-1. `fix/security-rls-audit` — RLS gap closure, edge-secret triggers, replay-safe migrations
+1. ✅ **DONE** `fix/security-rls-audit` — RLS gap closure, edge-secret triggers, replay-safe migrations — merged to `develop` via PR #9 (2026-06-24). Follow-up: BACKLOG P1 hardening (search_path on edge-secret trigger fns).
 2. `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests
 3. `feature/groups-overhaul` — fuller group customization + `group_identity_columns` migration (bug #3)
 4. `chore/shared-wiring` — repo/router/providers glue the features depend on
@@ -55,8 +55,9 @@ before merge (see memory `flutter-analyze-gate-worktree`). Expect conflicts betw
 groups-overhaul / shared-wiring / i18n-keys — integrate in the order above.
 
 ### D. Reset / rename
-- `develop` (374 behind, 0 ahead) → hard-reset to `origin/main`, then it becomes the
-  integration target. `Development-june` work rebases onto it.
+- ~~`develop` (374 behind, 0 ahead) → hard-reset to `origin/main`~~ **DONE / superseded**:
+  `develop` is already the integration trunk = `origin/main` + planning commit, and equals
+  `Development-june`. **Do NOT hard-reset develop** — it is live and ahead of main. (Verified 2026-06-24.)
 - After C completes and `develop` is verified, merge `develop → main` and re-tag.
 
 ---
