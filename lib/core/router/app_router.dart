@@ -13,6 +13,7 @@ import '../../features/dashboard/presentation/screens/group_detail_screen.dart';
 import '../../features/dashboard/presentation/screens/invite_member_screen.dart';
 import '../../features/expenses/presentation/screens/add_expense_screen.dart';
 import '../../features/expenses/presentation/screens/edit_expense_screen.dart';
+import '../../features/expenses/presentation/screens/group_expense_entry_type_screen.dart';
 import '../../features/expenses/presentation/screens/group_picker_screen.dart';
 import '../../features/activity/presentation/screens/activity_screen.dart';
 import '../../features/analytics/presentation/screens/analytics_screen.dart';
@@ -64,6 +65,7 @@ final class AppRouter {
   static const String addExpense       = '/add-expense';
   static const String editExpense      = '/group/:id/expense/:expenseId';
   static const String groupPicker      = '/add-expense/choose-group';
+  static const String groupExpenseEntryType = '/add-expense/entry-type';
   static const String groupDetail      = '/group/:id';
   static const String inviteMember     = '/group/:id/invite';
   static const String inviteFriend     = '/invite-friend';
@@ -367,6 +369,25 @@ final class AppRouter {
               child: const WalletEntryTypeScreen(),
             ),
           ),
+        ),
+
+        // ── Group expense: Step 0 — entry type chooser ────────────────────
+        GoRoute(
+          path: groupExpenseEntryType,
+          name: 'groupExpenseEntryType',
+          pageBuilder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: GroupExpenseEntryTypeScreen(
+                  groupId: extra?['groupId'] as String? ?? '',
+                  groupName: extra?['groupName'] as String? ?? 'Group',
+                  groupCurrency: extra?['groupCurrency'] as String?,
+                ),
+              ),
+            );
+          },
         ),
 
         // ── Group: info screen (tap from groups list) ─────────────────

@@ -790,8 +790,8 @@
     "no_results_hint": "სცადეთ სხვა საძიებო ტერმინი ან ფილტრი."
   },
   "receipt": {
-    "scan_bill": "Scan a bill",
-    "scan_bill_subtitle": "AI reads the receipt — pre-fills the form",
+    "scan_bill": "სკანირება ან ატვირთვა",
+    "scan_bill_subtitle": "ფოტო ან PDF — AI ავსებს ფორმას",
     "scan_destination_title": "სად უნდა წავიდეს ეს ქვითარი?",
     "destination_personal": "პირადი საფულე",
     "scanning": "Opening scanner…",
@@ -819,6 +819,8 @@
     "invalid_amount": "Amount must be greater than zero",
     "save_failed": "Could not save. Check your connection.",
     "enter_manually": "Enter manually",
+    "add_how": "როგორ გსურთ დამატება?",
+    "entry_manual_subtitle": "შეიყვანეთ თანხა და დეტალები",
     "saving": "Saving…",
     "saved": "Saved!",
     "confidence": "{pct}% confidence",

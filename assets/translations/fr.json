@@ -790,8 +790,8 @@
     "no_results_hint": "Essayez un autre terme de recherche ou filtre."
   },
   "receipt": {
-    "scan_bill": "Scan a bill",
-    "scan_bill_subtitle": "AI reads the receipt — pre-fills the form",
+    "scan_bill": "Scanner ou importer",
+    "scan_bill_subtitle": "Photo ou PDF — l'IA remplit le formulaire",
     "scan_destination_title": "Où doit aller cette facture ?",
     "destination_personal": "Portefeuille personnel",
     "scanning": "Opening scanner…",
@@ -819,6 +819,8 @@
     "invalid_amount": "Amount must be greater than zero",
     "save_failed": "Could not save. Check your connection.",
     "enter_manually": "Enter manually",
+    "add_how": "Comment voulez-vous l'ajouter ?",
+    "entry_manual_subtitle": "Saisir le montant et les détails",
     "saving": "Saving…",
     "saved": "Saved!",
     "confidence": "{pct}% de confiance",
