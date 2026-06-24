@@ -1,0 +1,2 @@
+[functions.notify-group-invite]
+verify_jwt = false

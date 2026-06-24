@@ -1,0 +1,2 @@
+[functions.sync-exchange-rates]
+verify_jwt = false

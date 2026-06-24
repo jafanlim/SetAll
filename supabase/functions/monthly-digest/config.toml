@@ -1,0 +1,2 @@
+[functions.monthly-digest]
+verify_jwt = false
