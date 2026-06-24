@@ -1306,6 +1306,7 @@ class SetAllRepository {
             'deleted_by':            uid,
             'deleted_at':            deletedAt,
             'deleted_with_group_id': groupId,
+            'original_created_at':   ex['created_at'],
           },
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
@@ -1432,7 +1433,9 @@ class SetAllRepository {
             'original_currency': row['currency'],
             'is_income':         row['is_income'] ?? 0,
             'category':          row['category'],
-            'created_at':        row['deleted_at'],
+            // Verbatim restore: prefer the original entry date; fall back to the
+            // deletion time for legacy snapshots captured before schema v36.
+            'created_at':        row['original_created_at'] ?? row['deleted_at'],
           },
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
@@ -3535,6 +3538,7 @@ class SetAllRepository {
           'deleted_by':      uid,
           'deleted_by_name': deletedByName,
           'deleted_at':      deletedAt,
+          'original_created_at': row['created_at'],
         },
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
@@ -3580,6 +3584,10 @@ class SetAllRepository {
     // shows the correct value; keep USD anchor in universal_usd_amount.
     final originalAmount = snap['original_amount'] ?? snap['amount'];
     final usdAnchor = snap['amount'];
+    // Verbatim restore: re-create with the original entry date. Fall back to the
+    // deletion time for legacy snapshots captured before schema v36.
+    final restoredCreatedAt = (snap['original_created_at'] as String?) ??
+        (snap['deleted_at'] as String?) ?? now;
     final restoredExpense = {
       'id':                   expenseId,
       'group_id':             snap['group_id'],
@@ -3590,7 +3598,7 @@ class SetAllRepository {
       'currency':             snap['currency'] ?? 'USD',
       'category':             snap['category'] ?? 'Other',
       'universal_usd_amount': usdAnchor,
-      'created_at':           now,
+      'created_at':           restoredCreatedAt,
       'updated_at':           now,
       'synced_at':            null,
     };
@@ -3616,6 +3624,7 @@ class SetAllRepository {
           'currency':             snap['currency'] ?? 'USD',
           'category':             snap['category'] ?? 'Other',
           'universal_usd_amount': usdAnchor,
+          'created_at':           restoredCreatedAt,
         });
         await LocalDatabase.db.update(
           'expenses', {'synced_at': DateTime.now().millisecondsSinceEpoch},
@@ -4165,6 +4174,7 @@ class SetAllRepository {
             'deleted_by':      uid,
             'deleted_by_name': deletedByName,
             'deleted_at':      deletedAt,
+            'original_created_at': r['created_at'],
           },
           conflictAlgorithm: ConflictAlgorithm.replace,
         );
@@ -4222,6 +4232,10 @@ class SetAllRepository {
       final snap = newSnapRows.first;
       if ((snap['deleted_by'] as String?) != uid) return false;
       final now = _now();
+      // Verbatim restore: re-create with the original entry date. Fall back to
+      // the deletion time for legacy snapshots captured before schema v36.
+      final restoredCreatedAt = (snap['original_created_at'] as String?) ??
+          (snap['deleted_at'] as String?) ?? now;
       final restoredExpense = {
         'id':                   entryId,
         'group_id':             null,
@@ -4232,7 +4246,7 @@ class SetAllRepository {
         'currency':             snap['currency'] ?? 'USD',
         'category':             snap['category'] ?? 'Other',
         'universal_usd_amount': snap['amount'],
-        'created_at':           now,
+        'created_at':           restoredCreatedAt,
         'updated_at':           now,
         'synced_at':            null,
       };
@@ -4253,6 +4267,7 @@ class SetAllRepository {
             'category':             snap['category'] ?? 'Other',
             'currency':             snap['currency'] ?? 'USD',
             'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
+            'created_at':           restoredCreatedAt,
           });
         } catch (e) {
           debugPrint('[restoreWalletEntry] Supabase upsert failed (expenses): $e');
@@ -4269,6 +4284,9 @@ class SetAllRepository {
     final snap = snapRows.first;
 
     final now = _now();
+    // Legacy snapshots never captured the original entry date; the deletion time
+    // is the closest available value for a verbatim-ish restore.
+    final restoredCreatedAt = (snap['deleted_at'] as String?) ?? now;
     final restoredExpense = {
       'id':                   entryId,
       'group_id':             null,
@@ -4279,7 +4297,7 @@ class SetAllRepository {
       'category':             snap['category'] ?? 'Other',
       'currency':             snap['currency'] ?? 'USD',
       'universal_usd_amount': snap['amount'],
-      'created_at':           now,
+      'created_at':           restoredCreatedAt,
       'updated_at':           now,
       'synced_at':            null,
     };
@@ -4300,6 +4318,7 @@ class SetAllRepository {
           'category':             snap['category'] ?? 'Other',
           'currency':             snap['currency'] ?? 'USD',
           'universal_usd_amount': double.tryParse(snap['amount'].toString()) ?? 0,
+          'created_at':           restoredCreatedAt,
         });
       } catch (e) {
         debugPrint('[restoreWalletEntry] Supabase upsert failed (legacy): $e');
