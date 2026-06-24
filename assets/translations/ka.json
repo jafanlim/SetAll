@@ -825,6 +825,8 @@
     "source_title": "აირჩიეთ სკანირების წყარო",
     "source_camera": "კამერა / სკანი",
     "source_gallery": "ფოტო გალერეა",
-    "source_file": "ფაილი (PDF ან სურათი)"
+    "source_file": "ფაილი (PDF ან სურათი)",
+    "split_preview": "ვინ იხდის",
+    "everyone": "ყველა"
   }
 }

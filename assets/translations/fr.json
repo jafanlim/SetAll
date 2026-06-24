@@ -825,6 +825,8 @@
     "source_title": "Choisir la source",
     "source_camera": "Appareil photo / Scan",
     "source_gallery": "Galerie photo",
-    "source_file": "Fichier (PDF ou image)"
+    "source_file": "Fichier (PDF ou image)",
+    "split_preview": "Qui paie",
+    "everyone": "Tout le monde"
   }
 }

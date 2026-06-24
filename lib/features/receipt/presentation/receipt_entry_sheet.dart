@@ -498,26 +498,33 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         final members =
             ref.read(groupMembersProvider(widget.groupId!)).valueOrNull ?? [];
         final payerId = _resolvePayerId(members, uid);
-        final splits = <SplitInsert>[
-          SplitInsert(userId: payerId, universalUsdOwed: amount),
-        ];
+        final owed = _computeMemberOwed(members, payerId);
+        final splits = owed.isEmpty
+            ? <SplitInsert>[
+                SplitInsert(userId: payerId, universalUsdOwed: amount)
+              ]
+            : owed.entries
+                .where((e) => e.value > Decimal.zero)
+                .map((e) =>
+                    SplitInsert(userId: e.key, universalUsdOwed: e.value))
+                .toList();
 
-        // Build line-item breakdown (Phase 2a-i: all items assigned to payer).
         final lineItems = _lineItems
-            .map((li) => ExpenseLineItem(
-                  name: li.nameCtrl.text.trim(),
-                  originalName: li.originalName,
-                  amount: (Decimal.tryParse(li.amountCtrl.text.trim()) ??
-                          Decimal.zero)
-                      .toString(),
-                  qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
-                  assignments: [
-                    LineItemAssignment(
-                      userId: payerId,
-                      qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
-                    ),
-                  ],
-                ))
+            .map((li) {
+              final assignees =
+                  li.assigneeIds.where((id) => members.any((m) => m.id == id)).toList();
+              final targets = assignees.isEmpty ? <String>[payerId] : assignees;
+              return ExpenseLineItem(
+                name: li.nameCtrl.text.trim(),
+                originalName: li.originalName,
+                amount: (Decimal.tryParse(li.amountCtrl.text.trim()) ??
+                        Decimal.zero)
+                    .toString(),
+                qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
+                assignments:
+                    targets.map((id) => LineItemAssignment(userId: id, qty: 1)).toList(),
+              );
+            })
             .toList();
 
         final expense = await repo.addExpense(
@@ -636,6 +643,44 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     if (members.any((m) => m.id == currentUserId)) return currentUserId;
     if (members.isNotEmpty) return members.first.id;
     return currentUserId;
+  }
+
+  /// Per-member entry-currency owed, reconciled to the entered/paid total.
+  /// Items with no assignees default to [payerId]; equal split among assignees
+  /// (weight 1 each); rounding remainder placed on the payer so Σ == paid.
+  /// Returns {} when it cannot compute (no amount / no positive items) so the
+  /// caller falls back to a single-payer split.
+  Map<String, Decimal> _computeMemberOwed(
+      List<ProfileModel> members, String payerId) {
+    final paid = Decimal.tryParse(_amountCtrl.text.trim()) ?? Decimal.zero;
+    if (paid <= Decimal.zero) return {};
+    final raw = <String, Decimal>{};
+    Decimal subtotal = Decimal.zero;
+    for (final li in _lineItems) {
+      final amt = Decimal.tryParse(li.amountCtrl.text.trim()) ?? Decimal.zero;
+      if (amt <= Decimal.zero) continue;
+      subtotal += amt;
+      final assignees =
+          li.assigneeIds.where((id) => members.any((m) => m.id == id)).toList();
+      final targets = assignees.isEmpty ? <String>[payerId] : assignees;
+      final share = (amt / Decimal.fromInt(targets.length))
+          .toDecimal(scaleOnInfinitePrecision: 10);
+      for (final id in targets) {
+        raw[id] = (raw[id] ?? Decimal.zero) + share;
+      }
+    }
+    if (subtotal <= Decimal.zero) return {};
+    final scale = (paid / subtotal).toDecimal(scaleOnInfinitePrecision: 10);
+    final owed = <String, Decimal>{};
+    for (final e in raw.entries) {
+      owed[e.key] = (e.value * scale).round(scale: 2);
+    }
+    final sum = owed.values.fold(Decimal.zero, (a, b) => a + b);
+    final remainder = paid - sum;
+    if (remainder != Decimal.zero) {
+      owed[payerId] = (owed[payerId] ?? Decimal.zero) + remainder;
+    }
+    return owed;
   }
 
   void _removeLineItem(String id) {
@@ -793,6 +838,10 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         : _commonCurrencies.first;
 
     final parsedAmount = Decimal.tryParse(_amountCtrl.text) ?? Decimal.zero;
+
+    final members = widget.groupId != null
+        ? (ref.watch(groupMembersProvider(widget.groupId!)).valueOrNull ?? <ProfileModel>[])
+        : <ProfileModel>[];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1010,9 +1059,11 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           const SizedBox(height: 4),
           _buildItemsTotal(),
         ],
+        if (widget.groupId != null && members.isNotEmpty && _lineItems.isNotEmpty)
+          _buildSplitPreview(members),
         if (_lineItems.isNotEmpty) ...[
           const SizedBox(height: 6),
-          ..._lineItems.map((li) => _buildLineItemRow(li)),
+          ..._lineItems.map((li) => _buildLineItemRow(li, members)),
         ],
 
         const SizedBox(height: 20),
@@ -1268,104 +1319,211 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     );
   }
 
-  Widget _buildLineItemRow(_EditableLineItem li) {
+  Widget _buildSplitPreview(List<ProfileModel> members) {
+    final currentUserId = ref.watch(currentUserIdProvider);
+    final payerId = _resolvePayerId(members, currentUserId ?? '');
+    final owed = _computeMemberOwed(members, payerId);
+    if (owed.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 8),
+        Text(
+          'receipt.split_preview'.tr(),
+          style: const TextStyle(fontSize: 11, color: Colors.white54),
+        ),
+        const SizedBox(height: 4),
+        ...owed.entries
+            .where((e) => e.value > Decimal.zero)
+            .map((e) {
+          final m = members.cast<ProfileModel?>().firstWhere(
+                (m) => m!.id == e.key,
+                orElse: () => null,
+              );
+          final label = m != null
+              ? (m.nickname ?? m.name)
+              : e.key;
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 2),
+            child: Text(
+              '$label: ${e.value.toStringAsFixed(2)} $_editCurrency',
+              style: const TextStyle(fontSize: 12, color: Colors.white70),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildLineItemRow(_EditableLineItem li, List<ProfileModel> members) {
     final showOriginalName = li.originalName != null &&
         li.originalName!.isNotEmpty &&
         li.originalName != li.nameCtrl.text;
+    final showChips = widget.groupId != null && members.isNotEmpty;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        crossAxisAlignment:
-            showOriginalName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Expanded(
-            flex: 3,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+          Row(
+            crossAxisAlignment:
+                showOriginalName ? CrossAxisAlignment.start : CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                flex: 3,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 36,
+                      child: TextField(
+                        controller: li.nameCtrl,
+                        style: const TextStyle(color: Colors.white, fontSize: 13),
+                        decoration: InputDecoration(
+                          hintText: 'receipt.item_name'.tr(),
+                          hintStyle:
+                              const TextStyle(color: Colors.white30, fontSize: 12),
+                          filled: true,
+                          fillColor: Colors.white10,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 10),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    if (showOriginalName)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 4, top: 2),
+                        child: Text(
+                          li.originalName!,
+                          style: const TextStyle(
+                              fontSize: 10, color: Colors.white38),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 80,
+                height: 36,
+                child: TextField(
+                  controller: li.amountCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    hintText: '0.00',
+                    hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 10),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(
+                width: 44,
+                height: 36,
+                child: TextField(
+                  controller: li.qtyCtrl,
+                  style: const TextStyle(color: Colors.white, fontSize: 13),
+                  keyboardType: TextInputType.number,
+                  decoration: InputDecoration(
+                    hintText: 'x1',
+                    hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                    filled: true,
+                    fillColor: Colors.white10,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              GestureDetector(
+                onTap: () => _removeLineItem(li.id),
+                child: const Icon(Icons.close_rounded, size: 18, color: Colors.white38),
+              ),
+            ],
+          ),
+          if (showChips) ...[
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
               children: [
-                SizedBox(
-                  height: 36,
-                  child: TextField(
-                    controller: li.nameCtrl,
-                    style: const TextStyle(color: Colors.white, fontSize: 13),
-                    decoration: InputDecoration(
-                      hintText: 'receipt.item_name'.tr(),
-                      hintStyle:
-                          const TextStyle(color: Colors.white30, fontSize: 12),
-                      filled: true,
-                      fillColor: Colors.white10,
-                      contentPadding:
-                          const EdgeInsets.symmetric(horizontal: 10),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide.none,
+                GestureDetector(
+                  onTap: () => setState(() {
+                    final allIds = members.map((m) => m.id).toList();
+                    if (allIds.every((id) => li.assigneeIds.contains(id))) {
+                      li.assigneeIds = [];
+                    } else {
+                      li.assigneeIds = List.from(allIds);
+                    }
+                  }),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: members.every((m) => li.assigneeIds.contains(m.id))
+                          ? _teal
+                          : Colors.white10,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      'receipt.everyone'.tr(),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: members.every((m) => li.assigneeIds.contains(m.id))
+                            ? Colors.black
+                            : Colors.white70,
                       ),
                     ),
                   ),
                 ),
-                if (showOriginalName)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, top: 2),
-                    child: Text(
-                      li.originalName!,
-                      style: const TextStyle(
-                          fontSize: 10, color: Colors.white38),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                ...members.map((m) {
+                  final selected = li.assigneeIds.contains(m.id);
+                  return GestureDetector(
+                    onTap: () => setState(() {
+                      if (selected) {
+                        li.assigneeIds.remove(m.id);
+                      } else {
+                        li.assigneeIds.add(m.id);
+                      }
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: selected ? _teal : Colors.white10,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        m.nickname ?? m.name.split(' ').first,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: selected ? Colors.black : Colors.white70,
+                        ),
+                      ),
                     ),
-                  ),
+                  );
+                }),
               ],
             ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 80,
-            height: 36,
-            child: TextField(
-              controller: li.amountCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                hintText: '0.00',
-                hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                filled: true,
-                fillColor: Colors.white10,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 6),
-          SizedBox(
-            width: 44,
-            height: 36,
-            child: TextField(
-              controller: li.qtyCtrl,
-              style: const TextStyle(color: Colors.white, fontSize: 13),
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                hintText: 'x1',
-                hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
-                filled: true,
-                fillColor: Colors.white10,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          GestureDetector(
-            onTap: () => _removeLineItem(li.id),
-            child: const Icon(Icons.close_rounded, size: 18, color: Colors.white38),
-          ),
+          ],
         ],
       ),
     );
@@ -1493,6 +1651,7 @@ class _EditableLineItem {
   final String? originalName;
   final TextEditingController amountCtrl;
   final TextEditingController qtyCtrl;
+  List<String> assigneeIds = [];
 
   _EditableLineItem({
     required this.id,

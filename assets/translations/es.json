@@ -825,6 +825,8 @@
     "source_title": "Elegir fuente",
     "source_camera": "Cámara / Escanear",
     "source_gallery": "Galería de fotos",
-    "source_file": "Archivo (PDF o imagen)"
+    "source_file": "Archivo (PDF o imagen)",
+    "split_preview": "Quién paga",
+    "everyone": "Todos"
   }
 }

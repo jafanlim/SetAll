@@ -826,6 +826,8 @@
     "source_title": "Choose scan source",
     "source_camera": "Camera / Scan",
     "source_gallery": "Photo Library",
-    "source_file": "File (PDF or image)"
+    "source_file": "File (PDF or image)",
+    "split_preview": "Who pays",
+    "everyone": "Everyone"
   }
 }

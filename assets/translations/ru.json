@@ -825,6 +825,8 @@
     "source_title": "Выберите источник",
     "source_camera": "Камера / Скан",
     "source_gallery": "Фотоальбом",
-    "source_file": "Файл (PDF или изображение)"
+    "source_file": "Файл (PDF или изображение)",
+    "split_preview": "Кто платит",
+    "everyone": "Все"
   }
 }

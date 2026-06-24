@@ -825,6 +825,8 @@
     "source_title": "Quelle wählen",
     "source_camera": "Kamera / Scan",
     "source_gallery": "Fotogalerie",
-    "source_file": "Datei (PDF oder Bild)"
+    "source_file": "Datei (PDF oder Bild)",
+    "split_preview": "Wer zahlt",
+    "everyone": "Alle"
   }
 }
