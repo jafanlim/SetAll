@@ -66,13 +66,18 @@ COMMENT ON FUNCTION public.create_group IS
   'Creates a normal group with identity columns and adds the caller as a member. SECURITY DEFINER bypasses RLS.';
 
 -- 3. Identity-only update RPC (creator-gated, no broad UPDATE RLS) ------------
+-- NULL params mean "leave unchanged" (COALESCE). p_clear_avatar = true sets
+-- avatar_url to NULL explicitly; otherwise a NULL p_avatar_url is a no-op.
+
+DROP FUNCTION IF EXISTS public.update_group_identity(uuid, text, bigint, text, text);
 
 CREATE OR REPLACE FUNCTION public.update_group_identity(
   p_group_id         uuid,
-  p_icon_name        text   DEFAULT NULL,
-  p_color_value      bigint DEFAULT NULL,
-  p_avatar_url       text   DEFAULT NULL,
-  p_default_currency text   DEFAULT NULL
+  p_icon_name        text    DEFAULT NULL,
+  p_color_value      bigint  DEFAULT NULL,
+  p_avatar_url       text    DEFAULT NULL,
+  p_default_currency text    DEFAULT NULL,
+  p_clear_avatar     boolean DEFAULT false
 )
 RETURNS void
 LANGUAGE plpgsql
@@ -101,16 +106,17 @@ BEGIN
 
   UPDATE public.groups
   SET
-    icon_name        = p_icon_name,
-    color_value      = p_color_value,
-    avatar_url       = p_avatar_url,
-    default_currency = p_default_currency,
+    icon_name        = COALESCE(p_icon_name, icon_name),
+    color_value      = COALESCE(p_color_value, color_value),
+    avatar_url       = CASE WHEN p_clear_avatar THEN NULL
+                            ELSE COALESCE(p_avatar_url, avatar_url) END,
+    default_currency = COALESCE(p_default_currency, default_currency),
     updated_at       = now()
   WHERE id = p_group_id;
 END;
 $$;
 
-GRANT EXECUTE ON FUNCTION public.update_group_identity(uuid, text, bigint, text, text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.update_group_identity(uuid, text, bigint, text, text, boolean) TO authenticated;
 
 COMMENT ON FUNCTION public.update_group_identity IS
-  'Updates only group identity columns. SECURITY DEFINER. Only the group creator may call.';
+  'Updates only group identity columns. NULL params leave unchanged (COALESCE). p_clear_avatar=true explicitly nulls avatar_url. SECURITY DEFINER. Only the group creator may call.';

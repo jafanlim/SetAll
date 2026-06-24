@@ -1056,6 +1056,7 @@ class SetAllRepository {
           'p_color_value': colorValue,
           'p_avatar_url': avatarUrl,
           'p_default_currency': defaultCurrency,
+          'p_clear_avatar': clearAvatarUrl,
         });
         return true;
       } catch (e) {
@@ -1079,6 +1080,7 @@ class SetAllRepository {
           'p_color_value': colorValue,
           'p_avatar_url': avatarUrl,
           'p_default_currency': defaultCurrency,
+          'p_clear_avatar': clearAvatarUrl,
         });
       } catch (e) {
         // Leave synced_at = NULL so the sync service retries.
