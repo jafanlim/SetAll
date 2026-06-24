@@ -604,6 +604,7 @@
     "csv_adding_to_group": "Adding to {group}",
     "csv_adding_to_wallet": "Adding to Personal Wallet",
     "csv_imported_ok": "Imported {count} entries",
+    "csv_import_skipped": "{count} duplicates skipped",
     "csv_more_rows": "… and {count} more",
     "csv_skip": "— Skip —",
     "csv_col_date": "Date",
@@ -791,8 +792,8 @@
     "no_results_hint": "Try a different search term or filter."
   },
   "receipt": {
-    "scan_bill": "Scan a bill",
-    "scan_bill_subtitle": "AI reads the receipt — pre-fills the form",
+    "scan_bill": "Scan or upload",
+    "scan_bill_subtitle": "Photo or PDF — AI fills the form",
     "scan_destination_title": "Where should this bill go?",
     "destination_personal": "Personal wallet",
     "scanning": "Opening scanner…",
@@ -805,7 +806,11 @@
     "parse_empty": "AI could not extract data from this receipt. Try entering manually.",
     "rate_limit": "Too many scans. Please wait a moment.",
     "confirm_title": "Review receipt",
-    "payer_label": "Paid by (name)",
+    "paid_by_member": "Paid by",
+    "items_total": "Items total",
+    "use_this": "use this",
+    "entered_total": "Entered",
+    "items_total_diff": "off by {diff}",
     "category": "Category",
     "date": "Date",
     "line_items": "Line items",
@@ -816,12 +821,16 @@
     "invalid_amount": "Amount must be greater than zero",
     "save_failed": "Could not save. Check your connection.",
     "enter_manually": "Enter manually",
+    "add_how": "How would you like to add it?",
+    "entry_manual_subtitle": "Type the amount and details",
     "saving": "Saving…",
     "saved": "Saved!",
     "confidence": "{pct}% confidence",
     "source_title": "Choose scan source",
     "source_camera": "Camera / Scan",
     "source_gallery": "Photo Library",
-    "source_file": "File (PDF or image)"
+    "source_file": "File (PDF or image)",
+    "split_preview": "Who pays",
+    "everyone": "Everyone"
   }
 }

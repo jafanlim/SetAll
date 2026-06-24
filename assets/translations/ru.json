@@ -529,6 +529,7 @@
     "csv_adding_to_group": "Добавление в {group}",
     "csv_adding_to_wallet": "Добавление в личный кошелёк",
     "csv_imported_ok": "Импортировано {count} записей",
+    "csv_import_skipped": "{count} дубликатов пропущено",
     "csv_more_rows": "… и ещё {count}",
     "csv_skip": "— Пропустить —",
     "csv_col_date": "Дата",
@@ -790,8 +791,8 @@
     "no_results_hint": "Попробуйте другой запрос или фильтр."
   },
   "receipt": {
-    "scan_bill": "Сканировать чек",
-    "scan_bill_subtitle": "ИИ читает чек — автозаполнение формы",
+    "scan_bill": "Сканировать или загрузить",
+    "scan_bill_subtitle": "Фото или PDF — ИИ заполнит форму",
     "scan_destination_title": "Куда отправить этот чек?",
     "destination_personal": "Личный кошелёк",
     "scanning": "Открытие сканера…",
@@ -804,7 +805,11 @@
     "parse_empty": "ИИ не смог извлечь данные. Попробуйте ввести вручную.",
     "rate_limit": "Слишком много сканирований. Подождите немного.",
     "confirm_title": "Проверка чека",
-    "payer_label": "Оплатил (имя)",
+    "paid_by_member": "Кто платил",
+    "items_total": "Сумма позиций",
+    "use_this": "применить",
+    "entered_total": "Введено",
+    "items_total_diff": "разница {diff}",
     "category": "Категория",
     "date": "Дата",
     "line_items": "Позиции",
@@ -815,12 +820,16 @@
     "invalid_amount": "Сумма должна быть больше нуля",
     "save_failed": "Не удалось сохранить. Проверьте соединение.",
     "enter_manually": "Ввести вручную",
+    "add_how": "Как вы хотите добавить?",
+    "entry_manual_subtitle": "Введите сумму и детали",
     "saving": "Сохранение…",
     "saved": "Сохранено!",
     "confidence": "{pct}% уверенности",
     "source_title": "Выберите источник",
     "source_camera": "Камера / Скан",
     "source_gallery": "Фотоальбом",
-    "source_file": "Файл (PDF или изображение)"
+    "source_file": "Файл (PDF или изображение)",
+    "split_preview": "Кто платит",
+    "everyone": "Все"
   }
 }

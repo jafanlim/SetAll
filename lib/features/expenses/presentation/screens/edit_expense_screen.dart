@@ -19,7 +19,7 @@ import '../../../../data/models/expense_model.dart';
 import '../../../../data/models/profile_model.dart';
 import '../../../../data/models/split_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
-import '../../../../domain/entities/expense.dart';
+import '../../../../domain/entities/expense.dart' show SplitType, ExpenseLineItem, LineItemAssignment, kExpenseCategories;
 import 'add_expense_screen.dart' show CurrencyPickerField, AttachButton;
 
 /// Edit existing expense (Splitwise-style). Loads expense + splits, pre-fills form, saves via updateExpense.
@@ -87,9 +87,14 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
   // Per-member controllers for non-even splits (keyed by member id).
   final Map<String, TextEditingController> _customCtrl = {};
 
+  // Line-item editor state (Phase 2c).
+  List<_EditableLineItem> _lineItems = [];
+  bool get _isItemized => _lineItems.isNotEmpty;
+
   @override
   void initState() {
     super.initState();
+    _amountController.addListener(_onItemChanged);
     _load();
   }
 
@@ -99,6 +104,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
     _descriptionController.dispose();
     _notesController.dispose();
     for (final c in _customCtrl.values) { c.dispose(); }
+    for (final li in _lineItems) { li.dispose(); }
     super.dispose();
   }
 
@@ -215,6 +221,24 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       _isLoading = false;
       if (expense == null) return;
 
+      // Populate line-item editor rows from loaded expense (Phase 2c).
+      for (final li in _lineItems) { li.dispose(); }
+      _lineItems = expense.lineItems.asMap().entries.map((e) {
+        final i = e.key; final li = e.value;
+        final row = _EditableLineItem(
+          id: 'li_$i',
+          nameCtrl: TextEditingController(text: li.name),
+          originalName: li.originalName,
+          amountCtrl: TextEditingController(
+              text: (Decimal.tryParse(li.amount) ?? Decimal.zero).toStringAsFixed(2)),
+          qtyCtrl: TextEditingController(text: li.qty.toString()),
+          assigneeIds: li.assignments.map((a) => a.userId).toList(),
+        );
+        row.amountCtrl.addListener(_onItemChanged);
+        row.qtyCtrl.addListener(_onItemChanged);
+        return row;
+      }).toList();
+
       _amountController.text      = expense.amount;
       _descriptionController.text = expense.description;
       _currency  = expense.currency;
@@ -330,55 +354,79 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
 
     final participantIds = _members.map((m) => m.id).toList();
 
-    List<SplitResult> results;
-    SplitType splitType;
-
-    switch (_splitMode) {
-      case SplitMode.even:
-        results   = SplitEngine.splitEven(total: amount, participantIds: participantIds, payerId: payerId);
-        splitType = SplitType.even;
-      case SplitMode.percentage:
-        final percents = participantIds
-            .map((id) => Decimal.tryParse(_customCtrl[id]?.text.trim() ?? '') ?? Decimal.zero)
-            .toList();
-        final sum = percents.fold(Decimal.zero, (a, b) => a + b);
-        if (sum <= Decimal.zero) {
-          if (mounted) { ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Percentages must sum to 100'))); }
-          return;
-        }
-        results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: percents);
-        splitType = SplitType.parts;
-      case SplitMode.shares:
-        final shares = participantIds
-            .map((id) => Decimal.tryParse(_customCtrl[id]?.text.trim() ?? '') ?? Decimal.zero)
-            .toList();
-        if (shares.every((s) => s <= Decimal.zero)) {
-          if (mounted) { ScaffoldMessenger.of(context)
-              .showSnackBar(const SnackBar(content: Text('Enter at least one share'))); }
-          return;
-        }
-        results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: shares);
-        splitType = SplitType.parts;
-      case SplitMode.manual:
-        final amounts = participantIds
-            .map((id) => Decimal.tryParse(
-                  _customCtrl[id]?.text.trim().replaceAll(',', '.') ?? '') ??
-                Decimal.zero)
-            .toList();
-        final totalManual = amounts.fold(Decimal.zero, (a, b) => a + b);
-        if (totalManual != amount) {
-          if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('add_expense.amounts_must_sum'.tr(namedArgs: {'amount': amount.toString(), 'total': totalManual.toString()})))); }
-          return;
-        }
-        results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, amountsOwed: amounts);
-        splitType = SplitType.manual;
+    final List<SplitInsert> splits;
+    final SplitType splitType;
+    if (_isItemized) {
+      final owed = _computeMemberOwed(_members, payerId);
+      splits = owed.isEmpty
+          ? [SplitInsert(userId: payerId, universalUsdOwed: amount)]
+          : owed.entries
+              .where((e) => e.value > Decimal.zero)
+              .map((e) => SplitInsert(userId: e.key, universalUsdOwed: e.value))
+              .toList();
+      splitType = SplitType.manual;
+    } else {
+      final List<SplitResult> results;
+      switch (_splitMode) {
+        case SplitMode.even:
+          results   = SplitEngine.splitEven(total: amount, participantIds: participantIds, payerId: payerId);
+          splitType = SplitType.even;
+        case SplitMode.percentage:
+          final percents = participantIds
+              .map((id) => Decimal.tryParse(_customCtrl[id]?.text.trim() ?? '') ?? Decimal.zero)
+              .toList();
+          final sum = percents.fold(Decimal.zero, (a, b) => a + b);
+          if (sum <= Decimal.zero) {
+            if (mounted) { ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Percentages must sum to 100'))); }
+            return;
+          }
+          results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: percents);
+          splitType = SplitType.parts;
+        case SplitMode.shares:
+          final shares = participantIds
+              .map((id) => Decimal.tryParse(_customCtrl[id]?.text.trim() ?? '') ?? Decimal.zero)
+              .toList();
+          if (shares.every((s) => s <= Decimal.zero)) {
+            if (mounted) { ScaffoldMessenger.of(context)
+                .showSnackBar(const SnackBar(content: Text('Enter at least one share'))); }
+            return;
+          }
+          results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, weights: shares);
+          splitType = SplitType.parts;
+        case SplitMode.manual:
+          final amounts = participantIds
+              .map((id) => Decimal.tryParse(
+                    _customCtrl[id]?.text.trim().replaceAll(',', '.') ?? '') ??
+                  Decimal.zero)
+              .toList();
+          final totalManual = amounts.fold(Decimal.zero, (a, b) => a + b);
+          if (totalManual != amount) {
+            if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('add_expense.amounts_must_sum'.tr(namedArgs: {'amount': amount.toString(), 'total': totalManual.toString()})))); }
+            return;
+          }
+          results   = SplitEngine.splitCustom(total: amount, participantIds: participantIds, amountsOwed: amounts);
+          splitType = SplitType.manual;
+      }
+      splits = results
+          .map((r) => SplitInsert(userId: r.userId, universalUsdOwed: r.amountOwed))
+          .toList();
     }
 
-    final splits = results
-        .map((r) => SplitInsert(userId: r.userId, universalUsdOwed: r.amountOwed))
-        .toList();
+    final lineItemsPayload = _lineItems.map((li) {
+      final assignees =
+          li.assigneeIds.where((id) => _members.any((m) => m.id == id)).toList();
+      final targets = assignees.isEmpty ? <String>[payerId] : assignees;
+      return ExpenseLineItem(
+        name: li.nameCtrl.text.trim(),
+        originalName: li.originalName,
+        amount: (Decimal.tryParse(li.amountCtrl.text.trim().replaceAll(',', '.'))
+                ?? Decimal.zero).toString(),
+        qty: int.tryParse(li.qtyCtrl.text.trim()) ?? 1,
+        assignments: targets.map((id) => LineItemAssignment(userId: id, qty: 1)).toList(),
+      );
+    }).toList();
 
     setState(() => _isSubmitting = true);
 
@@ -397,6 +445,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       iconColor:      _entryColor.toARGB32(),
       attachmentPaths: List.unmodifiable(_attachmentPaths),
       notes: _notesController.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesController.text.trim()),
+      lineItems: lineItemsPayload,
     );
 
     if (mounted) {
@@ -551,6 +600,200 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
         }),
       ],
       const SizedBox(height: 4),
+    ];
+  }
+
+  // ── Itemized editor helpers (Phase 2c) ───────────────────────────────────
+
+  void _onItemChanged() => setState(() {});
+
+  void _addEditLineItem() {
+    final li = _EditableLineItem(
+      id: 'li_${DateTime.now().microsecondsSinceEpoch}',
+      nameCtrl: TextEditingController(),
+      amountCtrl: TextEditingController(),
+      qtyCtrl: TextEditingController(text: '1'),
+    );
+    li.amountCtrl.addListener(_onItemChanged);
+    li.qtyCtrl.addListener(_onItemChanged);
+    setState(() => _lineItems.add(li));
+  }
+
+  void _removeEditLineItem(String id) {
+    setState(() {
+      final idx = _lineItems.indexWhere((li) => li.id == id);
+      if (idx != -1) { _lineItems[idx].dispose(); _lineItems.removeAt(idx); }
+    });
+  }
+
+  /// Single source of truth for both preview + save. Equal split among
+  /// assignees; unassigned items → payer; scale item-sum to entered total;
+  /// remainder onto payer.
+  Map<String, Decimal> _computeMemberOwed(List<ProfileModel> members, String payerId) {
+    final paid = Decimal.tryParse(
+        _amountController.text.trim().replaceAll(',', '.')) ?? Decimal.zero;
+    if (paid <= Decimal.zero) return {};
+    final raw = <String, Decimal>{};
+    Decimal subtotal = Decimal.zero;
+    for (final li in _lineItems) {
+      final amt = Decimal.tryParse(
+          li.amountCtrl.text.trim().replaceAll(',', '.')) ?? Decimal.zero;
+      if (amt <= Decimal.zero) continue;
+      subtotal += amt;
+      final assignees =
+          li.assigneeIds.where((id) => members.any((m) => m.id == id)).toList();
+      final targets = assignees.isEmpty ? <String>[payerId] : assignees;
+      final share = (amt / Decimal.fromInt(targets.length))
+          .toDecimal(scaleOnInfinitePrecision: 10);
+      for (final id in targets) {
+        raw[id] = (raw[id] ?? Decimal.zero) + share;
+      }
+    }
+    if (subtotal <= Decimal.zero) return {};
+    final scale = (paid / subtotal).toDecimal(scaleOnInfinitePrecision: 10);
+    final owed = <String, Decimal>{};
+    for (final e in raw.entries) {
+      owed[e.key] = (e.value * scale).round(scale: 2);
+    }
+    final sum = owed.values.fold(Decimal.zero, (a, b) => a + b);
+    final remainder = paid - sum;
+    if (remainder != Decimal.zero) {
+      owed[payerId] = (owed[payerId] ?? Decimal.zero) + remainder;
+    }
+    return owed;
+  }
+
+  InputDecoration _editItemFieldDeco(ThemeData theme, String hint) => InputDecoration(
+    hintText: hint, isDense: true, filled: true,
+    fillColor: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+    border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
+  );
+
+  Widget _editAssigneeChip(
+      ThemeData theme, _EditableLineItem li, String? id, String label, bool selected) {
+    return GestureDetector(
+      onTap: () => setState(() {
+        if (id == null) {
+          final allIds = _members.map((m) => m.id).toList();
+          if (allIds.every((x) => li.assigneeIds.contains(x))) {
+            li.assigneeIds = [];
+          } else {
+            li.assigneeIds = List.from(allIds);
+          }
+        } else if (li.assigneeIds.contains(id)) {
+          li.assigneeIds.remove(id);
+        } else {
+          li.assigneeIds.add(id);
+        }
+      }),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected
+              ? _teal
+              : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(label, style: TextStyle(
+          fontSize: 11, fontWeight: FontWeight.w600,
+          color: selected ? Colors.white : theme.colorScheme.onSurface)),
+      ),
+    );
+  }
+
+  Widget _buildEditItemRow(ThemeData theme, _EditableLineItem li) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                flex: 3,
+                child: TextField(
+                  controller: li.nameCtrl,
+                  style: const TextStyle(fontSize: 13),
+                  decoration: _editItemFieldDeco(theme, 'receipt.item_name'.tr()),
+                ),
+              ),
+              const SizedBox(width: 6),
+              SizedBox(width: 80, child: TextField(
+                controller: li.amountCtrl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                textAlign: TextAlign.end,
+                style: const TextStyle(fontSize: 13),
+                decoration: _editItemFieldDeco(theme, '0.00'),
+              )),
+              const SizedBox(width: 6),
+              SizedBox(width: 44, child: TextField(
+                controller: li.qtyCtrl,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 13),
+                decoration: _editItemFieldDeco(theme, 'x1'),
+              )),
+              IconButton(
+                icon: const Icon(Icons.close, size: 18),
+                onPressed: () => _removeEditLineItem(li.id),
+              ),
+            ],
+          ),
+          if (_members.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Wrap(spacing: 6, runSpacing: 6, children: [
+                _editAssigneeChip(theme, li, null, 'receipt.everyone'.tr(),
+                    _members.every((m) => li.assigneeIds.contains(m.id))),
+                ..._members.map((m) => _editAssigneeChip(
+                    theme, li, m.id, m.name, li.assigneeIds.contains(m.id))),
+              ]),
+            ),
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _buildItemizedSection(ThemeData theme) {
+    final payerId = _payerId ?? (_members.isNotEmpty ? _members.first.id : '');
+    final owed = _computeMemberOwed(_members, payerId);
+    return [
+      Row(children: [
+        Text('receipt.line_items'.tr(), style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+      ]),
+      const SizedBox(height: 8),
+      ..._lineItems.map((li) => _buildEditItemRow(theme, li)),
+      Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: _addEditLineItem,
+          icon: const Icon(Icons.add, size: 16),
+          label: Text('receipt.add_item'.tr(), style: const TextStyle(fontSize: 12)),
+        ),
+      ),
+      if (owed.isNotEmpty) ...[
+        const SizedBox(height: 8),
+        Text('receipt.split_preview'.tr(), style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+        const SizedBox(height: 6),
+        ..._members
+            .where((m) => (owed[m.id] ?? Decimal.zero) > Decimal.zero)
+            .map((m) => Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(m.name, style: theme.textTheme.bodyMedium?.copyWith(fontSize: 13)),
+                      Text('$_currency ${owed[m.id]!.toStringAsFixed(2)}',
+                          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
+                    ],
+                  ),
+                )),
+      ],
+      const SizedBox(height: 16),
     ];
   }
 
@@ -941,7 +1184,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
             if (widget.groupId.isNotEmpty && _members.isNotEmpty) ..._buildPayerSection(theme),
 
             // ── Split mode + per-member inputs ───────────────────────────
-            if (widget.groupId.isNotEmpty && _members.length > 1) ..._buildSplitSection(theme),
+            if (widget.groupId.isNotEmpty && _members.length > 1)
+              ...(_isItemized ? _buildItemizedSection(theme) : _buildSplitSection(theme)),
 
             const SizedBox(height: 16),
                   ],
@@ -1127,4 +1371,21 @@ class _IconColorPickerState extends State<_IconColorPicker> {
       ),
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Editable line item (Phase 2c)
+// ---------------------------------------------------------------------------
+class _EditableLineItem {
+  final String id;
+  final TextEditingController nameCtrl;
+  final String? originalName;
+  final TextEditingController amountCtrl;
+  final TextEditingController qtyCtrl;
+  List<String> assigneeIds;
+  _EditableLineItem({
+    required this.id, required this.nameCtrl, this.originalName,
+    required this.amountCtrl, required this.qtyCtrl, List<String>? assigneeIds,
+  }) : assigneeIds = assigneeIds ?? [];
+  void dispose() { nameCtrl.dispose(); amountCtrl.dispose(); qtyCtrl.dispose(); }
 }

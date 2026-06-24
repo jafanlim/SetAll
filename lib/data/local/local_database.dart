@@ -94,7 +94,12 @@ class LocalDatabase {
   ///     entry time; eliminates USD-rate drift in wallet totals
   /// Schema v34 adds:
   ///   • receipt_cache – local-only 30-day receipt image cache keyed by expense_id
-  static const int _version = 34;
+  /// Schema v35 adds:
+  ///   • expenses.line_items – JSON array of itemized line items (Phase 2a-i)
+  /// Schema v36 adds:
+  ///   • deleted_expenses.original_created_at – original entry date, so Restore
+  ///     re-creates the entry verbatim instead of stamping the restore time
+  static const int _version = 36;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -524,6 +529,16 @@ class LocalDatabase {
         )
       ''');
     }
+    if (oldVersion < 35) {
+      // Schema v35: itemized line items for group expenses (Phase 2a-i).
+      await _addColumnIfNotExists(db, 'expenses', 'line_items', 'TEXT');
+    }
+    if (oldVersion < 36) {
+      // Schema v36: capture the original entry date in the deletion snapshot so
+      // Restore re-creates the entry verbatim (not stamped with the restore time).
+      await _addColumnIfNotExists(
+          db, 'deleted_expenses', 'original_created_at', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -597,7 +612,8 @@ class LocalDatabase {
         icon_codepoint        INTEGER,
         icon_color            INTEGER,
         attachment_urls       TEXT,
-        notes                 TEXT
+        notes                 TEXT,
+        line_items            TEXT
       )
     ''');
     await db.execute('''
@@ -688,7 +704,8 @@ class LocalDatabase {
         deleted_by            TEXT NOT NULL,
         deleted_by_name       TEXT,
         deleted_at            TEXT NOT NULL,
-        deleted_with_group_id TEXT        -- Schema v18: set when cascade-deleted with a group
+        deleted_with_group_id TEXT,       -- Schema v18: set when cascade-deleted with a group
+        original_created_at   TEXT        -- Schema v36: original entry date for verbatim Restore
       )
     ''');
     await db.execute('''

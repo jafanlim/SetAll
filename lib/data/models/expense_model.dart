@@ -24,6 +24,7 @@ class ExpenseModel extends Expense {
     super.iconColor,
     super.attachmentUrls,
     super.notes,
+    super.lineItems = const [],
   });
 
   static SplitType _splitTypeFromString(String? v) {
@@ -65,6 +66,7 @@ class ExpenseModel extends Expense {
       iconColor: json['icon_color'] as int?,
       attachmentUrls: _parseAttachmentUrls(json['attachment_urls']),
       notes: json['notes'] as String?,
+      lineItems: _parseLineItems(json['line_items']),
     );
   }
 
@@ -90,6 +92,8 @@ class ExpenseModel extends Expense {
         if (attachmentUrls != null && attachmentUrls!.isNotEmpty)
           'attachment_urls': jsonEncode(attachmentUrls),
         if (notes != null && notes!.isNotEmpty) 'notes': notes,
+        if (lineItems.isNotEmpty)
+          'line_items': jsonEncode(lineItems.map((e) => e.toJson()).toList()),
       };
 
   static List<String>? _parseAttachmentUrls(dynamic raw) {
@@ -101,5 +105,27 @@ class ExpenseModel extends Expense {
       }
     } catch (_) {}
     return null;
+  }
+
+  static List<ExpenseLineItem> _parseLineItems(dynamic raw) {
+    if (raw == null) return const [];
+    try {
+      List<dynamic> list;
+      if (raw is String) {
+        if (raw.isEmpty) return const [];
+        final decoded = jsonDecode(raw);
+        if (decoded is! List) return const [];
+        list = decoded;
+      } else if (raw is List) {
+        list = raw;
+      } else {
+        return const [];
+      }
+      return list
+          .map((e) => ExpenseLineItem.fromJson(e as Map<String, dynamic>))
+          .toList();
+    } catch (_) {
+      return const [];
+    }
   }
 }

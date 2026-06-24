@@ -31,7 +31,7 @@ class ReceiptIngestService {
 
   // ── Public API ────────────────────────────────────────────────────────────
 
-  /// Compress the scanned receipt to WebP (≤1200px). Returns the bytes so the
+  /// Compress the scanned receipt to WebP (~2200px). Returns the bytes so the
   /// caller can both [ingest] them and cache them locally without recompressing.
   /// [imagePath] is a local file path (native) or blob URL (web).
   Future<Uint8List?> compressReceipt(String imagePath) => _compressImage(imagePath);
@@ -158,9 +158,9 @@ class ReceiptIngestService {
     try {
       final result = await FlutterImageCompress.compressWithFile(
         imagePath,
-        minWidth: 1200,
-        minHeight: 1200,
-        quality: 80,
+        minWidth: 2200,
+        minHeight: 2200,
+        quality: 92,
         format: CompressFormat.webp,
         keepExif: false,
       );

@@ -133,7 +133,8 @@ Future<void> _createSchema(Database db, int _) async {
       deleted_by            TEXT NOT NULL,
       deleted_by_name       TEXT,
       deleted_at            TEXT NOT NULL,
-      deleted_with_group_id TEXT
+      deleted_with_group_id TEXT,
+      original_created_at   TEXT
     )
   ''');
   await db.execute('''

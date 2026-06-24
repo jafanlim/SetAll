@@ -53,7 +53,7 @@ jobs:
           serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SETALL_45061 }}
           groups: testers
           file: build/app/outputs/flutter-apk/app-release.apk
-          releaseNotes: "v${{ github.ref_name }} — key migration + security hardening"
+          releaseNotes: "v${{ github.ref_name }} — receipt & bill scanning, itemized who-pays-what splits, duplicate-safe statement import"
 
   # ── macOS & Windows ──────────────────────────────────────────────────────────
   build-desktop:

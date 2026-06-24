@@ -128,7 +128,8 @@ void main() {
               group_id TEXT, group_name TEXT,
               is_income INTEGER NOT NULL DEFAULT 0, category TEXT,
               deleted_by TEXT NOT NULL, deleted_by_name TEXT,
-              deleted_at TEXT NOT NULL, deleted_with_group_id TEXT
+              deleted_at TEXT NOT NULL, deleted_with_group_id TEXT,
+              original_created_at TEXT
             )
           ''');
           await db.execute('''

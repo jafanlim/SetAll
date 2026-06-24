@@ -1,7 +1,11 @@
 // FEAT-RECEIPT: Receipt image ingest — receives the receipt image inline as base64,
 // sends it to the OpenAI vision model, and returns a validated expense draft.
 // Uses gpt-4.1 (single vision call; the app's 30s timeout + Netlify's ~26s sync cap rule out a 2-call escalation).
-// API key: process.env.OPENAI_API_KEY.
+// PREMIUM OCR: if GOOGLE_VISION_API_KEY is set, the image is first transcribed by
+//   Google Cloud Vision (DOCUMENT_TEXT_DETECTION) and the TEXT is structured by the
+//   model — faithful non-Latin (Georgian) names instead of vision-LLM hallucination.
+//   Absent the key, it falls back to the gpt-4.1 vision path. (Pay-to-use gate hook.)
+// API keys: process.env.OPENAI_API_KEY (required), process.env.GOOGLE_VISION_API_KEY (optional).
 // PRIVACY: the image is NEVER persisted — no Storage, no signed URL, no attachment.
 //   It exists only in-memory for the duration of this request ("get context, don't store").
 // SECURITY: Bearer token verified via supabase.auth.getUser; per-user rate limit 10/60s.
@@ -51,6 +55,83 @@ function centsToAmount(cents) {
   return `${intPart}.${fracPart}`;
 }
 
+// ── Structured-output schema (shared by the vision + OCR-text paths) ──
+const RECEIPT_RESPONSE_FORMAT = {
+  type: 'json_schema',
+  json_schema: {
+    name: 'receipt_draft',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        amount:        { type: 'string', description: "Total amount as decimal string, e.g. '45.50'" },
+        currency:      { type: 'string', description: 'ISO 4217 3-letter code' },
+        description:            { type: 'string', description: 'Short label 3-6 words translated to locale' },
+        original_description:  { type: 'string', description: 'Description in original language/script verbatim' },
+        category:               { type: 'string' },
+        merchant_name:          { type: 'string' },
+        last4:         { type: ['string', 'null'], description: 'Card last 4 digits if visible, else null' },
+        entry_date:    { type: 'string', description: 'ISO date YYYY-MM-DD from receipt, or today' },
+        line_items:    {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              name:          { type: 'string' },
+              original_name: { type: 'string', description: 'Item name exactly as printed, original script' },
+              amount:        { type: 'string' },
+              quantity:      { type: 'integer' },
+            },
+            required: ['name', 'original_name', 'amount', 'quantity'],
+            additionalProperties: false,
+          },
+        },
+        confidence:    { type: 'number', description: '0.0–1.0' },
+        needs_clarification: { type: ['string', 'null'], enum: ['amount', 'currency', 'date', null] },
+      },
+      required: ['amount', 'currency', 'description', 'original_description', 'category', 'merchant_name',
+                 'last4', 'entry_date', 'line_items', 'confidence', 'needs_clarification'],
+      additionalProperties: false,
+    },
+  },
+};
+
+// ── Google Cloud Vision OCR (premium pre-pass) ──
+// Dedicated OCR transcribes non-Latin scripts (Georgian, etc.) far better than a
+// general vision LLM, which hallucinates item names. Returns the full transcript
+// string, or null on any failure (caller falls back to the gpt-4.1 vision path).
+// The image is sent to Google for text extraction only; it is not persisted.
+async function googleVisionOcr(apiKey, imageBase64, languageHints) {
+  try {
+    const resp = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        requests: [{
+          image: { content: imageBase64 },
+          features: [{ type: 'DOCUMENT_TEXT_DETECTION' }],
+          imageContext: languageHints ? { languageHints } : undefined,
+        }],
+      }),
+    });
+    if (!resp || !resp.ok) {
+      console.warn('[receipt] Google Vision HTTP', resp && resp.status);
+      return null;
+    }
+    const json = await resp.json();
+    const r0 = json && json.responses && json.responses[0];
+    if (r0 && r0.error) {
+      console.warn('[receipt] Google Vision error', r0.error.code, r0.error.message);
+      return null;
+    }
+    const text = r0 && r0.fullTextAnnotation && r0.fullTextAnnotation.text;
+    return (typeof text === 'string' && text.trim().length > 0) ? text : null;
+  } catch (e) {
+    console.warn('[receipt] Google Vision exception', e && e.message);
+    return null;
+  }
+}
+
 // ── OpenAI call helper (returns fetch Response or null on network error) ──
 
 async function openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownCategories) {
@@ -67,45 +148,35 @@ async function openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownC
       },
     ],
     temperature: 0,
-    response_format: {
-      type: 'json_schema',
-      json_schema: {
-        name: 'receipt_draft',
-        strict: true,
-        schema: {
-          type: 'object',
-          properties: {
-            amount:        { type: 'string', description: "Total amount as decimal string, e.g. '45.50'" },
-            currency:      { type: 'string', description: 'ISO 4217 3-letter code' },
-            description:            { type: 'string', description: 'Short label 3-6 words translated to locale' },
-            original_description:  { type: 'string', description: 'Description in original language/script verbatim' },
-            category:               { type: 'string' },
-            merchant_name:          { type: 'string' },
-            last4:         { type: ['string', 'null'], description: 'Card last 4 digits if visible, else null' },
-            entry_date:    { type: 'string', description: 'ISO date YYYY-MM-DD from receipt, or today' },
-            line_items:    {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  name:          { type: 'string' },
-                  original_name: { type: 'string', description: 'Item name exactly as printed, original script' },
-                  amount:        { type: 'string' },
-                  quantity:      { type: 'integer' },
-                },
-                required: ['name', 'original_name', 'amount', 'quantity'],
-                additionalProperties: false,
-              },
-            },
-            confidence:    { type: 'number', description: '0.0–1.0' },
-            needs_clarification: { type: ['string', 'null'], enum: ['amount', 'currency', 'date', null] },
-          },
-          required: ['amount', 'currency', 'description', 'original_description', 'category', 'merchant_name',
-                     'last4', 'entry_date', 'line_items', 'confidence', 'needs_clarification'],
-          additionalProperties: false,
-        },
-      },
+    response_format: RECEIPT_RESPONSE_FORMAT,
+  };
+
+  return fetch(OPENAI_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${apiKey}`,
     },
+    body: JSON.stringify(body),
+  });
+}
+
+// OCR-text path (premium): structure the dedicated-OCR transcript instead of an image.
+function openaiChatCompletionFromText(apiKey, model, systemPrompt, ocrText, knownCategories) {
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: `Receipt OCR transcript (verbatim from a dedicated OCR engine — use these exact names and numbers; do not invent or substitute):\n\n${ocrText}` },
+          { type: 'text', text: `knownCategories: ${JSON.stringify(knownCategories)}` },
+        ],
+      },
+    ],
+    temperature: 0,
+    response_format: RECEIPT_RESPONSE_FORMAT,
   };
 
   return fetch(OPENAI_API_URL, {
@@ -377,8 +448,10 @@ Rules:
   - original_name: the item name EXACTLY as printed on the receipt, in its original language
     and script (Georgian, Cyrillic, Arabic, CJK, etc.). Do NOT translate, transliterate, or
     reduce — keep the full descriptive text as shown, including non-Latin characters.
-  - amount: the item price as a decimal string.
-  - quantity: integer quantity (default 1).
+  - amount: the LINE TOTAL for this item — the price for the FULL quantity, exactly as
+            printed on the receipt. Do NOT divide by quantity; do NOT return a per-unit price.
+  - quantity: how many units (integer, default 1). Informational only — amount already
+            covers the full quantity.
 - confidence: your confidence 0.0–1.0 that the amount and currency are correct.
 - needs_clarification: "amount" if total is unreadable, "currency" if indeterminate, "date" if
   date is critical and missing, null otherwise.
@@ -391,16 +464,38 @@ ${itemHints || '(none yet)'}
 
 Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurrency}  Locale: ${localeName}`;
 
+    // OCR-text variant of the prompt: same rules, but the text is already accurately
+    // transcribed, so the model must NOT invent item names.
+    const textSystemPrompt = systemPrompt.replace(
+      'Extract structured data from the receipt image.',
+      'You are given the OCR transcript of a receipt below (already extracted by a dedicated OCR engine — it is accurate). Use ONLY the item names and numbers that appear in it. NEVER invent, guess, or substitute item names; copy original_name VERBATIM from the transcript.',
+    );
+
     // ── API key check ──
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
       return { statusCode: 500, headers, body: JSON.stringify({ error: 'parse_failed' }) };
     }
 
-    // ── Call helper ──
-    const call = (model) => openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownCategories);
+    // ── OCR path selection ──
+    // Premium: if Google Vision is configured, transcribe with dedicated OCR and
+    // structure the TEXT (faithful non-Latin names). Otherwise fall back to the
+    // gpt-4.1 vision call (which hallucinates non-Latin item names).
+    const googleKey = process.env.GOOGLE_VISION_API_KEY;
+    let ocrText = null;
+    if (googleKey) {
+      // No languageHints — let Vision AUTO-DETECT the script. Hinting the user's UI
+      // locale (e.g. 'ru') on a Georgian receipt produced mojibake / gibberish.
+      ocrText = await googleVisionOcr(googleKey, imageBase64);
+    }
+    const ocrUsed = !!(ocrText && ocrText.trim().length > 0);
+    console.log('[receipt] OCR path', { keyPresent: !!googleKey, ocrUsed });
 
-    // ── Single vision call: gpt-4.1 (accurate OCR on non-Latin scripts) ──
+    const call = ocrUsed
+      ? (model) => openaiChatCompletionFromText(apiKey, model, textSystemPrompt, ocrText, knownCategories)
+      : (model) => openaiChatCompletion(apiKey, model, systemPrompt, dataUrl, knownCategories);
+
+    // ── Single LLM call: gpt-4.1 (OCR-text structuring, or vision fallback) ──
     let openaiResponse = await call('gpt-4.1');
 
     // 429 retry (once)
@@ -459,6 +554,7 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
       body: JSON.stringify({
         draft: validated.draft,
         escalated,
+        ocr: ocrUsed,
       }),
     };
 
