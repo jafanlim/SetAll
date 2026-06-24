@@ -3239,6 +3239,7 @@ class SetAllRepository {
     int? iconColor,
     List<String> attachmentPaths = const [],
     String? notes,
+    List<ExpenseLineItem> lineItems = const [],
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -3273,8 +3274,9 @@ class SetAllRepository {
             iconColor: iconColor,
             attachmentUrls: finalAttachmentUrls.isEmpty ? null : finalAttachmentUrls,
             notes: notes,
+            lineItems: lineItems,
           );
-    
+
           // Full data for local SQLite.
           final expenseData = expense.toJson()
             ..remove('created_at')
@@ -3284,7 +3286,8 @@ class SetAllRepository {
         if (finalAttachmentUrls.isEmpty) expenseData['attachment_urls'] = null;
         // Supabase payload: remap types + clamp icon_color to signed INT4.
         final supabaseExpenseData = Map<String, dynamic>.from(expenseData)
-          ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32);
+          ..['icon_color'] = (expenseData['icon_color'] as int?)?.toSigned(32)
+          ..['line_items'] = lineItems.map((e) => e.toJson()).toList();
     
           if (_isWeb && _client != null) {
             try {
