@@ -190,6 +190,11 @@ jobs:
 
       - name: Build Windows
         if: matrix.os == 'windows-latest'
+        # CMake 4.x on the runner removed compatibility with cmake_minimum_required < 3.5,
+        # which the bundled firebase_cpp_sdk_windows still declares. This env var restores
+        # the old default policy version so configuration succeeds.
+        env:
+          CMAKE_POLICY_VERSION_MINIMUM: "3.5"
         run: |
           flutter config --enable-windows-desktop
           flutter build windows --release --no-tree-shake-icons --dart-define-from-file=.env.client
@@ -215,6 +220,9 @@ jobs:
   release:
     name: Publish GitHub Release
     needs: [build-desktop, build-android]
+    # Publish whatever artifacts succeeded even if one platform job failed
+    # (downloads are continue-on-error; missing files are skipped).
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
       - name: Download macOS artifact
