@@ -78,6 +78,21 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   silently reverted develop's `delete_group`/`leave_group` RPCs, restoreExpense `original_amount`, and
   `settled_by` (stale-branch clean-merge). `chore/shared-wiring` KEPT: its providers/routes/screen wiring
   must be harvested per-feature (C-5/7/8/9) from `bc7e056` — see BACKLOG §E.
+- ✅ C-5 `feat/wallet-csv-import` (bug #1) → merged to `develop` via PR #16 (2026-06-25, squash `77811b9`).
+  **Part A** cherry-pick `898abd5`: new `csv_adapter.dart`, `ingest_row.dart`, `ingest_service.dart`,
+  `import_ingest_screen.dart`, `netlify/functions/ingest.js` + 2 tests; `pdf-parse` dep added (all develop
+  deps kept); `splitwise_import_screen.dart` adopted `CsvAdapter.parse` + `SplitwiseRow`. **Part B** harvested
+  the INGEST SLICE of `bc7e056`: `ingestServiceProvider`/`IngestNotifier`/`ingestRowsProvider` +
+  `walletImport`→`ImportIngestScreen` route (additive only, zero deletions in providers/router).
+  `wallet_entry_type_screen.dart` kept develop's (Scan-a-Bill card); `setall_repository.dart` untouched
+  (revert-guard `delete_group`/`leave_group`/`original_amount`/`settled_by` all match develop). analyze green,
+  343/343 tests incl. `wallet_import_parity_test` + `csv_adapter_test`.
+  ⚠️ **Controller caught + bounced ONE regression before merge**: the first pass resolved the wallet-import
+  conflict by keeping develop's `addExpense(groupId:null)` path, which leaves `base_currency_amount` NULL —
+  silently dropping the wallet-import-parity fix (the branch's own test documents `addExpense groupId=null`
+  leaves it null vs `upsertWalletEntry` freezing it). Corrected to a TRUE UNION: develop's dedup +
+  `upsertWalletEntry` (freezes `base_currency_amount`). Group-destination branch unchanged (`addExpense` +
+  `SplitInsert`). Lesson reinforced: a "clean" conflict resolution can still drop a feature's whole purpose.
 
 ## 4. Open bugs / requested work (active backlog)
 

@@ -42,7 +42,7 @@ legacy/initial-ios-debug · security-review-last-10-prs
    ⚠️ **`feature/groups-overhaul` (origin `5ad69df`) NOT purged** — it still carries ~735 lines of UNMERGED group-customization UI (create_group_screen +514, groups_screen, group_detail_screen, repo glue) that the targeted fix did NOT include. Keep-for-later-UI-task vs discard is a USER decision — do not delete until confirmed (see §E).
 4. ✅ **DONE (surgical additive, NOT a cherry-pick)** `chore/shared-wiring` data-layer → merged to `develop` via PR #15 (2026-06-25, squash `550bccd`). Added ONLY the 15 genuinely-new repo methods (budgets/recurring/alerts/insights: getBudgets/upsertBudget/deleteBudget, getRecurringRules/insertRecurringRule/dismissRecurringRule/deleteRecurringRule, getAlertPrefs/upsertAlertPrefs/alertLogContains/insertAlertLog, insertInsightSignal, watchAllPayerExpenses/getAllPayerExpenses/getCategorySpend) + `netlifyIngestUrl` — verbatim from `bc7e056`, pure additions, zero existing lines touched (verified: counts delete_group/leave_group/original_amount/settled_by all match develop).
    ⚠️ **First attempt PR #14 was CLOSED by controller**: a full `git cherry-pick bc7e056` (54 behind) silently REVERTED develop's `rpc('delete_group')`/`rpc('leave_group')`, restoreExpense `original_amount` fix, and 4 `settled_by` lines (clean-but-stale merge, no conflict markers). Lesson: never wholesale-merge a stale branch — extract what's genuinely new. **`chore/shared-wiring` (origin `bc7e056`) NOT purged** — its providers (`setall_providers.dart`) + routes (`app_router.dart`) + screen edits for ingest/budget/recurring/alerts are the wiring each FEATURE PR (C-5/7/8/9) must re-add from `bc7e056` once that feature's screens/services land. See §E.
-5. `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests
+5. ✅ **DONE** `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests → merged to `develop` via PR #16 (2026-06-25, squash `77811b9`). Cherry-pick `898abd5` (csv_adapter/ingest_row/ingest_service/import_ingest_screen/netlify ingest.js + 2 tests, `pdf-parse` dep) + harvested the ingest slice of `bc7e056` (ingestServiceProvider/IngestNotifier/ingestRowsProvider + `walletImport`→`ImportIngestScreen`). Controller bounced ONE regression: wallet-import conflict first kept develop's `addExpense(groupId:null)` (leaves `base_currency_amount` NULL) → corrected to TRUE UNION = develop dedup + `upsertWalletEntry` (freezes base_currency_amount). `setall_repository.dart` untouched; providers/router additive.
 6. `feat/soft-delete` — 90-day restore / deleted_expenses
 7. `feat/recurring` — recurring detection
 8. `feat/budget` — monthly budgets
@@ -72,10 +72,12 @@ groups-overhaul / shared-wiring / i18n-keys — integrate in the order above.
 - **`chore/shared-wiring`** (origin `bc7e056`) — KEEP until C-9 done. Its data-layer is on develop (C-4/PR #15),
   but its **providers + routes + screen edits** for ingest/budget/recurring/alerts were deliberately NOT
   taken (they reference screens/services that arrive with the feature branches). Each feature PR must harvest
-  its slice from `bc7e056`: C-5 ingest → `ingestServiceProvider`/`ingestRowsProvider` + `walletImport`→`ImportIngestScreen` route;
-  C-7 recurring → `recurringCandidatesProvider` + `recurring`→`RecurringScreen` route; C-8 budget → `budgets`→`BudgetsScreen` route;
-  C-9 alerts → `alertServiceProvider`/`alertPrefsProvider`/`alertQueueProvider` + `alertPrefs`→`AlertPrefsScreen` route.
-  Purge `chore/shared-wiring` only after all four have landed.
+  its slice from `bc7e056`:
+  - ✅ **C-5 ingest — HARVESTED** (PR #16, 2026-06-25): `ingestServiceProvider`/`IngestNotifier`/`ingestRowsProvider` + `walletImport`→`ImportIngestScreen` route on develop.
+  - ⬜ C-7 recurring → `recurringCandidatesProvider` + `recurring`→`RecurringScreen` route;
+  - ⬜ C-8 budget → `budgets`→`BudgetsScreen` route;
+  - ⬜ C-9 alerts → `alertServiceProvider`/`alertPrefsProvider`/`alertQueueProvider` + `alertPrefs`→`AlertPrefsScreen` route.
+  Purge `chore/shared-wiring` only after C-7/8/9 have all landed.
 
 ---
 
