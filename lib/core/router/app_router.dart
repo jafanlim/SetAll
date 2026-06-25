@@ -40,6 +40,7 @@ import '../../features/web/download_screen.dart';
 import '../../features/web/legal_screen.dart';
 import '../../features/insights/presentation/screens/insights_screen.dart';
 import '../../features/receipt/presentation/scan_destination_screen.dart';
+import '../../features/budget/presentation/screens/budgets_screen.dart';
 import '../../features/recurring/presentation/screens/recurring_screen.dart';
 
 final class AppRouter {
@@ -80,6 +81,7 @@ final class AppRouter {
   static const String editGroup              = '/group/:id/edit';
   static const String insights = '/insights';
   static const String scanReceipt = '/scan-receipt';
+  static const String budgets    = '/budgets';
   static const String recurring   = '/recurring';
   static const String download = '/download';
   static const String privacy  = '/privacy';
@@ -600,6 +602,18 @@ final class AppRouter {
             child: Material(
               color: Theme.of(context).colorScheme.surface,
               child: const InsightsScreen(),
+            ),
+          ),
+        ),
+
+        // ── Budgets screen ─────────────────────────────────────────────────
+        GoRoute(
+          path: budgets,
+          name: 'budgets',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const BudgetsScreen(),
             ),
           ),
         ),
