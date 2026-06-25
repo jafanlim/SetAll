@@ -132,7 +132,7 @@ class ProactiveAlertService {
     final mean = categoryMean[latestCategory] ?? Decimal.zero;
     if (mean <= Decimal.zero) return [];
 
-    final threshold = Decimal.parse((mean.toDouble() * prefs.anomalyK).toStringAsFixed(6));
+    final threshold = mean * (Decimal.tryParse(prefs.anomalyK.toString()) ?? Decimal.fromInt(2));
     if (latestAmountBase <= threshold) return [];
 
     // Dedup check
@@ -177,15 +177,13 @@ class ProactiveAlertService {
     for (final b in budgets) {
       final id = b['id'] as String? ?? '';
       final category = b['category'] as String?; // null = Overall
-      final limitRaw = double.tryParse(b['amount']?.toString() ?? '') ?? 0.0;
-      if (limitRaw <= 0) continue;
+      final limit = Decimal.tryParse(b['amount']?.toString() ?? '') ?? Decimal.zero;
+      if (limit <= Decimal.zero) continue;
 
       final spend = category == null ? totalSpend : (categorySpend[category] ?? Decimal.zero);
       if (spend <= Decimal.zero) continue;
 
-      final pct = spend.toDouble() / limitRaw;
-
-      if (prefs.budget100Enabled && pct >= 1.0) {
+      if (prefs.budget100Enabled && spend >= limit) {
         final refKey = 'budget:$id:100';
         final fired = await _repo.alertLogContains(alertType: 'budget_100', refKey: refKey);
         if (!fired) {
@@ -197,7 +195,7 @@ class ProactiveAlertService {
             refKey: refKey,
           ));
         }
-      } else if (prefs.budget80Enabled && pct >= 0.8) {
+      } else if (prefs.budget80Enabled && spend >= (limit * Decimal.parse('0.8'))) {
         final refKey = 'budget:$id:80';
         final fired = await _repo.alertLogContains(alertType: 'budget_80', refKey: refKey);
         if (!fired) {
