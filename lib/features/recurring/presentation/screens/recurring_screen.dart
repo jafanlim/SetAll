@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../data/recurring_candidate.dart';
 
@@ -31,7 +32,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       await repo.insertRecurringRule({
         'id': const Uuid().v4(),
         'description': c.description,
-        'amount': c.amount,
+        'amount': c.amount.toString(),
         'currency': c.currency,
         'category': c.category,
         'interval_days': c.intervalDays,
@@ -62,7 +63,7 @@ class _RecurringScreenState extends ConsumerState<RecurringScreen> {
       await repo.insertRecurringRule({
         'id': const Uuid().v4(),
         'description': c.description,
-        'amount': c.amount,
+        'amount': c.amount.toString(),
         'currency': c.currency,
         'category': c.category,
         'interval_days': c.intervalDays,
@@ -281,7 +282,7 @@ class _CandidateTile extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '${c.currency} ${c.amount.toStringAsFixed(2)} · '
+              '${c.currency} ${formatAmountForCurrency(c.amount.toString(), c.currency)} · '
               '${'recurring.every_days'.tr(namedArgs: {'days': '${c.intervalDays}'})} · next: $nextFmt',
               style: TextStyle(
                   fontSize: 12,
@@ -376,7 +377,7 @@ class _ConfirmedRuleTile extends StatelessWidget {
             style:
                 const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
         subtitle: Text(
-          '$ccy ${double.tryParse(amt)?.toStringAsFixed(2) ?? amt} · '
+          '$ccy ${formatAmountForCurrency(amt, ccy)} · '
           '${'recurring.every_days'.tr(namedArgs: {'days': days})}${nextFmt.isNotEmpty ? ' · next: $nextFmt' : ''}',
           style: TextStyle(
               fontSize: 11, color: theme.colorScheme.onSurfaceVariant),

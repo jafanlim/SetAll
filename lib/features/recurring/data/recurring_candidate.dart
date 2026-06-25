@@ -1,3 +1,5 @@
+import 'package:decimal/decimal.dart';
+
 /// A detected recurring-payment candidate before the user confirms/dismisses.
 class RecurringCandidate {
   const RecurringCandidate({
@@ -12,7 +14,7 @@ class RecurringCandidate {
   });
 
   final String description;
-  final double amount;
+  final Decimal amount;
   final String currency;
   final String category;
   final int intervalDays;

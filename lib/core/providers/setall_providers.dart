@@ -16,6 +16,8 @@ import '../../data/models/wallet_entry_model.dart';
 import '../../data/models/ai_insight_model.dart';
 import '../../features/wallet/data/ingest_row.dart';
 import '../../features/wallet/data/ingest_service.dart';
+import '../../features/recurring/data/recurring_candidate.dart';
+import '../../features/recurring/data/recurring_detection_service.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -465,3 +467,23 @@ final localeProvider = StateProvider<Locale>((ref) => const Locale('en'));
 /// True while a screen (wallet / groups) is in edit mode.
 /// Shell reads this to hide the voice FAB, matching the screen's own FAB hide logic.
 final screenEditModeProvider = StateProvider<bool>((ref) => false);
+
+// setall-recurring-detection providers
+// ---------------------------------------------------------------------------
+
+/// Runs heuristic detection over all user-paid expenses (personal + group)
+/// and returns candidates not already in confirmed recurring_rules.
+/// Uses FutureProvider to properly await the Supabase fetch before running
+/// detection — avoids the empty-initial-value timing issue with StreamProvider.
+final recurringCandidatesProvider =
+    FutureProvider<List<RecurringCandidate>>((ref) async {
+  final repo = ref.watch(setAllRepositoryProvider);
+  final expenses = await repo.getAllPayerExpenses();
+  return RecurringDetectionService.detect(expenses);
+});
+
+/// Confirmed recurring rules from Supabase.
+final recurringRulesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  return ref.watch(setAllRepositoryProvider).getRecurringRules();
+});

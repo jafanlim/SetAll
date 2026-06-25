@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
 import '../../../data/models/expense_model.dart';
@@ -236,15 +237,26 @@ class RecurringDetectionService {
     final effectiveInterval =
         avgInterval.clamp(_kMinIntervalDays, _kMaxIntervalDays);
 
-    final representative = matched.last;
+    // Pick the expense whose parsed amount is closest to the modal
+    // as the representative — use its real amount string (Decimal), not the float.
+    ExpenseModel? representative = matched.last;
+    double bestDiff = double.infinity;
+    for (final e in matched) {
+      final a = double.tryParse(e.amount) ?? 0.0;
+      final diff = (a - modalAmount).abs();
+      if (diff < bestDiff) {
+        bestDiff = diff;
+        representative = e;
+      }
+    }
 
     return RecurringCandidate(
       description: descOverride != null
           ? matched
               .map((e) => e.description)
               .reduce((a, b) => a.length <= b.length ? a : b)
-          : representative.description,
-      amount: modalAmount,
+          : representative!.description,
+      amount: Decimal.parse(representative!.amount),
       currency: representative.currency,
       category: representative.category,
       intervalDays: effectiveInterval,
