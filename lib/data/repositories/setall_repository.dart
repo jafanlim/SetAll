@@ -772,6 +772,62 @@ class SetAllRepository {
     }
   }
 
+  /// Watches all expenses where the current user is the payer, including both
+  /// personal wallet entries (group_id IS NULL) and group expenses.
+  /// Used by recurring-charge detection so group-paid recurring bills are found.
+  Stream<List<ExpenseModel>> watchAllPayerExpenses({int limit = 10000}) async* {
+    List<ExpenseModel> last;
+    try { last = await getAllPayerExpenses(limit: limit); } catch (e) {
+      debugPrint('[watchAllPayerExpenses] initial load error (yielding []): $e');
+      last = [];
+    }
+    yield last;
+    await for (final _ in _changeController.stream) {
+      List<ExpenseModel> next;
+      try { next = await getAllPayerExpenses(limit: limit); } catch (e) {
+        debugPrint('[watchAllPayerExpenses] reload error (keeping last): $e');
+        continue;
+      }
+      if (_expenseListChanged(last, next)) {
+        last = next;
+        yield next;
+      }
+    }
+  }
+
+  /// Returns all expenses where the current user is the payer — both personal
+  /// wallet entries and group expenses.
+  Future<List<ExpenseModel>> getAllPayerExpenses({int limit = 10000}) async {
+    final uid = await ensureUser();
+    if (uid == null) {
+      debugPrint('[getAllPayerExpenses] uid=null — returning []');
+      return [];
+    }
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('expenses')
+          .select()
+          .eq('payer_id', uid)
+          .order('created_at', ascending: false)
+          .limit(limit) as List;
+      final result = rows.map((r) => _rowToExpense(r as Map<String, dynamic>)).toList();
+      debugPrint('[getAllPayerExpenses] web uid=$uid returned ${result.length} entries');
+      return result;
+    }
+
+    final rows = await LocalDatabase.db.query(
+      'expenses',
+      where: 'payer_id = ?',
+      whereArgs: [uid],
+      orderBy: 'created_at DESC',
+      limit: limit,
+    );
+    final result = rows.map<ExpenseModel>((row) => _rowToExpense(row)).toList();
+    debugPrint('[getAllPayerExpenses] sqlite uid=$uid returned ${result.length} entries');
+    return result;
+  }
+
   static bool _groupListChanged(List<GroupModel> a, List<GroupModel> b) {
     if (a.length != b.length) return true;
     for (var i = 0; i < a.length; i++) {
@@ -2618,6 +2674,57 @@ class SetAllRepository {
   }
 
   // ---------------------------------------------------------------------------
+  // Budget spend query (owned by setall-budgets)
+  // ---------------------------------------------------------------------------
+
+  /// Returns per-category spend in the user's base currency for all personal
+  /// expenses whose [createdAt] falls in [[from], [to]).
+  ///
+  /// Conversion priority (mirrors [getWalletEntryTotals]):
+  ///   1. frozen [baseCurrencyAmount] stored at save time (schema v33+)
+  ///   2. [universalUsdAmount] × live USD→base rate (fallback for older entries)
+  ///
+  /// Income entries are skipped. The null / empty category maps to `"General"`.
+  Future<Map<String, Decimal>> getCategorySpend(
+    DateTime from,
+    DateTime to, {
+    String baseCurrency = 'USD',
+  }) async {
+    final all = await getPersonalExpenses();
+    final result = <String, Decimal>{};
+
+    // Fetch USD→baseCurrency rate at most once across all entries.
+    Decimal usdToBase = Decimal.one;
+    if (baseCurrency != 'USD' && _currencyService != null) {
+      usdToBase = await _currencyService.getRate('USD', baseCurrency);
+    }
+
+    for (final e in all) {
+      if (e.isIncome) continue;
+      final createdAt = DateTime.tryParse(e.createdAt ?? '')?.toLocal();
+      if (createdAt == null) continue;
+      if (createdAt.isBefore(from) || !createdAt.isBefore(to)) continue;
+
+      final cat = (e.category.isEmpty) ? 'General' : e.category;
+
+      final Decimal amt;
+      final hasFrozen = e.baseCurrencyAmount?.isNotEmpty == true;
+      if (hasFrozen) {
+        amt = Decimal.tryParse(e.baseCurrencyAmount!) ?? Decimal.zero;
+      } else {
+        final usd = Decimal.tryParse(e.universalUsdAmount ?? '0') ?? Decimal.zero;
+        amt = baseCurrency == 'USD' ? usd : (usd * usdToBase).round(scale: 2);
+      }
+
+      result[cat] = (result[cat] ?? Decimal.zero) + amt;
+    }
+
+    debugPrint('[getCategorySpend] from=$from to=$to base=$baseCurrency '
+        'categories=${result.keys.join(",")}');
+    return result;
+  }
+
+  // ---------------------------------------------------------------------------
   // User Categories
   // ---------------------------------------------------------------------------
 
@@ -2752,6 +2859,192 @@ class SetAllRepository {
     String baseCurrency = 'USD',
   }) async {
     return getWalletEntryTotals(baseCurrency: baseCurrency);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Budgets (CRUD — Supabase only; mobile uses local SQLite mirror via sync)
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all budget rows for the current user.
+  Future<List<Map<String, dynamic>>> getBudgets() async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('budgets')
+          .select()
+          .eq('user_id', uid)
+          .order('created_at', ascending: true) as List;
+      return rows.cast<Map<String, dynamic>>();
+    }
+
+    // SQLite path (mobile) — table may not exist on older installs; guard it.
+    try {
+      final rows = await LocalDatabase.db.query(
+        'budgets',
+        where: 'user_id = ?',
+        whereArgs: [uid],
+        orderBy: 'created_at ASC',
+      );
+      return rows.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Upsert a budget row (insert or overwrite by id).
+  Future<void> upsertBudget(Map<String, dynamic> budget) async {
+    final uid = await ensureUser();
+    if (uid == null) throw StateError('No authenticated user');
+    final row = {...budget, 'user_id': uid};
+
+    if (_isWeb && _client != null) {
+      await _client.from('budgets').upsert(row);
+      return;
+    }
+
+    try {
+      await LocalDatabase.db.insert(
+        'budgets',
+        row,
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+    } catch (_) {
+      // Table may not exist on very old local DBs — silently skip.
+    }
+  }
+
+  /// Delete a budget row by id.
+  Future<void> deleteBudget(String id) async {
+    if (_isWeb && _client != null) {
+      await _client.from('budgets').delete().eq('id', id);
+      return;
+    }
+    try {
+      await LocalDatabase.db.delete('budgets', where: 'id = ?', whereArgs: [id]);
+    } catch (_) {}
+  }
+
+  // ---------------------------------------------------------------------------
+  // Recurring Rules (setall-recurring-detection — Supabase-direct on web)
+  // ---------------------------------------------------------------------------
+
+  /// Fetch all confirmed recurring rules for the current user.
+  Future<List<Map<String, dynamic>>> getRecurringRules() async {
+    final uid = await ensureUser();
+    if (uid == null) return [];
+    if (_client == null) return [];
+    final rows = await _client
+        .from('recurring_rules')
+        .select()
+        .eq('user_id', uid)
+        .eq('status', 'confirmed')
+        .order('created_at', ascending: false) as List;
+    return rows.cast<Map<String, dynamic>>();
+  }
+
+  /// Insert a confirmed recurring rule.
+  Future<void> insertRecurringRule(Map<String, dynamic> rule) async {
+    final uid = await ensureUser();
+    if (uid == null) throw StateError('No authenticated user');
+    if (_client == null) return;
+    await _client.from('recurring_rules').insert({...rule, 'user_id': uid});
+  }
+
+  /// Dismiss a recurring rule by id (set status = dismissed).
+  Future<void> dismissRecurringRule(String id) async {
+    if (_client == null) return;
+    await _client
+        .from('recurring_rules')
+        .update({'status': 'dismissed'})
+        .eq('id', id);
+  }
+
+  /// Delete a recurring rule by id.
+  Future<void> deleteRecurringRule(String id) async {
+    if (_client == null) return;
+    await _client.from('recurring_rules').delete().eq('id', id);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Proactive Alerts (setall-proactive-alerts — Supabase-direct on web)
+  // ---------------------------------------------------------------------------
+
+  /// Returns the alert_prefs row for the current user, or null if not set.
+  Future<Map<String, dynamic>?> getAlertPrefs() async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return null;
+    final rows = await _client
+        .from('alert_prefs')
+        .select()
+        .eq('user_id', uid)
+        .limit(1) as List;
+    if (rows.isEmpty) return null;
+    return (rows.first as Map<String, dynamic>);
+  }
+
+  /// Upsert alert_prefs for the current user.
+  Future<void> upsertAlertPrefs(Map<String, dynamic> prefs) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('alert_prefs').upsert({
+      ...prefs,
+      'user_id': uid,
+    }, onConflict: 'user_id');
+  }
+
+  /// Returns true if an alert_log row already exists for this (alertType, refKey).
+  Future<bool> alertLogContains({
+    required String alertType,
+    required String refKey,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return false;
+    final rows = await _client
+        .from('alert_log')
+        .select('id')
+        .eq('user_id', uid)
+        .eq('alert_type', alertType)
+        .eq('ref_key', refKey)
+        .limit(1) as List;
+    return rows.isNotEmpty;
+  }
+
+  /// Insert an alert_log entry to mark an alert as fired.
+  Future<void> insertAlertLog({
+    required String alertType,
+    required String refKey,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('alert_log').insert({
+      'user_id': uid,
+      'alert_type': alertType,
+      'ref_key': refKey,
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Insight Signal (setall-insight-self-improvement Stage 1)
+  // ---------------------------------------------------------------------------
+
+  /// Emit an insight_signal row. Fire-and-forget — caller does not await errors.
+  Future<void> insertInsightSignal({
+    required String sessionId,
+    required String messageId,
+    required String signalType,
+    Map<String, dynamic>? extra,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null || _client == null) return;
+    await _client.from('insight_signal').insert({
+      'user_id':     uid,
+      'session_id':  sessionId,
+      'message_id':  messageId,
+      'signal_type': signalType,
+      if (extra != null && extra.isNotEmpty) 'extra': extra,
+    });
   }
 
   /// Stream a unified activity feed: group + personal expenses, sorted newest-first.
