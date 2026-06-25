@@ -93,6 +93,14 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   leaves it null vs `upsertWalletEntry` freezing it). Corrected to a TRUE UNION: develop's dedup +
   `upsertWalletEntry` (freezes `base_currency_amount`). Group-destination branch unchanged (`addExpense` +
   `SplitInsert`). Lesson reinforced: a "clean" conflict resolution can still drop a feature's whole purpose.
+- ✅ C-6 `feat/soft-delete` → **SUPERSEDED, no merge** (2026-06-25). Soft-delete/restore is already on develop in a
+  more evolved form: repo tombstone writes + restore reads of `deleted_expenses`, the table created in
+  `local_database.dart` (LOCAL SQLite — soft-delete is deliberately offline-only, `sync_service.dart:739`),
+  restore UI with a **365-day** window (branch was a stale 90-day), and `soft_delete_integrity_test.dart`. The
+  branch (origin `ab998aa`, 58 behind) only added 5 **server-side** Supabase migrations for a synced
+  `public.deleted_expenses` table the app never uses + stale screen i18n reverts + 2 key-gen python scripts.
+  Cherry-picking would have reverted develop and orphaned a server table. Not dispatched. Open product question
+  (server-persisted tombstones for cross-device/post-reinstall restore) deferred to BACKLOG §E.
 
 ## 4. Open bugs / requested work (active backlog)
 
