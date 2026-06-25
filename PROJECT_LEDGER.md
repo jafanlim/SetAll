@@ -190,8 +190,8 @@ secret; surgical diffs (no whole-file reflow / broad `git add`); not done until 
 
 | # | Pri | Task | Maps to | Status |
 |---|---|---|---|---|
-| 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | **CODE DONE PR #26** — LIVE-VERIFY PENDING (user-gated) |
-| 2 | P1 | `setall-push-and-digest` | §4 item 5 | BLOCKED on TASK 1 live-verify |
+| 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | **CODE DONE (PR #26 + #27); APPLIED to prod — gateway 403 ELIMINATED.** 1 blocker left: `EDGE_SHARED_SECRET`≠Vault (gated secret op) |
+| 2 | P1 | `setall-push-and-digest` | §4 item 5 | BLOCKED on the `EDGE_SHARED_SECRET` fix above |
 | 3 | P1 | `net-balance-offset` (write short spec first) | carried TODO #1 | not started |
 | 4 | P1 | `setall-web-insights-datasource` | §4 item 4 | not started |
 | 5 | P1 | `setall-shared-expense-wallet-share` | §4 item 2 | not started |
@@ -216,15 +216,31 @@ atop this unfinished migration.
 - ⚠️ **PR #25 REJECTED before #26** — stale-fork feature-dropper (forked from develop@`2a29232`, pre-#22); its migration would
   have silently reverted #22's `SET search_path` hardening (Git reported MERGEABLE — pure migration ordering, no textual conflict).
   Branch rebuilt onto current develop + re-dispatched.
-- ☐ **LIVE-VERIFY (user-gated — `flutter analyze` can't prove this).** Vault `secret_key` prereq DONE (user steps 1–4). Remaining
-  ops (user runs with controller guidance): (a) apply `20260625010000` via **Dashboard SQL editor** (NOT `supabase db push` —
-  documented repo↔live migration-history divergence); (b) `supabase functions deploy bug-triage monthly-digest
-  send-group-notification sync-exchange-rates weekly-analysis --project-ref vrsmsgyxeyzyrdonsnrk`; (c) update the external
-  sync-exchange-rates 24h scheduler to send the new `apikey`; (d) verify Unified Logs show **200 not 403** +
-  `monthly-digest?test=akostnz@gmail.com` arrives + welcome/reset emails still work. **Open scoping Q:** are
-  `send-email`/`send-welcome-email` invoked via Dashboard Auth Hooks or via DB triggers `send_email_hook`/`on_profile_created`?
-  If DB triggers, they 403 too and need a 2-line apikey follow-up migration (step (d) doubles as the probe).
-  **TASK 2 does not start until (d) passes.**
+- ✅ **FOLLOW-UP MERGED — PR #27** (`develop` squash `1751935`, 2026-06-26). The open scoping Q is **answered**: `send-email`
+  (auth hook `hook_send_email`) and `send-welcome-email` (trigger `on_profile_created`) ARE invoked via DB pg-functions →
+  both 403'd too. Plus a 3rd gap found live: the `sync-exchange-rates-daily` pg_cron (NOT an external scheduler as previously
+  assumed) carried a literal un-substituted `Bearer <SERVICE_ROLE_KEY>` placeholder. New migration `20260625020000` adds the
+  Vault apikey to all 3. (`send-email`/`send-welcome-email` fns are Resend-only — no dead-key dependency, so the gateway fix
+  fully restores them.)
+- ✅ **APPLIED TO PROD + VERIFIED (controller, via MCP + CLI, 2026-06-26).** Vault `secret_key` prereq was DONE (user steps 1–4).
+  - Migrations `20260625010000` + `20260625020000` applied (`apply_migration`). Re-queried all **7 DB→edge call sites** →
+    **all carry `apikey`** (4 fns: trigger_bug_triage / notify_group_members / on_profile_created / hook_send_email; 3 crons:
+    send-monthly-digest / weekly-analysis / sync-exchange-rates-daily), `SET search_path` intact, placeholder gone.
+  - Deployed the 5 fns via CLI with `--no-verify-jwt`. **Caught + fixed a drift:** `bug-triage`/`monthly-digest`/
+    `send-group-notification` were live at `verify_jwt=true` (a prior deploy flipped them) → would 401 cron/trigger calls
+    before our gate; all 5 now `verify_jwt=false` (per-fn `config.toml` is NOT read by the CLI — only central `supabase/config.toml`
+    or the `--no-verify-jwt` flag).
+  - **Digest live-test** (`net.http_post` to `monthly-digest?test=akostnz@gmail.com`, secret read from Vault in-DB):
+    **403 GONE** — request now reaches the function. (Returned the function's own response, not a gateway reject.)
+- ⛔ **ONE BLOCKER LEFT (gated secret op — user must run):** digest test returned **401 `{"error":"unauthorized"}`** = the
+  function's `x-edge-secret` gate. Diagnosed via SHA-256 digest compare (no secret exposed): the edge-fn env `EDGE_SHARED_SECRET`
+  (digest `64f6…`) ≠ Vault `edge_shared_secret` (sha `803e…`). These were meant to be identical (PR #23/#24 design: triggers send
+  Vault value, fns check `EDGE_SHARED_SECRET` env). Fix = align them: `supabase secrets set EDGE_SHARED_SECRET=<the exact Vault
+  edge_shared_secret value> --project-ref vrsmsgyxeyzyrdonsnrk` (no redeploy needed — fn secrets are injected at invocation).
+  Then re-run the digest test → expect 200 + email. **NOT a TASK 1 code issue** (the key migration is complete + verified); this is
+  the separate x-edge-secret enforcement secret. **TASK 2 does not start until this 401→200 flips.**
+- ⚠️ **Separate prod-divergence flag (NOT TASK 1):** live `supabase_migrations` is missing `20260624000000` (C-3 group-identity,
+  PR #13) — group icon/colour fixes aren't on prod. Tracked under Phase-1; verify-and-apply separately.
 
 ### Backlog detail
 
