@@ -101,6 +101,15 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   `public.deleted_expenses` table the app never uses + stale screen i18n reverts + 2 key-gen python scripts.
   Cherry-picking would have reverted develop and orphaned a server table. Not dispatched. Open product question
   (server-persisted tombstones for cross-device/post-reinstall restore) deferred to BACKLOG §E.
+- ✅ C-7 `feat/recurring` → merged to `develop` via PR #17 (2026-06-25, squash `f9fad76`). Clean cherry-pick of
+  `ac38e9b` (4 NEW files: recurring_candidate / recurring_detection_service / recurring_screen + migration
+  `20260607000002_recurring_rules.sql` with full RLS) — zero conflicts, no existing files touched. Harvested the
+  recurring slice of `bc7e056`: `recurringCandidatesProvider` + `recurringRulesProvider` + `recurring`→`RecurringScreen`
+  route (additive, zero deletions). **Money-rule fix (controller-required):** `RecurringCandidate.amount` `double`→`Decimal`;
+  the service emits `Decimal.parse(<real expense closest to modal>.amount)` instead of the float `modalAmount`; screen
+  displays via `formatAmountForCurrency` and persists `amount.toString()` (numeric column); the ±10% clustering and
+  `confidence` stay `double` (heuristics, not stored money). `setall_repository.dart` untouched; revert-guard tokens match.
+  analyze green, 343/343 tests. The visible settings entry-tile is deferred to C-10 (needs `settings_ext.recurring*` keys).
 
 ## 4. Open bugs / requested work (active backlog)
 
