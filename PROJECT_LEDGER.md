@@ -135,6 +135,21 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   **➡ This completes the `bc7e056` (chore/shared-wiring) harvest** — data layer (C-4) + all four wiring slices (ingest C-5, recurring
   C-7, budget C-8, alerts C-9) are now on develop. Only the settings entry-tiles remain to lift in C-10; then `bc7e056` is purged
   (tag `archive/shared-wiring` before deleting, to preserve the SHA this ledger cites).
+- ✅ C-10 `chore/i18n-keys` → merged to `develop` via PR #20 (2026-06-25, squash `8da8d6b`). NOT a cherry-pick: branch
+  `42967d0` was 65 commits stale — a merge would have dropped develop's 40 `receipt.*` keys (from the merged AI-receipt
+  feature) and reverted an already-i18n'd screen. Instead an **additive key union**: 107 keys that landed feature screens
+  already call (ingest 29 / expense_detail 19 / alerts 19 / budget 14 / activity_screen 9 / recurring 9 / settings_ext 6 /
+  wallet_screen 2) were merged into all 6 locales (en/de/es/fr/ka/ru) via a throwaway add-if-missing script (deleted, not
+  committed) — real translations where the branch had them, English fallback for the 31 EN-only keys. **Controller-verified
+  invariants on the PR head** (independent flat-dict diff develop↔PR): every locale lost=0 develop keys, valChanged=0 develop
+  values, new107=107 present, `receipt.*`=40 with 0 changed; the sole parity gap (`dashboard.personal_wallet_title` absent
+  from non-en) PRE-EXISTED on develop and is not among the 107. **Part B:** the 3 deferred settings entry-tiles (Budgets→
+  `AppRouter.budgets`, Recurring→`AppRouter.recurring`, Alert-prefs→`AppRouter.alertPrefs`, `settings_ext.*` labels) added to
+  develop's settings_screen via the existing `_NavRow` pattern (0 deletions — additive; routes resolve from C-7/8/9). **Dropped
+  from the stale branch:** `group_expense_detail_screen.dart` (develop already references `expense_detail.*` 15×; 223 lines
+  diverged) and 8 `scripts/add_*_keys.py` (one-shot generators). analyze green, 343/343 tests.
+  **➡ `chore/shared-wiring` (bc7e056) PURGED** post-merge (fully harvested across C-4/5/7/8/9/10); SHA preserved as tag
+  `archive/shared-wiring`. **Phase-0 integration queue now: only C-11 (website) + C-12 (ai-provider-cache) remain.**
 
 ## 4. Open bugs / requested work (active backlog)
 
