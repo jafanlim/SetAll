@@ -20,6 +20,7 @@ import '../../../../core/utils/split_engine.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
+import '../../../alerts/data/alert_service.dart';
 import '../../../../domain/entities/expense.dart';
 
 // Currency catalogue re-exported via setall_providers.dart → currencies.dart.
@@ -390,7 +391,34 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
         universalUsdAmount: usdAmount.toString(),
       );
       await repo.upsertWalletEntry(entry);
-      unawaited(ref.read(syncServiceProvider).writeWidgetData());
+      // Capture refs before navigation disposes the widget.
+      final alertSvc   = ref.read(alertServiceProvider);
+      final alertQueue = ref.read(alertQueueProvider.notifier);
+      final syncSvc    = ref.read(syncServiceProvider);
+      // Fire-and-forget proactive alert checks for new personal expenses.
+      if (!_isIncome && existing == null) {
+        unawaited(_runAlertChecks(
+          expenseId:   entry.id,
+          category:    _category,
+          amount:      amount,
+          currency:    _currency,
+          repo:        repo,
+          alertSvc:    alertSvc,
+          alertQueue:  alertQueue,
+          payload:     {
+            'id':          entry.id,
+            'amount':      entry.amount,
+            'currency':    entry.currency,
+            'description': entry.description,
+            'category':    entry.category,
+            'isIncome':    entry.isIncome,
+            'createdAt':   entry.createdAt,
+            'iconCodepoint': entry.iconCodepoint,
+            'iconColor':   entry.iconColor,
+          },
+        ));
+      }
+      unawaited(syncSvc.writeWidgetData());
       if (mounted) {
         setState(() => _isSubmitting = false);
         HapticUtils.success(); // HAPTIC-01: wallet creation — heavy confirms high-value action
@@ -537,6 +565,92 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
           SnackBar(content: Text('add_expense.could_not_save_expense'.tr())),
         );
       }
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Proactive alert checks (fire-and-forget after new personal expense)
+  // ---------------------------------------------------------------------------
+
+  Future<void> _runAlertChecks({
+    required String expenseId,
+    required String category,
+    required Decimal amount,
+    required String currency,
+    required SetAllRepository repo,
+    required ProactiveAlertService alertSvc,
+    required AlertQueueNotifier alertQueue,
+    Map<String, dynamic>? payload,
+  }) async {
+    try {
+      final prefs = await alertSvc.getPrefs();
+      if (!prefs.anomalyEnabled && !prefs.budget80Enabled && !prefs.budget100Enabled) {
+        return;
+      }
+
+      final baseCurrency = await repo.getCurrentUserProfile()
+          .then((p) => p?.defaultCurrency ?? 'USD');
+
+      // ── Anomaly check ────────────────────────────────────────────────────
+      if (prefs.anomalyEnabled) {
+        // Compute category mean over the past N months (excluding current month).
+        final now = DateTime.now();
+        final historyFrom = DateTime(now.year, now.month - prefs.anomalyMonths, 1);
+        final historyTo   = DateTime(now.year, now.month, 0, 23, 59, 59);
+
+        final histMap = await repo.getCategorySpend(
+            historyFrom, historyTo,
+            baseCurrency: baseCurrency);
+
+        // Mean = total historical spend for category / N months.
+        final historicalTotal = histMap[category] ?? Decimal.zero;
+        final mean = (historicalTotal / Decimal.fromInt(prefs.anomalyMonths))
+            .toDecimal(scaleOnInfinitePrecision: 6);
+
+        // Convert current expense amount to base currency using USD pivot.
+        final rateToUsd = await repo.resolveRateToUsd(currency);
+        final amountUsd = (amount * rateToUsd).round(scale: 6);
+
+        final anomalyAlerts = await alertSvc.checkAnomaly(
+          prefs: prefs,
+          categorySpendThisMonth: {},
+          categorySpendHistory: {},
+          categoryMean: {category: mean},
+          latestExpenseId: expenseId,
+          latestCategory: category,
+          latestAmountBase: amountUsd,
+          expenseGroupId: widget.groupId.isEmpty ? null : widget.groupId,
+          payload: payload,
+        );
+        if (anomalyAlerts.isNotEmpty) {
+          alertQueue.enqueue(anomalyAlerts);
+        }
+      }
+
+      // ── Budget threshold check ──────────────────────────────────────────
+      if (prefs.budget80Enabled || prefs.budget100Enabled) {
+        final now = DateTime.now();
+        final monthFrom = DateTime(now.year, now.month, 1);
+        final monthTo   = DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+
+        final spendMap = await repo.getCategorySpend(
+            monthFrom, monthTo,
+            baseCurrency: baseCurrency);
+        final totalSpend = spendMap.values.fold(Decimal.zero, (a, b) => a + b);
+        final budgets = await repo.getBudgets();
+
+        final budgetAlerts = await alertSvc.checkBudgets(
+          prefs: prefs,
+          budgets: budgets,
+          categorySpend: spendMap,
+          totalSpend: totalSpend,
+        );
+        if (budgetAlerts.isNotEmpty) {
+          alertQueue.enqueue(budgetAlerts);
+        }
+      }
+    } catch (e) {
+      debugPrint('[_runAlertChecks] $e');
     }
   }
 

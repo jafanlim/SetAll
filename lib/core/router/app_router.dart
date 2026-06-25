@@ -42,6 +42,7 @@ import '../../features/insights/presentation/screens/insights_screen.dart';
 import '../../features/receipt/presentation/scan_destination_screen.dart';
 import '../../features/budget/presentation/screens/budgets_screen.dart';
 import '../../features/recurring/presentation/screens/recurring_screen.dart';
+import '../../features/alerts/presentation/screens/alert_prefs_screen.dart';
 
 final class AppRouter {
   AppRouter._();
@@ -83,6 +84,7 @@ final class AppRouter {
   static const String scanReceipt = '/scan-receipt';
   static const String budgets    = '/budgets';
   static const String recurring   = '/recurring';
+  static const String alertPrefs  = '/alert-prefs';
   static const String download = '/download';
   static const String privacy  = '/privacy';
   static const String terms    = '/terms';
@@ -626,6 +628,18 @@ final class AppRouter {
             child: Material(
               color: Theme.of(context).colorScheme.surface,
               child: const RecurringScreen(),
+            ),
+          ),
+        ),
+
+        // ── Alert preferences screen ─────────────────────────────────────────
+        GoRoute(
+          path: alertPrefs,
+          name: 'alertPrefs',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const AlertPrefsScreen(),
             ),
           ),
         ),

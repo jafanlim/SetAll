@@ -18,6 +18,7 @@ import '../../features/wallet/data/ingest_row.dart';
 import '../../features/wallet/data/ingest_service.dart';
 import '../../features/recurring/data/recurring_candidate.dart';
 import '../../features/recurring/data/recurring_detection_service.dart';
+import '../../features/alerts/data/alert_service.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -574,3 +575,38 @@ final budgetProgressProvider =
     );
   }).toList();
 });
+
+// ---------------------------------------------------------------------------
+// setall-proactive-alerts providers
+// ---------------------------------------------------------------------------
+
+/// Singleton alert service.
+final alertServiceProvider = Provider<ProactiveAlertService>((ref) {
+  return ProactiveAlertService(ref.watch(setAllRepositoryProvider));
+});
+
+/// User's alert preferences (FutureProvider — re-read on invalidate).
+final alertPrefsProvider = FutureProvider<AlertPrefs>((ref) async {
+  return ref.watch(alertServiceProvider).getPrefs();
+});
+
+/// Live in-app alert queue.  Notifier accumulates alerts; UI dismisses them.
+class AlertQueueNotifier extends Notifier<List<ProactiveAlert>> {
+  @override
+  List<ProactiveAlert> build() => [];
+
+  void enqueue(List<ProactiveAlert> alerts) {
+    if (alerts.isEmpty) return;
+    state = [...state, ...alerts];
+  }
+
+  void dismiss(String refKey) {
+    state = state.where((a) => a.refKey != refKey).toList();
+  }
+
+  void clear() => state = [];
+}
+
+final alertQueueProvider =
+    NotifierProvider<AlertQueueNotifier, List<ProactiveAlert>>(
+        AlertQueueNotifier.new);
