@@ -51,6 +51,18 @@ serve(async (req) => {
     return new Response('ok', { headers: CORS_HEADERS })
   }
 
+    // x-edge-secret gate (P1): only the DB trigger/cron (which sends this header
+    // from Vault edge_shared_secret) may invoke this function. verify_jwt=false,
+    // so this header check is the ONLY auth on the function body.
+    const expected = Deno.env.get('EDGE_SHARED_SECRET') ?? ''
+    const provided = req.headers.get('x-edge-secret') ?? ''
+    if (expected.length === 0 || provided !== expected) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      })
+    }
+
   try {
     const supabaseAdmin = createClient(SUPABASE_URL, SERVICE_KEY)
     const url           = new URL(req.url)
