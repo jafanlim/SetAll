@@ -6,7 +6,6 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/services/csv_adapter.dart';
@@ -14,7 +13,6 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/profile_model.dart';
-import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
