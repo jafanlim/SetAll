@@ -1,7 +1,7 @@
 // Supabase Edge Function: send monthly spending digest emails.
 // Scheduled via pg_cron: 0 9 1 * * (1st of each month, 09:00 UTC)
 // Deploy: supabase functions deploy monthly-digest --no-verify-jwt
-// Requires secrets: RESEND_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+// Requires secrets: RESEND_API_KEY, SUPABASE_URL, SUPABASE_SECRET_KEYS
 //
 // ?test=email@address.com — send to EXACTLY ONE user, uses current month data.
 //   Returns early — cron path never runs in test mode.
@@ -11,7 +11,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY') ?? ''
 const SUPABASE_URL   = Deno.env.get('SUPABASE_URL')   ?? ''
-const SERVICE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const SERVICE_KEY    = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default'] ?? ''
 const FROM_ADDRESS   = 'noreply@setall.app'
 const APP_URL        = 'https://setall.app'
 
