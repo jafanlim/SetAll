@@ -119,6 +119,22 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   **No money fix needed** — already Decimal-correct (`Decimal.tryParse` input → `amount.toString()` persist; amount/spend Decimal;
   only `fraction` double). `setall_repository.dart` untouched; revert-guard matches. analyze green, 343/343 tests. Budgets is
   reachable via the wallet "Budget →" link (settings tile still deferred to C-10).
+- ✅ C-9 `feat/alerts-insights` → merged to `develop` via PR #19 (2026-06-25, squash `ab00f52`). Cherry-pick of `c8a94e3`
+  (NEW alert_service / alert_prefs_screen / alert_banner + 2 RLS migrations `20260608000001_proactive_alerts` [alert_prefs +
+  alert_log, 2 ENABLE-RLS / 7 policies] and `20260608000002_insight_signal` [1 ENABLE-RLS / 4 policies]; MODIFIED adaptive_shell
+  [wraps content in `AlertBannerOverlay` + a locale-sync microtask], add_expense_screen [fire-and-forget `_runAlertChecks` after a
+  new personal expense], insights_provider [`insertInsightSignal` on dismiss/followup/shown]). ONE conflict (insights_provider):
+  resolved correctly — kept develop's Dart-3 `'context': ?contextPayload` AND folded in the 3 `insertInsightSignal` calls (both
+  verified present; old `if (contextPayload != null)` form gone). Harvested the alert slice of `bc7e056`: `alertServiceProvider` +
+  `alertPrefsProvider` + `AlertQueueNotifier` + `alertQueueProvider` + `alertPrefs`→`AlertPrefsScreen` route (additive; no dup of
+  the budget/recurring/ingest providers already on develop). **Money-rule fix (controller-required):** budget threshold was
+  `double.tryParse(amount)` + `spend.toDouble()/limit` + `pct >= 1.0/0.8` → now `Decimal.tryParse(amount)` + `spend >= limit` /
+  `spend >= limit * Decimal.parse('0.8')`; anomaly threshold was `Decimal.parse((mean.toDouble()*k).toStringAsFixed(6))` → now
+  `mean * Decimal.tryParse(anomalyK.toString())` (exact Decimal×Decimal). Only `anomalyK` (sensitivity coefficient, not money) stays
+  double. `setall_repository.dart` untouched; revert-guard matches. analyze green, 343/343 tests. Settings entry-tile deferred to C-10.
+  **➡ This completes the `bc7e056` (chore/shared-wiring) harvest** — data layer (C-4) + all four wiring slices (ingest C-5, recurring
+  C-7, budget C-8, alerts C-9) are now on develop. Only the settings entry-tiles remain to lift in C-10; then `bc7e056` is purged
+  (tag `archive/shared-wiring` before deleting, to preserve the SHA this ledger cites).
 
 ## 4. Open bugs / requested work (active backlog)
 
