@@ -60,27 +60,54 @@ groups-overhaul / shared-wiring / i18n-keys — integrate in the order above.
 - ~~`develop` (374 behind, 0 ahead) → hard-reset to `origin/main`~~ **DONE / superseded**:
   `develop` is already the integration trunk = `origin/main` + planning commit, and equals
   `Development-june`. **Do NOT hard-reset develop** — it is live and ahead of main. (Verified 2026-06-24.)
-- After C completes and `develop` is verified, merge `develop → main` and re-tag.
+- ✅ **DONE (2026-06-25):** `main` fast-forwarded to `develop` (`e120315` → `fff1b9d`, clean 34-commit ff, NO version
+  tag → no release-build CI). main == develop == `fff1b9d`. No re-tag/release yet (user chose "FF now, no tag");
+  a `v*` release tag remains a separate future action when shipping.
 
-### E. Deferred branch decisions (USER call — do not auto-delete)
+### Phase-0 CLOSE-OUT — ✅ COMPLETE (2026-06-25)
+All Phase-0 integration done (11 merged, 2 superseded). Remote cleaned to **only `main` + `develop`** (both `fff1b9d`).
+Every purged branch is preserved as an `archive/<name>` tag (recoverable: `git switch -c <name> archive/<name>`).
+**13 archive tags pushed to remote:**
+| archive tag | SHA | was |
+|---|---|---|
+| archive/group-identity-persistence | 056f815 | fix/group-identity-persistence (C-3) |
+| archive/shared-wiring-datalayer | e5e216b | chore/shared-wiring-datalayer (C-4 source) |
+| archive/shared-wiring | bc7e056 | chore/shared-wiring (wiring source) |
+| archive/wallet-csv-import | 898abd5 | feat/wallet-csv-import (C-5) |
+| archive/recurring | ac38e9b | feat/recurring (C-7) |
+| archive/budget | 166c675 | feat/budget (C-8) |
+| archive/alerts-insights | c8a94e3 | feat/alerts-insights (C-9) |
+| archive/i18n-keys | 42967d0 | chore/i18n-keys (C-10) |
+| archive/crit-01-ai-provider-cache | 9d0536e | fix/crit-01-ai-provider-cache (C-12) |
+| archive/integrate-shared-wiring | 2d20ca7 | integrate/shared-wiring (scratch) |
+| archive/groups-overhaul | 5ad69df | feature/groups-overhaul (deferred UI) |
+| archive/soft-delete | ab998aa | feat/soft-delete (deferred cloud-restore) |
+| archive/website-2-0-integration | d5ca365 | feature/website-2-0-integration (superseded) |
+
+**4 ancestor branches deleted WITHOUT a tag** (permanently reachable from `develop`'s history, so no tag needed):
+`fix/security-rls-audit` (4887203, C-1), `chore/edge-fn-configs` (b3e84c5, C-2), `chore/chat-eval` (df70e9f, C-13),
+`Development-june` (4517fcf, old integration trunk).
+
+### E. Deferred branch decisions — ✅ RESOLVED (2026-06-25): user said delete all; archived + branches deleted
 - **`feature/groups-overhaul`** (origin `5ad69df`) — bug #3 (identity persistence) was fixed
   separately in C-3 (PR #13), but this branch still holds ~735 lines of UNMERGED group-customization
   **UI**: `create_group_screen.dart` (+514), `groups_screen.dart`, `group_detail_screen.dart`, repo glue.
-  427 behind, conflicts in 7/8 files vs develop. **Decision pending:** (a) keep as a future
-  "group-customization UI overhaul" task and integrate later, or (b) discard as superseded/stale.
-  Not purged until the user decides.
+  427 behind, conflicts in 7/8 files vs develop. ✅ **RESOLVED (2026-06-25): branch DELETED** (user chose delete-all);
+  code preserved as tag **`archive/groups-overhaul`** (5ad69df). NOTE: this UI was NOT on develop — to revisit the
+  group-customization overhaul, resurrect from the tag: `git switch -c groups-overhaul archive/groups-overhaul`.
 - **`feat/soft-delete`** (origin `ab998aa`) — soft-delete is already on develop (C-6 superseded). The branch's
   ONLY non-stale content is 5 **server-side** Supabase migrations for a synced `public.deleted_expenses` table.
   develop chose **local-only** soft-delete (tombstones never leave the device — `sync_service.dart:739`). So the
   branch represents an UNBUILT capability: **cross-device / post-reinstall restore** (server-persisted tombstones).
-  **Decision pending:** (a) keep the branch as a future "cloud restore" product task, or (b) discard as a rejected
-  design. Default = keep. Not purged until the user decides.
+  ✅ **RESOLVED (2026-06-25): branch DELETED** (user chose delete-all); code preserved as tag **`archive/soft-delete`**
+  (ab998aa). NOTE: the server-side cross-device-restore migrations were NOT on develop (develop is local-only) — to build
+  "cloud restore" later, resurrect from the tag: `git switch -c soft-delete archive/soft-delete`.
 - **`feature/website-2-0-integration`** (origin `d5ca365`, 351 behind) — **SUPERSEDED** (C-11). develop already shipped
   Website 2.0 and evolved it far beyond this branch (full i18n in 6 locales, portal group-spending cards, insights AI
   currency conversion, password-reset page, `web/app.html` build, the 9-page `production_legitimacy_test`). The branch holds
-  nothing develop lacks — its login.html doesn't even wire login→portal (develop's does). **Decision pending:** almost
-  certainly (b) discard as superseded; keep only if the user wants the old static-storefront markup for reference.
-  Default = keep (not auto-deleted). Not purged until the user decides.
+  nothing develop lacks — its login.html doesn't even wire login→portal (develop's does). ✅ **RESOLVED (2026-06-25):
+  branch DELETED** (superseded; user chose delete-all). Code preserved as tag **`archive/website-2-0-integration`** (d5ca365)
+  in the unlikely event the old static-storefront markup is ever wanted.
 - **`chore/shared-wiring`** (origin `bc7e056`) — KEEP until C-9 done. Its data-layer is on develop (C-4/PR #15),
   but its **providers + routes + screen edits** for ingest/budget/recurring/alerts were deliberately NOT
   taken (they reference screens/services that arrive with the feature branches). Each feature PR must harvest

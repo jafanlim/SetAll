@@ -1,6 +1,11 @@
 # SetAll — Project Ledger (single source of truth)
 
-_Last updated: 2026-06-24. This file supersedes and consolidates the scattered journals:_
+> **STATUS 2026-06-25 — Phase-0 COMPLETE.** All 13 §C branches resolved (11 merged, 2 superseded). `main` fast-forwarded
+> to `develop`; both trunks = `fff1b9d`. Remote pruned to **only `main` + `develop`**; the 16 integrated/deferred branches
+> were deleted, with 13 preserved as `archive/*` tags (see BACKLOG §"Phase-0 CLOSE-OUT" for the tag↔SHA index) and 4
+> ancestors reachable from develop. **Next: Phase 1 (P1/P2 bug fixes), branched off `develop` as before.**
+
+_Last updated: 2026-06-25. This file supersedes and consolidates the scattered journals:_
 _`progress.md`, `project ledger.md`, `projectledger.md` (was on fix/crit-01), `wiki doc.md`,_
 _`BACKEND_STATUS.md`, `IMPLEMENTATION_CHECKLIST.md`, `session_feb27_2026.md`,_
 _`how workflow implemented.md`, `debug_protocol.md`, `docs/session-*.md`._
