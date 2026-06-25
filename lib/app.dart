@@ -159,8 +159,12 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
       unawaited(
         sync.performFullSync().then((_) {
           if (!mounted) return;
-          ref.invalidate(balanceSummaryProvider);
-          ref.invalidate(recentExpensesProvider);
+          if (isUserSwitch || isFirstLogin) {
+            _invalidateAllProviders(); // fresh data just landed — refresh everything
+          } else {
+            ref.invalidate(balanceSummaryProvider);
+            ref.invalidate(recentExpensesProvider);
+          }
         }),
       );
       // Sync FCM token to Supabase on first login so push notifications work.
@@ -272,6 +276,17 @@ class _SetAllAppState extends ConsumerState<SetAllApp>
     ref.invalidate(friendGroupsProvider);
     ref.invalidate(recentExpensesProvider);
     ref.invalidate(insightsProvider);
+    // Per-group/wallet/master providers — invalidate all instances so
+    // account-switch surfaces fresh data instead of stale cached state.
+    ref.invalidate(groupBalanceSummaryProvider); // family → invalidates all per-group instances
+    ref.invalidate(masterBalanceProvider);
+    ref.invalidate(walletBalanceProvider);
+    ref.invalidate(walletTotalsProvider);
+    ref.invalidate(walletEntryTotalsProvider);
+    ref.invalidate(personalExpensesProvider);
+    ref.invalidate(walletEntriesProvider);
+    ref.invalidate(omniActivityProvider);
+    ref.invalidate(simplifiedDebtsProvider);
   }
 
   static bool get _isDesktop =>
