@@ -487,3 +487,90 @@ final recurringRulesProvider =
     FutureProvider<List<Map<String, dynamic>>>((ref) async {
   return ref.watch(setAllRepositoryProvider).getRecurringRules();
 });
+
+// ---------------------------------------------------------------------------
+// setall-budgets: canonical spend query + budget providers
+// ---------------------------------------------------------------------------
+
+/// Parameters for [categorySpendProvider] family.
+typedef CategorySpendParams = ({DateTime from, DateTime to});
+
+/// Per-category spend in the user's base currency for the given date window.
+/// Owned by setall-budgets; setall-proactive-alerts reads this.
+/// Backed by [getCategorySpend] which filters [getPersonalExpenses()].
+final categorySpendProvider =
+    FutureProvider.family<Map<String, Decimal>, CategorySpendParams>(
+        (ref, params) async {
+  final baseCurrency = await ref.watch(baseCurrencyProvider.future);
+  // React to new expenses so budget progress updates live.
+  ref.watch(personalExpensesProvider);
+  return ref
+      .watch(setAllRepositoryProvider)
+      .getCategorySpend(params.from, params.to, baseCurrency: baseCurrency);
+});
+
+/// Raw budget rows for the current user.
+final budgetsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  ref.watch(baseCurrencyProvider);
+  return ref.watch(setAllRepositoryProvider).getBudgets();
+});
+
+/// One budget row with its current-period spend attached.
+class BudgetProgress {
+  const BudgetProgress({
+    required this.id,
+    required this.category,
+    required this.period,
+    required this.amount,
+    required this.currency,
+    required this.spend,
+  });
+
+  final String  id;
+  final String? category;   // null = overall
+  final String  period;
+  final Decimal amount;
+  final String  currency;
+  final Decimal spend;
+
+  double get fraction =>
+      amount > Decimal.zero
+          ? (spend / amount)
+              .toDecimal(scaleOnInfinitePrecision: 6)
+              .toDouble()
+              .clamp(0.0, 1.0)
+          : 0.0;
+  bool get isOver => spend >= amount;
+}
+
+/// Current-month budget progress for all budget rows.
+final budgetProgressProvider =
+    FutureProvider<List<BudgetProgress>>((ref) async {
+  final budgets = await ref.watch(budgetsProvider.future);
+  if (budgets.isEmpty) return [];
+
+  final now  = DateTime.now();
+  final from = DateTime(now.year, now.month);
+  final to   = DateTime(now.year, now.month + 1);
+
+  final spendMap = await ref.watch(
+    categorySpendProvider((from: from, to: to)).future,
+  );
+
+  // Overall spend = sum of all categories.
+  final totalSpend = spendMap.values.fold(Decimal.zero, (a, b) => a + b);
+
+  return budgets.map((b) {
+    final cat    = b['category'] as String?;
+    final spend  = cat == null ? totalSpend : (spendMap[cat] ?? Decimal.zero);
+    return BudgetProgress(
+      id:       b['id']       as String,
+      category: cat,
+      period:   (b['period']  as String?) ?? 'monthly',
+      amount:   Decimal.tryParse(b['amount'].toString()) ?? Decimal.zero,
+      currency: (b['currency'] as String?) ?? 'USD',
+      spend:    spend,
+    );
+  }).toList();
+});
