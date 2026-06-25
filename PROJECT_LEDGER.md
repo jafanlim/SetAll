@@ -150,6 +150,15 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   diverged) and 8 `scripts/add_*_keys.py` (one-shot generators). analyze green, 343/343 tests.
   **➡ `chore/shared-wiring` (bc7e056) PURGED** post-merge (fully harvested across C-4/5/7/8/9/10); SHA preserved as tag
   `archive/shared-wiring`. **Phase-0 integration queue now: only C-11 (website) + C-12 (ai-provider-cache) remain.**
+- ⚠️ C-11 `feature/website-2-0-integration` → **SUPERSEDED, no dispatch** (controller determination, 2026-06-25). Branch
+  `d5ca365` is 5 ahead / 351 behind; develop already shipped Website 2.0 and evolved it far past the branch. Evidence: all 5
+  "new" pages (login/portal/privacy/support/terms.html) already exist on develop → the full merge conflicts in ALL 9 files;
+  develop's `login.html` wires login→portal (3 `portal` refs) while the branch's does NOT (0); develop's Makefile already
+  builds from `web/app.html`; develop's pages are newer/bigger on 5 of 7; develop's web history adds full i18n (6 locales),
+  portal group-spending cards, insights AI currency conversion, a password-reset page — all post-dating the branch; and
+  `production_legitimacy_test` is tuned to develop's 9-page site. A merge/cherry-pick would silently revert develop's web work
+  and break the login→portal flow — the C-6 trap. No PR. Branch keep/discard deferred to USER (BACKLOG §E; recommend discard).
+  **Phase-0 integration queue now: only C-12 (ai-provider-cache) remains.**
 
 ## 4. Open bugs / requested work (active backlog)
 
