@@ -110,6 +110,15 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   displays via `formatAmountForCurrency` and persists `amount.toString()` (numeric column); the ±10% clustering and
   `confidence` stay `double` (heuristics, not stored money). `setall_repository.dart` untouched; revert-guard tokens match.
   analyze green, 343/343 tests. The visible settings entry-tile is deferred to C-10 (needs `settings_ext.recurring*` keys).
+- ✅ C-8 `feat/budget` → merged to `develop` via PR #18 (2026-06-25, squash `04c6ad9`). Clean cherry-pick of `166c675`
+  (NEW budgets_screen + migration `20260607000001_budgets.sql` with full RLS) + a `wallet_screen.dart` budget edit
+  ("Budget →" link + per-category `BudgetProgress` bar) that applied with ZERO conflicts — develop's wallet_screen was
+  byte-identical to the branch parent (`git diff develop 166c675^ = 0`). Harvested the budget provider section of
+  `bc7e056`: `categorySpendProvider` (also consumed by C-9 alerts) + `budgetsProvider` + `BudgetProgress` + `budgetProgressProvider`
+  + `budgets`→`BudgetsScreen` route (additive, zero deletions; no duplicate of the recurring/ingest providers already on develop).
+  **No money fix needed** — already Decimal-correct (`Decimal.tryParse` input → `amount.toString()` persist; amount/spend Decimal;
+  only `fraction` double). `setall_repository.dart` untouched; revert-guard matches. analyze green, 343/343 tests. Budgets is
+  reachable via the wallet "Budget →" link (settings tile still deferred to C-10).
 
 ## 4. Open bugs / requested work (active backlog)
 
