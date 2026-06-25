@@ -20,6 +20,7 @@ import '../../features/analytics/presentation/screens/analytics_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_type_screen.dart';
 import '../../features/wallet/presentation/screens/wallet_entry_detail_screen.dart';
+import '../../features/wallet/presentation/screens/import_ingest_screen.dart';
 import '../../features/dashboard/presentation/screens/group_expense_detail_screen.dart';
 import '../../data/models/expense_model.dart';
 import '../../data/models/wallet_entry_model.dart';
@@ -72,6 +73,7 @@ final class AppRouter {
   static const String walletEntryType       = '/wallet/add';
   static const String walletEntryDetail      = '/wallet/entry';
   static const String walletEntryEdit        = '/wallet/entry/edit/:id';
+  static const String walletImport           = '/wallet/import';
   static const String groupExpenseDetail     = '/group-expense-detail';
   static const String groupInfo              = '/group-info';
   static const String editGroup              = '/group/:id/edit';
@@ -367,6 +369,18 @@ final class AppRouter {
             child: Material(
               color: Theme.of(context).colorScheme.surface,
               child: const WalletEntryTypeScreen(),
+            ),
+          ),
+        ),
+
+        // ── Wallet: bank statement import (setall-ingestion-pipeline) ────
+        GoRoute(
+          path: walletImport,
+          name: 'walletImport',
+          pageBuilder: (context, state) => MaterialPage(
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              child: const ImportIngestScreen(),
             ),
           ),
         ),

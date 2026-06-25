@@ -14,6 +14,8 @@ import '../../data/models/expense_model.dart';
 import '../../data/models/profile_model.dart';
 import '../../data/models/wallet_entry_model.dart';
 import '../../data/models/ai_insight_model.dart';
+import '../../features/wallet/data/ingest_row.dart';
+import '../../features/wallet/data/ingest_service.dart';
 import '../../domain/entities/activity_event.dart';
 export '../constants/currencies.dart';
 
@@ -401,6 +403,60 @@ final aiInsightsProvider = FutureProvider<List<AiInsightModel>>((ref) async {
     return [];
   }
 });
+
+// ---------------------------------------------------------------------------
+// setall-ingestion-pipeline providers
+// ---------------------------------------------------------------------------
+
+/// IngestService singleton — depends on repository for getUserCategories + upsertWalletEntry.
+final ingestServiceProvider = Provider<IngestService>((ref) {
+  return IngestService(repository: ref.watch(setAllRepositoryProvider));
+});
+
+/// Mutable list of pending IngestRows for the review screen.
+/// Notifier exposes mutation helpers (approve, reject, edit, setAll).
+class IngestNotifier extends Notifier<List<IngestRow>> {
+  @override
+  List<IngestRow> build() => [];
+
+  void setRows(List<IngestRow> rows) => state = List.unmodifiable(rows);
+
+  void clear() => state = [];
+
+  void approveAll() {
+    state = List.unmodifiable(
+      state.map((r) => r.status == IngestRowStatus.rejected
+          ? r
+          : r.copyWith(status: IngestRowStatus.approved)).toList(),
+    );
+  }
+
+  void toggleStatus(String id) {
+    state = List.unmodifiable(state.map((r) {
+      if (r.id != id) return r;
+      final next = r.status == IngestRowStatus.approved
+          ? IngestRowStatus.rejected
+          : r.status == IngestRowStatus.rejected
+              ? IngestRowStatus.pending
+              : IngestRowStatus.approved;
+      return r.copyWith(status: next);
+    }).toList());
+  }
+
+  void editRow(String id, {String? description, String? category, bool? isIncome}) {
+    state = List.unmodifiable(state.map((r) {
+      if (r.id != id) return r;
+      return r.copyWith(
+        description: description,
+        category:    category,
+        isIncome:    isIncome,
+      );
+    }).toList());
+  }
+}
+
+final ingestRowsProvider =
+    NotifierProvider<IngestNotifier, List<IngestRow>>(IngestNotifier.new);
 
 /// Tracks the active app locale so providers without BuildContext can read languageCode.
 /// Updated by adaptive_shell on every build.
