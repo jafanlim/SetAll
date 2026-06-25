@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/services/csv_adapter.dart';
@@ -13,6 +14,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/profile_model.dart';
+import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
 import '../../../../domain/entities/expense.dart';
 
@@ -165,17 +167,17 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
           if (mounted) setState(() => _imported = count + skipped);
           continue;
         }
-        await repo.addExpense(
-          groupId:     null,
-          payerId:     uid,
-          amount:      row.cost,
-          description: row.description,
-          currency:    row.currency,
-          splitType:   SplitType.even,
-          splits:      [SplitInsert(userId: uid, universalUsdOwed: row.cost)],
-          category:    _mapCategory(row.category),
-          isIncome:    row.isIncome,
-          entryDate:   row.date,
+        await repo.upsertWalletEntry(
+          WalletEntryModel(
+            id:          const Uuid().v4(),
+            userId:      uid,
+            amount:      row.cost.toString(),
+            description: row.description,
+            category:    _mapCategory(row.category),
+            currency:    row.currency,
+            isIncome:    row.isIncome,
+            createdAt:   row.date.toUtc().toIso8601String(),
+          ),
         );
         count++;
         if (mounted) setState(() => _imported = count + skipped);
