@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
@@ -56,6 +57,16 @@ const _kAiOffline = '__offline__'; // no connectivity
 // AI insight provider — cached result keyed to the current user session.
 // Invalidate on manual refresh or app re-open.
 final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
+  // AI Insight Cache Strategy (CRIT-01)
+  // keepAlive prevents autoDispose on Dashboard navigation.
+  // Timer closes the link after 15 minutes, allowing Riverpod to clean up.
+  // ref.onDispose cancels the timer if the provider is manually invalidated
+  // (e.g., pull-to-refresh) before the 15-minute window expires.
+  final link = ref.keepAlive();
+  Timer? cacheTimer;
+  ref.onDispose(() => cacheTimer?.cancel());
+  cacheTimer = Timer(const Duration(minutes: 15), () => link.close());
+
   final analyticsData = await ref.watch(analyticsDataProvider.future);
 
   // Empty state: no expenses and no income — skip the network call entirely.
