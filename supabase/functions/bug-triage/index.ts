@@ -5,7 +5,7 @@
 // 3. Sends a formatted email to contact@setall.app via Resend.
 //
 // Secrets required (all already set):
-//   GROQ_API_KEY, RESEND_API_KEY, SUPABASE_SERVICE_ROLE_KEY
+//   GROQ_API_KEY, RESEND_API_KEY, SUPABASE_SECRET_KEYS
 //
 // Deploy: supabase functions deploy bug-triage --no-verify-jwt
 
@@ -17,7 +17,7 @@ const GROQ_MODEL    = 'llama-3.3-70b-versatile'
 const GROQ_URL      = 'https://api.groq.com/openai/v1/chat/completions'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')           ?? ''
 const SUPABASE_URL  = Deno.env.get('SUPABASE_URL')              ?? ''
-const SERVICE_KEY   = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const SERVICE_KEY   = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default'] ?? ''
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',

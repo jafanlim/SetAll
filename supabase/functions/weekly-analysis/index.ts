@@ -18,7 +18,7 @@ const GROQ_API_KEY = Deno.env.get('GROQ_API_KEY') ?? ''
 const GROQ_MODEL   = 'llama-3.3-70b-versatile'
 const GROQ_URL     = 'https://api.groq.com/openai/v1/chat/completions'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')              ?? ''
-const SERVICE_KEY  = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+const SERVICE_KEY  = JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default'] ?? ''
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin':  '*',
