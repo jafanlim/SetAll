@@ -72,6 +72,12 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   RPC (COALESCE partial + `p_clear_avatar`); swallowed `catch(_){}` removed. Controller caught + bounced a
   partial-update clobber regression before merge. `feature/groups-overhaul` NOT purged — retains ~735 lines
   of unmerged group-customization UI; keep/discard is a user decision (BACKLOG §C-3 / §E).
+- ✅ C-4 `chore/shared-wiring` data-layer → merged to `develop` (PR #15, 2026-06-25). SURGICAL ADDITIVE
+  extraction: only the 15 new repo methods (budgets/recurring/alerts/insights) + `netlifyIngestUrl`, verbatim
+  from `bc7e056`, zero existing lines touched. First attempt (PR #14, full `cherry-pick`) was CLOSED — it
+  silently reverted develop's `delete_group`/`leave_group` RPCs, restoreExpense `original_amount`, and
+  `settled_by` (stale-branch clean-merge). `chore/shared-wiring` KEPT: its providers/routes/screen wiring
+  must be harvested per-feature (C-5/7/8/9) from `bc7e056` — see BACKLOG §E.
 
 ## 4. Open bugs / requested work (active backlog)
 

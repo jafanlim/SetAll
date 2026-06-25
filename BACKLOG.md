@@ -40,7 +40,8 @@ legacy/initial-ios-debug · security-review-last-10-prs
 2. ✅ **DONE** `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests — merged to `develop` via PR #10 (2026-06-24). 18-assertion pgTAP RLS suite covers all 3 C-1 gaps.
 3. ✅ **DONE (targeted, not a branch merge)** bug #3 fixed via `fix/group-identity-persistence` → merged to `develop` (PR #13, 2026-06-24, squash `b150a7a`). Migration `20260624000000`: `color_value`→`bigint` (ARGB overflow was the real root cause the spec missed), `default_currency` column added, `create_group` extended to set identity atomically, new `update_group_identity` RPC (creator-gated, SECURITY DEFINER, COALESCE for partial updates + `p_clear_avatar` flag). Dart: `createGroup`/`updateGroupCustomization` + sync push routed through RPCs, all swallowed `catch(_){}` removed; pull-merge COALESCE preserved. Controller caught + bounced ONE regression before merge (the edit-path RPC nulled untouched columns on partial edits — would have wiped icon/colour on avatar-only create calls).
    ⚠️ **`feature/groups-overhaul` (origin `5ad69df`) NOT purged** — it still carries ~735 lines of UNMERGED group-customization UI (create_group_screen +514, groups_screen, group_detail_screen, repo glue) that the targeted fix did NOT include. Keep-for-later-UI-task vs discard is a USER decision — do not delete until confirmed (see §E).
-4. `chore/shared-wiring` — repo/router/providers glue the features depend on
+4. ✅ **DONE (surgical additive, NOT a cherry-pick)** `chore/shared-wiring` data-layer → merged to `develop` via PR #15 (2026-06-25, squash `550bccd`). Added ONLY the 15 genuinely-new repo methods (budgets/recurring/alerts/insights: getBudgets/upsertBudget/deleteBudget, getRecurringRules/insertRecurringRule/dismissRecurringRule/deleteRecurringRule, getAlertPrefs/upsertAlertPrefs/alertLogContains/insertAlertLog, insertInsightSignal, watchAllPayerExpenses/getAllPayerExpenses/getCategorySpend) + `netlifyIngestUrl` — verbatim from `bc7e056`, pure additions, zero existing lines touched (verified: counts delete_group/leave_group/original_amount/settled_by all match develop).
+   ⚠️ **First attempt PR #14 was CLOSED by controller**: a full `git cherry-pick bc7e056` (54 behind) silently REVERTED develop's `rpc('delete_group')`/`rpc('leave_group')`, restoreExpense `original_amount` fix, and 4 `settled_by` lines (clean-but-stale merge, no conflict markers). Lesson: never wholesale-merge a stale branch — extract what's genuinely new. **`chore/shared-wiring` (origin `bc7e056`) NOT purged** — its providers (`setall_providers.dart`) + routes (`app_router.dart`) + screen edits for ingest/budget/recurring/alerts are the wiring each FEATURE PR (C-5/7/8/9) must re-add from `bc7e056` once that feature's screens/services land. See §E.
 5. `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests
 6. `feat/soft-delete` — 90-day restore / deleted_expenses
 7. `feat/recurring` — recurring detection
@@ -68,6 +69,13 @@ groups-overhaul / shared-wiring / i18n-keys — integrate in the order above.
   427 behind, conflicts in 7/8 files vs develop. **Decision pending:** (a) keep as a future
   "group-customization UI overhaul" task and integrate later, or (b) discard as superseded/stale.
   Not purged until the user decides.
+- **`chore/shared-wiring`** (origin `bc7e056`) — KEEP until C-9 done. Its data-layer is on develop (C-4/PR #15),
+  but its **providers + routes + screen edits** for ingest/budget/recurring/alerts were deliberately NOT
+  taken (they reference screens/services that arrive with the feature branches). Each feature PR must harvest
+  its slice from `bc7e056`: C-5 ingest → `ingestServiceProvider`/`ingestRowsProvider` + `walletImport`→`ImportIngestScreen` route;
+  C-7 recurring → `recurringCandidatesProvider` + `recurring`→`RecurringScreen` route; C-8 budget → `budgets`→`BudgetsScreen` route;
+  C-9 alerts → `alertServiceProvider`/`alertPrefsProvider`/`alertQueueProvider` + `alertPrefs`→`AlertPrefsScreen` route.
+  Purge `chore/shared-wiring` only after all four have landed.
 
 ---
 
