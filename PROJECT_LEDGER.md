@@ -57,7 +57,12 @@ the rest of the "spring wave" never landed. This is the real Phase-0 work.
 have interdependencies — they must be integrated in order, into `develop`, each behind the
 `flutter analyze` green gate, not merged blindly.
 
-**Phase-0 integration progress:**
+**Phase-0 integration progress:** ✅ **COMPLETE (2026-06-25)** — all 13 §C items resolved: 11 merged to `develop`
+(C-1, C-2, C-3, C-4, C-5, C-7, C-8, C-9, C-10, C-12, C-13), 2 determined SUPERSEDED with no dispatch (C-6 soft-delete,
+C-11 website-2-0). develop tip = `d4ad8d0`. Merged branches purged; `bc7e056` archived as tag `archive/shared-wiring`.
+**Next = Phase-0 close-out:** (1) align `main ← develop` (currently main `e120315`, develop `d4ad8d0`); (2) USER keep/discard
+on the 3 deferred §E branches (`feature/groups-overhaul`, `feat/soft-delete`, `feature/website-2-0-integration`). Then Phase 1.
+
 - ✅ C-1 `fix/security-rls-audit` → merged to `develop` (PR #9, 2026-06-24). 6 migrations
   (RLS gap closure, edge-secret triggers, replay-safe repairs); analyze green; verified surgical.
 - ✅ C-2 `chore/edge-fn-configs` → merged to `develop` (PR #10, 2026-06-24). 9 edge-fn
@@ -159,6 +164,15 @@ have interdependencies — they must be integrated in order, into `develop`, eac
   `production_legitimacy_test` is tuned to develop's 9-page site. A merge/cherry-pick would silently revert develop's web work
   and break the login→portal flow — the C-6 trap. No PR. Branch keep/discard deferred to USER (BACKLOG §E; recommend discard).
   **Phase-0 integration queue now: only C-12 (ai-provider-cache) remains.**
+- ✅ C-12 `fix/crit-01-ai-provider-cache` (CRIT-01) → merged to `develop` via PR #21 (2026-06-25, squash `d4ad8d0`). NOT a
+  cherry-pick: branch `9d0536e` was 271 behind and carried 2 stray journals (`projectledger.md`, `wiki doc.md`). Surgical
+  hand-application of the ~11-line fix onto develop's current `dashboard_screen.dart`: added `import 'dart:async'` + a
+  `ref.keepAlive()` link, a 15-min `Timer(() => link.close())`, and `ref.onDispose(() => cacheTimer?.cancel())` at the top of
+  `_aiInsightProvider` (kept it `autoDispose` — keepAlive+timer is the intended Riverpod pattern). Before this, the provider
+  re-hit the Groq AI API on every Dashboard revisit; develop had ZERO keepAlive usage (CRIT-01 genuinely unfixed). Controller-
+  verified: single-file additive diff (0 deletions), keepAlive block inside the provider before the analyticsData fetch,
+  `dart:async` imported, stray journals NOT taken, MERGEABLE/CLEAN. analyze green, 343/343 tests.
+  **➡ Phase-0 integration COMPLETE — see the §3 banner. Next: close-out (align main←develop + §E user decisions).**
 
 ## 4. Open bugs / requested work (active backlog)
 
