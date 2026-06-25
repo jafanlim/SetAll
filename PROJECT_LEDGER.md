@@ -196,7 +196,7 @@ secret; surgical diffs (no whole-file reflow / broad `git add`); not done until 
 | 4 | P1 | `setall-web-insights-datasource` | §4 item 4 | not started |
 | 5 | P1 | `setall-shared-expense-wallet-share` | §4 item 2 | not started |
 | 6 | P2 | `setall-statement-multi-import` (RECONCILE w/ landed wallet-csv-import) | §4 item 1 | not started |
-| 7 | P2 | carried TODOs (ghost-row FK · OAuth auto-close · invite search · "settled up") | carried TODOs #2–5 | not started |
+| 7 | P2 | carried TODOs (ghost-row FK · OAuth auto-close · invite search · ~~"settled up"~~) | carried TODOs #2–5 | "settled up" ✅ DONE (PR #28); 3 left |
 
 **TASK 1 — `setall-edge-key-completion` (P0):** prod disabled legacy `anon`/`service_role` JWT keys (memory
 `edge-fn-legacy-keys-disabled`) → DB-trigger/cron `net.http_post` 403 at gateway (no `apikey`) + the 5 fns built
@@ -259,8 +259,9 @@ Carried-over TODOs (from old `progress.md`):
 - Ghost-row nickname FK violation on `pending_invites` _(TASK 7)_.
 - Google OAuth in-app browser doesn't auto-close _(TASK 7)_.
 - Group invite search (email/nickname) returns nothing _(TASK 7)_.
-- "Settled up" stale after account switch _(TASK 7; root-caused — `_invalidateAllProviders()` in `lib/app.dart` misses
-  `groupBalanceSummaryProvider` family + wallet/master/omni/simplifiedDebts providers)._
+- ~~"Settled up" stale after account switch~~ ✅ **DONE (TASK 7, PR #28, `de17765`)** — `_invalidateAllProviders()` in `lib/app.dart`
+  now invalidates the `groupBalanceSummaryProvider` family + wallet/master/omni/simplifiedDebts; comprehensive re-invalidation
+  after post-switch sync. analyze 0, 343/343.
 
 ## 5. Spec index (`openspec/`) — 13 total
 
