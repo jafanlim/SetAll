@@ -38,7 +38,8 @@ legacy/initial-ios-debug · security-review-last-10-prs
 ### C. Integrate into `develop` THEN delete (real unmerged work — ordered by dependency)
 1. ✅ **DONE** `fix/security-rls-audit` — RLS gap closure, edge-secret triggers, replay-safe migrations — merged to `develop` via PR #9 (2026-06-24). Follow-up: BACKLOG P1 hardening (search_path on edge-secret trigger fns).
 2. ✅ **DONE** `chore/edge-fn-configs` — edge fn config.toml + RLS regression tests — merged to `develop` via PR #10 (2026-06-24). 18-assertion pgTAP RLS suite covers all 3 C-1 gaps.
-3. ⚠️ **REFRAMED — targeted fix, branch NOT merged** `feature/groups-overhaul` is 427 behind with conflicts in 7/8 files, and its `group_identity_columns` migration is ALREADY on develop (`20260312000004` + `20260313000005`). Per user (2026-06-24): do NOT force-merge the stale branch — fix bug #3 directly per `openspec/setall-group-identity-persistence`. Controller-confirmed real root cause (spec missed it): `groups.color_value` is `integer` (created by `20260312000004`; the later `bigint` migration is a no-op) → ARGB `0xFFRRGGBB` overflows 32-bit → remote write throws → swallowed `catch(_){}` → colour reverts. Plus `groups.default_currency` column is missing from all migrations though the app writes it. Dispatching as `fix/group-identity-persistence`; purge groups-overhaul unmerged afterward.
+3. ✅ **DONE (targeted, not a branch merge)** bug #3 fixed via `fix/group-identity-persistence` → merged to `develop` (PR #13, 2026-06-24, squash `b150a7a`). Migration `20260624000000`: `color_value`→`bigint` (ARGB overflow was the real root cause the spec missed), `default_currency` column added, `create_group` extended to set identity atomically, new `update_group_identity` RPC (creator-gated, SECURITY DEFINER, COALESCE for partial updates + `p_clear_avatar` flag). Dart: `createGroup`/`updateGroupCustomization` + sync push routed through RPCs, all swallowed `catch(_){}` removed; pull-merge COALESCE preserved. Controller caught + bounced ONE regression before merge (the edit-path RPC nulled untouched columns on partial edits — would have wiped icon/colour on avatar-only create calls).
+   ⚠️ **`feature/groups-overhaul` (origin `5ad69df`) NOT purged** — it still carries ~735 lines of UNMERGED group-customization UI (create_group_screen +514, groups_screen, group_detail_screen, repo glue) that the targeted fix did NOT include. Keep-for-later-UI-task vs discard is a USER decision — do not delete until confirmed (see §E).
 4. `chore/shared-wiring` — repo/router/providers glue the features depend on
 5. `feat/wallet-csv-import` — bank-statement importer (bug #1) + tests
 6. `feat/soft-delete` — 90-day restore / deleted_expenses
@@ -59,6 +60,14 @@ groups-overhaul / shared-wiring / i18n-keys — integrate in the order above.
   `develop` is already the integration trunk = `origin/main` + planning commit, and equals
   `Development-june`. **Do NOT hard-reset develop** — it is live and ahead of main. (Verified 2026-06-24.)
 - After C completes and `develop` is verified, merge `develop → main` and re-tag.
+
+### E. Deferred branch decisions (USER call — do not auto-delete)
+- **`feature/groups-overhaul`** (origin `5ad69df`) — bug #3 (identity persistence) was fixed
+  separately in C-3 (PR #13), but this branch still holds ~735 lines of UNMERGED group-customization
+  **UI**: `create_group_screen.dart` (+514), `groups_screen.dart`, `group_detail_screen.dart`, repo glue.
+  427 behind, conflicts in 7/8 files vs develop. **Decision pending:** (a) keep as a future
+  "group-customization UI overhaul" task and integrate later, or (b) discard as superseded/stale.
+  Not purged until the user decides.
 
 ---
 
