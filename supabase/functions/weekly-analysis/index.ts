@@ -32,6 +32,29 @@ serve(async (req) => {
   }
 
   try {
+    // ── Dual-mode auth gate ──
+    // Path A: pg_cron sends x-edge-secret + empty body
+    const secretOk = (Deno.env.get('EDGE_SHARED_SECRET') ?? '').length > 0 && (req.headers.get('x-edge-secret') ?? '') === Deno.env.get('EDGE_SHARED_SECRET');
+
+    // Path B: Flutter app sends Authorization: Bearer <user JWT>
+    let authedUid: string | null = null;
+    if (!secretOk) {
+      const authHeader = req.headers.get('Authorization') ?? '';
+      const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null;
+      if (token) {
+        const { data, error } = await createClient(SUPABASE_URL, SERVICE_KEY).auth.getUser(token);
+        authedUid = (!error && data?.user) ? data.user.id : null;
+      }
+    }
+
+    // Fail closed — neither valid secret nor valid JWT
+    if (!secretOk && authedUid == null) {
+      return new Response(JSON.stringify({ error: 'unauthorized' }), {
+        status: 401,
+        headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
+      });
+    }
+
     const admin = createClient(SUPABASE_URL, SERVICE_KEY)
 
     // Parse optional on-demand body
@@ -40,6 +63,9 @@ serve(async (req) => {
       const body = await req.json()
       if (body?.onDemand && body?.userId) onDemandUid = body.userId
     } catch (_) { /* cron call — no body */ }
+
+    // Security — JWT path is restricted to the authenticated user
+    if (!secretOk && authedUid) onDemandUid = authedUid;
 
     // Time window: last 7 days
     const now   = new Date()
