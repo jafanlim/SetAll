@@ -181,23 +181,70 @@ on the 3 deferred §E branches (`feature/groups-overhaul`, `feat/soft-delete`, `
 
 ## 4. Open bugs / requested work (active backlog)
 
+### Phase-1 task queue (formalized 2026-06-25, priority order)
+
+Each task branches off `develop` as `fix/*`/`feat/*`/`integrate/*`, PR'd back into `develop`. Hard rules:
+money = integer-cents/`Decimal` (no float); RLS on every new table; never expose service_role / hardcode a
+secret; surgical diffs (no whole-file reflow / broad `git add`); not done until `flutter analyze` = 0 AND
+343/343 tests; a "clean" merge that silently drops a feature's purpose = reject (verify, don't trust).
+
+| # | Pri | Task | Maps to | Status |
+|---|---|---|---|---|
+| 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | **CODE DONE PR #26** — LIVE-VERIFY PENDING (user-gated) |
+| 2 | P1 | `setall-push-and-digest` | §4 item 5 | BLOCKED on TASK 1 live-verify |
+| 3 | P1 | `net-balance-offset` (write short spec first) | carried TODO #1 | not started |
+| 4 | P1 | `setall-web-insights-datasource` | §4 item 4 | not started |
+| 5 | P1 | `setall-shared-expense-wallet-share` | §4 item 2 | not started |
+| 6 | P2 | `setall-statement-multi-import` (RECONCILE w/ landed wallet-csv-import) | §4 item 1 | not started |
+| 7 | P2 | carried TODOs (ghost-row FK · OAuth auto-close · invite search · "settled up") | carried TODOs #2–5 | not started |
+
+**TASK 1 — `setall-edge-key-completion` (P0):** prod disabled legacy `anon`/`service_role` JWT keys (memory
+`edge-fn-legacy-keys-disabled`) → DB-trigger/cron `net.http_post` 403 at gateway (no `apikey`) + the 5 fns built
+`createClient(URL, SUPABASE_SERVICE_ROLE_KEY)` = dead key. PRs #23/#24 (`x-edge-secret` gates) were correct but sat
+atop this unfinished migration.
+- ✅ **CODE MERGED — PR #26** (`develop` squash `3c71e2e`, 2026-06-25), controller byte-verified:
+  - Migration `20260625010000_complete_edge_key_migration.sql` — `CREATE OR REPLACE`s 4 objects (`trigger_bug_triage`,
+    `notify_group_members`, send-monthly-digest cron, weekly-analysis cron); bodies VERBATIM from authoritative sources
+    (#22 `20260625000000` for the 2 trigger fns, `20260601000001` for the 2 crons) + exactly one line per `net.http_post`:
+    `'apikey', (SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'secret_key' LIMIT 1)`. Secret read from
+    Vault at call time — never in the file. Idempotent DO-block guards on the cron unschedules. Both trigger bodies confirmed
+    BYTE-IDENTICAL to #22 except the apikey line (python difflib); #22's `SET search_path = public` hardening still on develop
+    → the stale-fork revert (PR #25) was avoided.
+  - 5 fns (`bug-triage`, `monthly-digest`, `send-group-notification`, `sync-exchange-rates`, `weekly-analysis`) swapped
+    `Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')` → `JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default']`.
+    `SERVICE_ROLE` = 0 in all 5; `x-edge-secret` gates intact. analyze green, 343/343.
+- ⚠️ **PR #25 REJECTED before #26** — stale-fork feature-dropper (forked from develop@`2a29232`, pre-#22); its migration would
+  have silently reverted #22's `SET search_path` hardening (Git reported MERGEABLE — pure migration ordering, no textual conflict).
+  Branch rebuilt onto current develop + re-dispatched.
+- ☐ **LIVE-VERIFY (user-gated — `flutter analyze` can't prove this).** Vault `secret_key` prereq DONE (user steps 1–4). Remaining
+  ops (user runs with controller guidance): (a) apply `20260625010000` via **Dashboard SQL editor** (NOT `supabase db push` —
+  documented repo↔live migration-history divergence); (b) `supabase functions deploy bug-triage monthly-digest
+  send-group-notification sync-exchange-rates weekly-analysis --project-ref vrsmsgyxeyzyrdonsnrk`; (c) update the external
+  sync-exchange-rates 24h scheduler to send the new `apikey`; (d) verify Unified Logs show **200 not 403** +
+  `monthly-digest?test=akostnz@gmail.com` arrives + welcome/reset emails still work. **Open scoping Q:** are
+  `send-email`/`send-welcome-email` invoked via Dashboard Auth Hooks or via DB triggers `send_email_hook`/`on_profile_created`?
+  If DB triggers, they 403 too and need a 2-line apikey follow-up migration (step (d) doubles as the probe).
+  **TASK 2 does not start until (d) passes.**
+
+### Backlog detail
+
 New specs written 2026-06-24 (flat layout `openspec/<name>/`):
-1. **statement-multi-import** — statement ingested as one chunk, no split, no dedupe.
+1. **statement-multi-import** _(TASK 6)_ — statement ingested as one chunk, no split, no dedupe.
    _Largely already solved by `feat/wallet-csv-import` — reconcile, don't rebuild._
-2. **shared-expense-wallet-share** — mirror my share of a shared expense into my wallet
+2. **shared-expense-wallet-share** _(TASK 5)_ — mirror my share of a shared expense into my wallet
    (opt-in, human-confirmed, activity-logged, `source_expense_id` link).
-3. **group-identity-persistence** — icon/colour don't stick. Root cause: `create_group` RPC
-   only gets `p_name`; identity set via a swallowed `catch(_){}` UPDATE that sync then clobbers.
-   _Check `feature/groups-overhaul`'s `group_identity_columns` migration — may be the missing DB side._
-4. **web-insights-datasource** — web has no SQLite; insights hub reads empty amounts.
-5. **push-and-digest** — push + monthly digest never delivered end-to-end.
+3. **group-identity-persistence** — ✅ fixed in C-3 (PR #13); icon/colour now stick. _Was: `create_group` RPC
+   only got `p_name`; identity set via a swallowed `catch(_){}` UPDATE that sync clobbered + ARGB overflow._
+4. **web-insights-datasource** _(TASK 4)_ — web has no SQLite; insights hub reads empty amounts.
+5. **push-and-digest** _(TASK 2)_ — push + monthly digest never delivered end-to-end. _Blocked on TASK 1 live-verify._
 
 Carried-over TODOs (from old `progress.md`):
-- Net balance not offset between two users (A↔B each show 50 instead of net 0) — **correctness bug, high priority**.
-- Ghost-row nickname FK violation on `pending_invites`.
-- Google OAuth in-app browser doesn't auto-close.
-- Group invite search (email/nickname) returns nothing.
-- "Settled up" stale after account switch.
+- Net balance not offset between two users (A↔B each show 50 instead of net 0) — **correctness bug, high priority** _(TASK 3)_.
+- Ghost-row nickname FK violation on `pending_invites` _(TASK 7)_.
+- Google OAuth in-app browser doesn't auto-close _(TASK 7)_.
+- Group invite search (email/nickname) returns nothing _(TASK 7)_.
+- "Settled up" stale after account switch _(TASK 7; root-caused — `_invalidateAllProviders()` in `lib/app.dart` misses
+  `groupBalanceSummaryProvider` family + wallet/master/omni/simplifiedDebts providers)._
 
 ## 5. Spec index (`openspec/`) — 13 total
 

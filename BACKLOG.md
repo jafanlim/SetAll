@@ -1,7 +1,7 @@
 # SetAll — Backlog & Phase-0 Branch Plan
 
 _Maintained alongside `PROJECT_LEDGER.md`. Controller reads this to dispatch tasks._
-_Updated: 2026-06-24._
+_Updated: 2026-06-25 (Phase-1 task queue; TASK 1 edge-key-completion code-done PR #26, live-verify pending)._
 
 ## Branch policy
 
@@ -126,12 +126,18 @@ Every purged branch is preserved as an `archive/<name>` tag (recoverable: `git s
 See Phase-0 section C above (one task per branch, in order).
 
 ### P1 — bug fixes (specs in `openspec/`)
-- ✅ **DONE (already fixed — controller recon 2026-06-25)** **net-balance-offset** — A↔B mutual debts net to zero. The fix is live: `balance_service.dart:50` nets `net = rawOwed − rawOwe` (then zeroes the smaller side) at BOTH global and per-group level — introduced in `2ccbf76` ("split math fixes"). Covered by `engine_torture_test` TEST 2 (summary-level: owed $50 / owe $20 → `youAreOwed 30.00`, `youOwe 0.00`) + TEST 3 (anchor-equal → 0.00), plus the settlement engine's per-pair netting (`repository_crud_test:866`, `engine_regression_guard 2a`). No dispatch needed. (Minor leftover: `friends_screen.dart:331`'s `owed>0 && owe>0` branch is now dead post-netting — harmless cosmetic cleanup, not the bug.)
+
+> **Phase-1 task queue (formalized 2026-06-25):** TASK 1 `setall-edge-key-completion` (P0 LEAD) — **CODE DONE PR #26,
+> live-verify pending** · TASK 2 `push-and-digest` (blocked on TASK 1 live-verify) · TASK 3 `net-balance-offset`
+> (already fixed — see below) · TASK 4 `web-insights-datasource` · TASK 5 `shared-expense-wallet-share` ·
+> TASK 6 `statement-multi-import` (reconcile) · TASK 7 carried P2 TODOs. Full status table: PROJECT_LEDGER §4.
+
+- ✅ **DONE (already fixed — controller recon 2026-06-25)** **net-balance-offset** _(TASK 3)_ — A↔B mutual debts net to zero. The fix is live: `balance_service.dart:50` nets `net = rawOwed − rawOwe` (then zeroes the smaller side) at BOTH global and per-group level — introduced in `2ccbf76` ("split math fixes"). Covered by `engine_torture_test` TEST 2 (summary-level: owed $50 / owe $20 → `youAreOwed 30.00`, `youOwe 0.00`) + TEST 3 (anchor-equal → 0.00), plus the settlement engine's per-pair netting (`repository_crud_test:866`, `engine_regression_guard 2a`). No dispatch needed. (Minor leftover: `friends_screen.dart:331`'s `owed>0 && owe>0` branch is now dead post-netting — harmless cosmetic cleanup, not the bug.)
 - ✅ **DONE** **group-identity-persistence** — icon/colour stick across sync → resolved by C-3 (`fix/group-identity-persistence`, PR #13, migration `20260624000000`: `color_value`→bigint + atomic `create_group` + `update_group_identity` RPC). The "pair with groups-overhaul" note is moot (groups-overhaul archived/deleted).
-- **statement-multi-import** — reconcile with wallet-csv-import; split + dedupe + dates
-- **shared-expense-wallet-share** — opt-in mirror of my share into wallet
-- **web-insights-datasource** — web reads real amounts (no SQLite)
-- **push-and-digest** — verify + fix push and monthly digest end-to-end
+- **statement-multi-import** _(TASK 6)_ — reconcile with wallet-csv-import; split + dedupe + dates
+- **shared-expense-wallet-share** _(TASK 5)_ — opt-in mirror of my share into wallet
+- **web-insights-datasource** _(TASK 4)_ — web reads real amounts (no SQLite)
+- **push-and-digest** _(TASK 2)_ — verify + fix push and monthly digest end-to-end. **BLOCKED on TASK 1 live-verify** (digest cron rides the same apikey path).
 
 ### P2 — carried TODOs
 - ghost-row nickname FK violation (`pending_invites`)
@@ -143,7 +149,7 @@ See Phase-0 section C above (one task per branch, in order).
 - **ci-ai-eval** — ✅ **INFRA FIXED 2026-06-24.** Was failing 9/9 (never ran). Three causes fixed: (1) gitignored `package-lock.json` → committed (PR #11); (2) sandboxed-npm lockfile drift vs CI npm (`gcp-metadata` 8.1.2 vs 7.0.1) → workflow switched `npm ci`→`npm install` (commit `e00ffe7`); (3) missing `GROQ_API_KEY` secret → user added it. CI now runs: install 37s, eval executes all 28 cases. **Remaining (separate, content not infra):** 3/28 assertions fail (`25 passed 89.29%`, exit 100). → new follow-up `ai-eval-3-failing-cases`: triage the 3 failing promptfoo cases (likely strict/flaky LLM asserts); decide fix-or-loosen. Not a required check.
 - **edge-fn-secret-enforcement** (security, P1) — 7 edge fns deploy `verify_jwt=false` with NO `x-edge-secret` check → publicly invokable (notification spoofing / Groq+email quota abuse). C-1 made the DB triggers SEND `x-edge-secret`; the functions didn't VERIFY it.
   - ✅ **4 of 7 DONE.** PR #23 (2026-06-25, squash `53d10a9`): `bug-triage`, `monthly-digest`, `send-group-notification` — `x-edge-secret`/`EDGE_SHARED_SECRET` fail-closed gate (after OPTIONS, before work). PR #24 (2026-06-25, squash `59e26b1`): `weekly-analysis` — **dual-mode** gate (`x-edge-secret` cron OR valid user JWT via `admin.auth.getUser(token)`); fail-closed 401; JWT path pinned to the authed user (`onDemandUid = authedUid`) so an authenticated user can't run another user's analysis nor the full batch. Controller-verified each: exact single-file diffs, deferred fns untouched, `deno check` + analyze + 343 tests green. **⚠ OPS REQUIRED before redeploy:** `supabase secrets set EDGE_SHARED_SECRET=<vault edge_shared_secret value>` then `supabase functions deploy bug-triage monthly-digest send-group-notification weekly-analysis` — else cron/triggers 401 (no bug-triage email / group notifications / monthly digest / weekly analysis). weekly-analysis app on-demand path keeps working on user JWT regardless.
-  - ⛔ **BLOCKED + RE-SCOPED 2026-06-25 — legacy API keys disabled on prod.** Edge-fn logs show **403** (gateway, not our 401) on `send-group-notification`, `sync-exchange-rates`, etc. Root cause: project disabled legacy `anon`/`service_role` JWT keys, but (a) the triggers (`20260601000001`) send only `x-edge-secret` — **no `apikey`** → gateway 403 before our code runs; (b) all 5 trigger/cron fns build `createClient(URL, SUPABASE_SERVICE_ROLE_KEY)` = the now-dead legacy key. So **PRs #23/#24's gates are correct but sit atop an unfinished API-key migration** (weekly-analysis `getUser` uses the dead SERVICE_ROLE_KEY). **The Deferred-3 below are BLOCKED behind this.** Full openspec exists: `openspec/setall-key-migration/` (design/proposal/spec/tasks). Fix = triggers add `apikey` = `sb_secret` from Vault; fns read `JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS'))['default']`; external sync-exchange-rates scheduler too; keep `verify_jwt=false` + x-edge-secret. User owns the openspec; resume security thread AFTER key migration lands.
+  - 🔄 **KEY-MIGRATION CODE LANDED — PR #26 (TASK 1), LIVE-VERIFY PENDING (2026-06-25).** Was: legacy `anon`/`service_role` JWT keys disabled on prod → edge-fn logs **403** (gateway, not our 401) on `send-group-notification`, `sync-exchange-rates`, etc.; (a) triggers (`20260601000001`) sent only `x-edge-secret` — **no `apikey`** → gateway 403 before our code; (b) all 5 trigger/cron fns built `createClient(URL, SUPABASE_SERVICE_ROLE_KEY)` = dead legacy key. **Fixed in code by PR #26** (`develop` squash `3c71e2e`): migration `20260625010000` adds `'apikey'` = Vault `secret_key` to all 4 trigger/cron `net.http_post` calls (bodies byte-verified vs #22/`20260601000001`); 5 fns read `JSON.parse(Deno.env.get('SUPABASE_SECRET_KEYS') ?? '{}')['default']`. `verify_jwt=false` + x-edge-secret kept. **Still gated on user LIVE-VERIFY** (apply migration via Dashboard SQL editor + deploy 5 fns + update external FX scheduler apikey + confirm 200-not-403 + digest email) — see PROJECT_LEDGER §4 TASK 1. **Deferred-3 below are UNBLOCKED in code; finish them only after TASK 1 live-verifies.** Full openspec: `openspec/changes/setall-edge-key-completion/` + `openspec/setall-key-migration/`.
   - ⬜ **Deferred 3 (BLOCKED behind key-migration above; each also needs more than an x-edge-secret-only gate — controller triage 2026-06-25):**
     - `send-test-email` — app-invoked from `settings_screen.dart` (user JWT). Needs a JWT/auth guard, or restrict to authenticated admins/dev-only.
     - `sync-exchange-rates` — invoked by an **external 24h scheduler not in the repo**; its header still reads `Authorization: Bearer service_role`. MUST locate/confirm the scheduler and switch it to send `x-edge-secret` (ops) BEFORE gating, or FX sync breaks.
