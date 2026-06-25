@@ -126,8 +126,8 @@ Every purged branch is preserved as an `archive/<name>` tag (recoverable: `git s
 See Phase-0 section C above (one task per branch, in order).
 
 ### P1 — bug fixes (specs in `openspec/`)
-- **net-balance-offset** — A↔B mutual debts net to zero, not double-counted. (correctness; no spec yet — small)
-- **group-identity-persistence** — icon/colour stick across sync (pair with groups-overhaul integration)
+- **net-balance-offset** — A↔B mutual debts net to zero, not double-counted. (correctness; no spec yet — small). NOTE (controller recon 2026-06-25): the settlement engine + top-line summary already net correctly (`balance_service.dart:50` `net = rawOwed − rawOwe`; tests `repository_crud_test:866`, `engine_regression_guard 2a`). Bug is in the **per-counterparty breakdown** (`raw` source), not the engine — fix there only.
+- ✅ **DONE** **group-identity-persistence** — icon/colour stick across sync → resolved by C-3 (`fix/group-identity-persistence`, PR #13, migration `20260624000000`: `color_value`→bigint + atomic `create_group` + `update_group_identity` RPC). The "pair with groups-overhaul" note is moot (groups-overhaul archived/deleted).
 - **statement-multi-import** — reconcile with wallet-csv-import; split + dedupe + dates
 - **shared-expense-wallet-share** — opt-in mirror of my share into wallet
 - **web-insights-datasource** — web reads real amounts (no SQLite)
@@ -142,7 +142,7 @@ See Phase-0 section C above (one task per branch, in order).
 ### Discovered during Phase-0 integration (new follow-ups)
 - **ci-ai-eval** — ✅ **INFRA FIXED 2026-06-24.** Was failing 9/9 (never ran). Three causes fixed: (1) gitignored `package-lock.json` → committed (PR #11); (2) sandboxed-npm lockfile drift vs CI npm (`gcp-metadata` 8.1.2 vs 7.0.1) → workflow switched `npm ci`→`npm install` (commit `e00ffe7`); (3) missing `GROQ_API_KEY` secret → user added it. CI now runs: install 37s, eval executes all 28 cases. **Remaining (separate, content not infra):** 3/28 assertions fail (`25 passed 89.29%`, exit 100). → new follow-up `ai-eval-3-failing-cases`: triage the 3 failing promptfoo cases (likely strict/flaky LLM asserts); decide fix-or-loosen. Not a required check.
 - **edge-fn-secret-enforcement** (security, P1) — 7 edge fns deploy `verify_jwt=false` with NO `x-edge-secret` check in body → publicly invokable: bug-triage, monthly-digest, notify-group-invite, send-group-notification, send-test-email, sync-exchange-rates, weekly-analysis. C-1 made the DB triggers SEND `x-edge-secret`, but the functions don't VERIFY it → notification spoofing / Groq+email quota abuse. Add header check (exempt the 2 Auth-hook fns: send-email, send-welcome-email).
-- **edge-secret-search-path** (hardening, from C-1) — `trigger_bug_triage()` + `notify_group_members()` are SECURITY DEFINER without `SET search_path = public` (Supabase `function_search_path_mutable` advisor). Also guard the two `cron.unschedule(...)` calls in `20260601000001`.
+- ✅ **DONE** **edge-secret-search-path** (P1 hardening, from C-1) → merged to `develop` via PR #22 (2026-06-25, squash `55ebad1`). New migration `20260625000000_harden_definer_search_path.sql` recreates `trigger_bug_triage()` (body from `20260601000001`) + `notify_group_members()` (body from `20260601000003`) with `LANGUAGE plpgsql / SECURITY DEFINER / SET search_path = public` headers — clears the Supabase `function_search_path_mutable` advisor. Controller-verified: both bodies BYTE-IDENTICAL to their authoritative defs (no behavior drift; all cross-schema refs `net.`/`vault.`/`public.` already qualified), exactly 2 functions recreated, 0 applied migrations edited (checksums intact), analyze + 343 tests green. `db lint` not run (no local DB). **Deferred (separate follow-up):** the `cron.unschedule(...)` idempotency guard in `20260601000001` — low-risk (only bites isolated/out-of-sequence migration runs); not touched to avoid editing an applied migration's checksum.
 
 ---
 
