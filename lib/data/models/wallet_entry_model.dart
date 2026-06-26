@@ -22,6 +22,7 @@ class WalletEntryModel {
     this.createdAt,
     this.updatedAt,
     this.syncedAt,
+    this.sourceExpenseId,
   });
 
   final String id;
@@ -46,6 +47,8 @@ class WalletEntryModel {
   final String? createdAt;
   final String? updatedAt;
   final int? syncedAt;
+  /// For wallet mirror entries: the group expense this wallet entry mirrors.
+  final String? sourceExpenseId;
 
   factory WalletEntryModel.fromJson(Map<String, dynamic> json) {
     return WalletEntryModel(
@@ -73,6 +76,7 @@ class WalletEntryModel {
       createdAt: json['created_at'] as String?,
       updatedAt: json['updated_at'] as String?,
       syncedAt: json['synced_at'] as int?,
+      sourceExpenseId: json['source_expense_id'] as String?,
     );
   }
 
@@ -96,6 +100,7 @@ class WalletEntryModel {
     if (deletedAt != null)          'deleted_at': deletedAt,
     'created_at': createdAt,
     'updated_at': updatedAt,
+    if (sourceExpenseId != null)    'source_expense_id': sourceExpenseId,
   };
 
   Map<String, dynamic> toSupabaseJson() => {
@@ -117,6 +122,7 @@ class WalletEntryModel {
     if (deletedAt != null)           'deleted_at': deletedAt,
     'created_at': createdAt,
     'updated_at': updatedAt,
+    if (sourceExpenseId != null)     'source_expense_id': sourceExpenseId,
   };
 
   WalletEntryModel copyWith({
@@ -140,6 +146,7 @@ class WalletEntryModel {
     String? createdAt,
     String? updatedAt,
     int? syncedAt,
+    String? sourceExpenseId,
   }) => WalletEntryModel(
     id:                   id                   ?? this.id,
     userId:               userId               ?? this.userId,
@@ -161,6 +168,7 @@ class WalletEntryModel {
     createdAt:            createdAt            ?? this.createdAt,
     updatedAt:            updatedAt            ?? this.updatedAt,
     syncedAt:             syncedAt             ?? this.syncedAt,
+    sourceExpenseId:      sourceExpenseId      ?? this.sourceExpenseId,
   );
 
   static List<String>? _parseUrls(dynamic raw) {
