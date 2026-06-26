@@ -137,7 +137,8 @@ See Phase-0 section C above (one task per branch, in order).
 - **statement-multi-import** _(TASK 6)_ — reconcile with wallet-csv-import; split + dedupe + dates
 - **shared-expense-wallet-share** _(TASK 5)_ — opt-in mirror of my share into wallet
 - **web-insights-datasource** _(TASK 4)_ — web reads real amounts (no SQLite)
-- **push-and-digest** _(TASK 2)_ — verify + fix push and monthly digest end-to-end. **BLOCKED on TASK 1 live-verify** (digest cron rides the same apikey path).
+- **push-and-digest** _(TASK 2)_ — digest ✅ **VERIFIED** (200/sent:1 email). Push: ✅ client token-registration fix merged (PR #29, `326a16a` — `init()` now pushes token + `syncToSupabase` falls back to live FCM token) + user set `FIREBASE_SERVICE_ACCOUNT` + `send-group-notification` redeployed. **Pending real-device verify:** a device login must insert into `fcm_tokens` (was 0/41), then a group expense → `notify_group_members` → FCM push. Controller can fire a controlled test once ≥1 token exists.
+- **group-info per-member debt amounts** _(NEW P2, user req 2026-06-26)_ — group info page member list should show each member's debt relative to me (amount), not just names. Data source: `simplifiedDebtsProvider(group.id)` (`List<SettlementTransaction>{fromUserId,toUserId,amount:Decimal,currency}`) × `groupMembersProvider` (`ProfileModel.id`/`.name`). Dispatched to DeepSeek.
 
 ### P2 — carried TODOs
 - ghost-row nickname FK violation (`pending_invites`)
