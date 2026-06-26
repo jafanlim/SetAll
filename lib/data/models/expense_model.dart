@@ -25,6 +25,7 @@ class ExpenseModel extends Expense {
     super.attachmentUrls,
     super.notes,
     super.lineItems = const [],
+    super.sourceExpenseId,
   });
 
   static SplitType _splitTypeFromString(String? v) {
@@ -67,6 +68,7 @@ class ExpenseModel extends Expense {
       attachmentUrls: _parseAttachmentUrls(json['attachment_urls']),
       notes: json['notes'] as String?,
       lineItems: _parseLineItems(json['line_items']),
+      sourceExpenseId: json['source_expense_id'] as String?,
     );
   }
 
@@ -94,6 +96,7 @@ class ExpenseModel extends Expense {
         if (notes != null && notes!.isNotEmpty) 'notes': notes,
         if (lineItems.isNotEmpty)
           'line_items': jsonEncode(lineItems.map((e) => e.toJson()).toList()),
+        if (sourceExpenseId != null) 'source_expense_id': sourceExpenseId,
       };
 
   static List<String>? _parseAttachmentUrls(dynamic raw) {

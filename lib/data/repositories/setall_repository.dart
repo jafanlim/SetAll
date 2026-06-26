@@ -4362,7 +4362,36 @@ class SetAllRepository {
     return (income: income, spend: spend, net: income - spend);
   }
 
-  Future<WalletEntryModel> upsertWalletEntry(WalletEntryModel entry) async {
+  /// Returns the id of an existing wallet mirror row for (payer_id, source_expense_id),
+  /// or null if no mirror exists yet. Exists so upsertWalletEntry can dedupe.
+  Future<String?> _findMirrorId(String payerId, String sourceExpenseId) async {
+    if (_isWeb && _client != null) {
+      final rows = await _client
+          .from('expenses')
+          .select('id')
+          .eq('payer_id', payerId)
+          .eq('source_expense_id', sourceExpenseId)
+          .isFilter('group_id', null)
+          .limit(1);
+      if (rows.isNotEmpty) {
+        return rows.first['id'] as String?;
+      }
+      return null;
+    }
+    final rows = await LocalDatabase.db.query(
+      'expenses',
+      columns: ['id'],
+      where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+      whereArgs: [payerId, sourceExpenseId],
+      limit: 1,
+    );
+    return rows.isNotEmpty ? rows.first['id'] as String? : null;
+  }
+
+  Future<WalletEntryModel> upsertWalletEntry(
+    WalletEntryModel entry, {
+    String? sourceExpenseId,
+  }) async {
     final uid = await ensureUser();
     if (uid == null) throw StateError('No authenticated user');
 
@@ -4397,11 +4426,20 @@ class SetAllRepository {
       // conversion as it did before v33 for this entry only.
     }
 
+    // Dedupe: when sourceExpenseId is set, find and reuse an existing mirror
+    // row so a second call with the same source updates rather than inserting
+    // a duplicate. The partial unique key is (payer_id, source_expense_id).
+    final effectiveSourceId = sourceExpenseId ?? entry.sourceExpenseId;
+    String? mirrorId;
+    if (effectiveSourceId != null) {
+      mirrorId = await _findMirrorId(uid, effectiveSourceId);
+    }
+
     // Build an ExpenseModel so the entry is stored in the `expenses` table
     // (group_id IS NULL = personal wallet entry). This is the canonical store
     // after the PROMPT-34 revert; wallet_entries is no longer written to.
     final expense = ExpenseModel(
-      id:                  entry.id,
+      id:                  mirrorId ?? entry.id,
       groupId:             null,
       payerId:             uid,
       amount:              entry.amount,
@@ -4420,6 +4458,7 @@ class SetAllRepository {
       attachmentUrls:      entry.attachmentUrls,
       createdAt:           createdAt,
       createdBy:           uid,
+      sourceExpenseId:     effectiveSourceId,
     );
 
     if (_isWeb && _client != null) {
@@ -4436,7 +4475,7 @@ class SetAllRepository {
       );
     }
     _notify();
-    return entry.copyWith(userId: uid);
+    return entry.copyWith(userId: uid, sourceExpenseId: effectiveSourceId);
   }
 
   Future<void> deleteWalletEntry(String id) async {

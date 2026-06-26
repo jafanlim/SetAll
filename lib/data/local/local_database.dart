@@ -99,7 +99,10 @@ class LocalDatabase {
   /// Schema v36 adds:
   ///   • deleted_expenses.original_created_at – original entry date, so Restore
   ///     re-creates the entry verbatim instead of stamping the restore time
-  static const int _version = 36;
+  /// Schema v37 adds:
+  ///   • expenses.source_expense_id – self-referential FK to expenses.id for
+  ///     wallet mirror linking + dedupe (shared-expense wallet share, Phase 1)
+  static const int _version = 37;
 
   /// True when running on web (no SQLite); app uses Supabase only.
   static bool get isWeb => _webMode;
@@ -539,6 +542,10 @@ class LocalDatabase {
       await _addColumnIfNotExists(
           db, 'deleted_expenses', 'original_created_at', 'TEXT');
     }
+    if (oldVersion < 37) {
+      // Schema v37: source_expense_id — links wallet mirror to its group expense.
+      await _addColumnIfNotExists(db, 'expenses', 'source_expense_id', 'TEXT');
+    }
   }
 
   /// Helper to safely add columns during migration.
@@ -613,7 +620,8 @@ class LocalDatabase {
         icon_color            INTEGER,
         attachment_urls       TEXT,
         notes                 TEXT,
-        line_items            TEXT
+        line_items            TEXT,
+        source_expense_id     TEXT
       )
     ''');
     await db.execute('''

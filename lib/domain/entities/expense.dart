@@ -92,6 +92,7 @@ class Expense {
     this.attachmentUrls,
     this.notes,
     this.lineItems = const [],
+    this.sourceExpenseId,
   });
 
   final String id;
@@ -155,4 +156,8 @@ class Expense {
 
   /// Itemized line items for group expenses (Phase 2a-i).
   final List<ExpenseLineItem> lineItems;
+
+  /// For wallet mirror entries: the group expense this mirrors (Phase 1 — data
+  /// layer only). NULL for regular group expenses and standalone wallet entries.
+  final String? sourceExpenseId;
 }
