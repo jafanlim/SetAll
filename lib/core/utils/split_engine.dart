@@ -3,6 +3,19 @@ import 'package:decimal/decimal.dart';
 /// The four ways a user can split an expense.
 enum SplitMode { even, percentage, shares, manual }
 
+/// Returns the current user's share from [results], or null if the user
+/// owes zero (or less) — meaning they have no personal cost to mirror.
+///
+/// Reads [SplitResult.amountOwed] directly — never recomputes via division.
+Decimal? myShareFromResults(List<SplitResult> results, String uid) {
+  for (final r in results) {
+    if (r.userId == uid && r.amountOwed > Decimal.zero) {
+      return r.amountOwed;
+    }
+  }
+  return null;
+}
+
 /// Result of a single user's share for an expense.
 class SplitResult {
   const SplitResult({
