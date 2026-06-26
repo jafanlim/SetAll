@@ -192,7 +192,7 @@ secret; surgical diffs (no whole-file reflow / broad `git add`); not done until 
 |---|---|---|---|---|
 | 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | ✅ **DONE + LIVE-VERIFIED 2026-06-26** (PR #26 + #27; applied to prod; digest test = 200 `sent:1`, email delivered) |
 | 2 | P1 | `setall-push-and-digest` | §4 item 5 | digest ✅ VERIFIED; push: client token-fix ✅ (PR #29) + `FIREBASE_SERVICE_ACCOUNT` set + fn redeployed → **pending real-device verify** (token must land in `fcm_tokens`) |
-| 8 | P2 | group-info per-member debt amounts (NEW, user req 2026-06-26) | — | dispatched to DeepSeek |
+| 8 | P2 | group-info per-member debt amounts (NEW, user req 2026-06-26) | — | ✅ DONE (PR #30, `d029731`) — DeepSeek clean, controller-verified (Decimal preserved, correct from/to direction, current-user excluded) |
 | 3 | P1 | `net-balance-offset` (write short spec first) | carried TODO #1 | not started |
 | 4 | P1 | `setall-web-insights-datasource` | §4 item 4 | not started |
 | 5 | P1 | `setall-shared-expense-wallet-share` | §4 item 2 | not started |
