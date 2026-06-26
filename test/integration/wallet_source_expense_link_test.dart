@@ -17,6 +17,7 @@ import 'package:setall/core/services/currency_service.dart';
 import 'package:setall/data/local/local_database.dart';
 import 'package:setall/data/models/wallet_entry_model.dart';
 import 'package:setall/data/repositories/setall_repository.dart';
+import 'package:setall/domain/entities/expense.dart';
 
 /// Stubbed rates: EUR→USD 1.08, GBP→USD 1.27, USD base.
 class _StubRates extends CurrencyService {
@@ -131,7 +132,8 @@ void main() {
               group_id TEXT, group_name TEXT,
               is_income INTEGER NOT NULL DEFAULT 0, category TEXT,
               deleted_by TEXT NOT NULL, deleted_by_name TEXT,
-              deleted_at TEXT NOT NULL, deleted_with_group_id TEXT
+              deleted_at TEXT NOT NULL, deleted_with_group_id TEXT,
+              original_created_at TEXT
             )
           ''');
           await db.execute('''
@@ -139,6 +141,17 @@ void main() {
               id TEXT PRIMARY KEY, expense_id TEXT NOT NULL,
               user_id TEXT NOT NULL, amount_owed TEXT,
               universal_usd_owed TEXT, deleted_with_group_id TEXT NOT NULL
+            )
+          ''');
+          await db.execute('''
+            CREATE TABLE expense_edits (
+              id TEXT PRIMARY KEY, expense_id TEXT NOT NULL,
+              old_description TEXT, new_description TEXT,
+              old_category TEXT, new_category TEXT,
+              old_amount TEXT, new_amount TEXT,
+              currency TEXT, group_id TEXT, group_name TEXT,
+              edited_by TEXT NOT NULL, edited_by_name TEXT,
+              edited_at TEXT NOT NULL
             )
           ''');
         },
@@ -324,6 +337,275 @@ void main() {
       expect(rows, hasLength(2));
       final sources = rows.map((r) => r['source_expense_id']).toSet();
       expect(sources, {sourceA, sourceB});
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Helpers for propagation tests
+  // ──────────────────────────────────────────────────────────────────────────
+
+  String isoNow() => DateTime.now().toUtc().toIso8601String();
+
+  Future<void> seedGroupExpense({
+    required String expenseId,
+    required String groupId,
+    required String amount,
+    String currency = 'USD',
+    String description = 'Test expense',
+  }) async {
+    await db.insert('groups', {
+      'id':          groupId,
+      'name':        'Test Group',
+      'creator_id':  _uid,
+      'created_by':  _uid,
+      'type':        'normal',
+      'is_deleted':  0,
+      'created_at':  isoNow(),
+      'updated_at':  isoNow(),
+    });
+    await db.insert('group_members', {
+      'group_id':  groupId,
+      'user_id':   _uid,
+      'joined_at': isoNow(),
+    });
+    await db.insert('expenses', {
+      'id':                  expenseId,
+      'group_id':            groupId,
+      'payer_id':            _uid,
+      'created_by':          _uid,
+      'amount':              amount,
+      'description':         description,
+      'currency':            currency,
+      'split_type':          'even',
+      'category':            'Food & drink',
+      'is_income':           0,
+      'created_at':          isoNow(),
+      'universal_usd_amount': amount,
+    });
+    await db.insert('splits', {
+      'id':                'split-$expenseId',
+      'expense_id':        expenseId,
+      'user_id':           _uid,
+      'universal_usd_owed': amount,
+      'entry_amount_owed':  amount,
+      'created_at':         isoNow(),
+    });
+  }
+
+  Future<void> createMirror({
+    required String mirrorId,
+    required String sourceExpenseId,
+    required String amount,
+    String currency = 'USD',
+  }) async {
+    await repo.upsertWalletEntry(
+      WalletEntryModel(
+        id:          mirrorId,
+        userId:      _uid,
+        amount:      amount,
+        currency:    currency,
+        description: 'Share · Test expense',
+        category:    'Food & drink',
+        isIncome:    false,
+        createdAt:   isoNow(),
+      ),
+      sourceExpenseId: sourceExpenseId,
+    );
+  }
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GROUP 3 — Delete propagation: mirror removed when source expense deleted
+  // ──────────────────────────────────────────────────────────────────────────
+  group('delete propagation', () {
+    test('deleteExpense removes linked mirror', () async {
+      const expenseId = 'exp-del-1';
+      const mirrorId  = 'mirror-del-1';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-del-1', amount: '100.00');
+      await createMirror(mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      // Verify mirror exists before delete.
+      var mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, hasLength(1));
+
+      final result = await repo.deleteExpense(expenseId);
+      expect(result, isTrue);
+
+      // Mirror must be gone.
+      mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, isEmpty);
+    });
+
+    test('deleteExpense is no-op when no mirror exists', () async {
+      const expenseId = 'exp-del-2';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-del-2', amount: '50.00');
+      // No mirror created — delete should still succeed.
+
+      final result = await repo.deleteExpense(expenseId);
+      expect(result, isTrue);
+    });
+
+    test('deleteExpenses batch removes all linked mirrors', () async {
+      const expA = 'exp-batch-a';
+      const expB = 'exp-batch-b';
+      const mirA = 'mirror-batch-a';
+      const mirB = 'mirror-batch-b';
+
+      await seedGroupExpense(expenseId: expA, groupId: 'grp-batch-a', amount: '30.00');
+      await seedGroupExpense(expenseId: expB, groupId: 'grp-batch-b', amount: '70.00');
+      await createMirror(mirrorId: mirA, sourceExpenseId: expA, amount: '30.00');
+      await createMirror(mirrorId: mirB, sourceExpenseId: expB, amount: '70.00');
+
+      var mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND group_id IS NULL AND source_expense_id IS NOT NULL',
+          whereArgs: [_uid]);
+      expect(mirrors, hasLength(2));
+
+      final result = await repo.deleteExpenses([expA, expB]);
+      expect(result, isTrue);
+
+      mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND group_id IS NULL AND source_expense_id IS NOT NULL',
+          whereArgs: [_uid]);
+      expect(mirrors, isEmpty);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GROUP 4 — Edit propagation: mirror updated when source expense edited
+  // ──────────────────────────────────────────────────────────────────────────
+  group('edit propagation', () {
+    test('edit group expense updates mirror amount', () async {
+      const expenseId = 'exp-edit-1';
+      const mirrorId  = 'mirror-edit-1';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-edit-1', amount: '100.00');
+      await createMirror(mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      // Capture the mirror's original date — editing must NOT reset it to now.
+      final before = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'source_expense_id = ?', whereArgs: [expenseId]);
+      final originalCreatedAt = before.first['created_at'];
+
+      // Edit: change my share from 100.00 → 33.33 USD.
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     'grp-edit-1',
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('33.33'))],
+        category:    'Food & drink',
+      );
+      expect(updated, isNotNull);
+
+      // Mirror must have the new share amount.
+      final mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, hasLength(1));
+      expect(mirrors.first['amount'], '33.33');
+      // …and its original date must be preserved (not jumped to today).
+      expect(mirrors.first['created_at'], originalCreatedAt);
+    });
+
+    test('edit group expense to zero share removes mirror', () async {
+      const expenseId = 'exp-edit-2';
+      const mirrorId  = 'mirror-edit-2';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-edit-2', amount: '100.00');
+      await createMirror(mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      // Edit: set my share to 0 (no longer a participant).
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     'grp-edit-2',
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: 'other-user', universalUsdOwed: Decimal.parse('100.00'))],
+        category:    'Food & drink',
+      );
+      expect(updated, isNotNull);
+
+      // Mirror must be gone.
+      final mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, isEmpty);
+    });
+
+    test('edit expense with no mirror is a no-op (no error)', () async {
+      const expenseId = 'exp-edit-3';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-edit-3', amount: '50.00');
+      // No mirror — edit should succeed without errors.
+
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     'grp-edit-3',
+        payerId:     _uid,
+        amount:      Decimal.parse('50.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('25.00'))],
+        category:    'Food & drink',
+      );
+      expect(updated, isNotNull);
+    });
+
+    test('edit does not create duplicate mirrors', () async {
+      const expenseId = 'exp-edit-4';
+      const mirrorId  = 'mirror-edit-4';
+
+      await seedGroupExpense(expenseId: expenseId, groupId: 'grp-edit-4', amount: '100.00');
+      await createMirror(mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      // First edit.
+      await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     'grp-edit-4',
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('50.00'))],
+        category:    'Food & drink',
+      );
+
+      // Second edit.
+      await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     'grp-edit-4',
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense (edited)',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('75.00'))],
+        category:    'Food & drink',
+      );
+
+      // Still exactly one mirror.
+      final mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, hasLength(1));
+      // Decimal.toString drops trailing zeros; 75.00 → '75'.
+      expect(mirrors.first['amount'], '75');
+      expect(mirrors.first['description'], 'Share · Test expense (edited)');
     });
   });
 }

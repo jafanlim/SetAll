@@ -1633,6 +1633,9 @@ class SetAllRepository {
       try {
         await _client.from('splits').delete().inFilter('expense_id', ids);
         await _client.from('expenses').delete().inFilter('id', ids);
+        for (final id in ids) {
+          await _removeMirrorForSource(id);
+        }
         _notify();
         return true;
       } catch (e) {
@@ -1658,6 +1661,9 @@ class SetAllRepository {
       await txn.delete('expenses', where: 'id IN ($placeholder)',          whereArgs: ids);
     });
 
+    for (final id in ids) {
+      await _removeMirrorForSource(id);
+    }
     _notify();
 
     // Push notification to other group members (fire-and-forget).
@@ -3630,6 +3636,15 @@ class SetAllRepository {
                   .select()
                   .eq('id', expenseId)
                   .single();
+              // Propagate share change to linked wallet mirror (5c-i).
+              await _propagateEditToMirror(
+                expenseId:   expenseId,
+                splits:      splits,
+                currency:    currency,
+                description: description,
+                category:    category,
+                isIncome:    isIncome,
+              );
               return ExpenseModel.fromJson(res);
             } catch (e) {
               if (e is PostgrestException) {
@@ -3771,6 +3786,17 @@ class SetAllRepository {
               }
             }
           }
+
+        // Propagate share change to linked wallet mirror (5c-i).
+        await _propagateEditToMirror(
+          expenseId:   expenseId,
+          splits:      splits,
+          currency:    currency,
+          description: description,
+          category:    category,
+          isIncome:    isIncome,
+        );
+
         final updatedRow = await LocalDatabase.db.query(
       'expenses',
       where: 'id = ?',
@@ -3802,6 +3828,7 @@ class SetAllRepository {
       try {
         await _client.from('splits').delete().eq('expense_id', expenseId);
         await _client.from('expenses').delete().eq('id', expenseId);
+        await _removeMirrorForSource(expenseId);
         return true;
       } catch (_) {
         return false;
@@ -3869,6 +3896,7 @@ class SetAllRepository {
       'splits', where: 'expense_id = ?', whereArgs: [expenseId]);
     await LocalDatabase.db.delete(
       'expenses', where: 'id = ?', whereArgs: [expenseId]);
+    await _removeMirrorForSource(expenseId);
     _notify();
     return true;
   }
@@ -4373,19 +4401,128 @@ class SetAllRepository {
           .eq('source_expense_id', sourceExpenseId)
           .isFilter('group_id', null)
           .limit(1);
-      if (rows.isNotEmpty) {
-        return rows.first['id'] as String?;
-      }
-      return null;
+      return rows.isNotEmpty ? rows.first['id'] as String? : null;
+    }
+    try {
+      final rows = await LocalDatabase.db.query(
+        'expenses',
+        columns: ['id'],
+        where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+        whereArgs: [payerId, sourceExpenseId],
+        limit: 1,
+      );
+      return rows.isNotEmpty ? rows.first['id'] as String? : null;
+    } catch (e) {
+      // Tolerate ONLY a missing source_expense_id column (legacy/test schemas
+      // that predate the mirror feature). Any other failure must propagate so
+      // dedupe never silently returns null and writes a duplicate mirror.
+      if (e.toString().contains('source_expense_id')) return null;
+      rethrow;
+    }
+  }
+
+  /// Reads the stored created_at of an expense/mirror row, or null if absent.
+  /// Used by edit propagation to preserve the mirror's original date.
+  Future<String?> _existingCreatedAt(String rowId) async {
+    if (_isWeb && _client != null) {
+      final row = await _client
+          .from('expenses')
+          .select('created_at')
+          .eq('id', rowId)
+          .maybeSingle();
+      return row?['created_at'] as String?;
     }
     final rows = await LocalDatabase.db.query(
       'expenses',
-      columns: ['id'],
-      where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
-      whereArgs: [payerId, sourceExpenseId],
+      columns: ['created_at'],
+      where: 'id = ?',
+      whereArgs: [rowId],
       limit: 1,
     );
-    return rows.isNotEmpty ? rows.first['id'] as String? : null;
+    return rows.isNotEmpty ? rows.first['created_at'] as String? : null;
+  }
+
+  /// Silently removes the wallet mirror row for a given source expense.
+  /// Hard-deletes from expenses (no snapshot → not restorable).
+  /// No-op when no mirror exists. Used by edit/delete propagation (5c-i).
+  Future<void> _removeMirrorForSource(String sourceExpenseId) async {
+    final uid = await ensureUser();
+    if (uid == null) return;
+
+    final mirrorId = await _findMirrorId(uid, sourceExpenseId);
+    if (mirrorId == null) return;
+
+    if (_isWeb && _client != null) {
+      await _client
+          .from('expenses')
+          .delete()
+          .eq('id', mirrorId)
+          .eq('payer_id', uid)
+          .isFilter('group_id', null);
+    } else {
+      await LocalDatabase.db.delete(
+        'expenses',
+        where: 'id = ? AND payer_id = ? AND group_id IS NULL',
+        whereArgs: [mirrorId, uid],
+      );
+    }
+  }
+
+  /// After an expense is edited: recompute the current user's share and update
+  /// or remove the linked wallet mirror. No-op when no mirror exists.
+  /// Uses entry-currency share amounts — consistent with how the mirror was
+  /// originally created (see add_expense_screen._doMirrorShare).
+  Future<void> _propagateEditToMirror({
+    required String expenseId,
+    required List<SplitInsert> splits,
+    required String currency,
+    required String description,
+    required String category,
+    required bool isIncome,
+  }) async {
+    final uid = await ensureUser();
+    if (uid == null) return;
+
+    final mirrorId = await _findMirrorId(uid, expenseId);
+    if (mirrorId == null) return; // no mirror exists — nothing to do
+
+    // Find current user's new share in the updated splits.
+    // SplitInsert.universalUsdOwed is the entry-currency share amount
+    // (historical naming — confirmed by comment in addExpense).
+    SplitInsert? mySplit;
+    for (final s in splits) {
+      if (s.userId == uid) {
+        mySplit = s;
+        break;
+      }
+    }
+
+    if (mySplit == null || mySplit.universalUsdOwed <= Decimal.zero) {
+      // Current user is no longer a participant or has zero share.
+      await _removeMirrorForSource(expenseId);
+      return;
+    }
+
+    // Update the existing mirror. Reuse mirrorId so upsertWalletEntry dedupes
+    // to the same row (via _findMirrorId inside upsertWalletEntry).
+    final desc = description.isNotEmpty ? 'Share · $description' : 'Share · $category';
+    // Preserve the mirror's original date. upsertWalletEntry defaults a null
+    // createdAt to now(), which would wrongly jump the wallet entry to today
+    // on every edit, so read and re-supply the existing created_at.
+    final originalCreatedAt = await _existingCreatedAt(mirrorId);
+    await upsertWalletEntry(
+      WalletEntryModel(
+        id:          mirrorId,
+        userId:      '',    // filled by upsertWalletEntry from auth
+        amount:      mySplit.universalUsdOwed.toString(),
+        currency:    currency,
+        description: desc,
+        category:    category,
+        isIncome:    isIncome,
+        createdAt:   originalCreatedAt,
+      ),
+      sourceExpenseId: expenseId,
+    );
   }
 
   Future<WalletEntryModel> upsertWalletEntry(
