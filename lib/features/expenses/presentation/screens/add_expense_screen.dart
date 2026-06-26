@@ -12,11 +12,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/attachment_processor.dart';
 import '../../../../core/utils/category_utils.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/utils/input_sanitizer.dart';
 import '../../../../core/utils/split_engine.dart';
+import '../../../../core/utils/mirror_share_pref.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../data/repositories/setall_repository.dart';
@@ -554,6 +556,9 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
             backgroundColor: _teal.withValues(alpha: 0.9),
           ),
         );
+        // Try to mirror the current user's share into their wallet.
+        await _maybeMirrorShareToWallet(expense, results, currentUid, repo);
+        if (!mounted) return;
         if (context.canPop()) {
           context.pop();
         } else {
@@ -652,6 +657,334 @@ class _AddExpenseScreenState extends ConsumerState<AddExpenseScreen> {
     } catch (e) {
       debugPrint('[_runAlertChecks] $e');
     }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Wallet mirror: copy my share of a group expense into my personal wallet
+  // ---------------------------------------------------------------------------
+
+  /// Computes the current user's share and, depending on the stored
+  /// [MirrorSharePreference], either mirrors automatically, shows a confirm
+  /// bottom sheet, or skips silently.
+  Future<void> _maybeMirrorShareToWallet(
+    dynamic expense,
+    List<SplitResult> results,
+    String? currentUid,
+    SetAllRepository repo,
+  ) async {
+    if (currentUid == null) return;
+    final myShare = myShareFromResults(results, currentUid);
+    if (myShare == null) return; // I owe nothing — nothing to mirror
+
+    final pref = await readMirrorSharePref();
+
+    switch (pref) {
+      case MirrorSharePreference.never:
+        return; // skip silently
+
+      case MirrorSharePreference.always:
+        final mirrorId = await _doMirrorShare(
+          expenseId: expense.id as String,
+          myShare: myShare,
+          repo: repo,
+        );
+        if (!mounted) return;
+        final scaffold = ScaffoldMessenger.of(context);
+        scaffold.showSnackBar(
+          SnackBar(
+            content: Text(
+              'Mirrored ${formatAmountForCurrency(myShare.toString(), _currency)} $_currency to wallet',
+            ),
+            action: mirrorId != null
+                ? SnackBarAction(
+                    label: 'Undo',
+                    onPressed: () {
+                      repo.deleteWalletEntry(mirrorId);
+                      scaffold.showSnackBar(
+                        const SnackBar(content: Text('Mirror removed')),
+                      );
+                    },
+                  )
+                : null,
+            backgroundColor: _teal.withValues(alpha: 0.9),
+          ),
+        );
+
+      case MirrorSharePreference.ask:
+        if (!mounted) return;
+        final confirmed = await _showMirrorSheet(
+          shareAmount: myShare,
+          repo: repo,
+          expense: expense,
+        );
+        // Sheet dismissed (Not Now / swipe-down) — do nothing; mirror was
+        // already written inside the sheet builder when "Add to wallet" was
+        // pressed (to keep the preference-setting code co-located).
+        if (confirmed == true && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text('Share added to wallet'),
+              backgroundColor: _teal.withValues(alpha: 0.9),
+            ),
+          );
+        }
+    }
+  }
+
+  /// Writes the wallet mirror row. Returns the entry id so the caller can
+  /// offer an Undo action.
+  Future<String?> _doMirrorShare({
+    required String? expenseId,
+    required Decimal myShare,
+    required SetAllRepository repo,
+  }) async {
+    try {
+      final desc = InputSanitizer.sanitize(_descriptionCtrl.text.trim());
+      final entry = WalletEntryModel(
+        id: const Uuid().v4(),
+        userId: '', // upsertWalletEntry fills from auth
+        amount: myShare.toString(),
+        currency: _currency,
+        description: 'Share · $desc',
+        category: _category,
+        isIncome: false,
+        createdAt: _composeCreatedAt(_selectedDate).toIso8601String(),
+        iconCodepoint: _entryIcon.codePoint,
+        iconColor: _entryColor.toARGB32(),
+      );
+      final saved = await repo.upsertWalletEntry(
+        entry,
+        sourceExpenseId: expenseId,
+      );
+      return saved.id;
+    } catch (e) {
+      debugPrint('[_doMirrorShare] $e');
+      return null;
+    }
+  }
+
+  /// Shows a bottom sheet asking the user whether to mirror their share.
+  /// Returns `true` when "Add to wallet" is tapped, `false` otherwise
+  /// (Not Now / swipe-dismiss).
+  ///
+  /// Preference persistence (always/never) happens inside the sheet builder
+  /// so the checkbox state is accessible.
+  Future<bool> _showMirrorSheet({
+    required Decimal shareAmount,
+    required SetAllRepository repo,
+    required dynamic expense,
+  }) async {
+    final desc = InputSanitizer.sanitize(_descriptionCtrl.text.trim());
+    final formatted = formatAmountForCurrency(shareAmount.toString(), _currency);
+    final theme = Theme.of(context);
+    final textColor = theme.textTheme.bodyMedium?.color ?? Colors.black87;
+    // Simple local date format — no intl dependency needed.
+    final dateStr =
+        '${_selectedDate.year}-${_selectedDate.month.toString().padLeft(2, '0')}-${_selectedDate.day.toString().padLeft(2, '0')}';
+
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: theme.colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        var always = false;
+        var never = false;
+
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: Colors.grey.shade400,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'Add your share to your wallet?',
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$formatted $_currency',
+                      style: theme.textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: _teal,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Description row
+                    Row(
+                      children: [
+                        Text('Description',
+                          style: TextStyle(fontSize: 13, color: textColor.withValues(alpha: 0.7))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text('Share · $desc',
+                            style: TextStyle(fontSize: 14, color: textColor),
+                            textAlign: TextAlign.end),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // Date row
+                    Row(
+                      children: [
+                        Text('Date',
+                          style: TextStyle(fontSize: 13, color: textColor.withValues(alpha: 0.7))),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(dateStr,
+                            style: TextStyle(fontSize: 14, color: textColor),
+                            textAlign: TextAlign.end),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // ── Primary actions ───────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              if (never) {
+                                writeMirrorSharePref(MirrorSharePreference.never);
+                              }
+                              Navigator.of(ctx).pop(false);
+                            },
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Not now'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: FilledButton(
+                            onPressed: () async {
+                              final nav = Navigator.of(ctx);
+                              if (always) {
+                                await writeMirrorSharePref(MirrorSharePreference.always);
+                              }
+                              // Write the mirror entry before popping.
+                              await _doMirrorShare(
+                                expenseId: expense.id as String,
+                                myShare: shareAmount,
+                                repo: repo,
+                              );
+                              nav.pop(true);
+                            },
+                            style: FilledButton.styleFrom(
+                              backgroundColor: _teal,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: const Text('Add to wallet'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // ── Preference toggles ────────────────────────────
+                    Row(
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setSheetState(() {
+                              always = !always;
+                              if (always) never = false;
+                            }),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: always,
+                                  onChanged: (v) => setSheetState(() {
+                                    always = v!;
+                                    if (always) never = false;
+                                  }),
+                                  activeColor: _teal,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    'Always do this',
+                                    style: TextStyle(fontSize: 13, color: textColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: InkWell(
+                            onTap: () => setSheetState(() {
+                              never = !never;
+                              if (never) always = false;
+                            }),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Checkbox(
+                                  value: never,
+                                  onChanged: (v) => setSheetState(() {
+                                    never = v!;
+                                    if (never) always = false;
+                                  }),
+                                  activeColor: _teal,
+                                  materialTapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                                Flexible(
+                                  child: Text(
+                                    'Don\'t ask again',
+                                    style: TextStyle(fontSize: 13, color: textColor),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    return result ?? false;
   }
 
   // ---------------------------------------------------------------------------

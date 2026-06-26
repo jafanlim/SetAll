@@ -194,4 +194,97 @@ void main() {
       expect(eur, equals(Decimal.parse('100.00')));
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // myShareFromResults — pure helper, no I/O
+  // ---------------------------------------------------------------------------
+
+  group('myShareFromResults', () {
+    test('returns my share from an even split (residual holder)', () {
+      // 100.00 / 3 = 33.33 per person, payer (userId 'a') absorbs remainder
+      final results = SplitEngine.splitEven(
+        total: Decimal.parse('100.00'),
+        participantIds: ['a', 'b', 'c'],
+        payerId: 'a',
+      );
+      // Payer 'a' gets the residual: 100.00 - 33.33 - 33.33 = 33.34
+      final share = myShareFromResults(results, 'a');
+      expect(share, isNotNull);
+      expect(share, equals(Decimal.parse('33.34')));
+    });
+
+    test('returns my share from an even split (non-payer)', () {
+      final results = SplitEngine.splitEven(
+        total: Decimal.parse('100.00'),
+        participantIds: ['a', 'b', 'c'],
+        payerId: 'a',
+      );
+      // Non-payer 'b' gets the base: 33.33
+      final share = myShareFromResults(results, 'b');
+      expect(share, isNotNull);
+      expect(share, equals(Decimal.parse('33.33')));
+    });
+
+    test('never returns a value with more than 2 decimal places', () {
+      // 100.00 / 3 — no share should have fractional cents
+      final results = SplitEngine.splitEven(
+        total: Decimal.parse('100.00'),
+        participantIds: ['a', 'b', 'c'],
+        payerId: 'a',
+      );
+      for (final r in results) {
+        final share = myShareFromResults(results, r.userId);
+        expect(share, isNotNull);
+        // toStringAsFixed(2) must equal the raw string — no 33.3333...
+        expect(share!.toStringAsFixed(2), share.toString());
+      }
+    });
+
+    test('returns exact amountOwed from manual split', () {
+      final results = SplitEngine.splitCustom(
+        total: Decimal.parse('200.00'),
+        participantIds: ['a', 'b', 'c'],
+        amountsOwed: [
+          Decimal.parse('150.00'),
+          Decimal.parse('30.00'),
+          Decimal.parse('20.00'),
+        ],
+      );
+      expect(myShareFromResults(results, 'a'), equals(Decimal.parse('150.00')));
+      expect(myShareFromResults(results, 'b'), equals(Decimal.parse('30.00')));
+      expect(myShareFromResults(results, 'c'), equals(Decimal.parse('20.00')));
+    });
+
+    test('returns null for payer with zero share', () {
+      // Payer 'a' pays, 'b' owes 100. 'a' has share 0.
+      final results = [
+        SplitResult(userId: 'a', amountOwed: Decimal.zero),
+        SplitResult(userId: 'b', amountOwed: Decimal.parse('100.00')),
+      ];
+      expect(myShareFromResults(results, 'a'), isNull);
+    });
+
+    test('returns null when user not in results', () {
+      final results = SplitEngine.splitEven(
+        total: Decimal.parse('100.00'),
+        participantIds: ['a', 'b'],
+        payerId: 'a',
+      );
+      expect(myShareFromResults(results, 'x'), isNull);
+    });
+
+    test('returns null for empty results', () {
+      expect(myShareFromResults([], 'a'), isNull);
+    });
+
+    test('reads amountOwed directly — never re-divides', () {
+      // Even if the results were from a split, the helper just reads.
+      // We verify by creating results that DON'T sum to any "total".
+      final results = [
+        SplitResult(userId: 'a', amountOwed: Decimal.parse('42.42')),
+      ];
+      // Helper should return 42.42 — it doesn't know or care about any total.
+      expect(myShareFromResults(results, 'a'), equals(Decimal.parse('42.42')));
+    });
+  });
 }
