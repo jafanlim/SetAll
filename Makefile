@@ -27,6 +27,10 @@ tailwind:
 # 6. Build Flutter web (release, JS renderer default in Flutter 3.22+)
 build-web: tailwind
 	flutter build web --release --no-tree-shake-icons --dart-define-from-file=.env.client
+	@if grep -rq 'your-project' build/web; then \
+	  echo "ERROR: build/web contains the 'your-project' placeholder — .env.client is not filled with real values (SUPABASE_URL/keys). Refusing to ship: a placeholder Supabase URL breaks ALL auth."; \
+	  exit 1; \
+	fi
 	cp web/app.html        build/web/app.html
 	cp "new website/landing page.html" build/web/index.html
 	cp web/login.html      build/web/login.html

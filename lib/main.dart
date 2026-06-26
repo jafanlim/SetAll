@@ -139,7 +139,7 @@ class _AppLoaderState extends State<_AppLoader> {
 
   Future<void> _init() async {
     try {
-      final hasSupabase = !AuthConfig.supabaseUrl.startsWith('YOUR_') && !AuthConfig.supabaseAnonKey.startsWith('YOUR_');
+      final hasSupabase = AuthConfig.hasValidSupabaseConfig;
 
       if (kIsWeb) {
         // Web: Supabase only. No anonymous sign-in; user signs in with Email or Google.

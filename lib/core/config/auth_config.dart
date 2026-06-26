@@ -40,6 +40,30 @@ class AuthConfig {
     defaultValue: 'sb_publishable_HAOfBmXozIHoIJVgiSgs6Q_zopu6KJ-',
   );
 
+  /// True only when [supabaseUrl] / [supabaseAnonKey] hold real values — not the
+  /// `.env.client.example` placeholders. Guards against shipping a build that
+  /// points at a non-existent project (which silently breaks ALL auth): a build
+  /// where `--dart-define-from-file=.env.client` injected
+  /// `SUPABASE_URL=https://your-project-ref.supabase.co` got past the old
+  /// `startsWith('YOUR_')` check and broke every web sign-in method.
+  static bool get hasValidSupabaseConfig {
+    bool looksPlaceholder(String v) {
+      final s = v.toLowerCase();
+      return s.isEmpty ||
+          s.startsWith('your_') ||
+          s.startsWith('your-') ||
+          s.contains('your-project') ||
+          s.contains('your_publishable') ||
+          s.contains('_here');
+    }
+
+    return supabaseUrl.startsWith('https://') &&
+        supabaseUrl.endsWith('.supabase.co') &&
+        !looksPlaceholder(supabaseUrl) &&
+        supabaseAnonKey.isNotEmpty &&
+        !looksPlaceholder(supabaseAnonKey);
+  }
+
   // 2. OAUTH CREDENTIALS (For Phase 0: Google Sign-In)
   // You will need these from the Google Cloud Console later when setting up Google Auth.
   
