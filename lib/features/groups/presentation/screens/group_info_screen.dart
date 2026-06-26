@@ -5,10 +5,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/providers/setall_providers.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
+import '../../../../data/models/profile_model.dart';
+import '../../../../domain/services/settlement_engine.dart';
 import '../../../settings/services/pdf_export_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -294,6 +298,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     ref.watch(myGroupsProvider);
     final membersAsync = ref.watch(groupMembersProvider(group.id));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(group.id));
+    final debtsAsync = ref.watch(simplifiedDebtsProvider(group.id));
 
     final accentColor = group.colorValue != null
         ? Color(group.colorValue!)
@@ -473,96 +478,13 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
               membersAsync.when(
                 data: (members) => members.isEmpty
                     ? const SizedBox.shrink()
-                    : GlassCard(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Members (${members.length})',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
-                                    color:
-                                        theme.colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                                TextButton.icon(
-                                  onPressed: () => context.push(
-                                    '/group/${group.id}/invite',
-                                    extra: {'groupName': group.name},
-                                  ),
-                                  icon: const Icon(
-                                      Icons.person_add_outlined,
-                                      size: 14),
-                                  label: const Text('Add',
-                                      style: TextStyle(fontSize: 11)),
-                                  style: TextButton.styleFrom(
-                                    foregroundColor: _teal,
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 4),
-                                    minimumSize: Size.zero,
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: members.map((m) {
-                                final initial = (m.name.isNotEmpty)
-                                    ? m.name[0].toUpperCase()
-                                    : '?';
-                                return Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Container(
-                                      width: 40,
-                                      height: 40,
-                                      decoration: BoxDecoration(
-                                        color: accentColor
-                                            .withValues(alpha: 0.15),
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: Center(
-                                        child: Text(
-                                          initial,
-                                          style: TextStyle(
-                                            color: accentColor,
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 15,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    SizedBox(
-                                      width: 48,
-                                      child: Text(
-                                        m.name.split(' ').first,
-                                        textAlign: TextAlign.center,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: theme.colorScheme
-                                              .onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
-                          ],
-                        ),
+                    : debtsAsync.when(
+                        data: (debts) => _buildMembersCard(
+                            members, debts, theme, accentColor),
+                        loading: () => _buildMembersCard(
+                            members, const [], theme, accentColor),
+                        error: (_, _) => _buildMembersCard(
+                            members, const [], theme, accentColor),
                       ),
                 loading: () => const SizedBox.shrink(),
                 error: (_, _) => const SizedBox.shrink(),
@@ -694,6 +616,138 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
             ),
           ),
       ],
+    );
+  }
+
+  // ── Members card builder ─────────────────────────────────────────────
+  Widget _buildMembersCard(
+    List<ProfileModel> members,
+    List<SettlementTransaction> debts,
+    ThemeData theme,
+    Color accentColor,
+  ) {
+    final myUid = Supabase.instance.client.auth.currentUser?.id;
+    return GlassCard(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Members (${members.length})',
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.5,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => context.push(
+                  '/group/${group.id}/invite',
+                  extra: {'groupName': group.name},
+                ),
+                icon: const Icon(Icons.person_add_outlined, size: 14),
+                label: const Text('Add', style: TextStyle(fontSize: 11)),
+                style: TextButton.styleFrom(
+                  foregroundColor: _teal,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...members.map((m) {
+            final initial =
+                m.name.isNotEmpty ? m.name[0].toUpperCase() : '?';
+            String label;
+            Color labelColor;
+
+            if (group.isSettled) {
+              label = 'settled up';
+              labelColor = theme.colorScheme.onSurfaceVariant;
+            } else if (myUid != null && m.id != myUid) {
+              final owesYouTxns = debts
+                  .where(
+                      (t) => t.toUserId == myUid && t.fromUserId == m.id)
+                  .toList();
+              final youOweTxns = debts
+                  .where(
+                      (t) => t.fromUserId == myUid && t.toUserId == m.id)
+                  .toList();
+              if (owesYouTxns.isNotEmpty) {
+                final total = owesYouTxns.fold(
+                    Decimal.zero, (sum, t) => sum + t.amount);
+                label =
+                    'owes you ${owesYouTxns.first.currency} ${total.toStringAsFixed(2)}';
+                labelColor = _teal;
+              } else if (youOweTxns.isNotEmpty) {
+                final total = youOweTxns.fold(
+                    Decimal.zero, (sum, t) => sum + t.amount);
+                label =
+                    'you owe ${youOweTxns.first.currency} ${total.toStringAsFixed(2)}';
+                labelColor = _orange;
+              } else {
+                label = 'settled up';
+                labelColor = theme.colorScheme.onSurfaceVariant;
+              }
+            } else {
+              label = 'settled up';
+              labelColor = theme.colorScheme.onSurfaceVariant;
+            }
+
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: accentColor.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        initial,
+                        style: TextStyle(
+                          color: accentColor,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      m.name.split(' ').first,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: theme.colorScheme.onSurface,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: labelColor,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
     );
   }
 }
