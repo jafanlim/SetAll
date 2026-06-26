@@ -87,7 +87,8 @@ Future<void> _createSchema(Database db, int _) async {
       icon_codepoint        INTEGER,
       icon_color            INTEGER,
       attachment_urls       TEXT,
-      notes                 TEXT
+      notes                 TEXT,
+      source_expense_id     TEXT
     )
   ''');
   await db.execute('''
