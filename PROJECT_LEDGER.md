@@ -190,8 +190,8 @@ secret; surgical diffs (no whole-file reflow / broad `git add`); not done until 
 
 | # | Pri | Task | Maps to | Status |
 |---|---|---|---|---|
-| 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | **CODE DONE (PR #26 + #27); APPLIED to prod — gateway 403 ELIMINATED.** 1 blocker left: `EDGE_SHARED_SECRET`≠Vault (gated secret op) |
-| 2 | P1 | `setall-push-and-digest` | §4 item 5 | BLOCKED on the `EDGE_SHARED_SECRET` fix above |
+| 1 | P0 (LEAD) | `setall-edge-key-completion` | foundational (unblocks push/digest) | ✅ **DONE + LIVE-VERIFIED 2026-06-26** (PR #26 + #27; applied to prod; digest test = 200 `sent:1`, email delivered) |
+| 2 | P1 | `setall-push-and-digest` | §4 item 5 | **UNBLOCKED** — TASK 1 verified; ready to dispatch |
 | 3 | P1 | `net-balance-offset` (write short spec first) | carried TODO #1 | not started |
 | 4 | P1 | `setall-web-insights-datasource` | §4 item 4 | not started |
 | 5 | P1 | `setall-shared-expense-wallet-share` | §4 item 2 | not started |
@@ -232,13 +232,13 @@ atop this unfinished migration.
     or the `--no-verify-jwt` flag).
   - **Digest live-test** (`net.http_post` to `monthly-digest?test=akostnz@gmail.com`, secret read from Vault in-DB):
     **403 GONE** — request now reaches the function. (Returned the function's own response, not a gateway reject.)
-- ⛔ **ONE BLOCKER LEFT (gated secret op — user must run):** digest test returned **401 `{"error":"unauthorized"}`** = the
-  function's `x-edge-secret` gate. Diagnosed via SHA-256 digest compare (no secret exposed): the edge-fn env `EDGE_SHARED_SECRET`
-  (digest `64f6…`) ≠ Vault `edge_shared_secret` (sha `803e…`). These were meant to be identical (PR #23/#24 design: triggers send
-  Vault value, fns check `EDGE_SHARED_SECRET` env). Fix = align them: `supabase secrets set EDGE_SHARED_SECRET=<the exact Vault
-  edge_shared_secret value> --project-ref vrsmsgyxeyzyrdonsnrk` (no redeploy needed — fn secrets are injected at invocation).
-  Then re-run the digest test → expect 200 + email. **NOT a TASK 1 code issue** (the key migration is complete + verified); this is
-  the separate x-edge-secret enforcement secret. **TASK 2 does not start until this 401→200 flips.**
+- ✅ **LIVE-VERIFIED 2026-06-26 — digest test = 200 `{"sent":1,"test":true,"email":"akostnz@gmail.com"}`, email delivered.**
+  The path from 401→200 had two parts: (1) `EDGE_SHARED_SECRET` (fn env) had to equal Vault `edge_shared_secret` — the user set it
+  via Dashboard (the `supabase secrets list` digest is CACHED/stale, so it kept showing the old `64f6…`; a throwaway `edge-secret-debug`
+  fn proved `match:true`, both sha `803e3f1c…`, then deleted); (2) **STALE ISOLATES** — the 5 fns were deployed BEFORE the secret was
+  fixed, and **Supabase injects fn secrets at isolate boot** so warm isolates kept the old value. **Redeploying the 5 fns after the
+  secret was correct** cycled the isolates → gate passes. (Lesson in memory `edge-fn-legacy-keys-disabled`: redeploy fns after any
+  change to a secret they read.) The other 4 fns share the identical gate/key pattern and were redeployed together. **TASK 1 closed.**
 - ⚠️ **Separate prod-divergence flag (NOT TASK 1):** live `supabase_migrations` is missing `20260624000000` (C-3 group-identity,
   PR #13) — group icon/colour fixes aren't on prod. Tracked under Phase-1; verify-and-apply separately.
 
