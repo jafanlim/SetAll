@@ -76,6 +76,9 @@ class NotificationService {
       final token = await messaging.getToken();
       if (token != null) {
         await _persistToken(token);
+        if (Supabase.instance.client.auth.currentUser != null) {
+          await syncToSupabase(token: token);
+        }
       }
 
       // ── 4. Token refresh — re-persist and re-sync ───────────────────────
@@ -113,7 +116,7 @@ class NotificationService {
       final uid = client.auth.currentUser?.id;
       if (uid == null) return;
 
-      final fcmToken = token ?? await getToken();
+      final fcmToken = token ?? await getToken() ?? await FirebaseMessaging.instance.getToken();
       if (fcmToken == null) return;
 
       await client.from('fcm_tokens').upsert(
