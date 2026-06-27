@@ -96,13 +96,15 @@ class _AddPersonModalState extends ConsumerState<_AddPersonModal> {
       if (mounted) Navigator.of(context).pop(AddPersonResultReal(profile));
     } catch (e) {
       if (!mounted) return;
-      final msg = e.toString().toLowerCase();
+      final raw = e.toString();
+      debugPrint('[addPersonModal] addMemberById failed: $raw');
+      final msg = raw.toLowerCase();
       setState(() {
         _error = msg.contains('already') || msg.contains('duplicate') || msg.contains('23505')
             ? '${profile.name} is already in this group.'
             : msg.contains('not found')
                 ? 'User not found.'
-                : 'Could not add member — check connection or try again.';
+                : 'Could not add member — $raw';
         _adding = false;
       });
     }

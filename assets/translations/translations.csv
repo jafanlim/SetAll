@@ -58,6 +58,7 @@ analytics.spending,Spending,Ausgaben,Расходы,ხარჯები,Dépen
 analytics.income,Income,Einnahmen,Доходы,შემოსავალი,Revenus,Ingresos
 analytics.daily_burn,Daily burn,Tagesbedarf,Дневной расход,დღიური ხარჯი,Dépense journalière,Gasto diario
 analytics.more,more,weitere,ещё,მეტი,de plus,más
+analytics.open_full_analytics,Open Full Analytics,Vollständige Analyse öffnen,Открыть полную аналитику,სრული ანალიტიკის გახსნა,Ouvrir l'analyse complète,Abrir análisis completo
 activity.title,Activity,Aktivität,Активность,აქტივობა,Activité,Actividad
 activity.no_activity,No activity yet,Noch keine Aktivität,Активности пока нет,აქტივობა ჯერ არ არის,Pas encore d'activité,Aún no hay actividad
 activity.start_tracking,Start Tracking,Tracking starten,Начать учёт,დაიწყეთ აღრიცხვა,Commencer le suivi,Empezar a registrar

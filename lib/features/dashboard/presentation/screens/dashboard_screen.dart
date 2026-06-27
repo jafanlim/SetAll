@@ -906,6 +906,21 @@ class _CompactAnalyticsSectionState extends State<_CompactAnalyticsSection> {
               ),
             ),
           ),
+        // ── Open full analytics screen ────────────────────────────────────
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: () {
+              HapticUtils.lightTap();
+              context.push(AppRouter.analytics);
+            },
+            icon: const Icon(Icons.analytics_outlined, size: 16, color: _aTeal),
+            label: Text(
+              'analytics.open_full_analytics'.tr(),
+              style: const TextStyle(fontSize: 12, color: _aTeal),
+            ),
+          ),
+        ),
       ],
     );
   }

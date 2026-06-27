@@ -185,11 +185,12 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (kIsWeb) {
         // Web: use Supabase OAuth redirect (same pattern as Google).
+        // Do NOT pass platformDefault on web — it opens a popup which
+        // browsers block, silently breaking the OAuth redirect.
         final redirectUrl = _authRedirectUrl();
         await Supabase.instance.client.auth.signInWithOAuth(
           OAuthProvider.apple,
           redirectTo: redirectUrl,
-          authScreenLaunchMode: LaunchMode.platformDefault,
         );
         if (mounted) setState(() => _loading = false);
       } else {
@@ -220,15 +221,26 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _loading = true);
     try {
       final redirectUrl = _authRedirectUrl();
-      await Supabase.instance.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: redirectUrl,
-        // platformDefault opens an in-app browser (SFSafariViewController on iOS,
-        // Chrome Custom Tabs on Android) that CAN be programmatically dismissed.
-        // DeepLinkService calls closeWebView() after the auth callback.
-        authScreenLaunchMode: LaunchMode.platformDefault,
-        queryParams: const {'prompt': 'select_account'},
-      );
+      if (kIsWeb) {
+        // Web: full-page redirect (no authScreenLaunchMode override needed;
+        // supabase_flutter hardcodes webOnlyWindowName:'_self' so the
+        // current page navigates to Google, not a popup).
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: redirectUrl,
+          queryParams: const {'prompt': 'select_account'},
+        );
+      } else {
+        // Mobile: platformDefault opens an in-app browser (SFSafariViewController
+        // on iOS, Chrome Custom Tabs on Android) that CAN be programmatically
+        // dismissed. DeepLinkService calls closeWebView() after the auth callback.
+        await Supabase.instance.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: redirectUrl,
+          authScreenLaunchMode: LaunchMode.platformDefault,
+          queryParams: const {'prompt': 'select_account'},
+        );
+      }
       if (mounted) setState(() => _loading = false);
       // Web: redirect happens in browser; app will reload with session.
       // Mobile: check profile existence after OAuth returns.

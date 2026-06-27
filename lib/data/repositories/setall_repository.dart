@@ -1072,7 +1072,8 @@ class SetAllRepository {
         // Reset sentinel so the sync service can retry later.
         await db.update('groups', {'synced_at': null}, where: 'id = ?', whereArgs: [id]);
         await db.update('group_members', {'synced_at': null}, where: 'group_id = ?', whereArgs: [id]);
-        debugPrint('⚠️ createGroup RPC failed (saved locally, will sync later): $e');
+        debugPrint('⚠️ createGroup RPC failed — group saved locally, '
+            'member-add/expense-split will fail until sync succeeds: $e');
       }
     } else {
       // Offline — reset sentinel so sync can push when connectivity returns.
@@ -2270,10 +2271,42 @@ class SetAllRepository {
     if (_client == null || !await _isOnline) {
       throw Exception('Internet connection required to add member.');
     }
-    await _client.rpc('add_member_by_id', params: {
-      'p_group_id': groupId,
-      'p_user_id': userId,
-    });
+    if (_client.auth.currentUser?.id == null) {
+      throw Exception('You must be signed in to add members. '
+          'Please sign out and sign in again.');
+    }
+    try {
+      await _client.rpc('add_member_by_id', params: {
+        'p_group_id': groupId,
+        'p_user_id': userId,
+      });
+    } catch (e) {
+      // Surface the RPC error verbatim — it carries the real reason
+      // (membership check, user-not-found, etc.).
+      final raw = e.toString();
+      if (raw.contains('must be a member')) {
+        // Group may exist only locally (create_group RPC failed silently).
+        // Check if the group even exists on Supabase. Use a flag so the
+        // diagnostic throw below isn't swallowed by this inner try/catch.
+        bool groupMissingRemotely = false;
+        try {
+          final remoteGroup = await _client
+              .from('groups')
+              .select('id')
+              .eq('id', groupId)
+              .maybeSingle();
+          groupMissingRemotely = remoteGroup == null;
+        } catch (_) {
+          // groups query also failed — fall through to the raw RPC error.
+        }
+        if (groupMissingRemotely) {
+          throw Exception('This group hasn\'t synced to the server yet. '
+              'Try pulling to refresh, or recreate the group.');
+        }
+        throw Exception(raw);
+      }
+      rethrow;
+    }
 
     // Mirror to local SQLite so the member appears immediately on mobile.
     if (!_isWeb) {
@@ -3863,6 +3896,7 @@ class SetAllRepository {
         await _client.from('splits').delete().eq('expense_id', expenseId);
         await _client.from('expenses').delete().eq('id', expenseId);
         await _removeMirrorForSource(expenseId);
+        _notify();
         return true;
       } catch (_) {
         return false;
@@ -4619,7 +4653,7 @@ class SetAllRepository {
         'expense_id':           mirrorId,
         'description':          mr['description'],
         'original_amount':      mr['amount'],
-        'amount':               mr['universal_usd_amount'] ?? mr['amount'],
+        'amount':               mr['amount'] ?? mr['universal_usd_amount'],
         'currency':             mr['original_currency'] ?? mr['currency'] ?? 'USD',
         'group_id':             srcGroupId,
         'group_name':           srcGroupName,
