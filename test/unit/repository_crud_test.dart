@@ -14,6 +14,7 @@ import 'package:setall/core/utils/split_engine.dart';
 import 'package:setall/data/local/local_database.dart';
 import 'package:setall/data/models/split_model.dart';
 import 'package:setall/data/repositories/setall_repository.dart';
+import 'package:setall/domain/entities/activity_event.dart';
 import 'package:setall/domain/services/settlement_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -51,7 +52,9 @@ Future<void> _createSchema(Database db, int _) async {
       avatar_url  TEXT,
       created_at  TEXT,
       updated_at  TEXT,
-      synced_at   INTEGER
+      synced_at   INTEGER,
+      settled_at  TEXT,
+      settled_by  TEXT
     )
   ''');
   await db.execute('''
@@ -888,6 +891,185 @@ void main() {
       expect(debts.first.fromUserId, equals('B'));
       expect(debts.first.toUserId,   equals('A'));
       expect(debts.first.amount, equals(Decimal.parse('20.00')));
+    });
+  });
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // MIRROR ACTIVITY-FEED VISIBILITY (Phase-1 TASK 5c-iii)
+  // ───────────────────────────────────────────────────────────────────────────
+
+  const srcGroupId   = 'grp-mirror-src';
+  const srcExpenseId = 'exp-mirror-src-001';
+  const mirrorId     = 'mirror-001';
+  const srcGroupName = 'Travel Buddies';
+
+  group('mirror activity feed visibility', () {
+    setUp(() async {
+      // Seed source group + expense so deleteExpense can resolve group info
+      // and cascade-remove the mirror.
+      await _seedGroup(db,
+          id: srcGroupId, name: srcGroupName, creatorId: _uid);
+      await _seedExpense(db,
+          id:          srcExpenseId,
+          groupId:     srcGroupId,
+          payerId:     _uid,
+          amount:      '100.00',
+          description: 'Group dinner',
+      );
+      // Seed the mirror: personal expense row with source_expense_id set.
+      await db.insert('expenses', {
+        'id':                mirrorId,
+        'group_id':          null,
+        'payer_id':          _uid,
+        'amount':            '30.00',
+        'description':       'Share · Group dinner',
+        'currency':          'USD',
+        'category':          'Food & drink',
+        'is_income':         0,
+        'source_expense_id': srcExpenseId,
+        'created_at':        DateTime.now().toUtc().toIso8601String(),
+      });
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    // ANTI-DOUBLE-COUNT: mirror already appears once via Step 3 (ExpenseEvent).
+    // Step 6 intentionally skips WalletActivityEvent for personal expenses.
+    // This test encodes that invariant permanently.
+    // ──────────────────────────────────────────────────────────────────────
+    test('mirror appears in omni feed exactly once (anti-double-count)',
+        () async {
+      final feed = await repo.watchOmniActivity().first;
+
+      final mirrorExpenseEvents = feed
+          .whereType<ExpenseEvent>()
+          .where((ev) => ev.expense.id == mirrorId)
+          .toList();
+      expect(mirrorExpenseEvents.length, 1,
+          reason: 'Mirror must appear in the feed as exactly one ExpenseEvent. '
+              'A second event would be double-counting.');
+
+      // Verify it is NOT surfaced as a WalletActivityEvent.
+      final walletDuplicates = feed.whereType<WalletActivityEvent>().where(
+          (ev) => ev.entry.id == mirrorId).toList();
+      expect(walletDuplicates, isEmpty,
+          reason: 'WalletActivityEvent is intentionally skipped for personal '
+              'expenses (Step 6 comment). Mirror must not double-appear here.');
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    test('mirror carries sourceExpenseId in feed, '
+        'distinct from plain personal expense', () async {
+      // Insert a plain personal expense (source_expense_id IS NULL).
+      const plainId = 'plain-personal-1';
+      await db.insert('expenses', {
+        'id':                plainId,
+        'group_id':          null,
+        'payer_id':          _uid,
+        'amount':            '15.00',
+        'description':       'Coffee',
+        'currency':          'USD',
+        'category':          'Food & drink',
+        'is_income':         0,
+        'source_expense_id': null,
+        'created_at':        DateTime.now().toUtc().toIso8601String(),
+      });
+
+      final feed = await repo.watchOmniActivity().first;
+
+      final mirrorEvent = feed
+          .whereType<ExpenseEvent>()
+          .firstWhere((ev) => ev.expense.id == mirrorId);
+      expect(mirrorEvent.expense.sourceExpenseId, srcExpenseId,
+          reason: 'Mirror expense must carry sourceExpenseId so the UI can '
+              'render a "from <group>" badge.');
+
+      final plainEvent = feed
+          .whereType<ExpenseEvent>()
+          .firstWhere((ev) => ev.expense.id == plainId);
+      expect(plainEvent.expense.sourceExpenseId, isNull,
+          reason: 'Plain personal expense must not carry a sourceExpenseId.');
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    // THE REAL GAP (1b): _removeMirrorForSource currently does a SILENT hard
+    // delete — no tombstone. After the fix, a mirror removal must write a row
+    // into deleted_expenses so it surfaces as ExpenseDeletedEvent (Step 6).
+    // ──────────────────────────────────────────────────────────────────────
+    test('mirror removal via deleteExpense writes tombstone '
+        'to deleted_expenses', () async {
+      final result = await repo.deleteExpense(srcExpenseId);
+      expect(result, isTrue);
+
+      // Mirror must be gone from live expenses.
+      expect(await _expenseExists(db, mirrorId), isFalse,
+          reason: 'Mirror must be removed from expenses when source is deleted.');
+
+      // Mirror must have a tombstone (previously SILENT — this was the gap).
+      final tombRows = await db.query('deleted_expenses',
+          where: 'expense_id = ?', whereArgs: [mirrorId]);
+      expect(tombRows, hasLength(1),
+          reason: 'Mirror removal must write a tombstone so the activity feed '
+              'shows a visible deletion event.');
+      final t = tombRows.first;
+      expect(t['group_id'], srcGroupId,
+          reason: 'Tombstone must carry the SOURCE group id so the feed shows '
+              '"from <group>" even after deletion.');
+      expect(t['group_name'], srcGroupName);
+      expect(t['description'], 'Share · Group dinner');
+      expect(t['category'], 'Food & drink');
+      expect(t['is_income'], 0);
+      expect(t['deleted_by'], _uid);
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    test('mirror removal surfaces as ExpenseDeletedEvent in feed', () async {
+      await repo.deleteExpense(srcExpenseId);
+
+      final feed = await repo.watchOmniActivity().first;
+
+      // Source expense deletion must show.
+      final srcDel = feed
+          .whereType<ExpenseDeletedEvent>()
+          .where((ev) => ev.expenseId == srcExpenseId)
+          .toList();
+      expect(srcDel, hasLength(1),
+          reason: 'Source expense deletion must appear in feed.');
+
+      // Mirror deletion must ALSO show — previously SILENT.
+      final mirrorDel = feed
+          .whereType<ExpenseDeletedEvent>()
+          .where((ev) => ev.expenseId == mirrorId)
+          .toList();
+      expect(mirrorDel, hasLength(1),
+          reason: 'Mirror deletion must appear in feed as ExpenseDeletedEvent. '
+              'Before this fix, _removeMirrorForSource had no tombstone.');
+      expect(mirrorDel.first.groupId, srcGroupId,
+          reason: 'Mirror deletion event must carry source group id.');
+      expect(mirrorDel.first.groupName, srcGroupName);
+    });
+
+    // ──────────────────────────────────────────────────────────────────────
+    test('standalone wallet entry deletion is unchanged (regression guard)',
+        () async {
+      const plainId = 'wallet-plain-1';
+      await db.insert('expenses', {
+        'id':                plainId,
+        'group_id':          null,
+        'payer_id':          _uid,
+        'amount':            '50.00',
+        'description':       'Groceries',
+        'currency':          'USD',
+        'category':          'Shopping',
+        'is_income':         0,
+        'source_expense_id': null,
+        'created_at':        DateTime.now().toUtc().toIso8601String(),
+      });
+
+      await repo.deleteExpense(plainId);
+
+      // Standalone wallet entry deletion must still appear (existing behavior).
+      expect(await _deletedExpenseExists(db, plainId), isTrue,
+          reason: 'Standalone wallet entry deletion must still tombstone.');
     });
   });
 }

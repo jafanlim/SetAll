@@ -4526,8 +4526,11 @@ class SetAllRepository {
     return rows.isNotEmpty ? rows.first['created_at'] as String? : null;
   }
 
-  /// Silently removes the wallet mirror row for a given source expense.
-  /// Hard-deletes from expenses (no snapshot → not restorable).
+  /// Removes the wallet mirror row for a given source expense and writes a
+  /// tombstone into [deleted_expenses] so the activity feed shows a visible
+  /// deletion event (Phase-1 TASK 5c-iii). Tombstone is native-only (web has
+  /// no SQLite).
+  ///
   /// No-op when no mirror exists. Used by edit/delete propagation (5c-i).
   Future<void> _removeMirrorForSource(String sourceExpenseId) async {
     final uid = await ensureUser();
@@ -4543,13 +4546,99 @@ class SetAllRepository {
           .eq('id', mirrorId)
           .eq('payer_id', uid)
           .isFilter('group_id', null);
-    } else {
-      await LocalDatabase.db.delete(
-        'expenses',
-        where: 'id = ? AND payer_id = ? AND group_id IS NULL',
-        whereArgs: [mirrorId, uid],
-      );
+      return;
     }
+
+    // ── Native: snapshot mirror before hard-deleting ──────────────────────
+    final mirrorRows = await LocalDatabase.db.query(
+      'expenses',
+      where: 'id = ? AND payer_id = ? AND group_id IS NULL',
+      whereArgs: [mirrorId, uid],
+      limit: 1,
+    );
+    if (mirrorRows.isEmpty) return; // already gone
+
+    final mr = mirrorRows.first;
+
+    // Resolve source group info so the deletion event carries a "from <group>"
+    // label. Try live expenses first (edit flow), then deleted_expenses
+    // tombstone (delete flow — the source expense may already be gone).
+    String? srcGroupId;
+    String srcGroupName = '';
+    final srcRows = await LocalDatabase.db.query(
+      'expenses',
+      columns: ['group_id'],
+      where: 'id = ?',
+      whereArgs: [sourceExpenseId],
+      limit: 1,
+    );
+    if (srcRows.isNotEmpty) {
+      srcGroupId = srcRows.first['group_id'] as String?;
+    } else {
+      final delSrcRows = await LocalDatabase.db.query(
+        'deleted_expenses',
+        columns: ['group_id', 'group_name'],
+        where: 'expense_id = ?',
+        whereArgs: [sourceExpenseId],
+        limit: 1,
+      );
+      if (delSrcRows.isNotEmpty) {
+        srcGroupId = delSrcRows.first['group_id'] as String?;
+        srcGroupName = delSrcRows.first['group_name'] as String? ?? '';
+      }
+    }
+    // Resolve group name if we only have the id.
+    if (srcGroupId != null && srcGroupName.isEmpty) {
+      final gRows = await LocalDatabase.db.query(
+        'groups',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [srcGroupId],
+        limit: 1,
+      );
+      if (gRows.isNotEmpty) {
+        srcGroupName = gRows.first['name'] as String? ?? '';
+      }
+    }
+
+    // Resolve deleter's display name.
+    String deletedByName = 'You';
+    final pRows = await LocalDatabase.db.query(
+      'profiles', columns: ['name', 'nickname'],
+      where: 'id = ?', whereArgs: [uid], limit: 1);
+    if (pRows.isNotEmpty) {
+      deletedByName = (pRows.first['nickname'] as String?)?.trim().isNotEmpty == true
+          ? pRows.first['nickname'] as String
+          : (pRows.first['name'] as String? ?? 'You');
+    }
+
+    final deletedAt = _now();
+    await LocalDatabase.db.insert(
+      'deleted_expenses',
+      {
+        'expense_id':           mirrorId,
+        'description':          mr['description'],
+        'original_amount':      mr['amount'],
+        'amount':               mr['universal_usd_amount'] ?? mr['amount'],
+        'currency':             mr['original_currency'] ?? mr['currency'] ?? 'USD',
+        'group_id':             srcGroupId,
+        'group_name':           srcGroupName,
+        'is_income':            mr['is_income'] ?? 0,
+        'category':             mr['category'] ?? 'Other',
+        'deleted_by':           uid,
+        'deleted_by_name':      deletedByName,
+        'deleted_at':           deletedAt,
+        'original_created_at':  mr['created_at'],
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+
+    // Hard-delete the mirror row.
+    await LocalDatabase.db.delete(
+      'expenses',
+      where: 'id = ? AND payer_id = ? AND group_id IS NULL',
+      whereArgs: [mirrorId, uid],
+    );
   }
 
   /// After an expense is edited: recompute the current user's share and update
