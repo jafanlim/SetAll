@@ -103,18 +103,28 @@ class SettlementEngine {
       final creditor = creditors[ci];
       final debtor = debtors[di];
 
-      final payment = creditor.value < debtor.value
+      final rawPayment = creditor.value < debtor.value
           ? creditor.value
           : debtor.value;
 
-      if (payment > Decimal.zero) {
-        transactions.add(SettlementTransaction(
-          fromUserId: debtor.key,
-          toUserId: creditor.key,
-          amount: payment.round(scale: 2),
-          currency: currency,
-        ));
+      final payment = rawPayment.round(scale: 2);
+      if (payment <= Decimal.zero) {
+        // Sub-cent remainder; cannot settle. Skip the smaller balance
+        // to avoid an infinite loop.
+        if (creditor.value < debtor.value) {
+          ci++;
+        } else {
+          di++;
+        }
+        continue;
       }
+
+      transactions.add(SettlementTransaction(
+        fromUserId: debtor.key,
+        toUserId: creditor.key,
+        amount: payment,
+        currency: currency,
+      ));
 
       if (creditor.value == payment) {
         ci++;

@@ -11,9 +11,9 @@ bundle:
 prompt: bundle
 	cat SYSTEM_INSTRUCTIONS.md PROJECT_LEDGER.md ai_context.txt | gemini-cli --prompt "$(msg)"
 
-# 3. The Math Guard
-test:
-	flutter test test/core/services/balance_service_test.dart
+# 3. The Math Guard — BalanceService + SettlementEngine netting regression suite
+math-guard:
+	flutter test test/core/services/balance_service_test.dart test/core/services/settlement_engine_test.dart
 
 # 4. Start local Supabase sandbox
 local-db:

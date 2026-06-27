@@ -38,7 +38,9 @@ class BalanceService {
 
   Future<BalanceSummary> getBalanceSummary() async {
     final uid = await _repo.ensureUser();
-    if (uid == null) return const BalanceSummary();
+    if (uid == null) {
+      return const BalanceSummary(youAreOwed: '0.00', youOwe: '0.00');
+    }
 
     final baseCurrency = await getBaseCurrency();
     final raw = await _repo.getBalanceRawData(uid);
@@ -60,11 +62,16 @@ class BalanceService {
 
   Future<BalanceSummary> getGroupBalanceSummary(String groupId, {String? targetCurrency}) async {
     final uid = await _repo.ensureUser();
-    if (uid == null) return const BalanceSummary();
+    if (uid == null) {
+      return const BalanceSummary(youAreOwed: '0.00', youOwe: '0.00');
+    }
 
     final baseCurrency = targetCurrency ?? await getBaseCurrency();
     final raw = await _repo.getGroupBalanceRawData(uid, groupId);
-    if (raw == null) return BalanceSummary(currency: baseCurrency);
+    if (raw == null) {
+      return BalanceSummary(
+          youAreOwed: '0.00', youOwe: '0.00', currency: baseCurrency);
+    }
 
     final rawOwed = await _sumInBase(raw.youAreOwed, baseCurrency);
     final rawOwe  = await _sumInBase(raw.youOwe,     baseCurrency);
