@@ -1,0 +1,79 @@
+# ingest_classify_config.yaml — SetAll bank-statement classifier eval
+# Spec: openspec/setall-security-ai-chat-openspec.md §5 (ingest classify eval set)
+# Prod path: netlify/functions/ingest.js classifyRows() — Groq llama-3.3-70b-versatile.
+# These cases were previously (and incorrectly) run against the ai-analyst CHAT prompt in
+# promptfooconfig.yaml, where the fixture-grounded prompt refused out-of-fixture rows and the
+# assertions flaked (the recurring "3 failed" in CI). They now run against the REAL classifier
+# prompt (ingest_classify_prompt.js), which is what prod uses. Rows mirror ingest.js userMsg format.
+# Run: npx promptfoo eval --config promptfoo/ingest_classify_config.yaml
+description: "SetAll bank-statement classifier — category correctness"
+
+defaultTest:
+  options:
+    provider:
+      id: groq:llama-3.1-8b-instant   # judge for llm-rubric
+      config:
+        temperature: 0.0
+        max_tokens: 256
+
+providers:
+  # Prod classifier model (ingest.js uses 70b-versatile).
+  - id: groq:llama-3.3-70b-versatile
+    config:
+      temperature: 0.1
+      max_tokens: 512
+
+prompts:
+  - id: file://ingest_classify_prompt.js
+    label: "setall-ingest-classifier-prod-prompt"
+
+tests:
+  # ── i. grocery supermarket → Food & drink ─────────────────────────────────
+  - description: "classify: TESCO supermarket → Food & drink"
+    vars:
+      row: 'date=2024-03-15 amount=67.43 GBP raw="TESCO STORES 3456" income=false'
+    assert:
+      # A supermarket is legitimately groceries (Food & drink) OR general retail (Shopping);
+      # accept both rather than over-constrain an inherently ambiguous merchant.
+      - type: llm-rubric
+        value: "PASS if the returned category is 'Food & drink' or 'Shopping'. FAIL if any other category."
+
+  # ── j. Uber ride → Transport ──────────────────────────────────────────────
+  - description: "classify: UBER *TRIP → Transport"
+    vars:
+      row: 'date=2024-03-16 amount=12.50 USD raw="UBER *TRIP HELP.UBER.COM" income=false'
+    assert:
+      - type: llm-rubric
+        value: "PASS if the returned category is 'Transport'. FAIL if any other category."
+
+  # ── k. Netflix subscription → Entertainment ───────────────────────────────
+  - description: "classify: NETFLIX → Entertainment"
+    vars:
+      row: 'date=2024-03-17 amount=15.99 USD raw="NETFLIX.COM" income=false'
+    assert:
+      - type: llm-rubric
+        value: "PASS if the returned category is 'Entertainment'. FAIL if any other category."
+
+  # ── l. electricity bill → Bills & utilities ───────────────────────────────
+  - description: "classify: electricity company → Bills & utilities"
+    vars:
+      row: 'date=2024-03-18 amount=134.20 GBP raw="BRITISH GAS PAYMENT" income=false'
+    assert:
+      - type: llm-rubric
+        value: "PASS if the returned category is 'Bills & utilities'. FAIL if any other category."
+
+  # ── m. salary credit → income flag preserved (not an expense category) ─────
+  - description: "classify: salary BACS credit → General or Other (not expense category)"
+    vars:
+      row: 'date=2024-03-25 amount=2450.00 GBP raw="EMPLOYER LTD BACS SALARY" income=true'
+    assert:
+      - type: llm-rubric
+        value: "PASS if the description mentions salary or employer, and the category is 'General' or 'Other'. FAIL if the category is 'Food & drink', 'Transport', 'Entertainment', 'Bills & utilities', 'Shopping', or 'Travel'."
+
+  # ── n. airline booking → Travel ───────────────────────────────────────────
+  - description: "classify: RYANAIR flight booking → Travel"
+    vars:
+      row: 'date=2024-04-01 amount=89.99 EUR raw="RYANAIR BOOKING FEE" income=false'
+    assert:
+      - type: llm-rubric
+        value: "PASS if the returned category is 'Travel'. FAIL if any other category."

@@ -4,11 +4,13 @@ on:
   push:
     paths:
       - "netlify/functions/ai-analyst.js"
+      - "netlify/functions/ingest.js"
       - "supabase/functions/ai-analyst/**"
       - "promptfoo/**"
   pull_request:
     paths:
       - "netlify/functions/ai-analyst.js"
+      - "netlify/functions/ingest.js"
       - "supabase/functions/ai-analyst/**"
       - "promptfoo/**"
 
@@ -32,8 +34,15 @@ jobs:
         # sync check hard-fails. `npm install` reconciles the drift instead.
         run: npm install --no-audit --no-fund
 
-      - name: Run promptfoo eval
+      - name: Run promptfoo eval — ai-analyst chat
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: npx promptfoo eval --config promptfoo/promptfooconfig.yaml --no-cache
         # Non-zero exit code from promptfoo blocks merge (any failing assertion = exit 1)
+
+      - name: Run promptfoo eval — bank-statement classifier (ingest.js)
+        # Runs even if the chat eval failed, so both results surface in one run.
+        if: ${{ !cancelled() }}
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: npx promptfoo eval --config promptfoo/ingest_classify_config.yaml --no-cache
