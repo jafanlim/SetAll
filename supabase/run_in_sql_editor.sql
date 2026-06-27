@@ -277,23 +277,34 @@ END IF; END $$;
 -- 5. PENDING INVITES (ghost accounts)
 -- ─────────────────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS public.pending_invites (
-  id          UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-  email       TEXT        NOT NULL,
-  group_id    UUID        NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
-  invited_by  UUID        NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  ghost_id    UUID        REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  group_id      UUID NOT NULL REFERENCES public.groups(id) ON DELETE CASCADE,
+  invited_email TEXT NOT NULL,
+  ghost_user_id UUID NOT NULL,          -- synthetic UUID; NO FK (ghost profiles are
+                                        -- deleted on claim, not PK-updated)
+  invited_by    UUID REFERENCES public.profiles(id),
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 ALTER TABLE public.pending_invites ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Group members can read pending invites') THEN
-  CREATE POLICY "Group members can read pending invites" ON public.pending_invites FOR SELECT
-    USING (group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
-        OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+
+CREATE INDEX IF NOT EXISTS pending_invites_email_idx ON public.pending_invites (lower(invited_email));
+CREATE INDEX IF NOT EXISTS pending_invites_ghost_idx  ON public.pending_invites (ghost_user_id);
+
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Members can read pending invites for their groups') THEN
+  CREATE POLICY "Members can read pending invites for their groups" ON public.pending_invites FOR SELECT
+    USING (EXISTS (
+      SELECT 1 FROM public.group_members
+      WHERE group_members.group_id = pending_invites.group_id
+        AND group_members.user_id  = auth.uid()
+    ));
 END IF; END $$;
-DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Group members can create invites') THEN
-  CREATE POLICY "Group members can create invites" ON public.pending_invites FOR INSERT WITH CHECK (
-    group_id IN (SELECT group_id FROM public.group_members WHERE user_id = auth.uid())
-    OR group_id IN (SELECT id FROM public.groups WHERE creator_id = auth.uid()));
+DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='pending_invites' AND policyname='Group creator can insert pending invites') THEN
+  CREATE POLICY "Group creator can insert pending invites" ON public.pending_invites FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.groups
+      WHERE groups.id         = pending_invites.group_id
+        AND groups.creator_id = auth.uid()
+    ));
 END IF; END $$;
 
 
@@ -393,21 +404,40 @@ END;
 $$;
 GRANT EXECUTE ON FUNCTION public.add_member_by_id(UUID, UUID) TO authenticated;
 
--- add_ghost_member: adds a placeholder for a non-registered user
+-- add_ghost_member: adds a placeholder for a non-registered user.
+-- Creates a ghost profile (no auth.users link), adds to group_members, and records
+-- a pending_invite. Ghost claiming happens via claim_ghost_account() BEFORE INSERT
+-- on auth.users — no PK-update needed, so no FK constraint on ghost_user_id.
 DROP FUNCTION IF EXISTS public.add_ghost_member(UUID, TEXT, UUID);
 CREATE OR REPLACE FUNCTION public.add_ghost_member(p_group_id UUID, p_email TEXT, p_invited_by UUID)
 RETURNS UUID LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_ghost_id UUID;
 BEGIN
-  SELECT id INTO v_ghost_id FROM public.profiles WHERE nickname = p_email AND is_ghost = TRUE LIMIT 1;
-  IF v_ghost_id IS NULL THEN
-    v_ghost_id := gen_random_uuid();
-    INSERT INTO public.profiles (id, name, nickname, is_ghost)
-    VALUES (v_ghost_id, SPLIT_PART(p_email,'@',1), p_email, TRUE);
+  -- Check if invite already exists for this group+email
+  SELECT ghost_user_id INTO v_ghost_id
+    FROM public.pending_invites
+    WHERE group_id = p_group_id
+      AND lower(invited_email) = lower(p_email)
+    LIMIT 1;
+
+  IF v_ghost_id IS NOT NULL THEN
+    RETURN v_ghost_id;
   END IF;
-  INSERT INTO public.group_members (group_id, user_id) VALUES (p_group_id, v_ghost_id) ON CONFLICT DO NOTHING;
-  INSERT INTO public.pending_invites (email, group_id, invited_by, ghost_id) VALUES (p_email, p_group_id, p_invited_by, v_ghost_id) ON CONFLICT DO NOTHING;
+
+  v_ghost_id := gen_random_uuid();
+
+  INSERT INTO public.profiles (id, name, is_ghost, default_currency)
+    VALUES (v_ghost_id, p_email, TRUE, 'USD')
+    ON CONFLICT (id) DO NOTHING;
+
+  INSERT INTO public.group_members (group_id, user_id, joined_at)
+    VALUES (p_group_id, v_ghost_id, now())
+    ON CONFLICT DO NOTHING;
+
+  INSERT INTO public.pending_invites (group_id, invited_email, ghost_user_id, invited_by)
+    VALUES (p_group_id, lower(p_email), v_ghost_id, p_invited_by);
+
   RETURN v_ghost_id;
 END;
 $$;
