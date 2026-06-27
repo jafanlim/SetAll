@@ -9,8 +9,11 @@ import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
+import 'package:decimal/decimal.dart';
+
 import '../../../core/config/auth_config.dart';
 import '../../../core/services/csv_adapter.dart';
+import '../../../core/utils/import_dedup.dart';
 import '../../../data/models/wallet_entry_model.dart';
 import '../../../data/repositories/setall_repository.dart';
 import 'ingest_row.dart';
@@ -85,7 +88,42 @@ class IngestService {
     return _parseResponse(resp);
   }
 
+  /// Builds a [Set] of [importDedupSig] signatures from every existing wallet
+  /// entry and returns a copy of [rows] where any row whose signature collides
+  /// is flagged `isDuplicate: true` and its status set to [IngestRowStatus.rejected].
+  /// Callers should call this **after** ingestion but **before** the review UI so
+  /// duplicate rows are pre-unchecked and badged.
+  Future<List<IngestRow>> flagDuplicates(List<IngestRow> rows) async {
+    if (rows.isEmpty) return rows;
+
+    final existing = await repository.getWalletEntries();
+    final seen = <String>{};
+    for (final e in existing) {
+      final createdAt = e.createdAt;
+      if (createdAt == null) continue;
+      final dt = DateTime.tryParse(createdAt);
+      if (dt == null) continue;
+      final amt = Decimal.tryParse(e.amount) ?? Decimal.zero;
+      seen.add(importDedupSig(dt, e.description, amt, e.currency));
+    }
+
+    return rows.map((r) {
+      final rowDate = DateTime.tryParse(r.date);
+      if (rowDate == null) return r;
+      final rowAmt = Decimal.tryParse(r.amount) ?? Decimal.zero;
+      final sig = importDedupSig(rowDate, r.description, rowAmt, r.currency);
+      if (seen.contains(sig)) {
+        return r.copyWith(isDuplicate: true, status: IngestRowStatus.rejected);
+      }
+      return r;
+    }).toList();
+  }
+
   // ── Commit approved rows → upsertWalletEntry ─────────────────────────────
+  /// Commits every approved row. `isDuplicate` is advisory only: flagDuplicates
+  /// pre-rejects + badges suspected duplicates, but if the user deliberately
+  /// re-approves one (e.g. a genuine second identical purchase the same day that
+  /// the heuristic flagged as a dup of an existing entry), it must still commit.
   Future<int> commitApproved(List<IngestRow> rows) async {
     final approved = rows.where((r) => r.status == IngestRowStatus.approved).toList();
     int committed = 0;

@@ -934,7 +934,8 @@
     "start_over": "Start over",
     "title": "Import Statement",
     "type_label": "Type",
-    "uploading": "Uploading & classifying…"
+    "uploading": "Uploading & classifying…",
+    "duplicate": "Duplicate"
   },
   "recurring": {
     "confidence": "{pct}% совпадение",
