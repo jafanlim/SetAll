@@ -256,7 +256,7 @@ New specs written 2026-06-24 (flat layout `openspec/<name>/`):
 5. **push-and-digest** _(TASK 2)_ — push + monthly digest never delivered end-to-end. _Blocked on TASK 1 live-verify._
 
 Carried-over TODOs (from old `progress.md`):
-- Net balance not offset between two users (A↔B each show 50 instead of net 0) — **correctness bug, high priority** _(TASK 3)_.
+- ✅ **DONE (TASK 3, PR #40)** Net balance A↔B offset — **confirmed not a live bug** (netting was already correct: `balance_service.dart` nets `rawOwed − rawOwe` globally + per-group; `SettlementEngine` nets per-member). Added the missing **Math-Guard suite** (`test/core/services/balance_service_test.dart` + `settlement_engine_test.dart`, 26 hermetic tests incl. anti-vacuous; `make math-guard`). The suite **caught a real pre-existing sub-cent defect**: `SettlementEngine` emitted a spurious `0.00` settlement txn when a member's net rounded sub-cent (the `payment > 0` gate used the *unrounded* amount) → fixed (round-first + skip/advance the smaller balance, which also guarantees termination). Normal 2-decimal inputs unchanged. 409/409.
 - Ghost-row nickname FK violation on `pending_invites` _(TASK 7)_.
 - Google OAuth in-app browser doesn't auto-close _(TASK 7)_.
 - Group invite search (email/nickname) returns nothing _(TASK 7)_.
