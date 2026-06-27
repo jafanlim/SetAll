@@ -10,6 +10,7 @@
 //       mapping chain (ExpenseModel.fromJson → AnalyticsRow.from*) preserves
 //       amounts identically for both SQLite and web paths.
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -146,11 +147,11 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 150.0,
+      expect(data.totalSpend, Decimal.parse('150.00'),
           reason: '100 wallet + 50 group = 150 USD total spend');
-      expect(data.categoryTotals['Food'], 100.0);
-      expect(data.categoryTotals['Transport'], 50.0);
-      expect(data.totalIncome, 0.0);
+      expect(data.categoryTotals['Food'], Decimal.parse('100.00'));
+      expect(data.categoryTotals['Transport'], Decimal.parse('50.00'));
+      expect(data.totalIncome, Decimal.zero);
       expect(data.allExpenses.length, 2);
       expect(data.currency, 'USD');
     });
@@ -166,9 +167,9 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 130.0);
-      expect(data.categoryTotals['Food'], 100.0);
-      expect(data.categoryTotals['Shopping'], 30.0);
+      expect(data.totalSpend, Decimal.parse('130.00'));
+      expect(data.categoryTotals['Food'], Decimal.parse('100.00'));
+      expect(data.categoryTotals['Shopping'], Decimal.parse('30.00'));
     });
 
     test('anti-vacuous: non-zero amounts in row factories survive mapping',
@@ -188,7 +189,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 99.99,
+      expect(data.totalSpend, Decimal.parse('99.99'),
           reason: '99.99 must survive the full provider chain — 0 means '
               'a mapping step dropped the amount');
       expect(data.allExpenses.single.amount, '99.99');
@@ -216,9 +217,9 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalIncome, 1000.0);
-      expect(data.totalSpend, 300.0);
-      expect(data.netFlow, 700.0);                                 // income - spend
+      expect(data.totalIncome, Decimal.parse('1000.00'));
+      expect(data.totalSpend, Decimal.parse('300.00'));
+      expect(data.netFlow, Decimal.parse('700.00'));               // income - spend
       expect(data.categoryTotals['Salary'], isNull,
           reason: 'Income should not appear in expense categoryTotals');
     });
@@ -239,9 +240,9 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalIncome, 500.0);
-      expect(data.totalSpend, 200.0);
-      expect(data.netFlow, 300.0);
+      expect(data.totalIncome, Decimal.parse('500.00'));
+      expect(data.totalSpend, Decimal.parse('200.00'));
+      expect(data.netFlow, Decimal.parse('300.00'));
     });
   });
 
@@ -285,7 +286,7 @@ void main() {
       // EUR row: entryCcy='EUR' == baseCurrency 'EUR' && originalAmount != null
       //   → uses originalAmount = 40 directly
       // Total spend = 108 + 40 = 148
-      expect(data.totalSpend, closeTo(148.0, 0.01),
+      expect(data.totalSpend, Decimal.parse('148.00'),
           reason: '108 (converted USD) + 40 (native EUR) = 148 EUR total');
       expect(data.currency, 'EUR');
     });
@@ -307,7 +308,7 @@ void main() {
       final data = await c.read(analyticsDataProvider.future);
 
       // USD rows: entryCcy='USD' == baseCurrency, originalAmount used.
-      expect(data.totalSpend, 75.0);
+      expect(data.totalSpend, Decimal.parse('75.00'));
       expect(data.currency, 'USD');
     });
   });
@@ -335,7 +336,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 75.0,
+      expect(data.totalSpend, Decimal.parse('75.00'),
           reason: 'Dedup should collapse two identical rows to one');
       expect(data.allExpenses.length, 1);
     });
@@ -355,7 +356,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 30.0);
+      expect(data.totalSpend, Decimal.parse('30.00'));
       expect(data.allExpenses.length, 2);
     });
 
@@ -374,7 +375,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 60.0);
+      expect(data.totalSpend, Decimal.parse('60.00'));
       expect(data.allExpenses.length, 2);
     });
   });
@@ -397,7 +398,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 50.0,
+      expect(data.totalSpend, Decimal.parse('50.00'),
           reason: 'Only the 5d-ago (\$50) row should count; '
               'the 60d-ago (\$500) row must be outside the window');
       expect(data.allExpenses.length, 1);
@@ -423,7 +424,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 10.0,
+      expect(data.totalSpend, Decimal.parse('10.00'),
           reason: '31-day-old entry must be excluded');
       expect(data.allExpenses.length, 1);
     });
@@ -439,7 +440,7 @@ void main() {
       final c = _container(walletEntries: entries);
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 100.0,
+      expect(data.totalSpend, Decimal.parse('100.00'),
           reason: '5 entries × \$20 within 30d window');
       expect(data.allExpenses.length, 5);
     });
@@ -454,9 +455,9 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 0.0);
-      expect(data.totalIncome, 0.0);
-      expect(data.netFlow, 0.0);
+      expect(data.totalSpend, Decimal.zero);
+      expect(data.totalIncome, Decimal.zero);
+      expect(data.netFlow, Decimal.zero);
       expect(data.categoryTotals, isEmpty);
       expect(data.allExpenses, isEmpty);
     });
@@ -470,7 +471,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 42.0);
+      expect(data.totalSpend, Decimal.parse('42.00'));
       expect(data.allExpenses.length, 1);
     });
 
@@ -483,7 +484,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.totalSpend, 88.0);
+      expect(data.totalSpend, Decimal.parse('88.00'));
       expect(data.allExpenses.length, 1);
     });
   });
@@ -541,7 +542,7 @@ void main() {
 
       final data = await c.read(analyticsDataProvider.future);
 
-      expect(data.netFlow, 500.0 - 200.0);
+      expect(data.netFlow, Decimal.parse('300.00'));
     });
   });
 
@@ -565,8 +566,63 @@ void main() {
           reason: 'Should have at least one period for ≤90d window');
       // Sum of expense across all periods should match totalSpend
       final periodExpenseSum =
-          data.ivePeriods.fold(0.0, (sum, p) => sum + p.expense);
+          data.ivePeriods.fold(Decimal.zero, (sum, p) => sum + p.expense);
       expect(periodExpenseSum, data.totalSpend);
+    });
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 9. Decimal exactness (float-drift guard)
+  // ─────────────────────────────────────────────────────────────────────────
+  group('Decimal exactness — no float drift', () {
+    test('0.10 + 0.20 is exactly 0.30 in Decimal', () async {
+      final c = _container(
+        walletEntries: [
+          _walletExpense(id: 'we-010', amount: '0.10', category: 'A'),
+          _walletExpense(id: 'we-020', amount: '0.20', category: 'A'),
+        ],
+      );
+
+      final data = await c.read(analyticsDataProvider.future);
+
+      // 0.10 + 0.20 = 0.30 MUST be exact — not 0.30000000000000004
+      expect(data.totalSpend, Decimal.parse('0.30'),
+          reason: 'Decimal arithmetic must be exact: 0.10 + 0.20 = 0.30');
+      expect(data.categoryTotals['A'], Decimal.parse('0.30'));
+    });
+
+    test('repeated thirds sum to exact whole in Decimal', () async {
+      // Three entries of 0.33 should sum to 0.99, not 0.9900000000000001
+      final entries = List.generate(3, (i) =>
+          _walletExpense(
+            id: 'we-th3-$i', amount: '0.33', category: 'Thirds',
+            createdAt: _daysAgo(i),
+          ),
+      );
+
+      final c = _container(walletEntries: entries);
+      final data = await c.read(analyticsDataProvider.future);
+
+      expect(data.totalSpend, Decimal.parse('0.99'),
+          reason: '3 × 0.33 = 0.99 exactly in Decimal');
+    });
+
+    test('Decimal netFlow = totalIncome - totalSpend is exact', () async {
+      final c = _container(
+        walletEntries: [
+          _walletExpense(id: 'we-inc', amount: '1000.00', category: 'Income',
+              isIncome: true),
+          _walletExpense(id: 'we-exp', amount: '333.33', category: 'Rent'),
+        ],
+      );
+
+      final data = await c.read(analyticsDataProvider.future);
+
+      // 1000.00 - 333.33 = 666.67 exactly
+      expect(data.netFlow, Decimal.parse('666.67'),
+          reason: 'Decimal arithmetic: 1000.00 - 333.33 = 666.67');
+      expect(data.totalIncome - data.totalSpend, data.netFlow,
+          reason: 'Invariant: netFlow = totalIncome - totalSpend');
     });
   });
 }

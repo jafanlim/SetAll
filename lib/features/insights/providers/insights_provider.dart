@@ -1,6 +1,7 @@
 import 'dart:async' show unawaited;
 import 'dart:convert';
 
+import 'package:decimal/decimal.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
@@ -192,12 +193,17 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
       if (!isCanvas) {
         final walletTotals = await repo.getWalletEntryTotals(baseCurrency: baseCurrency);
         final balanceSummary = await repo.getBalanceSummary();
-        final categoryTotals = Map<String, double>.from(analyticsData.categoryTotals);
+        final categoryTotals = Map<String, Decimal>.from(analyticsData.categoryTotals);
         // Build monthly totals from ivePeriods (granularity matches analytics window).
-        final monthlyTotals = <String, double>{};
+        final monthlyTotals = <String, Decimal>{};
         for (final p in analyticsData.ivePeriods) {
           monthlyTotals[p.label] = p.expense;
         }
+        // Convert Decimal maps to double for JSON serialization.
+        final categoryTotalsJson = categoryTotals
+            .map((k, v) => MapEntry(k, v.toDouble()));
+        final monthlyTotalsJson = monthlyTotals
+            .map((k, v) => MapEntry(k, v.toDouble()));
         contextPayload = {
           'currency': baseCurrency,
           'baseBalance': walletTotals.net.toDouble(),
@@ -205,8 +211,8 @@ class InsightsNotifier extends AsyncNotifier<InsightsState> {
           'spend': walletTotals.spend.toDouble(),
           'sharedOwed': double.tryParse(balanceSummary.youAreOwed) ?? 0.0,
           'sharedOwe': double.tryParse(balanceSummary.youOwe) ?? 0.0,
-          'categoryTotals': categoryTotals,
-          'monthlyTotals': monthlyTotals,
+          'categoryTotals': categoryTotalsJson,
+          'monthlyTotals': monthlyTotalsJson,
           'asOf': DateTime.now().toIso8601String().substring(0, 10),
         };
       }
