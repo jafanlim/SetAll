@@ -16,6 +16,7 @@ import '../../../../core/utils/haptic_utils.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/wallet_entry_model.dart';
 import '../../../../domain/entities/activity_event.dart';
+import '../../../../features/wallet/presentation/widgets/group_badge.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -910,6 +911,7 @@ Widget _buildEventTile({
   VoidCallback? onTap,
   Widget? leadingOverride,
   List<_ContextAction>? contextActions,
+  Widget? badgeSuffix,
 }) {
   Widget tile = InkWell(
     borderRadius: BorderRadius.circular(16),
@@ -948,6 +950,10 @@ Widget _buildEventTile({
                       ),
                     ),
                   ),
+                  if (badgeSuffix != null) ...[
+                    const SizedBox(width: 4),
+                    badgeSuffix,
+                  ],
                   if (timestamp != null && timestamp.isNotEmpty) ...[
                     const SizedBox(width: 6),
                     Text(
@@ -1211,6 +1217,12 @@ class _ExpenseTile extends ConsumerWidget {
 
     final badge = isPersonal ? 'Wallet' : (event.groupName.isEmpty ? 'Group' : event.groupName);
 
+    // Show "from <group>" chip when this personal entry is a mirror of a
+    // group expense (Phase-1 TASK 5c-iii).
+    final Widget? groupBadge = e.sourceExpenseId != null
+        ? GroupBadge(sourceExpenseId: e.sourceExpenseId!)
+        : null;
+
     // ── Currency fix: always use the expense's own currency ──────────────
     final primaryAmt = formatAmount(e.amount);
     final primaryCcy = e.currency;
@@ -1296,6 +1308,7 @@ class _ExpenseTile extends ConsumerWidget {
           amountSub:       amountSub,
           amountPositive:  e.isIncome || isSettlement,
           editMode:        true,
+          badgeSuffix:     groupBadge,
         ),
       );
     }
@@ -1410,6 +1423,7 @@ class _ExpenseTile extends ConsumerWidget {
           amountSub:       amountSub,
           amountPositive:  e.isIncome || isSettlement,
           onTap:           navigateToDetail,
+          badgeSuffix:     groupBadge,
         ),
       );
     }
@@ -1429,6 +1443,7 @@ class _ExpenseTile extends ConsumerWidget {
       amountPositive:  e.isIncome || isSettlement,
       contextActions:  actions,
       onTap:           navigateToDetail,
+      badgeSuffix:     groupBadge,
     );
   }
 }
