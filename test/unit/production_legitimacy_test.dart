@@ -129,8 +129,15 @@ void main() {
   group('Physical address footer — all 9 public pages', () {
     const address = 'SetAll Fintech Systems | 56 Tbilisi-Kojori st, Tbilisi, Georgia';
 
+    // index.html is NOT the source web/index.html (that became the Flutter dev
+    // entry in PR #52). `make build-web` deploys "new website/landing page.html"
+    // as build/web/index.html, so validate the ACTUAL deploy source for the home page.
+    String pagePath(String page) => page == 'index.html'
+        ? '$_projectRoot/new website/landing page.html'
+        : '$_projectRoot/web/$page';
+
     void checkPage(String htmlFile) {
-      final html = File('$_projectRoot/web/$htmlFile').readAsStringSync();
+      final html = File(pagePath(htmlFile)).readAsStringSync();
       expect(html, contains('SetAll Fintech Systems'),
           reason: '$htmlFile: business entity name must appear in footer');
       expect(html, contains('56 Tbilisi-Kojori st'),
@@ -156,7 +163,7 @@ void main() {
         'privacy.html', 'terms.html', 'support.html',
         'download.html', 'reset-password.html',
       ]) {
-        final html = File('$_projectRoot/web/$page').readAsStringSync();
+        final html = File(pagePath(page)).readAsStringSync();
         expect(html, contains(address),
             reason: '$page: address must be the canonical string: "$address"');
       }
