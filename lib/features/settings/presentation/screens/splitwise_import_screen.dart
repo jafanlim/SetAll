@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/utils/import_dedup.dart';
+
 import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/services/csv_adapter.dart';
 import '../../../../core/utils/haptic_utils.dart';
@@ -23,15 +25,6 @@ const _slate = Color(0xFF94A3B8);
 
 enum _Destination { wallet, group }
 
-/// Duplicate signature for import dedup: same calendar day + name +
-/// amount-to-cents + currency. Dates are normalised to local time so a stored
-/// UTC `created_at` and a locally-parsed CSV date compare on the same day.
-String _dedupSig(DateTime date, String description, Decimal amount, String currency) {
-  final d = date.toLocal();
-  final day = '${d.year}-${d.month}-${d.day}';
-  return '$day|${description.trim().toLowerCase()}'
-      '|${amount.round(scale: 2)}|${currency.trim().toUpperCase()}';
-}
 
 // ---------------------------------------------------------------------------
 // SplitwiseImportScreen
@@ -154,14 +147,14 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       final seen = <String>{
         for (final e in existing)
           if (e.createdAt != null)
-            _dedupSig(
+            importDedupSig(
               DateTime.tryParse(e.createdAt!) ?? DateTime.now(),
               e.description,
               Decimal.tryParse(e.amount) ?? Decimal.zero,
               e.currency),
       };
       for (final row in _rows) {
-        final sig = _dedupSig(row.date, row.description, row.cost, row.currency);
+        final sig = importDedupSig(row.date, row.description, row.cost, row.currency);
         if (!seen.add(sig)) {
           skipped++;
           if (mounted) setState(() => _imported = count + skipped);
@@ -197,14 +190,14 @@ class _SplitwiseImportScreenState extends ConsumerState<SplitwiseImportScreen> {
       final seen = <String>{
         for (final e in existing)
           if (e.createdAt != null)
-            _dedupSig(
+            importDedupSig(
               DateTime.tryParse(e.createdAt!) ?? DateTime.now(),
               e.description,
               Decimal.tryParse(e.amount) ?? Decimal.zero,
               e.currency),
       };
       for (final row in _rows) {
-        final sig = _dedupSig(row.date, row.description, row.cost, row.currency);
+        final sig = importDedupSig(row.date, row.description, row.cost, row.currency);
         if (!seen.add(sig)) {
           skipped++;
           if (mounted) setState(() => _imported = count + skipped);

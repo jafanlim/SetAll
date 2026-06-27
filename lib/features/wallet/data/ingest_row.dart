@@ -28,6 +28,8 @@ class IngestRow {
   bool isIncome;
   IngestRowStatus status;
 
+  bool isDuplicate = false;
+
   IngestRow copyWith({
     String? description,
     String? category,
@@ -36,6 +38,7 @@ class IngestRow {
     String? date,
     String? amount,
     String? currency,
+    bool? isDuplicate,
   }) => IngestRow(
     id:             id,
     date:           date            ?? this.date,
@@ -46,7 +49,7 @@ class IngestRow {
     category:       category        ?? this.category,
     isIncome:       isIncome        ?? this.isIncome,
     status:         status          ?? this.status,
-  );
+  )..isDuplicate = isDuplicate ?? this.isDuplicate;
 
   factory IngestRow.fromJson(Map<String, dynamic> j) => IngestRow(
     date:            j['date']            as String? ?? '',

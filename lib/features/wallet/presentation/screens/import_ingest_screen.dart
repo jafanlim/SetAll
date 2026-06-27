@@ -77,8 +77,10 @@ class _ImportIngestScreenState extends ConsumerState<ImportIngestScreen> {
       }
 
       // All rows start as approved so user can just reject what they don't want.
+      // Run dedupe first: pre-reject and badge rows that already exist in wallet.
+      final deduped = await svc.flagDuplicates(rows);
       ref.read(ingestRowsProvider.notifier).setRows(
-        rows.map((r) => r.copyWith(status: IngestRowStatus.approved)).toList(),
+        deduped.map((r) => r.isDuplicate ? r : r.copyWith(status: IngestRowStatus.approved)).toList(),
       );
       setState(() { _loading = false; });
     } on IngestException catch (e) {
@@ -486,9 +488,29 @@ class _IngestRowTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(row.description,
-                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(row.description,
+                              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        if (row.isDuplicate) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: _brandOrange.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'ingest.duplicate'.tr(),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: _brandOrange),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                     const SizedBox(height: 2),
                     Text(
                       '${row.date}  ·  ${row.category}',
