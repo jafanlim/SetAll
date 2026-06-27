@@ -16,6 +16,7 @@ import '../../../../core/providers/setall_providers.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
+import '../widgets/group_badge.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -403,6 +404,10 @@ class _WalletEntryDetailScreenState
                           color: categoryColor,
                         ),
                       ),
+                      if (expense.sourceExpenseId != null) ...[
+                        const SizedBox(height: 4),
+                        GroupBadge(sourceExpenseId: expense.sourceExpenseId!),
+                      ],
                     ],
                   ),
                 ),

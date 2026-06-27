@@ -608,4 +608,167 @@ void main() {
       expect(mirrors.first['description'], 'Share · Test expense (edited)');
     });
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GROUP 5 — deleteGroup removes wallet mirrors (5c-ii)
+  // ──────────────────────────────────────────────────────────────────────────
+  group('deleteGroup mirror cleanup', () {
+    test('deleteGroup (owner) removes linked mirror', () async {
+      const expenseId = 'exp-delgrp-1';
+      const groupId   = 'grp-del-1';
+      const mirrorId  = 'mirror-delgrp-1';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '100.00');
+      await createMirror(
+        mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      // Verify mirror exists before group delete.
+      var mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, hasLength(1));
+
+      final result = await repo.deleteGroup(groupId);
+      expect(result, isTrue);
+
+      // Mirror must be gone after group delete.
+      mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND source_expense_id = ? AND group_id IS NULL',
+          whereArgs: [_uid, expenseId]);
+      expect(mirrors, isEmpty);
+    });
+
+    test('deleteGroup with no mirrors is a no-op (no error)', () async {
+      const expenseId = 'exp-delgrp-2';
+      const groupId   = 'grp-del-2';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '50.00');
+      // No mirror created — deleteGroup should still succeed.
+
+      final result = await repo.deleteGroup(groupId);
+      expect(result, isTrue);
+    });
+
+    test('deleteGroup deletes mirrors for all expenses in the group', () async {
+      const expA = 'exp-delgrp-batch-a';
+      const expB = 'exp-delgrp-batch-b';
+      const groupId = 'grp-del-batch';
+      const mirA = 'mirror-batch-delgrp-a';
+      const mirB = 'mirror-batch-delgrp-b';
+
+      await db.insert('groups', {
+        'id': groupId, 'name': 'Batch Group', 'creator_id': _uid,
+        'created_by': _uid, 'type': 'normal', 'is_deleted': 0,
+        'created_at': isoNow(), 'updated_at': isoNow(),
+      });
+      await db.insert('group_members', {
+        'group_id': groupId, 'user_id': _uid, 'joined_at': isoNow(),
+      });
+      for (final exp in [
+        (id: expA, amt: '30.00'),
+        (id: expB, amt: '70.00'),
+      ]) {
+        await db.insert('expenses', {
+          'id': exp.id, 'group_id': groupId, 'payer_id': _uid,
+          'created_by': _uid, 'amount': exp.amt, 'description': 'Test',
+          'currency': 'USD', 'split_type': 'even', 'category': 'Food & drink',
+          'is_income': 0, 'created_at': isoNow(), 'universal_usd_amount': exp.amt,
+        });
+        await db.insert('splits', {
+          'id': 'split-$exp.id', 'expense_id': exp.id, 'user_id': _uid,
+          'universal_usd_owed': exp.amt, 'entry_amount_owed': exp.amt,
+          'created_at': isoNow(),
+        });
+      }
+      await createMirror(mirrorId: mirA, sourceExpenseId: expA, amount: '30.00');
+      await createMirror(mirrorId: mirB, sourceExpenseId: expB, amount: '70.00');
+
+      var mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND group_id IS NULL AND source_expense_id IS NOT NULL',
+          whereArgs: [_uid]);
+      expect(mirrors, hasLength(2));
+
+      final result = await repo.deleteGroup(groupId);
+      expect(result, isTrue);
+
+      mirrors = await db.query('expenses',
+          where: 'payer_id = ? AND group_id IS NULL AND source_expense_id IS NOT NULL',
+          whereArgs: [_uid]);
+      expect(mirrors, isEmpty);
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GROUP 6 — sourceGroupName resolution (5c-ii)
+  // ──────────────────────────────────────────────────────────────────────────
+  group('sourceGroupName', () {
+    test('returns group name for a linked mirror', () async {
+      const expenseId = 'exp-srcname-1';
+      const groupId   = 'grp-srcname-1';
+      const groupName = 'Test Group Name';
+
+      // Seed with a specific group name.
+      await db.insert('groups', {
+        'id': groupId, 'name': groupName, 'creator_id': _uid,
+        'created_by': _uid, 'type': 'normal', 'is_deleted': 0,
+        'created_at': isoNow(), 'updated_at': isoNow(),
+      });
+      await db.insert('group_members', {
+        'group_id': groupId, 'user_id': _uid, 'joined_at': isoNow(),
+      });
+      await db.insert('expenses', {
+        'id': expenseId, 'group_id': groupId, 'payer_id': _uid,
+        'created_by': _uid, 'amount': '100.00', 'description': 'Test',
+        'currency': 'USD', 'split_type': 'even', 'category': 'Food & drink',
+        'is_income': 0, 'created_at': isoNow(), 'universal_usd_amount': '100.00',
+      });
+
+      final name = await repo.sourceGroupName(expenseId);
+      expect(name, groupName);
+    });
+
+    test('returns null when source expense does not exist', () async {
+      final name = await repo.sourceGroupName('non-existent-expense-id');
+      expect(name, isNull);
+    });
+
+    test('returns null when source expense has no group', () async {
+      const expenseId = 'exp-srcname-2';
+
+      await db.insert('expenses', {
+        'id': expenseId, 'group_id': null, 'payer_id': _uid,
+        'created_by': _uid, 'amount': '50.00', 'description': 'Personal',
+        'currency': 'USD', 'split_type': 'even', 'category': 'General',
+        'is_income': 0, 'created_at': isoNow(), 'universal_usd_amount': '50.00',
+      });
+
+      final name = await repo.sourceGroupName(expenseId);
+      expect(name, isNull);
+    });
+
+    test('returns null when the group has been deleted', () async {
+      const expenseId = 'exp-srcname-3';
+      const groupId   = 'grp-srcname-3';
+
+      await db.insert('groups', {
+        'id': groupId, 'name': 'Gone Group', 'creator_id': _uid,
+        'created_by': _uid, 'type': 'normal', 'is_deleted': 0,
+        'created_at': isoNow(), 'updated_at': isoNow(),
+      });
+      await db.insert('expenses', {
+        'id': expenseId, 'group_id': groupId, 'payer_id': _uid,
+        'created_by': _uid, 'amount': '25.00', 'description': 'Test',
+        'currency': 'USD', 'split_type': 'even', 'category': 'Food & drink',
+        'is_income': 0, 'created_at': isoNow(), 'universal_usd_amount': '25.00',
+      });
+
+      // Delete the group from the DB (simulate gone group).
+      await db.delete('groups', where: 'id = ?', whereArgs: [groupId]);
+
+      final name = await repo.sourceGroupName(expenseId);
+      expect(name, isNull);
+    });
+  });
 }

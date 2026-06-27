@@ -20,6 +20,7 @@ import '../../../../core/widgets/app_top_button.dart';
 import '../../../../core/widgets/glass_card.dart';
 import '../../../../data/models/wallet_entry_model.dart';
 import '../../../settings/services/pdf_export_service.dart';
+import '../widgets/group_badge.dart';
 
 // ---------------------------------------------------------------------------
 // Palette
@@ -1084,6 +1085,11 @@ class _WalletEntryRow extends ConsumerWidget {
                     Text(entry.category.isEmpty ? 'common.general'.tr() : categoryTr(entry.category),
                         style: theme.textTheme.bodySmall?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
+                    if (entry.sourceExpenseId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 3),
+                        child: GroupBadge(sourceExpenseId: entry.sourceExpenseId!),
+                      ),
                   ],
                 ),
               ),
