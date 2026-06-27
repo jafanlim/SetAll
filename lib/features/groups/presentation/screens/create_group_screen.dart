@@ -261,7 +261,7 @@ class _CreateGroupScreenState extends ConsumerState<CreateGroupScreen> {
       try {
         await repo.addMemberById(groupId, member.id);
       } catch (e) {
-        failedNames.add(member.name);
+        failedNames.add('${member.name} ($e)');
         debugPrint('addMemberById failed for ${member.name}: $e');
       }
     }

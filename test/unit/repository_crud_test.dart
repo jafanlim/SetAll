@@ -917,17 +917,20 @@ void main() {
           description: 'Group dinner',
       );
       // Seed the mirror: personal expense row with source_expense_id set.
+      // Real-world mirrors store the share in `amount` and keep
+      // `universal_usd_amount` at 0 (the USD anchor lives on the source).
       await db.insert('expenses', {
-        'id':                mirrorId,
-        'group_id':          null,
-        'payer_id':          _uid,
-        'amount':            '30.00',
-        'description':       'Share · Group dinner',
-        'currency':          'USD',
-        'category':          'Food & drink',
-        'is_income':         0,
-        'source_expense_id': srcExpenseId,
-        'created_at':        DateTime.now().toUtc().toIso8601String(),
+        'id':                  mirrorId,
+        'group_id':            null,
+        'payer_id':            _uid,
+        'amount':              '30.00',
+        'universal_usd_amount': '0.00',
+        'description':         'Share · Group dinner',
+        'currency':            'USD',
+        'category':            'Food & drink',
+        'is_income':           0,
+        'source_expense_id':   srcExpenseId,
+        'created_at':          DateTime.now().toUtc().toIso8601String(),
       });
     });
 
@@ -1019,6 +1022,13 @@ void main() {
       expect(t['category'], 'Food & drink');
       expect(t['is_income'], 0);
       expect(t['deleted_by'], _uid);
+      // Amount must be the mirror's share amount (30.00), NOT the
+      // universal_usd_amount (0.00).  See Part C / Phase-1 P2.
+      expect(t['amount'], '30.00',
+          reason: 'Tombstone amount must be the mirror share amount, '
+              'not universal_usd_amount (mirrors store 0 there).');
+      expect(t['original_amount'], '30.00',
+          reason: 'Tombstone original_amount must preserve the share amount.');
     });
 
     // ──────────────────────────────────────────────────────────────────────
