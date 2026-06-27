@@ -29,7 +29,16 @@ Flutter (mobile + web + desktop) shared-expense / personal-finance app on Supaba
 
 ## 2. Release state
 
-- **Shipped: v1.7.0 (`1.7.0+34`)**, merged to `main` (61d86a5), tagged `v1.7.0`.
+- **Shipped: v1.8.0 (`1.8.0+35`)** — 2026-06-27. `main` fast-forwarded to `develop` (`00c5365`),
+  tagged `v1.8.0` (CI: Android/macOS/Windows + GitHub Release; iOS manual). **Web deployed live to
+  setall.app** via `make build-web` + `netlify deploy --prod`. Contents = the Phase-1 wave: edge-key
+  migration completion (live-verified), budgets, recurring detection, proactive alerts/insight signals,
+  wallet bank-statement import + dedupe, shared-expense→wallet mirror, web-insights datasource,
+  net-balance netting, group-identity persistence, soft-delete, CRIT-01 AI cache, P2 QA sweep
+  (ghost-FK, OAuth browser close, invite search, account-switch refresh), web pdfx fix, restored
+  landing-page legal footer + schema.org. **Known follow-up:** push-notification *delivery* to a
+  device still unverified (FCM token registration fixed; digest email verified).
+- **Prev: v1.7.0 (`1.7.0+34`)**, merged to `main` (61d86a5), tagged `v1.7.0`.
   Contents: AI receipt ingest, **receipt-split phases 1–2** (itemized line-items: persist,
   detail view, editable breakdown, entry-type chooser), import dedupe + transaction-date
   preservation, Google Vision OCR pre-pass, voice entry, USD-ledger migration, debt
