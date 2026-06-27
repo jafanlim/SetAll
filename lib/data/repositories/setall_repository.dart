@@ -1219,6 +1219,13 @@ class SetAllRepository {
         final expIds =
             expRows.map((r) => (r as Map<String, dynamic>)['id'] as String).toList();
         if (expIds.isNotEmpty) {
+          // Remove wallet mirrors BEFORE deleting the source expenses (5c-ii).
+          // The postgres FK source_expense_id is ON DELETE SET NULL, so deleting
+          // the source first nulls the link and _findMirrorId can no longer match
+          // it — the mirror would survive as an orphan. Order matters on web.
+          for (final id in expIds) {
+            await _removeMirrorForSource(id);
+          }
           await _client.from('splits').delete().inFilter('expense_id', expIds);
           await _client.from('expenses').delete().eq('group_id', groupId);
         }
@@ -1240,6 +1247,10 @@ class SetAllRepository {
         }
         await db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
         await db.delete('group_members', where: 'group_id = ?', whereArgs: [groupId]);
+        // Remove wallet mirrors for hard-deleted expenses (5c-ii).
+        for (final r in expRows) {
+          await _removeMirrorForSource(r['id'] as String);
+        }
       } catch (e) {
         debugPrint('[forceDeleteGroup] SQLite purge error (continuing): $e');
       }
@@ -1278,9 +1289,10 @@ class SetAllRepository {
 
     if (_isWeb && _client != null) {
       try {
-        // Snapshot name + creator before deleting.
+        // Snapshot name + creator + expense ids before deleting.
         String webGroupName = groupId;
         String? creatorId;
+        final List<String> expenseIds = []; // collect for mirror cleanup (5c-ii)
         try {
           final infoRows = await _client.from('groups').select('name, creator_id').eq('id', groupId).limit(1) as List;
           if (infoRows.isNotEmpty) {
@@ -1288,8 +1300,20 @@ class SetAllRepository {
             webGroupName = info['name'] as String? ?? groupId;
             creatorId    = info['creator_id'] as String?;
           }
+          // Collect expense ids before the RPC cascade-deletes them (5c-ii).
+          final expRows = await _client.from('expenses').select('id').eq('group_id', groupId) as List;
+          expenseIds.addAll(expRows.map((r) => (r as Map<String, dynamic>)['id'] as String));
         } catch (_) {}
 
+        // Remove wallet mirrors BEFORE the cascade (5c-ii). The postgres FK
+        // source_expense_id is ON DELETE SET NULL, so if the source expense is
+        // deleted first the link is nulled and _findMirrorId can no longer match
+        // it, leaving an orphan mirror. The mirror is the user's own personal
+        // (group_id IS NULL) row, deletable via RLS while still a member. Mirrors
+        // are not restored on group Restore — they are a wallet-local construct.
+        for (final id in expenseIds) {
+          await _removeMirrorForSource(id);
+        }
         if (creatorId == uid) {
           // Owner: use SECURITY DEFINER RPC so it can cascade-delete splits/
           // expenses paid by OTHER members (plain RLS would block those deletes).
@@ -1407,6 +1431,11 @@ class SetAllRepository {
         await LocalDatabase.db.delete(
           'expenses', where: 'id = ?', whereArgs: [ex['id']]);
       }
+      // Remove wallet mirrors for cascade-deleted expenses (5c-ii).
+      // Mirrors are not restored on group Restore — they are a wallet-local construct.
+      for (final ex in expenseRows) {
+        await _removeMirrorForSource(ex['id'] as String);
+      }
     } else {
       // ── Non-owner: soft-delete the group row FIRST so any concurrent sync
       // tick sees is_deleted=1 and does not strip the left_groups entry,
@@ -1426,6 +1455,10 @@ class SetAllRepository {
       await LocalDatabase.db.delete('expenses', where: 'group_id = ?', whereArgs: [groupId]);
       await LocalDatabase.db.delete('group_members',
           where: 'group_id = ?', whereArgs: [groupId]);
+      // Remove wallet mirrors for cascade-deleted expenses (5c-ii).
+      for (final row in expenseRows) {
+        await _removeMirrorForSource(row['id'] as String);
+      }
     }
 
     _logGroupDeletedEvents(uid, {groupId: (groupName, creatorId ?? uid)});
@@ -4418,6 +4451,56 @@ class SetAllRepository {
       // dedupe never silently returns null and writes a duplicate mirror.
       if (e.toString().contains('source_expense_id')) return null;
       rethrow;
+    }
+  }
+
+  /// Resolves the group name for a source expense. Returns the group name,
+  /// or null if the source expense doesn't exist, doesn't belong to a group,
+  /// or the group is gone. Used by the wallet "from group" badge (5c-ii).
+  Future<String?> sourceGroupName(String sourceExpenseId) async {
+    if (_isWeb && _client != null) {
+      try {
+        final rows = await _client
+            .from('expenses')
+            .select('group_id')
+            .eq('id', sourceExpenseId)
+            .limit(1) as List;
+        if (rows.isEmpty) return null;
+        final groupId = (rows.first as Map<String, dynamic>)['group_id'] as String?;
+        if (groupId == null) return null;
+        final groupRows = await _client
+            .from('groups')
+            .select('name')
+            .eq('id', groupId)
+            .limit(1) as List;
+        if (groupRows.isEmpty) return null;
+        return (groupRows.first as Map<String, dynamic>)['name'] as String?;
+      } catch (_) {
+        return null;
+      }
+    }
+    try {
+      final rows = await LocalDatabase.db.query(
+        'expenses',
+        columns: ['group_id'],
+        where: 'id = ?',
+        whereArgs: [sourceExpenseId],
+        limit: 1,
+      );
+      if (rows.isEmpty) return null;
+      final groupId = rows.first['group_id'] as String?;
+      if (groupId == null) return null;
+      final groupRows = await LocalDatabase.db.query(
+        'groups',
+        columns: ['name'],
+        where: 'id = ?',
+        whereArgs: [groupId],
+        limit: 1,
+      );
+      if (groupRows.isEmpty) return null;
+      return groupRows.first['name'] as String?;
+    } catch (_) {
+      return null;
     }
   }
 
