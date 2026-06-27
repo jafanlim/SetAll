@@ -104,8 +104,8 @@ final _analyticsFilterProvider =
 class IvEPeriod {
   const IvEPeriod(this.label, this.income, this.expense);
   final String label;
-  final double income;
-  final double expense;
+  final Decimal income;
+  final Decimal expense;
 }
 
 /// Unified row for the analytics drill-down list.
@@ -179,22 +179,22 @@ class AnalyticsData {
     required this.incomeCategoryTotals,
     required this.allExpenses,
   });
-  final Map<String, double> categoryTotals;
-  final List<FlSpot>        netTrend;
-  final double              totalSpend;
-  final double              totalIncome;
-  final String              currency;
-  final Map<String, double> currencyBreakdown;
+  final Map<String, Decimal> categoryTotals;
+  final List<FlSpot>         netTrend;
+  final Decimal              totalSpend;
+  final Decimal              totalIncome;
+  final String               currency;
+  final Map<String, Decimal> currencyBreakdown;
   // Vital signs
-  final double   netFlow;        // income - spend
-  final double   netFlowPct;     // % vs previous period (0 if unavailable)
-  final double   burnRate;       // avg daily spend
-  final String   topCategory;
-  final double   topCategoryPct;
+  final Decimal netFlow;         // income - spend (Decimal, exact)
+  final double  netFlowPct;      // % vs previous period (0 if unavailable)
+  final double  burnRate;        // avg daily spend (derived from Decimal sum)
+  final String  topCategory;
+  final double  topCategoryPct;
   // Income vs Expense chart periods
   final List<IvEPeriod> ivePeriods;
   // Income breakdown by category (mirrors categoryTotals but for income)
-  final Map<String, double> incomeCategoryTotals;
+  final Map<String, Decimal> incomeCategoryTotals;
   // Raw filtered rows for drill-down list
   final List<AnalyticsRow> allExpenses;
 }
@@ -239,13 +239,13 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
   // Amount normalization: convert to baseCurrency.
   // 1. If the expense was originally recorded in baseCurrency, use originalAmount directly.
   // 2. Otherwise multiply the stored universalUsdAmount by the live USD→base rate.
-  double normalizedAmt(AnalyticsRow e) {
+  Decimal normalizedAmt(AnalyticsRow e) {
     final rawUsd   = Decimal.tryParse(e.universalUsdAmount) ?? Decimal.zero;
     final entryCcy = e.originalCurrency ?? e.currency;
     if (entryCcy == baseCurrency && e.originalAmount != null) {
-      return (Decimal.tryParse(e.originalAmount!) ?? rawUsd).toDouble();
+      return Decimal.tryParse(e.originalAmount!) ?? rawUsd;
     }
-    return (rawUsd * usdToBaseRate).toDouble();
+    return rawUsd * usdToBaseRate;
   }
 
   // Date window
@@ -256,10 +256,10 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
       : now.add(const Duration(days: 1));
 
   // Category totals + currency breakdown + income (within window)
-  final categoryMap        = <String, double>{};
-  final incomeMap          = <String, double>{};
-  final currencyBreakdown  = <String, double>{};
-  double totalIncome       = 0;
+  final categoryMap        = <String, Decimal>{};
+  final incomeMap          = <String, Decimal>{};
+  final currencyBreakdown  = <String, Decimal>{};
+  Decimal totalIncome      = Decimal.zero;
   final windowExpenses     = <AnalyticsRow>[];   // for drill-down list
 
   for (final e in filtered) {
@@ -274,26 +274,26 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
     if (e.isIncome) {
       totalIncome += amt;
       final cat = e.category.isNotEmpty ? e.category : 'Income';
-      incomeMap[cat] = (incomeMap[cat] ?? 0) + amt;
+      incomeMap[cat] = (incomeMap[cat] ?? Decimal.zero) + amt;
       continue;
     }
 
     final cat = e.category.isNotEmpty ? e.category : 'Other';
-    categoryMap[cat] = (categoryMap[cat] ?? 0) + amt;
+    categoryMap[cat] = (categoryMap[cat] ?? Decimal.zero) + amt;
 
     // Original currency tally for the right panel
     final ccy = e.originalCurrency ?? e.currency;
     if (ccy.isNotEmpty && ccy != baseCurrency) {
       final origAmt = Decimal.tryParse(e.originalAmount ?? e.amount) ?? Decimal.zero;
-      currencyBreakdown[ccy] = (currencyBreakdown[ccy] ?? 0) + origAmt.toDouble();
+      currencyBreakdown[ccy] = (currencyBreakdown[ccy] ?? Decimal.zero) + origAmt;
     }
   }
 
   // Top-8 + bucket rest
   final sorted = categoryMap.entries.toList()
     ..sort((a, b) => b.value.compareTo(a.value));
-  final Map<String, double> topCats = {};
-  double otherTotal = 0;
+  final Map<String, Decimal> topCats = {};
+  Decimal otherTotal = Decimal.zero;
   for (int i = 0; i < sorted.length; i++) {
     if (i < 8) {
       topCats[sorted[i].key] = sorted[i].value;
@@ -301,21 +301,21 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
       otherTotal += sorted[i].value;
     }
   }
-  if (otherTotal > 0) topCats['Other'] = otherTotal;
+  if (otherTotal > Decimal.zero) topCats['Other'] = otherTotal;
 
-  final totalSpend = topCats.values.fold(0.0, (a, b) => a + b);
+  final totalSpend = topCats.values.fold(Decimal.zero, (a, b) => a + b);
 
   // Span must be declared before vital signs and trend sections
   final spanDays = now.difference(cutoff).inDays.clamp(1, 365);
 
   // ── Vital signs ───────────────────────────────────────────────────────────
   final netFlow   = totalIncome - totalSpend;
-  final burnRate  = spanDays > 0 ? totalSpend / spanDays : 0.0;
+  final burnRate  = spanDays > 0 ? totalSpend.toDouble() / spanDays : 0.0;
 
   // Previous period for % change comparison
   final prevCutoff = cutoff.subtract(Duration(days: spanDays));
-  double prevSpend = 0;
-  double prevIncome = 0;
+  Decimal prevSpend = Decimal.zero;
+  Decimal prevIncome = Decimal.zero;
   for (final e in filtered) {
     final dateStr = e.createdAt;
     if (dateStr == null) continue;
@@ -325,14 +325,17 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
     if (e.isIncome) { prevIncome += amt; } else { prevSpend += amt; }
   }
   final prevNet   = prevIncome - prevSpend;
-  final netFlowPct = prevNet != 0 ? ((netFlow - prevNet) / prevNet.abs() * 100) : 0.0;
+  final netFlowPct = prevNet != Decimal.zero
+      ? ((netFlow - prevNet).toDouble() / prevNet.abs().toDouble() * 100)
+      : 0.0;
 
   final topCatEntry = topCats.isNotEmpty
       ? (topCats.entries.toList()..sort((a, b) => b.value.compareTo(a.value))).first
       : null;
   final topCategory    = topCatEntry?.key    ?? '';
-  final topCategoryPct = totalSpend > 0 && topCatEntry != null
-      ? topCatEntry.value / totalSpend * 100 : 0.0;
+  final topCategoryPct = totalSpend > Decimal.zero && topCatEntry != null
+      ? topCatEntry.value.toDouble() / totalSpend.toDouble() * 100
+      : 0.0;
 
   // ── Income vs Expense grouped bars ────────────────────────────────────────
   // Choose granularity: weekly for ≤90d windows, monthly otherwise
@@ -343,7 +346,7 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
     for (int w = weeks - 1; w >= 0; w--) {
       final wStart = cutoff.add(Duration(days: w * 7));
       final wEnd   = wStart.add(const Duration(days: 7));
-      double inc = 0, exp = 0;
+      Decimal inc = Decimal.zero, exp = Decimal.zero;
       for (final e in windowExpenses) {
         final date = DateTime.tryParse(e.createdAt ?? '');
         if (date == null || !date.isAfter(wStart) || !date.isBefore(wEnd)) continue;
@@ -359,7 +362,7 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
     for (int m = months - 1; m >= 0; m--) {
       final mStart = DateTime(now.year, now.month - m, 1);
       final mEnd   = DateTime(now.year, now.month - m + 1, 1);
-      double inc = 0, exp = 0;
+      Decimal inc = Decimal.zero, exp = Decimal.zero;
       for (final e in windowExpenses) {
         final date = DateTime.tryParse(e.createdAt ?? '');
         if (date == null || !date.isAfter(mStart) || !date.isBefore(mEnd)) continue;
@@ -372,7 +375,7 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
   }
 
   // Net trend over selected window
-  final dailyNet = List.filled(spanDays, 0.0);
+  final dailyNet = List<Decimal>.filled(spanDays, Decimal.zero);
   for (final e in filtered) {
     final dateStr = e.createdAt;
     if (dateStr == null) continue;
@@ -385,11 +388,11 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
     dailyNet[idx] += e.isIncome ? amt : -amt;
   }
 
-  double running = 0;
+  Decimal running = Decimal.zero;
   final spots = <FlSpot>[];
   for (int i = 0; i < spanDays; i++) {
     running += dailyNet[i];
-    spots.add(FlSpot(i.toDouble(), running));
+    spots.add(FlSpot(i.toDouble(), running.toDouble()));
   }
 
   return AnalyticsData(
@@ -447,8 +450,8 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
               icon: const Icon(Icons.download_outlined),
               tooltip: 'Download report',
               onPressed: () => PdfExportService().exportAnalyticsPdf(
-                income:   data.totalIncome,
-                expenses: data.totalSpend,
+                income:   data.totalIncome.toDouble(),
+                expenses: data.totalSpend.toDouble(),
                 entries:  data.allExpenses,
                 currency: data.currency,
               ),
@@ -475,7 +478,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
                   style: TextStyle(color: theme.colorScheme.error)),
               ),
               data: (data) {
-                if (data.totalSpend == 0 &&
+                if (data.totalSpend == Decimal.zero &&
                     data.netTrend.every((s) => s.y == 0)) {
                   return _EmptyState();
                 }
@@ -1037,11 +1040,11 @@ class _PieOrDonut extends StatelessWidget {
       final isTouched = i == touchedIndex;
       final color = _kPaletteColors[i % _kPaletteColors.length];
       final denom = incomeMode ? data.totalIncome : data.totalSpend;
-      final pct = denom > 0
-          ? entries[i].value / denom * 100
+      final pct = denom > Decimal.zero
+          ? entries[i].value.toDouble() / denom.toDouble() * 100
           : 0.0;
       return PieChartSectionData(
-        value:      entries[i].value,
+        value:      entries[i].value.toDouble(),
         color:      color,
         radius:     isDonut ? (isTouched ? 46 : 38) : (isTouched ? 120 : 110),
         showTitle:  !isDonut && isTouched,
@@ -1125,7 +1128,7 @@ class _PieOrDonut extends StatelessWidget {
                 if (selectedEntry != null) ...[
                   const SizedBox(height: 6),
                   Text(
-                    '${denom2 > 0 ? (selectedEntry.value / denom2 * 100).toStringAsFixed(1) : '0.0'}%',
+                    '${denom2 > Decimal.zero ? (selectedEntry.value.toDouble() / denom2.toDouble() * 100).toStringAsFixed(1) : '0.0'}%',
                     style: const TextStyle(
                       fontSize: 13, fontWeight: FontWeight.w600,
                       color: _kLabel,
@@ -1212,14 +1215,14 @@ class _BarChart extends StatelessWidget {
       ..sort((a, b) => b.value.compareTo(a.value));
     if (entries.isEmpty) return _EmptyChartHint();
 
-    final maxVal = entries.first.value;
+    final maxVal = entries.first.value.toDouble();
 
     return Column(
       children: entries.asMap().entries.map((entry) {
         final i     = entry.key;
         final e     = entry.value;
         final color = _kPaletteColors[i % _kPaletteColors.length];
-        final pct   = maxVal > 0 ? e.value / maxVal : 0.0;
+        final pct   = maxVal > 0 ? e.value.toDouble() / maxVal : 0.0;
 
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 5),
@@ -1289,9 +1292,9 @@ class _CategoryLegend extends StatelessWidget {
     required this.total,
     required this.touchedIndex,
   });
-  final Map<String, double> totals;
-  final double              total;
-  final int?                touchedIndex;
+  final Map<String, Decimal> totals;
+  final Decimal              total;
+  final int?                 touchedIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -1511,7 +1514,7 @@ class _VitalSignsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPositive = data.netFlow >= 0;
+    final isPositive = data.netFlow >= Decimal.zero;
     final flowColor  = isPositive ? _teal : _rose;
     final pctAbs     = data.netFlowPct.abs();
     final pctLabel   = pctAbs > 0
@@ -1662,7 +1665,7 @@ class _IvEChart extends StatelessWidget {
     if (periods.isEmpty) return _EmptyChartHint();
 
     final maxVal = periods
-        .expand((p) => [p.income, p.expense])
+        .expand((p) => [p.income.toDouble(), p.expense.toDouble()])
         .fold(0.0, math.max);
     if (maxVal == 0) return _EmptyChartHint();
 
@@ -1674,13 +1677,13 @@ class _IvEChart extends StatelessWidget {
         barsSpace: 3,
         barRods: [
           BarChartRodData(
-            toY: p.income,
+            toY: p.income.toDouble(),
             color: _teal,
             width: 8,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
           ),
           BarChartRodData(
-            toY: p.expense,
+            toY: p.expense.toDouble(),
             color: _violet,
             width: 8,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
@@ -1972,7 +1975,7 @@ class _BalanceSheetCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme     = Theme.of(context);
-    final isPos     = data.netFlow >= 0;
+    final isPos     = data.netFlow >= Decimal.zero;
     final netColor  = isPos ? _teal : _rose;
 
     return Container(
@@ -2056,7 +2059,7 @@ class _BSRow extends StatelessWidget {
     this.bold   = false,
   });
   final String  label;
-  final double  value;
+  final Decimal value;
   final String  currency;
   final Color   color;
   final IconData icon;

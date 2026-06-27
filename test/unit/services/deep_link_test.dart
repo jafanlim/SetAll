@@ -9,12 +9,51 @@
 // live device and a real Supabase session — those are E2E concerns. Here we
 // test the scheme gate and lifecycle contracts in isolation.
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:setall/core/config/auth_config.dart';
 import 'package:setall/core/services/deep_link_service.dart';
 
 void main() {
   // Use the singleton — safe because isSetAllSchemeUri is pure / stateless.
   final svc = DeepLinkService.instance;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 0. OAuth redirect URL — platform-correct base URL for auto-close
+  // ─────────────────────────────────────────────────────────────────────────
+  group('OAuth redirect URL (kAuthRedirectBaseUrl)', () {
+    test('returns non-empty string on all platforms', () {
+      expect(kAuthRedirectBaseUrl, isNotEmpty);
+    });
+
+    test('web URL is the Supabase auth callback (https)', () {
+      if (kIsWeb) {
+        expect(kAuthRedirectBaseUrl,
+            'https://vrsmsgyxeyzyrdonsnrk.supabase.co/auth/v1/callback');
+      }
+    });
+
+    test('native URLs use custom scheme (not http)', () {
+      if (!kIsWeb) {
+        expect(kAuthRedirectBaseUrl.startsWith('http'), isFalse,
+            reason: 'Native redirects must use custom URL schemes '
+                '(com.jafa.setall.app:// or com.setall.app://) for the OS '
+                'to return the user to the app after OAuth');
+      }
+    });
+
+    test('iOS uses App Store bundle ID scheme', () {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        expect(kAuthRedirectBaseUrl, 'com.jafa.setall.app://login-callback');
+      }
+    });
+
+    test('Android uses unified bundle ID scheme', () {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        expect(kAuthRedirectBaseUrl, 'com.setall.app://login-callback');
+      }
+    });
+  });
 
   // ─────────────────────────────────────────────────────────────────────────
   // 1. Accepted schemes (should trigger session recovery)

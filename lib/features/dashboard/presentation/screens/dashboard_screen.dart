@@ -71,8 +71,8 @@ final _aiInsightProvider = FutureProvider.autoDispose<String>((ref) async {
 
   // Empty state: no expenses and no income — skip the network call entirely.
   if (analyticsData.allExpenses.isEmpty &&
-      analyticsData.totalIncome == 0 &&
-      analyticsData.totalSpend  == 0) {
+      analyticsData.totalIncome == Decimal.zero &&
+      analyticsData.totalSpend  == Decimal.zero) {
     return _kAiEmpty;
   }
 
@@ -318,7 +318,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             // ── WIDGET 5: Compact Analytics Summary ──────────────────────────
             analyticsAsync.when(
               skipLoadingOnReload: true,
-              data: (data) => data.totalSpend == 0 && data.totalIncome == 0
+              data: (data) => data.totalSpend == Decimal.zero && data.totalIncome == Decimal.zero
                   ? const SizedBox.shrink()
                   : _CompactAnalyticsSection(data: data),
               loading: () => const _AnalyticsLoadingCard(),
@@ -967,8 +967,8 @@ class _DashboardDonutChart extends StatelessWidget {
     required this.totalSpend,
     required this.currency,
   });
-  final Map<String, double> categoryTotals;
-  final double totalSpend;
+  final Map<String, Decimal> categoryTotals;
+  final Decimal totalSpend;
   final String currency;
 
   @override
@@ -979,7 +979,7 @@ class _DashboardDonutChart extends StatelessWidget {
     final sections = List.generate(entries.length, (i) {
       final color = _kPaletteColors[i % _kPaletteColors.length];
       return PieChartSectionData(
-        value: entries[i].value,
+        value: entries[i].value.toDouble(),
         color: color,
         radius: 30,
         showTitle: false,
@@ -1013,7 +1013,7 @@ class _DashboardDonutChart extends StatelessWidget {
                   final i = entry.key;
                   final e = entry.value;
                   final color = _kPaletteColors[i % _kPaletteColors.length];
-                  final pct = totalSpend > 0 ? e.value / totalSpend * 100 : 0.0;
+                  final pct = totalSpend > Decimal.zero ? e.value.toDouble() / totalSpend.toDouble() * 100 : 0.0;
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 3),
                     child: Row(

@@ -4,6 +4,7 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../router/app_router.dart';
 
@@ -70,6 +71,17 @@ class DeepLinkService {
       try {
         await Supabase.instance.client.auth.getSessionFromUrl(uri);
         if (kDebugMode) debugPrint('[DeepLinkService] session recovered from link');
+        // Dismiss the in-app browser (SFSafariViewController / Chrome Custom Tabs)
+        // that was opened by signInWithOAuth(…authScreenLaunchMode: platformDefault).
+        if (!kIsWeb) {
+          try {
+            if (await supportsCloseForLaunchMode(LaunchMode.platformDefault)) {
+              await closeInAppWebView();
+            }
+          } catch (_) {
+            // closeInAppWebView is best-effort — ignore if unsupported.
+          }
+        }
       } on AuthException catch (e) {
         if (kDebugMode) debugPrint('[DeepLinkService] auth error: ${e.message}');
       } catch (e) {

@@ -373,7 +373,8 @@ class SetAllRepository {
       return rows
           .map((r) => ProfileModel.fromJson(r as Map<String, dynamic>))
           .toList();
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[searchUsers] RPC failed: $e');
       return [];
     }
   }
