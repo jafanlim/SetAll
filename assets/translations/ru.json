@@ -96,7 +96,8 @@
     "spending": "Расходы",
     "income": "Доходы",
     "daily_burn": "Дневной расход",
-    "more": "ещё"
+    "more": "ещё",
+    "open_full_analytics": "Открыть полную аналитику"
   },
   "activity": {
     "title": "Активность",
