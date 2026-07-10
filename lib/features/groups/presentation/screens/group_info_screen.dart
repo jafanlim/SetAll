@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/app_router.dart';
 import '../../../../core/providers/setall_providers.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -222,6 +223,14 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
         MediaQuery.sizeOf(context).width - 48, 64, 0, 0),
       items: [
         PopupMenuItem(
+          value: 'insights',
+          child: Row(children: [
+            const Icon(Icons.insights_outlined, size: 16, color: _teal),
+            const SizedBox(width: 8),
+            Text('groups_screen.group_insights'.tr()),
+          ]),
+        ),
+        PopupMenuItem(
           value: 'rename',
           child: Row(children: [
             const Icon(Icons.edit_outlined, size: 16, color: _teal),
@@ -272,6 +281,10 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
       ],
     );
     if (!mounted) return;
+    if (result == 'insights') {
+      context.push(AppRouter.analytics,
+          extra: {'groupId': group.id, 'groupName': group.name});
+    }
     if (result == 'rename') _rename();
     if (result == 'invite') {
       context.push('/group/${group.id}/invite',

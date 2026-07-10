@@ -240,6 +240,7 @@
     "expense_deleted": "Dépense supprimée",
     "download_report": "Télécharger le rapport",
     "add_member": "Ajouter un membre",
+    "group_insights": "Aperçu du groupe",
     "group_name_hint": "Nom du groupe",
     "settle_body": "Marquer \"{name}\" comme soldé ? Toutes les dettes seront à zéro.",
     "delete_group": "Supprimer le groupe",

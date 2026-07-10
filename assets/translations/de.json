@@ -240,6 +240,7 @@
     "expense_deleted": "Ausgabe gelöscht",
     "download_report": "Bericht herunterladen",
     "add_member": "Mitglied hinzufügen",
+    "group_insights": "Gruppenanalysen",
     "group_name_hint": "Gruppenname",
     "settle_body": "\"{name}\" als beglichen markieren? Alle Schulden werden auf null gesetzt.",
     "delete_group": "Gruppe löschen",

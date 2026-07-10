@@ -240,6 +240,7 @@
     "expense_deleted": "Gasto eliminado",
     "download_report": "Descargar informe",
     "add_member": "Añadir miembro",
+    "group_insights": "Información del grupo",
     "group_name_hint": "Nombre del grupo",
     "settle_body": "¿Marcar \"{name}\" como saldado? Todas las deudas quedarán a cero.",
     "delete_group": "Eliminar grupo",
