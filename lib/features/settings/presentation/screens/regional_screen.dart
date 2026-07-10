@@ -51,19 +51,10 @@ class _RegionalScreenState extends State<RegionalScreen> {
   String get _systemDateFormat => _fmtFromLocale(_regionLocaleStr);
 
   String get _systemTimeFormat {
-    // Check @hours= ICU extension (macOS)
-    final hoursMatch = RegExp(r'[@;]hours=(h\d+)', caseSensitive: false)
-        .firstMatch(_regionLocaleStr);
-    if (hoursMatch != null) {
-      final h = hoursMatch.group(1)!.toLowerCase();
-      return (h == 'h23' || h == 'h24') ? _kFmt24h : _kFmt12h;
-    }
-    // Fallback: intl jm() skeleton
-    try {
-      final skeleton = DateFormat.jm(_regionLocaleStr.split('@').first).pattern ?? '';
-      if (skeleton.contains('a') || skeleton.toLowerCase().contains('h:')) return _kFmt12h;
-    } catch (_) {}
-    return _kFmt24h;
+    // Delegates to the shared resolver so both the settings preview and the
+    // app-wide DateFormatService use identical logic (setall-region-time-format).
+    final pattern = DateFormatService.timePatternFromLocale(_regionLocaleStr);
+    return pattern == 'h:mm a' ? _kFmt12h : _kFmt24h;
   }
 
   String get _effectiveTimeFormat => _manualTimeOverride ? _timeFormat : _systemTimeFormat;
