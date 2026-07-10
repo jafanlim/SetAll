@@ -771,4 +771,156 @@ void main() {
       expect(name, isNull);
     });
   });
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // GROUP 7 — Edit date propagation (setall-expense-date-edit P1)
+  // ──────────────────────────────────────────────────────────────────────────
+  group('edit date propagation', () {
+    test('updateExpense(entryDate: X) persists X in expense created_at', () async {
+      const expenseId = 'exp-date-1';
+      const groupId   = 'grp-date-1';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '100.00');
+
+      // Capture original created_at.
+      final before = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [expenseId]);
+      final originalCreatedAt = before.first['created_at'];
+
+      final pickedDate = DateTime(2025, 3, 15, 14, 30).toUtc();
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     groupId,
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('100.00'))],
+        category:    'Food & drink',
+        entryDate:   pickedDate,
+      );
+      expect(updated, isNotNull);
+
+      // created_at must reflect the picked date.
+      final after = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [expenseId]);
+      expect(after.first['created_at'], isNot(originalCreatedAt),
+          reason: 'created_at must change when entryDate is explicitly provided');
+      expect(after.first['created_at'], pickedDate.toIso8601String());
+    });
+
+    test('updateExpense() without entryDate leaves created_at untouched (regression guard)', () async {
+      const expenseId = 'exp-date-2';
+      const groupId   = 'grp-date-2';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '50.00');
+
+      final before = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [expenseId]);
+      final originalCreatedAt = before.first['created_at'];
+
+      // Edit only the description — no entryDate.
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     groupId,
+        payerId:     _uid,
+        amount:      Decimal.parse('50.00'),
+        description: 'Updated description',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('50.00'))],
+        category:    'Food & drink',
+      );
+      expect(updated, isNotNull);
+
+      final after = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [expenseId]);
+      expect(after.first['created_at'], originalCreatedAt,
+          reason: 'created_at must NOT change when entryDate is not provided — '
+              'PR #34 regression class: normal edits must not reset date to now');
+    });
+
+    test('mirror created_at follows when entryDate is explicitly provided', () async {
+      const expenseId = 'exp-date-3';
+      const mirrorId  = 'mirror-date-3';
+      const groupId   = 'grp-date-3';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '100.00');
+      await createMirror(
+        mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      final mirrorBefore = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [mirrorId]);
+      final originalMirrorCreatedAt = mirrorBefore.first['created_at'];
+
+      final pickedDate = DateTime(2025, 7, 4, 10, 0).toUtc();
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     groupId,
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('50.00'))],
+        category:    'Food & drink',
+        entryDate:   pickedDate,
+      );
+      expect(updated, isNotNull);
+
+      // Mirror created_at must follow the explicitly edited source date.
+      final mirrorAfter = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [mirrorId]);
+      expect(mirrorAfter.first['created_at'], isNot(originalMirrorCreatedAt),
+          reason: 'Mirror created_at must change when source date was explicitly edited');
+      expect(mirrorAfter.first['created_at'], pickedDate.toIso8601String());
+    });
+
+    test('mirror created_at preserved when entryDate is not provided', () async {
+      const expenseId = 'exp-date-4';
+      const mirrorId  = 'mirror-date-4';
+      const groupId   = 'grp-date-4';
+
+      await seedGroupExpense(
+        expenseId: expenseId, groupId: groupId, amount: '100.00');
+      await createMirror(
+        mirrorId: mirrorId, sourceExpenseId: expenseId, amount: '100.00');
+
+      final mirrorBefore = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [mirrorId]);
+      final originalMirrorCreatedAt = mirrorBefore.first['created_at'];
+
+      // Edit without entryDate — only change share amount.
+      final updated = await repo.updateExpense(
+        expenseId:   expenseId,
+        groupId:     groupId,
+        payerId:     _uid,
+        amount:      Decimal.parse('100.00'),
+        description: 'Test expense',
+        currency:    'USD',
+        splitType:   SplitType.even,
+        splits:      [SplitInsert(userId: _uid, universalUsdOwed: Decimal.parse('75.00'))],
+        category:    'Food & drink',
+      );
+      expect(updated, isNotNull);
+
+      // Mirror created_at must be preserved (PR #34 behavior).
+      final mirrorAfter = await db.query('expenses',
+          columns: ['created_at'],
+          where: 'id = ?', whereArgs: [mirrorId]);
+      expect(mirrorAfter.first['created_at'], originalMirrorCreatedAt,
+          reason: 'Mirror created_at must be preserved when source date was not edited');
+    });
+  });
 }

@@ -446,6 +446,7 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       attachmentPaths: List.unmodifiable(_attachmentPaths),
       notes: _notesController.text.trim().isEmpty ? null : InputSanitizer.sanitize(_notesController.text.trim()),
       lineItems: lineItemsPayload,
+      entryDate: _entryDate,
     );
 
     if (mounted) {

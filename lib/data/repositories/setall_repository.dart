@@ -3627,6 +3627,7 @@ class SetAllRepository {
     List<String> attachmentPaths = const [],
     String? notes,
     List<ExpenseLineItem> lineItems = const [],
+    DateTime? entryDate,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return null;
@@ -3666,8 +3667,12 @@ class SetAllRepository {
 
           // Full data for local SQLite.
           final expenseData = expense.toJson()
-            ..remove('created_at')
             ..remove('created_by');
+          if (entryDate != null) {
+            expenseData['created_at'] = entryDate.toUtc().toIso8601String();
+          } else {
+            expenseData.remove('created_at');
+          }
         // When all attachments were removed, toJson omits the key → old SQLite
         // value is never cleared.  Explicitly null it so the UPDATE wipes it.
         if (finalAttachmentUrls.isEmpty) expenseData['attachment_urls'] = null;
@@ -3711,6 +3716,7 @@ class SetAllRepository {
                 description: description,
                 category:    category,
                 isIncome:    isIncome,
+                entryDate:   entryDate,
               );
               return ExpenseModel.fromJson(res);
             } catch (e) {
@@ -3862,6 +3868,7 @@ class SetAllRepository {
           description: description,
           category:    category,
           isIncome:    isIncome,
+          entryDate:   entryDate,
         );
 
         final updatedRow = await LocalDatabase.db.query(
@@ -4686,6 +4693,7 @@ class SetAllRepository {
     required String description,
     required String category,
     required bool isIncome,
+    DateTime? entryDate,
   }) async {
     final uid = await ensureUser();
     if (uid == null) return;
@@ -4713,10 +4721,15 @@ class SetAllRepository {
     // Update the existing mirror. Reuse mirrorId so upsertWalletEntry dedupes
     // to the same row (via _findMirrorId inside upsertWalletEntry).
     final desc = description.isNotEmpty ? 'Share · $description' : 'Share · $category';
-    // Preserve the mirror's original date. upsertWalletEntry defaults a null
-    // createdAt to now(), which would wrongly jump the wallet entry to today
-    // on every edit, so read and re-supply the existing created_at.
-    final originalCreatedAt = await _existingCreatedAt(mirrorId);
+    // Mirror date policy (controller decision, setall-expense-date-edit):
+    // - When source date was explicitly edited → propagate to mirror (same purchase).
+    // - When source date was not edited → preserve mirror's own created_at (PR #34).
+    final String? mirrorCreatedAt;
+    if (entryDate != null) {
+      mirrorCreatedAt = entryDate.toUtc().toIso8601String();
+    } else {
+      mirrorCreatedAt = await _existingCreatedAt(mirrorId);
+    }
     await upsertWalletEntry(
       WalletEntryModel(
         id:          mirrorId,
@@ -4726,7 +4739,7 @@ class SetAllRepository {
         description: desc,
         category:    category,
         isIncome:    isIncome,
-        createdAt:   originalCreatedAt,
+        createdAt:   mirrorCreatedAt,
       ),
       sourceExpenseId: expenseId,
     );
