@@ -282,7 +282,7 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     );
     if (!mounted) return;
     if (result == 'insights') {
-      context.push(AppRouter.analytics,
+      context.push(AppRouter.analyticsView,
           extra: {'groupId': group.id, 'groupName': group.name});
     }
     if (result == 'rename') _rename();

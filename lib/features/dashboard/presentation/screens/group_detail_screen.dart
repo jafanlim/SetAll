@@ -398,7 +398,7 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
                     if (value == 'insights') {
-                      context.push(AppRouter.analytics,
+                      context.push(AppRouter.analyticsView,
                           extra: {'groupId': groupId, 'groupName': groupName});
                     }
                     if (value == 'rename') _renameGroup(context);

@@ -96,7 +96,8 @@
     "spending": "ხარჯები",
     "income": "შემოსავალი",
     "daily_burn": "დღიური ხარჯი",
-    "more": "მეტი"
+    "more": "მეტი",
+    "open_full_analytics": "სრული ანალიტიკის გახსნა"
   },
   "activity": {
     "title": "აქტივობა",

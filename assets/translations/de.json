@@ -96,7 +96,8 @@
     "spending": "Ausgaben",
     "income": "Einnahmen",
     "daily_burn": "Tagesbedarf",
-    "more": "weitere"
+    "more": "weitere",
+    "open_full_analytics": "Vollständige Analyse öffnen"
   },
   "activity": {
     "title": "Aktivität",

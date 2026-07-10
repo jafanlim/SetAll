@@ -57,6 +57,7 @@ final class AppRouter {
   static const String dashboard = '/';
   static const String activity   = '/activity';
   static const String analytics  = '/analytics';
+  static const String analyticsView = '/analytics-view';
   static const String wallet = '/wallet';
   static const String groups = '/groups';
   static const String createGroup = '/create-group';
@@ -600,6 +601,24 @@ final class AppRouter {
               child: const ScanDestinationScreen(),
             ),
           ),
+        ),
+
+        // ── Analytics view (pushed over shell, back-swipe; see fix/group-insights-shell-route-crash) ──
+        GoRoute(
+          path: analyticsView,
+          name: 'analyticsView',
+          pageBuilder: (context, state) {
+            final extra = state.extra as Map<String, dynamic>?;
+            return MaterialPage(
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: AnalyticsScreen(
+                  initialGroupId: extra?['groupId'] as String?,
+                  groupName: extra?['groupName'] as String?,
+                ),
+              ),
+            );
+          },
         ),
 
         // ── AI Insights Panel (pushed over dashboard, back-swipe supported) ──

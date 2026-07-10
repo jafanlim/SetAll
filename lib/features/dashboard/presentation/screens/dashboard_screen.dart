@@ -912,7 +912,7 @@ class _CompactAnalyticsSectionState extends State<_CompactAnalyticsSection> {
           child: TextButton.icon(
             onPressed: () {
               HapticUtils.lightTap();
-              context.push(AppRouter.analytics);
+              context.push(AppRouter.analyticsView);
             },
             icon: const Icon(Icons.analytics_outlined, size: 16, color: _aTeal),
             label: Text(

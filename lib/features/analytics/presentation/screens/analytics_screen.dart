@@ -472,6 +472,15 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
         elevation: 0,
         scrolledUnderElevation: 0.5,
         automaticallyImplyLeading: false,
+        // Show a back button only when pushed (e.g. scoped group insights);
+        // the bottom-nav tab instance cannot pop, so it stays chromeless.
+        leading: (ModalRoute.of(context)?.canPop ?? false)
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back),
+                tooltip: 'common.back'.tr(),
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : null,
         actions: [
           analyticsAsync.whenOrNull(
             data: (data) => IconButton(

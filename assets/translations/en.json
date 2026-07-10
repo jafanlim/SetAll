@@ -64,7 +64,8 @@
     "spending": "Spending",
     "income": "Income",
     "daily_burn": "Daily burn",
-    "more": "more"
+    "more": "more",
+    "open_full_analytics": "Open full analytics"
   },
   "activity": {
     "title": "Activity",
