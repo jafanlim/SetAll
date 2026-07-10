@@ -27,7 +27,7 @@ class MainActivity : FlutterActivity() {
                 // already present to keep the ICU extension valid.
                 val sep = if (ident.contains("@")) ";" else "@"
                 android.util.Log.d("SetAll", "region getRegionLocale -> $ident${sep}hours=${if (is24) "h23" else "h12"}")
-                result("$ident${sep}hours=${if (is24) "h23" else "h12"}")
+                result.success("$ident${sep}hours=${if (is24) "h23" else "h12"}")
             } else {
                 result.notImplemented()
             }
