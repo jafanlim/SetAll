@@ -10,6 +10,7 @@ import '../../../../core/router/app_router.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/repositories/setall_repository.dart' show BalanceSummary;
 import '../../../../domain/services/settlement_engine.dart' show SettlementTransaction;
+import '../../../../core/services/date_format_service.dart';
 import '../../../../core/utils/amount_formatter.dart';
 import '../../../../core/utils/haptic_utils.dart';
 import '../../../../core/widgets/glass_card.dart';
@@ -617,13 +618,13 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     (_, i) {
                       final expense = expenses[i];
                       if (_editMode) {
-                        return _ExpenseTileSelectable(
+                        return ExpenseTileSelectable(
                           expense: expense,
                           selected: _selected.contains(expense.id),
                           onToggle: () => _toggleExpense(expense.id),
                         );
                       }
-                      return _ExpenseTile(
+                      return ExpenseTile(
                         expense: expense,
                         groupId: groupId,
                         groupName: groupName,
@@ -925,10 +926,32 @@ class _MemberList extends ConsumerWidget {
 }
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/// Formats [createdAt] (ISO-8601 string) for display in expense tiles.
+/// Uses short form ("d MMM") for current-year entries and medium form
+/// ("d MMM yyyy") for prior-year entries.
+String formatExpenseDate(String? createdAt) {
+  if (createdAt == null) return '';
+  try {
+    final dt = DateTime.parse(createdAt).toLocal();
+    if (dt.year == DateTime.now().year) {
+      return DateFormatService.instance.formatShort(dt);
+    } else {
+      return DateFormatService.instance.formatMedium(dt);
+    }
+  } catch (_) {
+    return '';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Selectable expense tile — used in batch Edit mode
 // ---------------------------------------------------------------------------
-class _ExpenseTileSelectable extends StatelessWidget {
-  const _ExpenseTileSelectable({
+class ExpenseTileSelectable extends ConsumerWidget {
+  const ExpenseTileSelectable({
+    super.key,
     required this.expense,
     required this.selected,
     required this.onToggle,
@@ -949,10 +972,39 @@ class _ExpenseTileSelectable extends StatelessWidget {
   };
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final icon = _categoryIcons[expense.category] ?? Icons.attach_money_outlined;
     final label = expense.description.isEmpty ? expense.category : expense.description;
+    final displayAmount = formatAmount(expense.originalAmount ?? expense.amount);
+    final displayCurrency = expense.originalCurrency ?? expense.currency;
+    final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
+    final baseCurrency = baseCurrencyAsync.valueOrNull ?? 'USD';
+
+    // Date
+    final dateStr = formatExpenseDate(expense.createdAt);
+
+    // ≈ estimate — shown only when displayed currency differs from base
+    final showConversion = displayCurrency != baseCurrency && expense.universalUsdAmount != null;
+    String? convertedAmount;
+    if (showConversion) {
+      if (baseCurrency == 'USD') {
+        // Direct from universal_usd_amount — no rate lookup needed (rate ≡ 1)
+        convertedAmount = (Decimal.tryParse(expense.universalUsdAmount!) ?? Decimal.zero)
+            .round(scale: 2)
+            .toStringAsFixed(2);
+      } else {
+        final rateAsync = ref.watch(rateToBaseProvider((from: 'USD', base: baseCurrency)));
+        if (rateAsync.valueOrNull != null) {
+          convertedAmount = ((Decimal.tryParse(expense.universalUsdAmount!) ?? Decimal.zero) *
+              (Decimal.tryParse(rateAsync.valueOrNull!) ?? Decimal.one))
+              .round(scale: 2)
+              .toStringAsFixed(2);
+        }
+      }
+    }
+
+    final showSecondary = dateStr.isNotEmpty || convertedAmount != null;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
@@ -997,15 +1049,47 @@ class _ExpenseTileSelectable extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(
-                    label,
-                    style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (showSecondary) ...[
+                        const SizedBox(height: 2),
+                        Row(
+                          children: [
+                            if (dateStr.isNotEmpty) ...[
+                              Text(
+                                dateStr,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                            if (dateStr.isNotEmpty && convertedAmount != null)
+                              const SizedBox(width: 6),
+                            if (convertedAmount != null) ...[
+                              Text(
+                                '≈ $baseCurrency $convertedAmount',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  '${expense.currency} ${formatAmount(expense.amount)}',
+                  '$displayCurrency $displayAmount',
                   style: const TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
@@ -1024,8 +1108,9 @@ class _ExpenseTileSelectable extends StatelessWidget {
 // ---------------------------------------------------------------------------
 // Expense list
 // ---------------------------------------------------------------------------
-class _ExpenseTile extends ConsumerWidget {
-  const _ExpenseTile({
+class ExpenseTile extends ConsumerWidget {
+  const ExpenseTile({
+    super.key,
     required this.expense,
     required this.groupId,
     required this.groupName,
@@ -1060,17 +1145,27 @@ class _ExpenseTile extends ConsumerWidget {
     final displayCurrency = expense.originalCurrency ?? expense.currency;
     final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
     final baseCurrency = baseCurrencyAsync.valueOrNull ?? 'USD';
-    // Only show conversion note when expense currency differs from base currency
-    final showConversion = expense.currency != baseCurrency && expense.universalUsdAmount != null;
-    final rateAsync = showConversion
-        ? ref.watch(rateToBaseProvider((from: 'USD', base: baseCurrency)))
-        : null;
-    final convertedAmount = showConversion && rateAsync?.valueOrNull != null
-        ? ((Decimal.tryParse(expense.universalUsdAmount ?? '0') ?? Decimal.zero) *
-            (Decimal.tryParse(rateAsync!.valueOrNull!) ?? Decimal.one))
+    // Date
+    final dateStr = formatExpenseDate(expense.createdAt);
+    // Show conversion when displayed currency differs from base AND we have a USD anchor
+    final showConversion = displayCurrency != baseCurrency && expense.universalUsdAmount != null;
+    String? convertedAmount;
+    if (showConversion) {
+      if (baseCurrency == 'USD') {
+        // Direct from universal_usd_amount — no rate lookup needed (rate ≡ 1)
+        convertedAmount = (Decimal.tryParse(expense.universalUsdAmount!) ?? Decimal.zero)
             .round(scale: 2)
-            .toStringAsFixed(2)
-        : null;
+            .toStringAsFixed(2);
+      } else {
+        final rateAsync = ref.watch(rateToBaseProvider((from: 'USD', base: baseCurrency)));
+        if (rateAsync.valueOrNull != null) {
+          convertedAmount = ((Decimal.tryParse(expense.universalUsdAmount!) ?? Decimal.zero) *
+              (Decimal.tryParse(rateAsync.valueOrNull!) ?? Decimal.one))
+              .round(scale: 2)
+              .toStringAsFixed(2);
+        }
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
@@ -1143,21 +1238,21 @@ class _ExpenseTile extends ConsumerWidget {
                       const SizedBox(height: 2),
                       Row(
                         children: [
-                          _SplitMethodBadge(expense.splitType),
-                          if (convertedAmount != null) ...[
-                            const SizedBox(width: 6),
+                          if (dateStr.isNotEmpty) ...[
                             Text(
-                              '≈ $baseCurrency $convertedAmount',
+                              dateStr,
                               style: TextStyle(
                                 fontSize: 10,
                                 color: theme.colorScheme.onSurfaceVariant,
                               ),
                             ),
-                          ] else if (expense.originalCurrency != null &&
-                              expense.originalCurrency != expense.currency) ...[
+                            const SizedBox(width: 6),
+                          ],
+                          _SplitMethodBadge(expense.splitType),
+                          if (convertedAmount != null) ...[
                             const SizedBox(width: 6),
                             Text(
-                              '${expense.currency} ${formatAmount(expense.amount)} base',
+                              '≈ $baseCurrency $convertedAmount',
                               style: TextStyle(
                                 fontSize: 10,
                                 color: theme.colorScheme.onSurfaceVariant,
