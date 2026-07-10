@@ -1,8 +1,8 @@
 // Unit tests for visionOcrWithRetry — built-in node:test runner only (zero deps).
-// Run: node --test netlify/functions/receipt-ingest.retry.test.mjs
+// Run: node --test test/functions/receipt-ingest.retry.test.mjs
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { visionOcrWithRetry } from './receipt-ingest.js';
+import { visionOcrWithRetry } from '../../netlify/functions/receipt-ingest.js';
 
 // ── Helpers to build injectable single-attempt mocks ──
 
