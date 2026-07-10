@@ -6,6 +6,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 const _regionChannel = MethodChannel('com.setall.app/region');
 
+/// True when the current platform has a native handler for the
+/// com.setall.app/region channel: macOS, iOS, and Android.
+/// Web, Windows, and Linux fall back to the PlatformDispatcher locale.
+bool _hasRegionChannel() =>
+    !kIsWeb &&
+    {TargetPlatform.macOS, TargetPlatform.iOS, TargetPlatform.android}
+        .contains(defaultTargetPlatform);
+
 // Matches the keys in regional_screen.dart
 const String _kDateFmtKey  = 'regional_date_format';
 const String _kManualFmt   = 'regional_manual_override';
@@ -96,7 +104,7 @@ class DateFormatService {
   /// Falls back to locale-driven detection via intl.
   Future<String> _systemTimePatternAsync() async {
     String? localeStr;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+    if (_hasRegionChannel()) {
       try {
         localeStr = await _regionChannel.invokeMethod<String>('getRegionLocale');
       } catch (_) {}
@@ -120,13 +128,13 @@ class DateFormatService {
 
   Future<String> _systemPatternAsync() async {
     String? localeStr;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+    if (_hasRegionChannel()) {
       try {
         localeStr = await _regionChannel.invokeMethod<String>('getRegionLocale');
       } catch (_) {}
     }
     localeStr ??= WidgetsBinding.instance.platformDispatcher.locale.toString();
-    return _patternFromLocale(localeStr);
+    return patternFromLocale(localeStr);
   }
 
   /// Determines date field order from a locale identifier string.
@@ -135,7 +143,8 @@ class DateFormatService {
   ///      most reliable when region locale comes from the platform channel.
   ///   2. intl skeleton fallback for language-only locales (e.g. "ja", "zh").
   ///   3. DMY safe default.
-  static String _patternFromLocale(String localeStr) {
+  @visibleForTesting
+  static String patternFromLocale(String localeStr) {
     // macOS appends an ICU region extension: e.g. "en_US@rg=gezzzz"
     // where "ge" is the ISO 3166-1 country code for Georgia.
     // Extract it first — it overrides the locale's own country code.

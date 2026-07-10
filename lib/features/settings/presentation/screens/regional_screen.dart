@@ -128,9 +128,11 @@ class _RegionalScreenState extends State<RegionalScreen> {
 
   Future<void> _load() async {
     final p = await SharedPreferences.getInstance();
-    // Resolve region locale: macOS → platform channel; others → PlatformDispatcher
+    // Resolve region locale: macOS/iOS/Android → platform channel; others → PlatformDispatcher
     String regionLocale;
-    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.macOS) {
+    if (!kIsWeb &&
+        {TargetPlatform.macOS, TargetPlatform.iOS, TargetPlatform.android}
+            .contains(defaultTargetPlatform)) {
       try {
         regionLocale = await _kRegionChannel.invokeMethod<String>('getRegionLocale') ?? '';
         debugPrint('[RegionalScreen] macOS Locale.current.identifier = $regionLocale');
