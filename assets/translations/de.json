@@ -866,7 +866,8 @@
     "source_gallery": "Fotogalerie",
     "source_file": "Datei (PDF oder Bild)",
     "split_preview": "Wer zahlt",
-    "everyone": "Alle"
+    "everyone": "Alle",
+    "ocr_degraded_hint": "Präzise Texterkennung nicht verfügbar — bitte Artikelnamen überprüfen"
   },
   "alerts": {
     "anomaly_body": "Diese Ausgabe ist deutlich höher als üblich für diese Kategorie.",

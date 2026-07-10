@@ -126,14 +126,26 @@ class ReceiptIngestResponse {
   /// Partial draft when clarification is needed.
   final ReceiptDraft? partial;
 
+  /// True when Google Vision dedicated OCR was used (not the vision-LLM fallback).
+  final bool ocr;
+
+  /// Machine-readable fail reason when ocr:false.
+  /// One of 'quota', 'http_{status}', 'exception', 'no_key', or null.
+  final String? ocrFailReason;
+
   const ReceiptIngestResponse({
     this.draft,
     this.escalated = false,
     this.needsClarification,
     this.partial,
+    this.ocr = false,
+    this.ocrFailReason,
   });
 
   factory ReceiptIngestResponse.fromJson(Map<String, dynamic> json) {
+    final ocr = json['ocr'] as bool? ?? false;
+    final ocrFailReason = json['ocrFailReason'] as String?;
+
     // Clarification shape: { needsClarification, partial }
     if (json.containsKey('needsClarification') && !json.containsKey('draft')) {
       return ReceiptIngestResponse(
@@ -141,6 +153,8 @@ class ReceiptIngestResponse {
         partial: json['partial'] != null
             ? ReceiptDraft.fromJson(json['partial'] as Map<String, dynamic>)
             : null,
+        ocr: ocr,
+        ocrFailReason: ocrFailReason,
       );
     }
 
@@ -150,6 +164,8 @@ class ReceiptIngestResponse {
           ? ReceiptDraft.fromJson(json['draft'] as Map<String, dynamic>)
           : null,
       escalated: json['escalated'] as bool? ?? false,
+      ocr: ocr,
+      ocrFailReason: ocrFailReason,
     );
   }
 
@@ -158,4 +174,9 @@ class ReceiptIngestResponse {
 
   /// Convenience: true when the server needs user clarification before proceeding.
   bool get hasClarification => needsClarification != null;
+
+  /// True when the Vision OCR path was configured but failed, meaning the client
+  /// should show a degraded-mode warning and fire telemetry.
+  static bool isOcrDegraded({required bool ocr, String? ocrFailReason}) =>
+      !ocr && ocrFailReason != null && ocrFailReason != 'no_key';
 }

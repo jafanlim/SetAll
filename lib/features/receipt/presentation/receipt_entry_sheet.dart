@@ -1,14 +1,16 @@
-import 'dart:io' show Directory, File;
+import 'dart:io' show Directory, File, Platform;
 
 import 'package:cunning_document_scanner/cunning_document_scanner.dart';
 import 'package:decimal/decimal.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:pdfx/pdfx.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/models/receipt_ingest_result.dart';
@@ -20,6 +22,7 @@ import '../../../data/models/wallet_entry_model.dart';
 import '../../../data/models/profile_model.dart';
 import '../../../data/repositories/setall_repository.dart' show SplitInsert;
 import '../../../domain/entities/expense.dart' show ExpenseLineItem, LineItemAssignment, SplitType;
+import '../../support/presentation/screens/bug_report_screen.dart' show BugReportService;
 
 // ── Brand colours ──────────────────────────────────────────────────────────
 const _teal        = Color(0xFF00D9B0);
@@ -68,6 +71,11 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
   DateTime _editDate = DateTime.now();
   String? _originalDescription;
   List<_EditableLineItem> _lineItems = [];
+
+  // OCR status from ingest response.
+  bool _ocrUsed = false;
+  String? _ocrFailReason;
+  bool _telemetrySent = false;
 
   // Clarification target.
   String? _clarifyField;
@@ -383,6 +391,10 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
 
       if (!mounted) return;
 
+      // Capture OCR status for the warning chip and telemetry.
+      _ocrUsed = response.ocr;
+      _ocrFailReason = response.ocrFailReason;
+
       // 4. Handle clarification.
       if (response.hasClarification) {
         _draft = response.partial ?? ReceiptDraft(
@@ -398,6 +410,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         );
         _clarifyField = response.needsClarification;
         _populateEditableFields(_draft!);
+        _maybeSendOcrTelemetry(locale);
         // Focus the field that needs clarification.
         setState(() => _state = ReceiptEntryState.confirming);
         return;
@@ -406,6 +419,7 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
       if (response.hasDraft && response.draft != null) {
         _draft = response.draft!;
         _populateEditableFields(_draft!);
+        _maybeSendOcrTelemetry(locale);
         setState(() => _state = ReceiptEntryState.confirming);
       } else {
         setState(() {
@@ -693,6 +707,66 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
     });
   }
 
+  // ── OCR telemetry ───────────────────────────────────────────────────────
+
+  /// Best-effort auto-telemetry via the existing bug_reports pipeline.
+  /// Fires at most once per scan, only when the Vision path was configured
+  /// but failed (degraded to the vision-LLM fallback).
+  void _maybeSendOcrTelemetry(String locale) {
+    if (_telemetrySent) return;
+    if (!ReceiptIngestResponse.isOcrDegraded(ocr: _ocrUsed, ocrFailReason: _ocrFailReason)) return;
+    _telemetrySent = true;
+
+    // Fire-and-forget — must never break the receipt flow.
+    _sendOcrTelemetry(locale);
+  }
+
+  Future<void> _sendOcrTelemetry(String locale) async {
+    try {
+      final client = Supabase.instance.client;
+      final uid = client.auth.currentUser?.id;
+      if (uid == null) return;
+
+      String deviceInfo = '';
+      if (!kIsWeb) {
+        deviceInfo = '${Platform.operatingSystem} ${Platform.operatingSystemVersion}';
+      }
+
+      String appVersion = '';
+      try {
+        final info = await PackageInfo.fromPlatform();
+        appVersion = '${info.version}+${info.buildNumber}';
+      } catch (_) {}
+
+      final breadcrumbs = BugReportService.breadcrumbs.join('\n');
+      final timestamp = DateTime.now().toUtc().toIso8601String();
+      final requestId = const Uuid().v4();
+
+      final logs = [
+        'requestId: $requestId',
+        'timestamp: $timestamp',
+        'ocrFailReason: $_ocrFailReason',
+        'model: gpt-4.1 (vision fallback)',
+        if (locale.isNotEmpty) 'locale: $locale',
+        if (breadcrumbs.isNotEmpty) '--- breadcrumbs ---',
+        if (breadcrumbs.isNotEmpty) breadcrumbs,
+      ].join('\n');
+
+      await client.from('bug_reports').insert({
+        'user_id': uid,
+        'description': 'OCR fallback: $_ocrFailReason',
+        'expected': null,
+        'severity': 'auto',
+        'device_info': deviceInfo.isNotEmpty ? deviceInfo : null,
+        'logs': logs,
+        'app_version': appVersion,
+        'created_at': timestamp,
+      });
+    } catch (e) {
+      debugPrint('[ReceiptEntry] OCR telemetry insert swallowed: $e');
+    }
+  }
+
   // ── UI ──────────────────────────────────────────────────────────────────
 
   @override
@@ -861,6 +935,10 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
           ),
           const SizedBox(height: 16),
         ],
+
+        // ── OCR degraded warning chip ──
+        if (ReceiptIngestResponse.isOcrDegraded(ocr: _ocrUsed, ocrFailReason: _ocrFailReason))
+          _buildOcrDegradedChip(),
 
         // ── Amount & Currency ──
         Container(
@@ -1607,6 +1685,38 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         ),
         const SizedBox(height: 40),
       ],
+    );
+  }
+
+  // ── OCR degraded chip ────────────────────────────────────────────────────
+
+  Widget _buildOcrDegradedChip() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _orange.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _orange.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: _orange, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'receipt.ocr_degraded_hint'.tr(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: _orange,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
