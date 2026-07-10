@@ -869,7 +869,8 @@
     "source_file": "File (PDF or image)",
     "split_preview": "Who pays",
     "everyone": "Everyone",
-    "ocr_degraded_hint": "Precise text recognition unavailable — verify item names"
+    "ocr_degraded_hint": "Precise text recognition unavailable — verify item names",
+    "unassigned_to_payer_hint": "Items left unassigned are charged to the payer."
   },
   "alerts": {
     "anomaly_body": "This expense is significantly higher than your usual spending in this category.",

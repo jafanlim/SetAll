@@ -868,7 +868,8 @@
     "source_file": "Datei (PDF oder Bild)",
     "split_preview": "Wer zahlt",
     "everyone": "Alle",
-    "ocr_degraded_hint": "Präzise Texterkennung nicht verfügbar — bitte Artikelnamen überprüfen"
+    "ocr_degraded_hint": "Präzise Texterkennung nicht verfügbar — bitte Artikelnamen überprüfen",
+    "unassigned_to_payer_hint": "Nicht zugewiesene Artikel werden dem Zahler belastet."
   },
   "alerts": {
     "anomaly_body": "Diese Ausgabe ist deutlich höher als üblich für diese Kategorie.",
