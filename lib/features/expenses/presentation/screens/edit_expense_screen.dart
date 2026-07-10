@@ -40,6 +40,7 @@ class EditExpenseScreen extends ConsumerStatefulWidget {
 }
 
 const _teal = Color(0xFF00D9B0);
+const _blue = Color(0xFF3B82F6);
 
 // ---------------------------------------------------------------------------
 // Entry icon + color catalogue
@@ -777,6 +778,8 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       ),
       if (owed.isNotEmpty) ...[
         const SizedBox(height: 8),
+        _buildUnassignedHint(),
+        const SizedBox(height: 4),
         Text('receipt.split_preview'.tr(), style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant, fontSize: 11)),
         const SizedBox(height: 6),
@@ -796,6 +799,33 @@ class _EditExpenseScreenState extends ConsumerState<EditExpenseScreen> {
       ],
       const SizedBox(height: 16),
     ];
+  }
+
+  Widget _buildUnassignedHint() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _blue.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _blue.withValues(alpha: 0.30)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: _blue, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'receipt.unassigned_to_payer_hint'.tr(),
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: _blue,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

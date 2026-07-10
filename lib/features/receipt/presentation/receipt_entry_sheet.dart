@@ -1139,6 +1139,8 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
         ],
         if (widget.groupId != null && members.isNotEmpty && _lineItems.isNotEmpty)
           _buildSplitPreview(members),
+        if (widget.groupId != null && members.isNotEmpty && _lineItems.isNotEmpty)
+          _buildUnassignedHint(),
         if (_lineItems.isNotEmpty) ...[
           const SizedBox(height: 6),
           ..._lineItems.map((li) => _buildLineItemRow(li, members)),
@@ -1711,6 +1713,38 @@ class _ReceiptEntrySheetState extends ConsumerState<ReceiptEntrySheet> {
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
                   color: _orange,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Unassigned-items disclaimer ───────────────────────────────────────────
+
+  Widget _buildUnassignedHint() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: _blue.withValues(alpha: 0.10),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: _blue.withValues(alpha: 0.30)),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded, color: _blue, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                'receipt.unassigned_to_payer_hint'.tr(),
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: _blue,
                 ),
               ),
             ),
