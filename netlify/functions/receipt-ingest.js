@@ -98,8 +98,7 @@ const RECEIPT_RESPONSE_FORMAT = {
 
 // ── Google Cloud Vision OCR (premium pre-pass) ──
 // Dedicated OCR transcribes non-Latin scripts (Georgian, etc.) far better than a
-// general vision LLM, which hallucinates item names. Returns the full transcript
-// string, or null on any failure (caller falls back to the gpt-4.1 vision path).
+// general vision LLM, which hallucinates item names. Returns {text, failReason}.
 // The image is sent to Google for text extraction only; it is not persisted.
 async function googleVisionOcr(apiKey, imageBase64, languageHints) {
   try {
@@ -115,21 +114,64 @@ async function googleVisionOcr(apiKey, imageBase64, languageHints) {
       }),
     });
     if (!resp || !resp.ok) {
-      console.warn('[receipt] Google Vision HTTP', resp && resp.status);
-      return null;
+      const status = resp ? resp.status : 0;
+      const reason = status === 429 ? 'quota' : `http_${status}`;
+      console.warn('[receipt] Google Vision HTTP', status);
+      return { text: null, failReason: reason };
     }
     const json = await resp.json();
     const r0 = json && json.responses && json.responses[0];
     if (r0 && r0.error) {
       console.warn('[receipt] Google Vision error', r0.error.code, r0.error.message);
-      return null;
+      return { text: null, failReason: 'exception' };
     }
     const text = r0 && r0.fullTextAnnotation && r0.fullTextAnnotation.text;
-    return (typeof text === 'string' && text.trim().length > 0) ? text : null;
+    if (typeof text === 'string' && text.trim().length > 0) {
+      return { text, failReason: null };
+    }
+    return { text: null, failReason: 'exception' };
   } catch (e) {
     console.warn('[receipt] Google Vision exception', e && e.message);
-    return null;
+    return { text: null, failReason: 'exception' };
   }
+}
+
+// ── Vision OCR retry wrapper ──
+// Retries EXACTLY ONCE on transient failure (429/5xx/network error) with ~1.5s
+// backoff. Does NOT retry 400/403. Takes an injectable single-attempt callable
+// (defaults to googleVisionOcr) so the retry logic is testable without network.
+// Returns {text, failReason} where failReason ∈ 'quota'|'http_<status>'|'exception'|null.
+async function visionOcrWithRetry(singleAttempt, apiKey, imageBase64, languageHints) {
+  let result;
+  try {
+    result = await singleAttempt(apiKey, imageBase64, languageHints);
+  } catch (e) {
+    result = { text: null, failReason: 'exception' };
+  }
+
+  if (result.text !== null && result.text !== undefined && result.text.length > 0) {
+    return { text: result.text, failReason: null };
+  }
+
+  // Only retry on transient failures: 429 (quota), 5xx, network/exception.
+  const transient = result.failReason === 'quota' ||
+                    (typeof result.failReason === 'string' && result.failReason.startsWith('http_5')) ||
+                    result.failReason === 'exception';
+  if (!transient) {
+    return { text: null, failReason: result.failReason };
+  }
+
+  await new Promise(r => setTimeout(r, 1500));
+  try {
+    result = await singleAttempt(apiKey, imageBase64, languageHints);
+  } catch (e) {
+    result = { text: null, failReason: 'exception' };
+  }
+
+  if (result.text !== null && result.text !== undefined && result.text.length > 0) {
+    return { text: result.text, failReason: null };
+  }
+  return { text: null, failReason: result.failReason };
 }
 
 // ── OpenAI call helper (returns fetch Response or null on network error) ──
@@ -310,6 +352,8 @@ function buildPartial(draft, defaultCurrency, knownCategories, paymentMethods, t
 // Handler
 // ═══════════════════════════════════════════════════════════════
 
+exports.visionOcrWithRetry = visionOcrWithRetry;
+
 exports.handler = async (event) => {
   const headers = {
     'Access-Control-Allow-Origin':  '*',
@@ -483,13 +527,16 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
     // gpt-4.1 vision call (which hallucinates non-Latin item names).
     const googleKey = process.env.GOOGLE_VISION_API_KEY;
     let ocrText = null;
+    let ocrFailReason = googleKey ? null : 'no_key';
     if (googleKey) {
       // No languageHints — let Vision AUTO-DETECT the script. Hinting the user's UI
       // locale (e.g. 'ru') on a Georgian receipt produced mojibake / gibberish.
-      ocrText = await googleVisionOcr(googleKey, imageBase64);
+      const vr = await visionOcrWithRetry(googleVisionOcr, googleKey, imageBase64);
+      ocrText = vr.text;
+      ocrFailReason = vr.failReason;
     }
     const ocrUsed = !!(ocrText && ocrText.trim().length > 0);
-    console.log('[receipt] OCR path', { keyPresent: !!googleKey, ocrUsed });
+    console.log('[receipt] OCR path', { keyPresent: !!googleKey, ocrUsed, ocrFailReason });
 
     const call = ocrUsed
       ? (model) => openaiChatCompletionFromText(apiKey, model, textSystemPrompt, ocrText, knownCategories)
@@ -555,6 +602,7 @@ Today's date: ${today}  Timezone: ${timezone}  Default currency: ${defaultCurren
         draft: validated.draft,
         escalated,
         ocr: ocrUsed,
+        ocrFailReason: ocrFailReason || null,
       }),
     };
 

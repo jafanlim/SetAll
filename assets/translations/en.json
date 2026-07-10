@@ -867,7 +867,8 @@
     "source_gallery": "Photo Library",
     "source_file": "File (PDF or image)",
     "split_preview": "Who pays",
-    "everyone": "Everyone"
+    "everyone": "Everyone",
+    "ocr_degraded_hint": "Precise text recognition unavailable — verify item names"
   },
   "alerts": {
     "anomaly_body": "This expense is significantly higher than your usual spending in this category.",

@@ -866,7 +866,8 @@
     "source_gallery": "Galería de fotos",
     "source_file": "Archivo (PDF o imagen)",
     "split_preview": "Quién paga",
-    "everyone": "Todos"
+    "everyone": "Todos",
+    "ocr_degraded_hint": "Reconocimiento de texto preciso no disponible — verifique los nombres"
   },
   "alerts": {
     "anomaly_body": "Este gasto es significativamente más alto de lo habitual para esta categoría.",
