@@ -135,7 +135,7 @@ class _RegionalScreenState extends State<RegionalScreen> {
             .contains(defaultTargetPlatform)) {
       try {
         regionLocale = await _kRegionChannel.invokeMethod<String>('getRegionLocale') ?? '';
-        debugPrint('[RegionalScreen] macOS Locale.current.identifier = $regionLocale');
+        debugPrint('[RegionalScreen] region channel locale = $regionLocale');
       } catch (e) {
         debugPrint('[RegionalScreen] platform channel error: $e');
         regionLocale = '';

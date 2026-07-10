@@ -45,6 +45,28 @@ void main() {
       );
     });
 
+    // ── YMD countries carrying a country code (reachable on iOS/Android once
+    //    the region channel is wired) — country short-circuit must NOT force
+    //    DMY. Regression guard for the ja_JP=dd/MM/yyyy latent bug. ──────────
+    test('ja_JP → yyyy-MM-dd (Japan region, not DMY)', () {
+      expect(DateFormatService.patternFromLocale('ja_JP'), 'yyyy-MM-dd');
+    });
+
+    test('zh_CN → yyyy-MM-dd (China region)', () {
+      expect(DateFormatService.patternFromLocale('zh_CN'), 'yyyy-MM-dd');
+    });
+
+    test('ko_KR → yyyy-MM-dd (Korea region)', () {
+      expect(DateFormatService.patternFromLocale('ko_KR'), 'yyyy-MM-dd');
+    });
+
+    test('en_US@rg=jpzzzz → yyyy-MM-dd (ICU region override to Japan)', () {
+      expect(
+        DateFormatService.patternFromLocale('en_US@rg=jpzzzz'),
+        'yyyy-MM-dd',
+      );
+    });
+
     test('empty string → safe default (does not throw)', () {
       final result = DateFormatService.patternFromLocale('');
       // Empty string has no country code and no recognised language →

@@ -166,10 +166,16 @@ class DateFormatService {
     // Country-code-driven lookup (covers cases like en_GE where intl falls
     // back to en → MDY, but the actual region format for GE is DMY)
     const mdyCountries = {'US', 'CA', 'PH', 'MH', 'FM', 'PR', 'AS', 'GU', 'VI', 'MP'};
+    // Countries that use YMD regardless of language — must be checked before the
+    // generic "any 2-letter country → DMY" fallback, else e.g. ja_JP / zh_CN /
+    // ko_KR / hu_HU (a country code now reachable on iOS/Android via the region
+    // channel) would wrongly resolve to DMY. Mirrors ymdLanguages below.
+    const ymdCountries = {'JP', 'CN', 'TW', 'KR', 'MN', 'HU'};
     const ymdLanguages = {'ja', 'zh', 'ko', 'mn', 'hu'};
 
     if (country.isNotEmpty) {
       if (mdyCountries.contains(country)) return 'MM/dd/yyyy';
+      if (ymdCountries.contains(country)) return 'yyyy-MM-dd';
       // For all other countries (GE, GB, NZ, AU, DE, FR, RU, etc.) → DMY
       if (country.length == 2) return 'dd/MM/yyyy';
     }
