@@ -13,6 +13,7 @@ import '../../../../core/config/auth_config.dart';
 import '../../../../data/models/group_model.dart';
 import '../../../../data/models/profile_model.dart';
 import '../../../../domain/services/settlement_engine.dart';
+import 'group_member_balance_helper.dart';
 import '../../../settings/services/pdf_export_service.dart';
 
 // ---------------------------------------------------------------------------
@@ -299,6 +300,8 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     final membersAsync = ref.watch(groupMembersProvider(group.id));
     final balanceAsync = ref.watch(groupBalanceSummaryProvider(group.id));
     final debtsAsync = ref.watch(simplifiedDebtsProvider(group.id));
+    final baseCurrencyAsync = ref.watch(baseCurrencyProvider);
+    final baseCurrency = baseCurrencyAsync.valueOrNull ?? 'USD';
 
     final accentColor = group.colorValue != null
         ? Color(group.colorValue!)
@@ -480,11 +483,11 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                     ? const SizedBox.shrink()
                     : debtsAsync.when(
                         data: (debts) => _buildMembersCard(
-                            members, debts, theme, accentColor),
+                            members, debts, theme, accentColor, baseCurrency),
                         loading: () => _buildMembersCard(
-                            members, const [], theme, accentColor),
+                            members, const [], theme, accentColor, baseCurrency),
                         error: (_, _) => _buildMembersCard(
-                            members, const [], theme, accentColor),
+                            members, const [], theme, accentColor, baseCurrency),
                       ),
                 loading: () => const SizedBox.shrink(),
                 error: (_, _) => const SizedBox.shrink(),
@@ -625,8 +628,16 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
     List<SettlementTransaction> debts,
     ThemeData theme,
     Color accentColor,
+    String baseCurrency,
   ) {
     final myUid = Supabase.instance.client.auth.currentUser?.id;
+    // Simplified debts are already denominated in the user's base currency
+    // (simplifiedDebtsProvider → getSimplifiedDebts stamps currency = baseCurrency),
+    // so the per-member net is shown directly in that currency. A separate
+    // group-currency primary + "≈ default" annotation would require a base→group
+    // conversion the settlement pipeline does not currently produce (deferred).
+    final debtCurrency = debts.isNotEmpty ? debts.first.currency : baseCurrency;
+
     return GlassCard(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -665,13 +676,37 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
           ...members.map((m) {
             final initial =
                 m.name.isNotEmpty ? m.name[0].toUpperCase() : '?';
-            String label;
-            Color labelColor;
+
+            // ── Primary line: overall net position ──────────────────────
+            final net = computeMemberNetPosition(memberId: m.id, debts: debts);
+
+            String primaryLabel;
+            Color primaryColor;
 
             if (group.isSettled) {
-              label = 'settled up';
-              labelColor = theme.colorScheme.onSurfaceVariant;
-            } else if (myUid != null && m.id != myUid) {
+              primaryLabel = 'settled up';
+              primaryColor = theme.colorScheme.onSurfaceVariant;
+            } else {
+              switch (net.position) {
+                case NetPosition.isOwed:
+                  primaryLabel =
+                      'is owed $debtCurrency ${net.displayAmount.toStringAsFixed(2)}';
+                  primaryColor = _teal;
+                case NetPosition.owes:
+                  primaryLabel =
+                      'owes $debtCurrency ${net.displayAmount.toStringAsFixed(2)}';
+                  primaryColor = _orange;
+                case NetPosition.settled:
+                  primaryLabel = 'settled up';
+                  primaryColor = theme.colorScheme.onSurfaceVariant;
+              }
+            }
+
+            // ── Secondary line: viewer-relative detail ──────────────────
+            final secondaryParts = <String>[];
+
+            // Existing viewer-relative detail (unchanged)
+            if (!group.isSettled && myUid != null && m.id != myUid) {
               final owesYouTxns = debts
                   .where(
                       (t) => t.toUserId == myUid && t.fromUserId == m.id)
@@ -683,27 +718,22 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
               if (owesYouTxns.isNotEmpty) {
                 final total = owesYouTxns.fold(
                     Decimal.zero, (sum, t) => sum + t.amount);
-                label =
-                    'owes you ${owesYouTxns.first.currency} ${total.toStringAsFixed(2)}';
-                labelColor = _teal;
+                secondaryParts.add(
+                    'owes you $debtCurrency ${total.toStringAsFixed(2)}');
               } else if (youOweTxns.isNotEmpty) {
                 final total = youOweTxns.fold(
                     Decimal.zero, (sum, t) => sum + t.amount);
-                label =
-                    'you owe ${youOweTxns.first.currency} ${total.toStringAsFixed(2)}';
-                labelColor = _orange;
-              } else {
-                label = 'settled up';
-                labelColor = theme.colorScheme.onSurfaceVariant;
+                secondaryParts.add(
+                    'you owe $debtCurrency ${total.toStringAsFixed(2)}');
               }
-            } else {
-              label = 'settled up';
-              labelColor = theme.colorScheme.onSurfaceVariant;
             }
+
+            final hasSecondary = secondaryParts.isNotEmpty;
 
             return Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     width: 36,
@@ -725,21 +755,35 @@ class _GroupInfoScreenState extends ConsumerState<GroupInfoScreen> {
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: Text(
-                      m.name.split(' ').first,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: theme.colorScheme.onSurface,
-                      ),
-                      overflow: TextOverflow.ellipsis,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          m.name.split(' ').first,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: theme.colorScheme.onSurface,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (hasSecondary)
+                          Text(
+                            secondaryParts.join('  ·  '),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: theme.colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   Text(
-                    label,
+                    primaryLabel,
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: labelColor,
+                      color: primaryColor,
                     ),
                   ),
                 ],
