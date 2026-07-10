@@ -1668,6 +1668,14 @@ class _SettlementPlanSection extends ConsumerWidget {
                           ],
                         ),
                       ),
+                      subtitle: Text(
+                        amountStr,
+                        style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13,
+                          color: isCurrentUserDebtor ? _orange : _teal,
+                        ),
+                      ),
                       trailing: (isCurrentUserDebtor || debt.toUserId == currentUid)
                           ? _SettleButton(
                               groupId: groupId,
@@ -1675,14 +1683,7 @@ class _SettlementPlanSection extends ConsumerWidget {
                               amountStr: amountStr,
                               isCreditor: debt.toUserId == currentUid && !isCurrentUserDebtor,
                             )
-                          : Text(
-                              amountStr,
-                              style: TextStyle(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
-                                color: _teal,
-                              ),
-                            ),
+                          : null,
                     );
                   }).toList(),
                 ),
