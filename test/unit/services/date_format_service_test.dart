@@ -132,4 +132,68 @@ void main() {
           reason: 'UK (en_GB) should resolve to 24h time skeleton, got: $skeleton');
     });
   });
+
+  group('timePatternFromLocale', () {
+    setUpAll(() async {
+      await initializeDateFormatting('en_GE');
+    });
+
+    test('en_GE@hours=h23 → 24h', () {
+      expect(
+        DateFormatService.timePatternFromLocale('en_GE@hours=h23'),
+        'HH:mm',
+      );
+    });
+
+    test('en_GE@hours=h12 → 12h', () {
+      expect(
+        DateFormatService.timePatternFromLocale('en_GE@hours=h12'),
+        'h:mm a',
+      );
+    });
+
+    test('en_US@rg=gezzzz;hours=h23 → 24h (multi-extension)', () {
+      expect(
+        DateFormatService.timePatternFromLocale('en_US@rg=gezzzz;hours=h23'),
+        'HH:mm',
+      );
+    });
+
+    test('en_US@rg=gezzzz;hours=h12 → 12h (multi-extension)', () {
+      expect(
+        DateFormatService.timePatternFromLocale('en_US@rg=gezzzz;hours=h12'),
+        'h:mm a',
+      );
+    });
+
+    test('en_GE (no hours) → skeleton fallback, resolves without throwing', () {
+      final result = DateFormatService.timePatternFromLocale('en_GE');
+      expect(result, isNotEmpty);
+      // Without @hours=, the result depends on CLDR data for en_GE.
+      // The key assertion: it resolves, doesn't throw.
+    });
+
+    // ── Regression guard: @hours= suffix must NOT corrupt date resolution ──
+
+    test('patternFromLocale with @hours=h23 still returns correct date pattern', () {
+      expect(
+        DateFormatService.patternFromLocale('en_GE@hours=h23'),
+        'dd/MM/yyyy',
+      );
+    });
+
+    test('patternFromLocale with @rg=gezzzz;hours=h23 still returns correct date pattern', () {
+      expect(
+        DateFormatService.patternFromLocale('en_US@rg=gezzzz;hours=h23'),
+        'dd/MM/yyyy',
+      );
+    });
+
+    test('patternFromLocale with @hours=h12 still returns correct date pattern', () {
+      expect(
+        DateFormatService.patternFromLocale('en_GE@hours=h12'),
+        'dd/MM/yyyy',
+      );
+    });
+  });
 }

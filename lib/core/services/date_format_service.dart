@@ -99,9 +99,6 @@ class DateFormatService {
   /// (Locale.current.identifier), which reflects System Settings → Region
   /// independently of the preferred language. Falls back to the intl-skeleton
   /// approach on other platforms.
-  /// Detects system 24h/12h preference.
-  /// macOS encodes this in the locale extension: @hours=h23 (24h) or @hours=h12 (12h).
-  /// Falls back to locale-driven detection via intl.
   Future<String> _systemTimePatternAsync() async {
     String? localeStr;
     if (_hasRegionChannel()) {
@@ -110,7 +107,17 @@ class DateFormatService {
       } catch (_) {}
     }
     localeStr ??= WidgetsBinding.instance.platformDispatcher.locale.toString();
-    // Check for explicit @hours= ICU extension
+    return timePatternFromLocale(localeStr);
+  }
+
+  /// Resolves a time pattern from a locale identifier string.
+  ///
+  /// Detects system 24h/12h preference:
+  /// - ICU extension: `@hours=h23` or `@hours=h24` → 24h; `@hours=h12` or `@hours=h11` → 12h.
+  /// - Fallback: intl `jm()` skeleton → 12h if pattern contains 'a' or 'h', else 24h default.
+  static String timePatternFromLocale(String localeStr) {
+    // Check for explicit @hours= ICU extension (appended by iOS/Android native handlers,
+    // or naturally present on macOS Locale.current.identifier)
     final hoursMatch = RegExp(r'[@;]hours=(h\d+)', caseSensitive: false)
         .firstMatch(localeStr);
     if (hoursMatch != null) {
