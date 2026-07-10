@@ -237,12 +237,18 @@ final class AppRouter {
             GoRoute(
               path: analytics,
               name: 'analytics',
-              pageBuilder: (context, state) => NoTransitionPage(
-                child: Material(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: const AnalyticsScreen(),
-                ),
-              ),
+              pageBuilder: (context, state) {
+                final extra = state.extra as Map<String, dynamic>?;
+                return NoTransitionPage(
+                  child: Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: AnalyticsScreen(
+                      initialGroupId: extra?['groupId'] as String?,
+                      groupName: extra?['groupName'] as String?,
+                    ),
+                  ),
+                );
+              },
             ),
             GoRoute(
               path: activity,

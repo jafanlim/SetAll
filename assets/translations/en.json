@@ -274,6 +274,7 @@
     "expense_deleted": "Expense deleted",
     "download_report": "Download report",
     "add_member": "Add member",
+    "group_insights": "Group insights",
     "group_name_hint": "Group name",
     "settle_body": "Mark \"{name}\" as settled? All debts will show as zero.",
     "delete_group": "Delete group",

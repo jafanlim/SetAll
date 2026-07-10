@@ -417,7 +417,12 @@ final analyticsDataProvider = FutureProvider<AnalyticsData>((ref) async {
 // Screen
 // ---------------------------------------------------------------------------
 class AnalyticsScreen extends ConsumerStatefulWidget {
-  const AnalyticsScreen({super.key});
+  const AnalyticsScreen({super.key, this.initialGroupId, this.groupName});
+
+  /// When non-null, the analytics filter is seeded to this group on first build.
+  final String? initialGroupId;
+  /// Human-readable name of the seeded group, shown in the header when scoped.
+  final String? groupName;
 
   @override
   ConsumerState<AnalyticsScreen> createState() => _AnalyticsScreenState();
@@ -426,6 +431,29 @@ class AnalyticsScreen extends ConsumerStatefulWidget {
 class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
   int?    _touchedIndex;
   String? _drillCategory; // null = show all
+  bool    _seeded = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialGroupId != null) {
+      // Seed the filter after the first frame to avoid "provider modified
+      // during build" lifecycle errors.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _seeded) return;
+        _seeded = true;
+        // Seed only the groupId — leave source at its default (all). The
+        // groupId filter (see analyticsDataProvider) already excludes wallet
+        // rows (null groupId), so the scoped view is group-only either way;
+        // keeping source=all means clearing the group chip widens back to the
+        // exact unscoped view (all rows incl. wallet), per the spec.
+        ref.read(_analyticsFilterProvider.notifier).state =
+            const _AnalyticsFilter().copyWith(
+          groupId: widget.initialGroupId,
+        );
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -437,7 +465,7 @@ class _AnalyticsScreenState extends ConsumerState<AnalyticsScreen> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(
-          'analytics.title'.tr(),
+          widget.groupName ?? 'analytics.title'.tr(),
           style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16),
         ),
         backgroundColor: theme.colorScheme.surface,

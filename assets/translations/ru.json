@@ -240,6 +240,7 @@
     "expense_deleted": "Расход удалён",
     "download_report": "Скачать отчёт",
     "add_member": "Добавить участника",
+    "group_insights": "Аналитика группы",
     "group_name_hint": "Название группы",
     "settle_body": "Пометить \"{name}\" как рассчитавшуюся? Все долги будут обнулены.",
     "delete_group": "Удалить группу",

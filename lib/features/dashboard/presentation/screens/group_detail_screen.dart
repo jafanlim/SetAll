@@ -397,6 +397,10 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                 PopupMenuButton<String>(
                   icon: const Icon(Icons.more_vert),
                   onSelected: (value) {
+                    if (value == 'insights') {
+                      context.push(AppRouter.analytics,
+                          extra: {'groupId': groupId, 'groupName': groupName});
+                    }
                     if (value == 'rename') _renameGroup(context);
                     if (value == 'editGroup' && group != null) {
                       context.push('/group/$groupId/edit', extra: group);
@@ -407,6 +411,14 @@ class _GroupDetailScreenState extends ConsumerState<GroupDetailScreen> {
                     if (value == 'reopen') _reopenGroup();
                   },
                   itemBuilder: (_) => [
+                    PopupMenuItem(
+                      value: 'insights',
+                      child: Row(children: [
+                        const Icon(Icons.insights_outlined, size: 16, color: _teal),
+                        const SizedBox(width: 8),
+                        Text('groups_screen.group_insights'.tr()),
+                      ]),
+                    ),
                     PopupMenuItem(value: 'editGroup', child: Text('group_detail.edit_group'.tr())),
                     PopupMenuItem(value: 'rename', child: Text('group_detail.rename_group'.tr())),
                     PopupMenuItem(value: 'editExpenses', child: Text('group_detail.select_expenses'.tr())),
