@@ -17,6 +17,8 @@ const _green      = Color(0xFF22C55E);
 const _greenDim   = Color(0x1A22C55E);
 const _blue       = Color(0xFF3B82F6);
 const _blueDim    = Color(0x1A3B82F6);
+const _amber      = Color(0xFFF59E0B);
+const _amberDim   = Color(0x1AF59E0B);
 
 /// Step 0 of the two-step wallet entry flow.
 /// The user chooses between [ADD AN INCOME], [ADD AN EXPENSE], or [SCAN A BILL].
@@ -143,6 +145,25 @@ class WalletEntryTypeScreen extends ConsumerWidget {
                       defaultCurrency: baseCurrency,
                     ),
                   );
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              // ── Import Statement Card ────────────────────────────────────
+              // Routes to the multi-row bank-statement importer (CSV / text-PDF →
+              // auto-classify → editable per-row review → commit). Previously the
+              // ImportIngestScreen route existed but nothing navigated to it.
+              _EntryTypeCard(
+                icon: Icons.upload_file_rounded,
+                iconColor: _amber,
+                iconBg: _amberDim,
+                title: 'wallet_screen.import_statement'.tr(),
+                subtitle: 'wallet_screen.import_statement_subtitle'.tr(),
+                accentColor: _amber,
+                onTap: () {
+                  HapticUtils.primaryTap();
+                  context.push(AppRouter.walletImport);
                 },
               ),
 
