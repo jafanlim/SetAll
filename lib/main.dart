@@ -148,7 +148,7 @@ class _AppLoaderState extends State<_AppLoader> {
           // Implicit flow on web: email confirmation links work cross-device
           // because GoTrue returns tokens in #fragment (no client-side
           // PKCE verifier required). Mobile uses PKCE via _initSupabase().
-          await Supabase.initialize(url: AuthConfig.supabaseUrl, anonKey: AuthConfig.supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
+          await Supabase.initialize(url: AuthConfig.supabaseUrl, publishableKey: AuthConfig.supabaseAnonKey, authOptions: const FlutterAuthClientOptions(authFlowType: AuthFlowType.implicit));
           // Recover session when user lands from email confirmation or OAuth (e.g. on iPhone opening link).
           await _recoverSessionFromUrlIfNeeded();
         }
@@ -212,7 +212,7 @@ class _AppLoaderState extends State<_AppLoader> {
   Future<void> _initSupabase() async {
     await Supabase.initialize(
       url: AuthConfig.supabaseUrl,
-      anonKey: AuthConfig.supabaseAnonKey,
+      publishableKey: AuthConfig.supabaseAnonKey,
       authOptions: const FlutterAuthClientOptions(
         authFlowType: AuthFlowType.pkce,
       ),
