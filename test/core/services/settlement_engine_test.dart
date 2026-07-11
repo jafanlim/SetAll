@@ -428,6 +428,154 @@ void main() {
   });
 
   // ──────────────────────────────────────────────────────────────────────────
+  // Currency conversion (USD → base) — RED on current code
+  // ──────────────────────────────────────────────────────────────────────────
+  group('Currency conversion (USD → base)', () {
+    // Hermetic fixture: base GEL, USD→GEL = 2.50, 3 members A/B/C.
+    // All USD amounts are whole-number so conversion is exact.
+    //
+    // e1: A pays $100 (split A40/B30/C30)
+    // e2: B pays $60  (split A20/B20/C20)
+    //
+    // USD nets: A = +100−40−20 = +40, B = +60−30−20 = +10, C = −30−20 = −50
+    // Correct GEL: A = +100.00 GEL, B = +25.00 GEL, C = −125.00 GEL
+    // Greedy (GEL): C(−125) → A(+100) = 100, C(−25) → B(+25) = 25
+    //
+    // Current broken engine: nets in USD → C→A 40.00, C→B 10.00
+    // labeled GEL but actually USD — ~2.5× understated.
+
+    final gelExpenses = [
+      _expense(
+          id: 'e1', groupId: _g, payerId: 'A', amount: '100.00',
+          currency: 'USD', universalUsdAmount: '100.00'),
+      _expense(
+          id: 'e2', groupId: _g, payerId: 'B', amount: '60.00',
+          currency: 'USD', universalUsdAmount: '60.00'),
+    ];
+    final gelSplits = [
+      _split(id: 's1', expenseId: 'e1', userId: 'A', universalUsdOwed: '40.00'),
+      _split(id: 's2', expenseId: 'e1', userId: 'B', universalUsdOwed: '30.00'),
+      _split(id: 's3', expenseId: 'e1', userId: 'C', universalUsdOwed: '30.00'),
+      _split(id: 's4', expenseId: 'e2', userId: 'A', universalUsdOwed: '20.00'),
+      _split(id: 's5', expenseId: 'e2', userId: 'B', universalUsdOwed: '20.00'),
+      _split(id: 's6', expenseId: 'e2', userId: 'C', universalUsdOwed: '20.00'),
+    ];
+
+    /// Compute Σ(rows to member) − Σ(rows from member) from settlement txns.
+    Decimal netFor(String userId, List<SettlementTransaction> txns) {
+      var net = Decimal.zero;
+      for (final t in txns) {
+        if (t.toUserId == userId) net += t.amount;
+        if (t.fromUserId == userId) net -= t.amount;
+      }
+      return net;
+    }
+
+    test('GREEN: GEL settlement net for A is 100 (40 USD × 2.50)', () {
+      final result = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'GEL',
+        usdToBaseRate: Decimal.parse('2.50'),
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      // C→A 100.00, C→B 25.00. A's net = 100.00 GEL.
+      final aNet = netFor('A', result);
+      expect(aNet, Decimal.parse('100.00'));
+    });
+
+    test('GREEN: B net is 25 (10 USD × 2.50)', () {
+      final result = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'GEL',
+        usdToBaseRate: Decimal.parse('2.50'),
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      final bNet = netFor('B', result);
+      expect(bNet, Decimal.parse('25.00'));
+    });
+
+    test('GREEN: C net is −125 (−50 USD × 2.50)', () {
+      final result = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'GEL',
+        usdToBaseRate: Decimal.parse('2.50'),
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      final cNet = netFor('C', result);
+      expect(cNet, Decimal.parse('-125.00'));
+    });
+
+    test('per-row: each row amount = round(usd_net_segment × 2.50, 2)', () {
+      final result = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'GEL',
+        usdToBaseRate: Decimal.parse('2.50'),
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      // USD nets: C owes 50 → greedy: A gets 40 (→100 GEL), B gets 10 (→25 GEL).
+      final cToA = result.firstWhere((t) => t.fromUserId == 'C' && t.toUserId == 'A');
+      expect(cToA.amount, Decimal.parse('100.00'),
+          reason: '40 USD × 2.50 = 100.00 GEL');
+
+      final cToB = result.firstWhere((t) => t.fromUserId == 'C' && t.toUserId == 'B');
+      expect(cToB.amount, Decimal.parse('25.00'),
+          reason: '10 USD × 2.50 = 25.00 GEL');
+
+      // Currency label is base.
+      expect(cToA.currency, 'GEL');
+      expect(cToB.currency, 'GEL');
+    });
+
+    test('total settled == 125 GEL (50 USD × 2.50)', () {
+      final result = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'GEL',
+        usdToBaseRate: Decimal.parse('2.50'),
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      final total = result.fold<Decimal>(
+          Decimal.zero, (sum, t) => sum + t.amount);
+      expect(total, Decimal.parse('125.00'));
+    });
+
+    test('USD-invariance: base==USD, rate==1 produces same output', () {
+      // With usdToBaseRate == 1 (default), the engine must produce identical
+      // output to a call that omits the parameter entirely.
+      final withRate = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'USD',
+        usdToBaseRate: Decimal.one,
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+      final withoutRate = SettlementEngine.simplify(
+        groupId: _g,
+        currency: 'USD',
+        expenses: gelExpenses,
+        splits: gelSplits,
+      );
+
+      expect(withRate.length, withoutRate.length);
+      for (var i = 0; i < withRate.length; i++) {
+        expect(withRate[i].fromUserId, withoutRate[i].fromUserId);
+        expect(withRate[i].toUserId, withoutRate[i].toUserId);
+        expect(withRate[i].amount, withoutRate[i].amount);
+        expect(withRate[i].currency, withoutRate[i].currency);
+      }
+    });
+  });
+
+  // ──────────────────────────────────────────────────────────────────────────
   // Anti-vacuous guard
   // ──────────────────────────────────────────────────────────────────────────
   group('Anti-vacuous guard', () {

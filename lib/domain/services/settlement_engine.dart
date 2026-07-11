@@ -38,6 +38,9 @@ class SettlementEngine {
   ///
   /// [groupId]: scope filter — only expenses/splits for this group are used.
   /// [currency]: the display currency label for returned [SettlementTransaction]s.
+  /// [usdToBaseRate]: rate to convert USD net balances to [currency] (e.g.
+  ///   `getRate('USD', 'GEL')`).  Default [Decimal.one] preserves backward
+  ///   compatibility (USD base — no conversion).
   /// [expenses]: raw expense maps, each containing at minimum:
   ///   { id, group_id, payer_id, amount (string), currency (string),
   ///     universal_usd_amount (string|null) }
@@ -47,6 +50,7 @@ class SettlementEngine {
   static List<SettlementTransaction> simplify({
     required String groupId,
     required String currency,
+    Decimal? usdToBaseRate,
     required List<Map<String, dynamic>> expenses,
     required List<SplitModel> splits,
   }) {
@@ -63,10 +67,16 @@ class SettlementEngine {
 
     for (final expense in groupExpenses) {
       final payerId = expense['payer_id'] as String;
-      final baseStr = expense['universal_usd_amount']?.toString();
-      final baseAmount =
-          baseStr != null ? Decimal.tryParse(baseStr) : null;
-      final amount = baseAmount ?? _parseDecimal(expense['amount']);
+      final universalStr = expense['universal_usd_amount']?.toString();
+      final universalAmount = universalStr != null
+          ? Decimal.tryParse(universalStr)
+          : null;
+      // Fallback: only use raw `amount` when the expense is already in USD;
+      // otherwise we would mix group-currency payer vs USD splits (mixed-currency net).
+      final amount = universalAmount ??
+          (expense['currency'] == 'USD'
+              ? _parseDecimal(expense['amount'])
+              : Decimal.zero);
       netBalances[payerId] =
           (netBalances[payerId] ?? Decimal.zero) + amount;
     }
@@ -76,6 +86,17 @@ class SettlementEngine {
           Decimal.tryParse(split.universalUsdOwed) ?? Decimal.zero;
       netBalances[split.userId] =
           (netBalances[split.userId] ?? Decimal.zero) - owedAmount;
+    }
+
+    // Convert each member's USD net to the display (base) currency before
+    // splitting into creditors/debtors.  This mirrors balance_service's
+    // convert-then-net so the two reconcile.
+    final rate = usdToBaseRate ?? Decimal.one;
+    if (rate != Decimal.one) {
+      for (final entry in netBalances.entries.toList()) {
+        netBalances[entry.key] =
+            (entry.value * rate).round(scale: 2);
+      }
     }
 
     // Step 2: Separate into creditors (positive) and debtors (negative).
