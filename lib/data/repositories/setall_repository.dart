@@ -4299,6 +4299,11 @@ class SetAllRepository {
       return SettlementEngine.simplify(
         groupId: groupId,
         currency: baseCurrency,
+        usdToBaseRate: baseCurrency == 'USD'
+            ? Decimal.one
+            : (_currencyService != null
+                ? await _currencyService.getRate('USD', baseCurrency)
+                : Decimal.one),
         expenses: expenseRows,
         splits: splitModels,
       );
@@ -4323,6 +4328,11 @@ class SetAllRepository {
     return SettlementEngine.simplify(
       groupId: groupId,
       currency: baseCurrency,
+      usdToBaseRate: baseCurrency == 'USD'
+          ? Decimal.one
+          : (_currencyService != null
+              ? await _currencyService.getRate('USD', baseCurrency)
+              : Decimal.one),
       expenses: expenseRows,
       splits: splitModels,
     );
